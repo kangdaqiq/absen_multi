@@ -1,0 +1,7 @@
+{
+    "require": {
+        "phpoffice/phpspreadsheet": "^5.2",
+        "php-mqtt/client": "^2.3",
+        "seld/jsonlint": "^1.11"
+    }
+}

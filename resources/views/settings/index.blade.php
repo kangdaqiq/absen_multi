@@ -18,40 +18,71 @@
 
                         <div class="form-group">
                             <label>Nama Sekolah</label>
-                            <input type="text" name="nama_sekolah" class="form-control" 
+                            <input type="text" name="nama_sekolah" class="form-control"
                                 value="{{ $settings['nama_sekolah'] ?? 'SMK Assuniyah Tumijajar' }}">
                         </div>
 
                         <div class="form-group">
                             <label>Alamat Sekolah (Kop Surat)</label>
-                            <textarea name="alamat_sekolah" class="form-control" rows="3">{{ $settings['alamat_sekolah'] ?? '' }}</textarea>
+                            <textarea name="alamat_sekolah" class="form-control"
+                                rows="3">{{ $settings['alamat_sekolah'] ?? '' }}</textarea>
                         </div>
 
                         <div class="form-group">
                             <label>Kota / Lokasi Tanda Tangan (Laporan)</label>
-                            <input type="text" name="alamat_ttd" class="form-control" 
-                                value="{{ $settings['alamat_ttd'] ?? 'Jakarta' }}"
-                                placeholder="Contoh: Jakarta">
+                            <input type="text" name="alamat_ttd" class="form-control"
+                                value="{{ $settings['alamat_ttd'] ?? 'Jakarta' }}" placeholder="Contoh: Jakarta">
                         </div>
 
                         <div class="form-group">
                             <label>Toleransi Buka Absensi Pulang(menit)</label>
-                            <input type="number" name="checkout_tolerance_minutes" class="form-control" 
-                                value="{{ $settings['checkout_tolerance_minutes'] ?? '15' }}"
-                                min="0" max="60"
+                            <input type="number" name="checkout_tolerance_minutes" class="form-control"
+                                value="{{ $settings['checkout_tolerance_minutes'] ?? '15' }}" min="0" max="60"
                                 placeholder="15">
                             <small class="text-muted">Guru bisa buka absensi pulang x menit sebelum jam pulang</small>
                         </div>
 
                         <hr>
+                        <h6 class="font-weight-bold text-primary">Konfigurasi Jadwal Otomatis (Scheduler)</h6>
+
+                        <div class="form-group">
+                            <label>Proses Absensi Harian (Auto Bolos/Alpha)</label>
+                            <input type="time" name="schedule_process_daily" class="form-control"
+                                value="{{ $settings['schedule_process_daily'] ?? '13:30' }}">
+                            <small class="text-muted">Waktu sistem memproses siswa yang tidak hadir (Alpha) atau lupa
+                                checkout (Bolos)</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Laporan Harian (Pagi)</label>
+                            <input type="time" name="schedule_daily_report" class="form-control"
+                                value="{{ $settings['schedule_daily_report'] ?? '08:15' }}">
+                            <small class="text-muted">Waktu pengiriman rekap kehadiran ke grup guru & wali kelas</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Info Jadwal Guru</label>
+                            <input type="time" name="schedule_send_teacher_schedule" class="form-control"
+                                value="{{ $settings['schedule_send_teacher_schedule'] ?? '07:30' }}">
+                            <small class="text-muted">Waktu pengiriman jadwal mengajar ke guru ybs</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Backup Database</label>
+                            <input type="time" name="schedule_backup_db" class="form-control"
+                                value="{{ $settings['schedule_backup_db'] ?? '23:59' }}">
+                        </div>
+
+                        <hr>
                         <h6 class="font-weight-bold text-primary">Notifikasi WhatsApp</h6>
-                        
+
                         <div class="form-group">
                             <label>Target Jadwal Guru (Nomor WA)</label>
-                            <input type="text" name="report_target_jid" class="form-control" 
+                            <input type="text" name="report_target_jid" class="form-control"
                                 value="{{ $settings['report_target_jid'] ?? '' }}"
                                 placeholder="Contoh: 628123456789@s.whatsapp.net">
-                            <small class="text-muted">Khusus untuk jadwal guru jam 06:00. Format: 628xxx@s.whatsapp.net (Grup/Pribadi)</small>
+                            <small class="text-muted">Khusus untuk jadwal guru jam 06:00. Format: 628xxx@s.whatsapp.net
+                                (Grup/Pribadi)</small>
                         </div>
 
                         <button type="submit" class="btn btn-primary btn-block">
@@ -75,7 +106,8 @@
                         <li>Kop Surat / Laporan (Mendatang)</li>
                     </ul>
                     <div class="alert alert-info">
-                        <strong>Tips:</strong> Untuk mendapatkan ID Grup WhatsApp (`@g.us`), gunakan fitur "Get Group ID" pada tools WA Gateway Anda, atau gunakan nomor pribadi (`@s.whatsapp.net`).
+                        <strong>Tips:</strong> Untuk mendapatkan ID Grup WhatsApp (`@g.us`), gunakan fitur "Get Group ID"
+                        pada tools WA Gateway Anda, atau gunakan nomor pribadi (`@s.whatsapp.net`).
                     </div>
                 </div>
             </div>
@@ -94,7 +126,8 @@
                 </div>
                 <div class="card-body">
                     <div class="alert alert-warning">
-                        <i class="fas fa-info-circle"></i> Laporan absensi jam 08:30 dan 13:30 akan dikirim ke semua grup yang aktif di bawah ini.
+                        <i class="fas fa-info-circle"></i> Laporan absensi jam 08:30 dan 13:30 akan dikirim ke semua grup
+                        yang aktif di bawah ini.
                     </div>
                     <div class="table-responsive">
                         <table class="table table-bordered">
@@ -109,37 +142,42 @@
                             </thead>
                             <tbody>
                                 @forelse($reportGroups as $group)
-                                <tr>
-                                    <td>{{ $loop->iteration }}</td>
-                                    <td>{{ $group->name }}</td>
-                                    <td><code>{{ $group->jid }}</code></td>
-                                    <td>
-                                        @if($group->is_active)
-                                            <span class="badge badge-success">Aktif</span>
-                                        @else
-                                            <span class="badge badge-secondary">Nonaktif</span>
-                                        @endif
-                                    </td>
-                                    <td>
-                                        <form action="{{ route('settings.toggle-group', $group->id) }}" method="POST" class="d-inline">
-                                            @csrf
-                                            <button type="submit" class="btn btn-sm btn-{{ $group->is_active ? 'warning' : 'success' }}" title="{{ $group->is_active ? 'Nonaktifkan' : 'Aktifkan' }}">
-                                                <i class="fas fa-{{ $group->is_active ? 'toggle-on' : 'toggle-off' }}"></i>
-                                            </button>
-                                        </form>
-                                        <form action="{{ route('settings.delete-group', $group->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Hapus grup ini?')">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button type="submit" class="btn btn-sm btn-danger" title="Hapus">
-                                                <i class="fas fa-trash"></i>
-                                            </button>
-                                        </form>
-                                    </td>
-                                </tr>
+                                    <tr>
+                                        <td>{{ $loop->iteration }}</td>
+                                        <td>{{ $group->name }}</td>
+                                        <td><code>{{ $group->jid }}</code></td>
+                                        <td>
+                                            @if($group->is_active)
+                                                <span class="badge badge-success">Aktif</span>
+                                            @else
+                                                <span class="badge badge-secondary">Nonaktif</span>
+                                            @endif
+                                        </td>
+                                        <td>
+                                            <form action="{{ route('settings.toggle-group', $group->id) }}" method="POST"
+                                                class="d-inline">
+                                                @csrf
+                                                <button type="submit"
+                                                    class="btn btn-sm btn-{{ $group->is_active ? 'warning' : 'success' }}"
+                                                    title="{{ $group->is_active ? 'Nonaktifkan' : 'Aktifkan' }}">
+                                                    <i class="fas fa-{{ $group->is_active ? 'toggle-on' : 'toggle-off' }}"></i>
+                                                </button>
+                                            </form>
+                                            <form action="{{ route('settings.delete-group', $group->id) }}" method="POST"
+                                                class="d-inline" onsubmit="return confirm('Hapus grup ini?')">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="btn btn-sm btn-danger" title="Hapus">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </form>
+                                        </td>
+                                    </tr>
                                 @empty
-                                <tr>
-                                    <td colspan="5" class="text-center text-muted">Belum ada grup terdaftar. Klik "Tambah Grup" untuk menambahkan.</td>
-                                </tr>
+                                    <tr>
+                                        <td colspan="5" class="text-center text-muted">Belum ada grup terdaftar. Klik "Tambah
+                                            Grup" untuk menambahkan.</td>
+                                    </tr>
                                 @endforelse
                             </tbody>
                         </table>
@@ -166,8 +204,10 @@
                         </div>
                         <div class="form-group">
                             <label>JID WhatsApp</label>
-                            <input type="text" name="jid" class="form-control" placeholder="Contoh: 120363XXXXX@g.us" required>
-                            <small class="text-muted">Format grup: 120363XXXXX@g.us atau pribadi: 628XXX@s.whatsapp.net</small>
+                            <input type="text" name="jid" class="form-control" placeholder="Contoh: 120363XXXXX@g.us"
+                                required>
+                            <small class="text-muted">Format grup: 120363XXXXX@g.us atau pribadi:
+                                628XXX@s.whatsapp.net</small>
                         </div>
                     </div>
                     <div class="modal-footer">

@@ -274,10 +274,15 @@ class RfidController extends Controller
     private function handleScan($uid, $apiKey)
     {
         try {
-            $siswa = Siswa::where('uid_rfid', $uid)->first();
+            $siswa = Siswa::with('kelas')->where('uid_rfid', $uid)->first();
             if (!$siswa) {
                 $this->logRequest($apiKey, 'unknown_card', $uid, false, 'Kartu tidak terdaftar');
                 return $this->response(false, 'unknown', 'Kartu belum terdaftar', 'error', ['type' => 'unknown_card', 'uid' => $uid]);
+            }
+
+            // CHECK: Is Class Attendance Active?
+            if ($siswa->kelas && !$siswa->kelas->is_active_attendance) {
+                return $this->response(false, 'gagal', 'Absensi dimatikan untuk kelas ini.', 'error', ['type' => 'class_disabled']);
             }
 
             // Jadwal

@@ -70,6 +70,14 @@
                         <span>Data Guru</span>
                     </a>
                 </li>
+
+                <!-- Broadcast WA -->
+                <li class="nav-item {{ request()->routeIs('broadcast.*') ? 'active' : '' }}">
+                    <a class="nav-link" href="{{ route('broadcast.index') }}">
+                        <i class="fab fa-whatsapp"></i>
+                        <span>Broadcast WA</span>
+                    </a>
+                </li>
             @endif
 
             <!-- Absensi Collapse -->

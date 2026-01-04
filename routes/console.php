@@ -20,8 +20,12 @@ $getTime = function ($key, $default) {
 };
 
 Schedule::command('db:backup')->dailyAt($getTime('schedule_backup_db', '23:59'));
-Schedule::command('absen:process-daily')->dailyAt($getTime('schedule_process_daily', '13:30'));
+Schedule::command('absen:process-daily')
+    ->dailyAt($getTime('schedule_process_daily', '13:30'))
+    ->days([1, 2, 3, 4, 5, 6]); // Mon-Sat
 
 Schedule::command('wa:process')->everyMinute();
 Schedule::command('schedule:send-teacher-schedule')->dailyAt($getTime('schedule_send_teacher_schedule', '07:30'));
-Schedule::command('absen:daily-report')->dailyAt($getTime('schedule_daily_report', '08:15'));
+Schedule::command('absen:daily-report')
+    ->dailyAt($getTime('schedule_daily_report', '08:15'))
+    ->days([1, 2, 3, 4, 5, 6]); // Mon-Sat

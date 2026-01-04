@@ -8,6 +8,8 @@ use App\Models\Attendance;
 use App\Models\MessageQueue;
 use App\Models\Setting;
 use App\Models\ReportGroup;
+use App\Models\HariLibur;
+use Carbon\Carbon;
 
 class DailyReportCommand extends Command
 {
@@ -32,6 +34,18 @@ class DailyReportCommand extends Command
         }
 
         $today = now()->format('Y-m-d');
+
+        // CHECK 1: Sunday
+        if (now()->isSunday()) {
+            $this->info("Today is Sunday. Report Skipped.");
+            return;
+        }
+
+        // CHECK 2: Holiday (Hari Libur)
+        if (HariLibur::where('tanggal', $today)->exists()) {
+            $this->info("Today is Holiday ($today). Report Skipped.");
+            return;
+        }
 
         // Debounce check
         $lastRun = Setting::where('setting_key', 'last_daily_report_date')->value('setting_value');

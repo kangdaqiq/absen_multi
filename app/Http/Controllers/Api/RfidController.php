@@ -24,7 +24,7 @@ class RfidController extends Controller
     const SCAN_COOLDOWN_SECONDS = 0;
 
     protected $wa;
-    
+
     // Logging context
     private $currentApiKey = null;
     private $currentUid = null;
@@ -55,7 +55,7 @@ class RfidController extends Controller
 
             // CHECK ATTENDANCE SCHEDULE REMOVED (Gate Only)
             // $attnResult = $this->attendanceService->handleAttendance($teacher);
-            
+
             $message = 'Guru authorized. Siswa dapat absen pulang.';
             $extra = [
                 'type' => 'teacher_authorization',
@@ -64,8 +64,8 @@ class RfidController extends Controller
             ];
 
             // Attendance info removed from response
-            
-            $this-> logRequest($apiKey, 'teacher_auth', $uid, true, 'Teacher authorized (Gate): ' . $teacher->nama);
+
+            $this->logRequest($apiKey, 'teacher_auth', $uid, true, 'Teacher authorized (Gate): ' . $teacher->nama);
             return $this->response(true, 'success', $message, 'ok', $extra);
         } catch (\Exception $e) {
             Log::error("Teacher scan error: " . $e->getMessage());
@@ -77,11 +77,11 @@ class RfidController extends Controller
     {
         $apiKey = trim($request->input('api_key', ''));
         $this->currentApiKey = $apiKey;
-        
+
         // 1. Auth API Key
         $device = $this->authenticate($apiKey);
         if (!$device) {
-            return $this->response(false, 'gagal', 'API key tidak valid', 'error'); 
+            return $this->response(false, 'gagal', 'API key tidak valid', 'error');
         }
 
         // 2. Input Validation
@@ -120,7 +120,8 @@ class RfidController extends Controller
 
     private function authenticate($apiKey)
     {
-        if (empty($apiKey)) return null;
+        if (empty($apiKey))
+            return null;
 
         $device = Device::where('api_key', $apiKey)->where('active', true)->first();
         if (!$device) {
@@ -135,7 +136,7 @@ class RfidController extends Controller
         $count = ApiLog::where('api_key', $apiKey)
             ->where('created_at', '>', now()->subMinute())
             ->count();
-        
+
         if ($count > self::MAX_REQUESTS_PER_MINUTE) {
             $this->logRequest($apiKey, 'rate_limit', '', false, 'Rate limit exceeded');
             $this->response(false, 'gagal', 'Terlalu banyak request. Tunggu sebentar.', 'error')->send();
@@ -148,7 +149,7 @@ class RfidController extends Controller
     private function validateUID($uid)
     {
         if (!preg_match('/^[A-F0-9]{8,20}$/i', $uid)) {
-            $this->response(false, 'gagal', 'Format UID tidak valid', 'error')->send();
+            $this->response(false, 'gagal', 'Format UID tidak valid', 'error', ['type' => 'invalid_uid'])->send();
             exit;
         }
         return strtoupper($uid);
@@ -162,7 +163,7 @@ class RfidController extends Controller
                 ->first();
 
             if ($lastScan) {
-                return $this->response(false, 'gagal', 'Tunggu sebentar...', 'warning');
+                return $this->response(false, 'gagal', 'Tunggu sebentar...', 'warning', ['type' => 'scan_cooldown']);
             }
         }
 
@@ -181,7 +182,7 @@ class RfidController extends Controller
         $siswa = Siswa::where('enroll_status', 'requested')
             ->where('updated_at', '>=', now()->subHour())
             ->exists();
-            
+
         $guru = Guru::where('enroll_status', 'requested')
             ->where('updated_at', '>=', now()->subHour())
             ->exists();
@@ -229,7 +230,7 @@ class RfidController extends Controller
                     'uid' => $uid
                 ]);
             }
-            
+
             // 2. Check Guru Request
             $guru = Guru::where('enroll_status', 'requested')
                 ->where('updated_at', '>=', now()->subHour())
@@ -261,7 +262,7 @@ class RfidController extends Controller
 
             // Neither found (expired race condition?)
             DB::rollBack();
-            return $this->response(false, 'gagal', 'Tidak ada permintaan enroll', 'warning');
+            return $this->response(false, 'gagal', 'Tidak ada permintaan enroll', 'warning', ['type' => 'enroll_request_not_found']);
 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -276,15 +277,15 @@ class RfidController extends Controller
             $siswa = Siswa::where('uid_rfid', $uid)->first();
             if (!$siswa) {
                 $this->logRequest($apiKey, 'unknown_card', $uid, false, 'Kartu tidak terdaftar');
-                return $this->response(false, 'unknown', 'Kartu belum terdaftar', 'error', ['type'=>'unknown_card', 'uid'=>$uid]);
+                return $this->response(false, 'unknown', 'Kartu belum terdaftar', 'error', ['type' => 'unknown_card', 'uid' => $uid]);
             }
 
             // Jadwal
             $indexHari = date('N'); // 1 (Mon) - 7 (Sun) 
-            
+
             $jadwal = Jadwal::where('index_hari', $indexHari)->where('is_active', 1)->first();
             if (!$jadwal) {
-                 return $this->response(false, 'gagal', 'Jadwal Kosong', 'warning');
+                return $this->response(false, 'gagal', 'Jadwal Kosong', 'warning', ['type' => 'schedule_empty']);
             }
 
             $now = now();
@@ -295,9 +296,9 @@ class RfidController extends Controller
             $batasTelat = $jamMasuk->copy()->addMinutes($toleransi);
             $awalAbsenMasuk = $jamMasuk->copy()->subHour();
             $akhirAbsenMasuk = $jamMasuk->copy()->addHours(2);
-            
+
             DB::beginTransaction();
-            
+
             $att = Attendance::where('student_id', $siswa->id)
                 ->where('tanggal', $now->format('Y-m-d'))
                 ->lockForUpdate()
@@ -306,7 +307,7 @@ class RfidController extends Controller
             // Case 1: Lengkap
             if ($att && $att->jam_pulang) {
                 DB::rollBack();
-                return $this->response(true, 'success', 'Absen Lengkap', 'ok', ['type'=>'sudah_lengkap', 'nama'=>$siswa->nama]);
+                return $this->response(true, 'success', 'Absen Lengkap', 'ok', ['type' => 'sudah_lengkap', 'nama' => $siswa->nama]);
             }
 
             // Case 2: Sudah Masuk, Belum Pulang
@@ -317,12 +318,12 @@ class RfidController extends Controller
                 // If still in check-in window and no teacher session, warn
                 if (!$teacherSession && $now->between($awalAbsenMasuk, $akhirAbsenMasuk)) {
                     DB::rollBack();
-                    return $this->response(true, 'success', 'Sudah Absen Masuk', 'ok', ['type'=>'sudah_absen_masuk', 'nama'=>$siswa->nama]);
+                    return $this->response(true, 'success', 'Sudah Absen Masuk', 'ok', ['type' => 'sudah_absen_masuk', 'nama' => $siswa->nama]);
                 }
 
                 if (!$teacherSession) {
                     DB::rollBack();
-                    return $this->response(false, 'gagal', 'Belum ada izin guru.', 'warning', ['type'=>'no_authorization', 'nama'=>$siswa->nama]);
+                    return $this->response(false, 'gagal', 'Belum ada izin guru.', 'warning', ['type' => 'no_authorization', 'nama' => $siswa->nama]);
                 }
 
                 // Pulang
@@ -330,7 +331,7 @@ class RfidController extends Controller
                 $totalSeconds = $now->diffInSeconds($masuk); // diff is absolute, ensures positive
                 // Ensure correct order? diffInSeconds is absolute.
                 // We want now - masuk.
-                
+
                 $att->update([
                     'jam_pulang' => $now->toTimeString(),
                     'total_seconds' => $totalSeconds,
@@ -345,9 +346,9 @@ class RfidController extends Controller
 
                 $this->logRequest($apiKey, 'checkout_success', $uid, true, 'Pulang: ' . $siswa->nama);
                 return $this->response(true, 'success', 'Absen pulang berhasil', 'ok', [
-                    'type'=>'absen_pulang', 
-                    'nama'=>$siswa->nama,
-                    'authorized_by'=>$teacherSession->teacher_name
+                    'type' => 'absen_pulang',
+                    'nama' => $siswa->nama,
+                    'authorized_by' => $teacherSession->teacher_name
                 ]);
             }
 
@@ -355,11 +356,11 @@ class RfidController extends Controller
             if (!$att) {
                 if ($now->lt($awalAbsenMasuk)) {
                     DB::rollBack();
-                    return $this->response(false, 'gagal', 'Absen Tutup (Terlalu Pagi)', 'warning', ['type'=>'too_early']);
+                    return $this->response(false, 'gagal', 'Absen Tutup (Terlalu Pagi)', 'warning', ['type' => 'too_early']);
                 }
                 if ($now->gt($akhirAbsenMasuk)) {
                     DB::rollBack();
-                    return $this->response(false, 'gagal', 'Absen Masuk Ditutup', 'warning', ['type'=>'checkin_closed']);
+                    return $this->response(false, 'gagal', 'Absen Masuk Ditutup', 'warning', ['type' => 'checkin_closed']);
                 }
 
                 $status = 'H';
@@ -403,9 +404,9 @@ class RfidController extends Controller
 
                 $this->logRequest($apiKey, 'checkin_success', $uid, true, 'Masuk: ' . $siswa->nama);
                 return $this->response(true, 'success', 'Absen masuk berhasil', 'ok', [
-                    'type'=>'absen_masuk', 
-                    'nama'=>$siswa->nama,
-                    'attendance_status'=>$status
+                    'type' => 'absen_masuk',
+                    'nama' => $siswa->nama,
+                    'attendance_status' => $status
                 ]);
             }
 
@@ -439,13 +440,13 @@ class RfidController extends Controller
     private function logRequest($apiKey, $action, $uid, $success, $message)
     {
         $this->hasLogged = true;
-        
+
         ApiLog::create([
             'api_key' => $apiKey,
             'action' => $action,
             'uid' => $uid,
             'success' => $success,
-            'message' => $message,
+            'message' => substr($message, 0, 500),
             'ip_address' => request()->ip(),
             'user_agent' => request()->userAgent(),
             'created_at' => now()
@@ -456,22 +457,25 @@ class RfidController extends Controller
     {
         $phone = $this->formatWhatsApp($phone);
         if ($phone) {
-             MessageQueue::create([
-                 'phone_number' => $phone,
-                 'message' => $message,
-                 'status' => 'pending',
-                 'created_at' => now()
-             ]);
+            MessageQueue::create([
+                'phone_number' => $phone,
+                'message' => $message,
+                'status' => 'pending',
+                'created_at' => now()
+            ]);
         }
     }
 
     private function formatWhatsApp($phone)
     {
         $phone = preg_replace('/[^0-9]/', '', $phone);
-        if (empty($phone)) return null;
-        if (substr($phone, 0, 1) === '0') $phone = '62' . substr($phone, 1);
-        elseif (substr($phone, 0, 2) !== '62') $phone = '62' . $phone;
-        
+        if (empty($phone))
+            return null;
+        if (substr($phone, 0, 1) === '0')
+            $phone = '62' . substr($phone, 1);
+        elseif (substr($phone, 0, 2) !== '62')
+            $phone = '62' . $phone;
+
         return $phone . '@s.whatsapp.net';
     }
 }

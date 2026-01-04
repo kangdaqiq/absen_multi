@@ -15,7 +15,7 @@ class ProcessWhatsappQueue extends Command
     public function handle()
     {
         $limit = $this->option('limit');
-        
+
         $messages = MessageQueue::where('status', 'pending')
             ->orderBy('created_at', 'asc')
             ->limit($limit)
@@ -30,16 +30,19 @@ class ProcessWhatsappQueue extends Command
 
         foreach ($messages as $msg) {
             $msg->update(['status' => 'processing']);
-            
+
             $success = $this->sendMessage($msg->phone_number, $msg->message);
-            
+
             $msg->update([
                 'status' => $success ? 'sent' : 'failed',
                 'updated_at' => now(),
                 'last_error' => $success ? null : 'API Request Failed'
             ]);
-            
+
             $this->info("Message ID {$msg->id} -> " . ($success ? 'SENT' : 'FAILED'));
+
+            // Delay to prevent WA Ban
+            sleep(2);
         }
     }
 
@@ -62,7 +65,7 @@ class ProcessWhatsappQueue extends Command
                 $body = $response->json();
                 return isset($body['code']) && $body['code'] === 'SUCCESS';
             }
-            
+
             Log::error("WA API Error: " . $response->body());
             return false;
         } catch (\Exception $e) {

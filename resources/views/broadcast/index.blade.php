@@ -73,7 +73,7 @@
     </div>
 @endsection
 
-@section('scripts')
+@push('scripts')
     <script>
         document.getElementById('checkAll').addEventListener('change', function () {
             var checkboxes = document.querySelectorAll('.class-checkbox');
@@ -90,4 +90,4 @@
             });
         });
     </script>
-@endsection
+@endpush

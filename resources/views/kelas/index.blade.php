@@ -60,7 +60,7 @@
                                 </td>
                                 <td>
                                     @if(!$k->is_active_attendance)
-                                        <span class="badge badge-secondary">Auto Nonaktif</span>
+                                        <span class="badge badge-secondary">Nonaktif</span>
                                     @else
                                         <form action="{{ route('kelas.toggle-report', $k->id) }}" method="POST">
                                             @csrf

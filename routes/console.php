@@ -29,3 +29,15 @@ Schedule::command('schedule:send-teacher-schedule')->dailyAt($getTime('schedule_
 Schedule::command('absen:daily-report')
     ->dailyAt($getTime('schedule_daily_report', '08:15'))
     ->days([1, 2, 3, 4, 5, 6]); // Mon-Sat
+
+// Weekly Absence Summary - Every Monday at 08:00
+Schedule::command('absen:weekly-absence-summary')
+    ->weeklyOn(1, '08:00')
+    ->when(function () {
+        try {
+            return \App\Models\Setting::where('setting_key', 'absence_notification_enabled')
+                ->value('setting_value') !== 'false';
+        } catch (\Exception $e) {
+            return true; // Default enabled
+        }
+    });

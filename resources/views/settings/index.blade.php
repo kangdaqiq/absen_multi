@@ -85,6 +85,35 @@
                                 (Grup/Pribadi)</small>
                         </div>
 
+                        <hr>
+                        <h6 class="font-weight-bold text-primary">Deteksi Ketidakhadiran Berlebihan</h6>
+
+                        <div class="form-group">
+                            <label>Threshold Ketidakhadiran (hari)</label>
+                            <input type="number" name="absence_threshold_days" class="form-control"
+                                value="{{ $settings['absence_threshold_days'] ?? '3' }}" min="1" max="30">
+                            <small class="text-muted">Jumlah hari Alpha/Bolos yang dianggap berlebihan</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Periode Pengecekan (hari)</label>
+                            <input type="number" name="absence_check_period_days" class="form-control"
+                                value="{{ $settings['absence_check_period_days'] ?? '7' }}" min="1" max="30">
+                            <small class="text-muted">Periode pengecekan dalam hari (default: 7 hari terakhir)</small>
+                        </div>
+
+                        <div class="form-group">
+                            <div class="custom-control custom-switch">
+                                <input type="checkbox" class="custom-control-input" id="absence_notification_enabled" 
+                                    name="absence_notification_enabled" value="true"
+                                    {{ ($settings['absence_notification_enabled'] ?? 'true') === 'true' ? 'checked' : '' }}>
+                                <label class="custom-control-label" for="absence_notification_enabled">
+                                    Aktifkan Notifikasi Mingguan
+                                </label>
+                            </div>
+                            <small class="text-muted">Laporan dikirim setiap Senin jam 08:00 ke wali kelas dan orang tua</small>
+                        </div>
+
                         <button type="submit" class="btn btn-primary btn-block">
                             <i class="fas fa-save"></i> Simpan Pengaturan
                         </button>
@@ -103,11 +132,15 @@
                     <p>Pengaturan ini digunakan untuk:</p>
                     <ul>
                         <li>Fitur Laporan Harian (Scheduler)</li>
+                        <li>Deteksi Ketidakhadiran Berlebihan (Mingguan)</li>
                         <li>Kop Surat / Laporan (Mendatang)</li>
                     </ul>
                     <div class="alert alert-info">
                         <strong>Tips:</strong> Untuk mendapatkan ID Grup WhatsApp (`@g.us`), gunakan fitur "Get Group ID"
                         pada tools WA Gateway Anda, atau gunakan nomor pribadi (`@s.whatsapp.net`).
+                    </div>
+                    <div class="alert alert-warning">
+                        <strong>Laporan Mingguan:</strong> Sistem akan mengirim laporan siswa dengan ketidakhadiran berlebihan setiap Senin jam 08:00 ke wali kelas dan orang tua siswa.
                     </div>
                 </div>
             </div>

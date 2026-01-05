@@ -43,34 +43,24 @@
                                 <td>{{ $g->uid_rfid }}</td>
                                 <td>{{ $g->id_finger }}</td>
                                 <td>
-                                    <button class="btn btn-sm btn-info btnEnroll"
-                                        data-id="{{ $g->id }}"
-                                        data-nama="{{ $g->nama }}"
-                                        data-uid="{{ $g->uid_rfid }}"
-                                        data-toggle="modal" data-target="#modalEnrollRFID">
+                                    <button class="btn btn-sm btn-info btnEnroll" data-id="{{ $g->id }}"
+                                        data-nama="{{ $g->nama }}" data-uid="{{ $g->uid_rfid }}" data-toggle="modal"
+                                        data-target="#modalEnrollRFID">
                                         <i class="fas fa-rss"></i>
                                     </button>
-                                    <button class="btn btn-sm btn-warning btnEdit"
-                                        data-id="{{ $g->id }}"
-                                        data-nama="{{ $g->nama }}"
-                                        data-nip="{{ $g->nip }}"
-                                        data-wa="{{ $g->no_wa }}"
-                                        data-rfid="{{ $g->uid_rfid }}"
-                                        data-toggle="modal" data-target="#modalEditGuru">
+                                    <button class="btn btn-sm btn-warning btnEdit" data-id="{{ $g->id }}"
+                                        data-nama="{{ $g->nama }}" data-nip="{{ $g->nip }}" data-wa="{{ $g->no_wa }}"
+                                        data-rfid="{{ $g->uid_rfid }}" data-toggle="modal" data-target="#modalEditGuru">
                                         <i class="fas fa-edit"></i>
                                     </button>
-                                    <button class="btn btn-sm btn-dark btnFinger"
-                                        data-id="{{ $g->id }}"
-                                        data-nama="{{ $g->nama }}"
-                                        data-finger="{{ $g->id_finger }}"
-                                        data-toggle="modal" data-target="#modalEnrollFinger">
+                                    <button class="btn btn-sm btn-dark btnFinger" data-id="{{ $g->id }}"
+                                        data-nama="{{ $g->nama }}" data-finger="{{ $g->id_finger }}" data-toggle="modal"
+                                        data-target="#modalEnrollFinger">
                                         <i class="fas fa-fingerprint"></i>
                                     </button>
 
-                                    <button class="btn btn-sm btn-danger btnHapus"
-                                        data-id="{{ $g->id }}"
-                                        data-nama="{{ $g->nama }}"
-                                        data-toggle="modal" data-target="#modalHapusGuru">
+                                    <button class="btn btn-sm btn-danger btnHapus" data-id="{{ $g->id }}"
+                                        data-nama="{{ $g->nama }}" data-toggle="modal" data-target="#modalHapusGuru">
                                         <i class="fas fa-trash"></i>
                                     </button>
                                 </td>
@@ -166,14 +156,16 @@
                     </div>
                     <div class="modal-body">
                         <div class="alert alert-info">
-                            <i class="fas fa-info-circle"></i> Gunakan file Excel (.xlsx) dengan format kolom: <strong>Nama, NIP, No WA</strong>.
+                            <i class="fas fa-info-circle"></i> Gunakan file Excel (.xlsx) dengan format kolom: <strong>Nama,
+                                NIP, No WA</strong>.
                         </div>
                         <div class="form-group">
                             <label>Pilih File Excel</label>
                             <input type="file" name="fileExcel" class="form-control-file" required>
                         </div>
                         <div class="mt-2">
-                             <a href="{{ route('guru.template') }}" class="small font-weight-bold"><i class="fas fa-download"></i> Download Template</a>
+                            <a href="{{ route('guru.template') }}" class="small font-weight-bold"><i
+                                    class="fas fa-download"></i> Download Template</a>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -217,7 +209,7 @@
                 </div>
                 <div class="modal-body text-center">
                     <h5 id="enroll_nama" class="font-weight-bold mb-3"></h5>
-                    
+
                     <div id="uid_wrapper" class="d-none mb-3">
                         <div class="alert alert-success">
                             UID Terdaftar: <strong id="enroll_uid" class="h4"></strong>
@@ -261,7 +253,7 @@
                             @endforeach
                         </select>
                     </div>
-                    
+
                     <div id="finger_wrapper" class="d-none mb-3">
                         <div class="alert alert-success">
                             ID Finger Terdaftar: <strong id="enroll_finger_id" class="h4"></strong>
@@ -286,241 +278,241 @@
 @endsection
 
 @push('scripts')
-<script>
-    $(document).ready(function() {
-        $('#dataTable').DataTable();
+    <script>
+        $(document).ready(function () {
+            $('#dataTable').DataTable();
 
-        // EDIT LOGIC
-        $('#dataTable').on('click', '.btnEdit', function() {
-            var id = $(this).data('id');
-            var nama = $(this).data('nama');
-            var nip = $(this).data('nip');
-            var wa = $(this).data('wa');
-            var rfid = $(this).data('rfid');
-            
-            $('#edit_nama').val(nama);
-            $('#edit_nip').val(nip);
-            $('#edit_wa').val(wa);
-            $('#edit_rfid').val(rfid);
-            
-            $('#formEditGuru').attr('action', '{{ url('guru') }}/' + id);
-        });
+            // EDIT LOGIC
+            $('#dataTable').on('click', '.btnEdit', function () {
+                var id = $(this).data('id');
+                var nama = $(this).data('nama');
+                var nip = $(this).data('nip');
+                var wa = $(this).data('wa');
+                var rfid = $(this).data('rfid');
 
-        // HAPUS LOGIC
-        $('#dataTable').on('click', '.btnHapus', function() {
-            var id = $(this).data('id');
-            var nama = $(this).data('nama');
-            $('#hapus_nama').text(nama);
-            $('#formHapusGuru').attr('action', '{{ url('guru') }}/' + id);
-        });
+                $('#edit_nama').val(nama);
+                $('#edit_nip').val(nip);
+                $('#edit_wa').val(wa);
+                $('#edit_rfid').val(rfid);
 
-        // ==========================
-        //  ENROLL LOGIC GURU
-        // ==========================
-        let enrollGuruId = null;
-        let enrollInterval = null;
+                $('#formEditGuru').attr('action', '{{ secure_url('guru') }}/' + id);
+            });
 
-        $('#dataTable').on('click', '.btnEnroll', function() {
-            enrollGuruId = $(this).data('id');
-            $('#enroll_nama').text($(this).data('nama'));
-            
-            // Reset UI
-            $('#enroll_status').html('');
-            $('#uid_wrapper').addClass('d-none');
-            $('#enroll_uid').text('');
-            $('#btnHapusUID').prop('disabled', true);
-            
-            // Check existing UID
-            var uid = $(this).data('uid');
-            if (uid) {
-                $('#enroll_uid').text(uid);
-                $('#uid_wrapper').removeClass('d-none');
-                $('#btnHapusUID').prop('disabled', false);
-            }
-        });
+            // HAPUS LOGIC
+            $('#dataTable').on('click', '.btnHapus', function () {
+                var id = $(this).data('id');
+                var nama = $(this).data('nama');
+                $('#hapus_nama').text(nama);
+                $('#formHapusGuru').attr('action', '{{ secure_url('guru') }}/' + id);
+            });
 
-        $('#btnMulaiEnroll').on('click', function() {
-            if (!enrollGuruId) return;
+            // ==========================
+            //  ENROLL LOGIC GURU
+            // ==========================
+            let enrollGuruId = null;
+            let enrollInterval = null;
 
-            $('#enroll_status').html('<div class="spinner-border text-primary" role="status"></div><br><span class="text-info blink">Silakan tempelkan kartu RFID...</span>');
-            
-            // Request Enroll
-            $.post('{{ url('guru') }}/' + enrollGuruId + '/enroll', {
-                _token: '{{ csrf_token() }}'
-            }, function(res) {
-                if (res.ok) {
-                    startEnrollPolling(enrollGuruId);
-                } else {
-                    $('#enroll_status').html('<span class="text-danger">Gagal request enrollment.</span>');
+            $('#dataTable').on('click', '.btnEnroll', function () {
+                enrollGuruId = $(this).data('id');
+                $('#enroll_nama').text($(this).data('nama'));
+
+                // Reset UI
+                $('#enroll_status').html('');
+                $('#uid_wrapper').addClass('d-none');
+                $('#enroll_uid').text('');
+                $('#btnHapusUID').prop('disabled', true);
+
+                // Check existing UID
+                var uid = $(this).data('uid');
+                if (uid) {
+                    $('#enroll_uid').text(uid);
+                    $('#uid_wrapper').removeClass('d-none');
+                    $('#btnHapusUID').prop('disabled', false);
                 }
             });
-        });
 
-        function startEnrollPolling(id) {
-            if (enrollInterval) clearInterval(enrollInterval);
-            let counter = 0;
-            
-            enrollInterval = setInterval(function() {
-                counter++;
-                if (counter > 20) { // 30 sec timeout
-                    clearInterval(enrollInterval);
-                    $('#enroll_status').html('<span class="text-warning">Waktu habis. Coba lagi.</span>');
-                    return;
-                }
+            $('#btnMulaiEnroll').on('click', function () {
+                if (!enrollGuruId) return;
 
-                $.get('{{ url('guru') }}/' + id + '/enroll-check', function(res) {
-                    if (res.ok && res.uid) {
+                $('#enroll_status').html('<div class="spinner-border text-primary" role="status"></div><br><span class="text-info blink">Silakan tempelkan kartu RFID...</span>');
+
+                // Request Enroll
+                $.post('{{ secure_url('guru') }}/' + enrollGuruId + '/enroll', {
+                    _token: '{{ csrf_token() }}'
+                }, function (res) {
+                    if (res.ok) {
+                        startEnrollPolling(enrollGuruId);
+                    } else {
+                        $('#enroll_status').html('<span class="text-danger">Gagal request enrollment.</span>');
+                    }
+                });
+            });
+
+            function startEnrollPolling(id) {
+                if (enrollInterval) clearInterval(enrollInterval);
+                let counter = 0;
+
+                enrollInterval = setInterval(function () {
+                    counter++;
+                    if (counter > 20) { // 30 sec timeout
                         clearInterval(enrollInterval);
-                        $('#enroll_uid').text(res.uid);
-                        $('#uid_wrapper').removeClass('d-none');
-                        $('#btnHapusUID').prop('disabled', false);
-                        $('#enroll_status').html('<span class="text-success font-weight-bold"><i class="fas fa-check-circle"></i> Berhasil! Refresh halaman untuk update tabel.</span>');
-                        
-                        setTimeout(function(){ location.reload(); }, 1500);
+                        $('#enroll_status').html('<span class="text-warning">Waktu habis. Coba lagi.</span>');
+                        return;
+                    }
+
+                    $.get('{{ secure_url('guru') }}/' + id + '/enroll-check', function (res) {
+                        if (res.ok && res.uid) {
+                            clearInterval(enrollInterval);
+                            $('#enroll_uid').text(res.uid);
+                            $('#uid_wrapper').removeClass('d-none');
+                            $('#btnHapusUID').prop('disabled', false);
+                            $('#enroll_status').html('<span class="text-success font-weight-bold"><i class="fas fa-check-circle"></i> Berhasil! Refresh halaman untuk update tabel.</span>');
+
+                            setTimeout(function () { location.reload(); }, 1500);
+                        }
+                    });
+                }, 1500);
+            }
+
+            $('#btnHapusUID').on('click', function () {
+                if (!enrollGuruId) return;
+                if (!confirm('Hapus UID RFID guru ini?')) return;
+
+                $.post('{{ secure_url('guru') }}/' + enrollGuruId + '/delete-uid', {
+                    _token: '{{ csrf_token() }}'
+                }, function (res) {
+                    if (res.ok) {
+                        $('#uid_wrapper').addClass('d-none');
+                        $('#enroll_uid').text('');
+                        $('#btnHapusUID').prop('disabled', true);
+                        $('#enroll_status').html('<span class="text-warning">UID dihapus.</span>');
+                        setTimeout(function () { location.reload(); }, 1000);
                     }
                 });
-            }, 1500);
-        }
+            });
 
-        $('#btnHapusUID').on('click', function() {
-            if (!enrollGuruId) return;
-            if (!confirm('Hapus UID RFID guru ini?')) return;
+            $('#modalEnrollRFID').on('hidden.bs.modal', function () {
+                if (enrollInterval) clearInterval(enrollInterval);
 
-            $.post('{{ url('guru') }}/' + enrollGuruId + '/delete-uid', {
-                _token: '{{ csrf_token() }}'
-            }, function(res) {
-                if (res.ok) {
-                    $('#uid_wrapper').addClass('d-none');
-                    $('#enroll_uid').text('');
-                    $('#btnHapusUID').prop('disabled', true);
-                    $('#enroll_status').html('<span class="text-warning">UID dihapus.</span>');
-                    setTimeout(function(){ location.reload(); }, 1000);
+                // Cancel request if pending
+                if (enrollGuruId) {
+                    $.post('{{ secure_url('guru') }}/' + enrollGuruId + '/enroll-cancel', {
+                        _token: '{{ csrf_token() }}'
+                    });
+                }
+
+                enrollGuruId = null;
+            });
+
+            // ==========================
+            //  ENROLL LOGIC FINGER
+            // ==========================
+            let enrollFingerId = null;
+            let enrollFingerInterval = null;
+
+            $('#dataTable').on('click', '.btnFinger', function () {
+                enrollFingerId = $(this).data('id');
+                $('#enroll_finger_nama').text($(this).data('nama'));
+
+                // Reset UI
+                $('#enroll_finger_status').html('');
+                $('#finger_wrapper').addClass('d-none');
+                $('#enroll_finger_id').text('');
+                $('#btnHapusFinger').prop('disabled', true);
+
+                // Check existing ID
+                var fid = $(this).data('finger');
+                if (fid) {
+                    $('#enroll_finger_id').text(fid);
+                    $('#finger_wrapper').removeClass('d-none');
+                    $('#btnHapusFinger').prop('disabled', false);
                 }
             });
-        });
 
-        $('#modalEnrollRFID').on('hidden.bs.modal', function () {
-            if (enrollInterval) clearInterval(enrollInterval);
-            
-            // Cancel request if pending
-            if (enrollGuruId) {
-                 $.post('{{ url('guru') }}/' + enrollGuruId + '/enroll-cancel', {
-                    _token: '{{ csrf_token() }}'
-                });
-            }
-            
-            enrollGuruId = null;
-        });
+            $('#btnMulaiEnrollFinger').on('click', function () {
+                if (!enrollFingerId) return;
 
-        // ==========================
-        //  ENROLL LOGIC FINGER
-        // ==========================
-        let enrollFingerId = null;
-        let enrollFingerInterval = null;
-
-        $('#dataTable').on('click', '.btnFinger', function() {
-            enrollFingerId = $(this).data('id');
-            $('#enroll_finger_nama').text($(this).data('nama'));
-            
-            // Reset UI
-            $('#enroll_finger_status').html('');
-            $('#finger_wrapper').addClass('d-none');
-            $('#enroll_finger_id').text('');
-            $('#btnHapusFinger').prop('disabled', true);
-            
-            // Check existing ID
-            var fid = $(this).data('finger');
-            if (fid) {
-                $('#enroll_finger_id').text(fid);
-                $('#finger_wrapper').removeClass('d-none');
-                $('#btnHapusFinger').prop('disabled', false);
-            }
-        });
-
-        $('#btnMulaiEnrollFinger').on('click', function() {
-            if (!enrollFingerId) return;
-
-            var deviceId = $('#finger_device_id').val();
-            if (!deviceId) {
-                alert('Pilih device terlebih dahulu!');
-                return;
-            }
-
-            $('#enroll_finger_status').html('<div class="spinner-border text-primary" role="status"></div><br><span class="text-info blink">Silakan tempelkan jari di sensor device...</span>');
-            
-            // Request Enroll
-            $.post('{{ url('guru') }}/' + enrollFingerId + '/enroll-finger', {
-                _token: '{{ csrf_token() }}',
-                device_id: deviceId
-            }, function(res) {
-                if (res.ok) {
-                    startFingerPolling(enrollFingerId);
-                } else {
-                    $('#enroll_finger_status').html('<span class="text-danger">Gagal request enrollment.</span>');
-                }
-            });
-        });
-
-        function startFingerPolling(id) {
-            if (enrollFingerInterval) clearInterval(enrollFingerInterval);
-            let counter = 0;
-            
-            enrollFingerInterval = setInterval(function() {
-                counter++;
-                if (counter > 40) { // 60 sec timeout
-                    clearInterval(enrollFingerInterval);
-                    $('#enroll_finger_status').html('<span class="text-warning">Waktu habis. Coba lagi.</span>');
+                var deviceId = $('#finger_device_id').val();
+                if (!deviceId) {
+                    alert('Pilih device terlebih dahulu!');
                     return;
                 }
 
-                $.get('{{ url('guru') }}/' + id + '/enroll-finger-check', function(res) {
-                    if (res.ok && res.id_finger) {
-                        clearInterval(enrollFingerInterval);
-                        $('#enroll_finger_id').text(res.id_finger);
-                        $('#finger_wrapper').removeClass('d-none');
-                        $('#btnHapusFinger').prop('disabled', false);
-                        $('#enroll_finger_status').html('<span class="text-success font-weight-bold"><i class="fas fa-check-circle"></i> Berhasil! Refresh halaman untuk update tabel.</span>');
-                        
-                        setTimeout(function(){ location.reload(); }, 1500);
+                $('#enroll_finger_status').html('<div class="spinner-border text-primary" role="status"></div><br><span class="text-info blink">Silakan tempelkan jari di sensor device...</span>');
 
+                // Request Enroll
+                $.post('{{ secure_url('guru') }}/' + enrollFingerId + '/enroll-finger', {
+                    _token: '{{ csrf_token() }}',
+                    device_id: deviceId
+                }, function (res) {
+                    if (res.ok) {
+                        startFingerPolling(enrollFingerId);
+                    } else {
+                        $('#enroll_finger_status').html('<span class="text-danger">Gagal request enrollment.</span>');
                     }
                 });
-            }, 1500);
-        }
+            });
 
-        $('#btnHapusFinger').on('click', function() {
-            if (!enrollFingerId) return;
-            if (!confirm('Hapus Sidik Jari guru ini?')) return;
+            function startFingerPolling(id) {
+                if (enrollFingerInterval) clearInterval(enrollFingerInterval);
+                let counter = 0;
 
-            $.post('{{ url('guru') }}/' + enrollFingerId + '/delete-finger', {
-                _token: '{{ csrf_token() }}'
-            }, function(res) {
-                if (res.ok) {
-                    $('#finger_wrapper').addClass('d-none');
-                    $('#enroll_finger_id').text('');
-                    $('#btnHapusFinger').prop('disabled', true);
-                    $('#enroll_finger_status').html('<span class="text-warning">Sidik Jari dihapus.</span>');
-                    setTimeout(function(){ location.reload(); }, 1000);
-                } else {
-                    alert('Gagal menghapus: ' + (res.message || 'Unknown error'));
+                enrollFingerInterval = setInterval(function () {
+                    counter++;
+                    if (counter > 40) { // 60 sec timeout
+                        clearInterval(enrollFingerInterval);
+                        $('#enroll_finger_status').html('<span class="text-warning">Waktu habis. Coba lagi.</span>');
+                        return;
+                    }
+
+                    $.get('{{ secure_url('guru') }}/' + id + '/enroll-finger-check', function (res) {
+                        if (res.ok && res.id_finger) {
+                            clearInterval(enrollFingerInterval);
+                            $('#enroll_finger_id').text(res.id_finger);
+                            $('#finger_wrapper').removeClass('d-none');
+                            $('#btnHapusFinger').prop('disabled', false);
+                            $('#enroll_finger_status').html('<span class="text-success font-weight-bold"><i class="fas fa-check-circle"></i> Berhasil! Refresh halaman untuk update tabel.</span>');
+
+                            setTimeout(function () { location.reload(); }, 1500);
+
+                        }
+                    });
+                }, 1500);
+            }
+
+            $('#btnHapusFinger').on('click', function () {
+                if (!enrollFingerId) return;
+                if (!confirm('Hapus Sidik Jari guru ini?')) return;
+
+                $.post('{{ secure_url('guru') }}/' + enrollFingerId + '/delete-finger', {
+                    _token: '{{ csrf_token() }}'
+                }, function (res) {
+                    if (res.ok) {
+                        $('#finger_wrapper').addClass('d-none');
+                        $('#enroll_finger_id').text('');
+                        $('#btnHapusFinger').prop('disabled', true);
+                        $('#enroll_finger_status').html('<span class="text-warning">Sidik Jari dihapus.</span>');
+                        setTimeout(function () { location.reload(); }, 1000);
+                    } else {
+                        alert('Gagal menghapus: ' + (res.message || 'Unknown error'));
+                    }
+                }).fail(function (xhr) {
+                    alert('Error: ' + xhr.status + ' ' + xhr.statusText + '\n' + xhr.responseText);
+                });
+            });
+
+            $('#modalEnrollFinger').on('hidden.bs.modal', function () {
+                if (enrollFingerInterval) clearInterval(enrollFingerInterval);
+
+                // Cancel request if pending
+                if (enrollFingerId) {
+                    $.post('{{ secure_url('guru') }}/' + enrollFingerId + '/enroll-finger-cancel', {
+                        _token: '{{ csrf_token() }}'
+                    });
                 }
-            }).fail(function(xhr) {
-                alert('Error: ' + xhr.status + ' ' + xhr.statusText + '\n' + xhr.responseText);
+
+                enrollFingerId = null;
             });
         });
-
-        $('#modalEnrollFinger').on('hidden.bs.modal', function () {
-            if (enrollFingerInterval) clearInterval(enrollFingerInterval);
-            
-            // Cancel request if pending
-            if (enrollFingerId) {
-                 $.post('{{ url('guru') }}/' + enrollFingerId + '/enroll-finger-cancel', {
-                    _token: '{{ csrf_token() }}'
-                });
-            }
-            
-            enrollFingerId = null;
-        });
-    });
-</script>
+    </script>
 @endpush

@@ -107,6 +107,10 @@ Route::middleware('auth')->group(function () {
         // Broadcast WA
         Route::get('/broadcast', [App\Http\Controllers\BroadcastController::class, 'index'])->name('broadcast.index');
         Route::post('/broadcast/send', [App\Http\Controllers\BroadcastController::class, 'send'])->name('broadcast.send');
+
+        // Absence Report
+        Route::get('/absence-report', [App\Http\Controllers\AbsenceReportController::class, 'index'])->name('absence-report.index');
+        Route::get('/absence-report/export', [App\Http\Controllers\AbsenceReportController::class, 'export'])->name('absence-report.export');
     });
 });
 

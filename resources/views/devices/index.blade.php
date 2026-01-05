@@ -50,19 +50,13 @@
                                     @endif
                                 </td>
                                 <td>
-                                    <button class="btn btn-sm btn-warning btnEdit"
-                                        data-id="{{ $d->id }}"
-                                        data-name="{{ $d->name }}"
-                                        data-key="{{ $d->api_key }}"
-                                        data-type="{{ $d->type }}"
-                                        data-active="{{ $d->active }}"
-                                        data-toggle="modal" data-target="#modalEditDevice">
+                                    <button class="btn btn-sm btn-warning btnEdit" data-id="{{ $d->id }}"
+                                        data-name="{{ $d->name }}" data-key="{{ $d->api_key }}" data-type="{{ $d->type }}"
+                                        data-active="{{ $d->active }}" data-toggle="modal" data-target="#modalEditDevice">
                                         <i class="fas fa-edit"></i>
                                     </button>
-                                    <button class="btn btn-sm btn-danger btnHapus"
-                                        data-id="{{ $d->id }}"
-                                        data-name="{{ $d->name }}"
-                                        data-toggle="modal" data-target="#modalHapusDevice">
+                                    <button class="btn btn-sm btn-danger btnHapus" data-id="{{ $d->id }}"
+                                        data-name="{{ $d->name }}" data-toggle="modal" data-target="#modalHapusDevice">
                                         <i class="fas fa-trash"></i>
                                     </button>
                                 </td>
@@ -95,7 +89,8 @@
                             <div class="input-group">
                                 <input type="text" name="api_key" id="create_api_key" class="form-control" required>
                                 <div class="input-group-append">
-                                    <button class="btn btn-outline-secondary" type="button" onclick="generateToken('create_api_key')">Generate</button>
+                                    <button class="btn btn-outline-secondary" type="button"
+                                        onclick="generateToken('create_api_key')">Generate</button>
                                 </div>
                             </div>
                         </div>
@@ -145,7 +140,8 @@
                             <div class="input-group">
                                 <input type="text" name="api_key" id="edit_api_key" class="form-control" required>
                                 <div class="input-group-append">
-                                    <button class="btn btn-outline-secondary" type="button" onclick="generateToken('edit_api_key')">Generate</button>
+                                    <button class="btn btn-outline-secondary" type="button"
+                                        onclick="generateToken('edit_api_key')">Generate</button>
                                 </div>
                             </div>
                         </div>
@@ -199,38 +195,38 @@
 @endsection
 
 @push('scripts')
-<script>
-    function generateToken(targetId) {
-        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-        let out = '';
-        for(let i=0;i<60;i++) out += chars.charAt(Math.floor(Math.random()*chars.length));
-        document.getElementById(targetId).value = out;
-    }
+    <script>
+        function generateToken(targetId) {
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+            let out = '';
+            for (let i = 0; i < 60; i++) out += chars.charAt(Math.floor(Math.random() * chars.length));
+            document.getElementById(targetId).value = out;
+        }
 
-    $(document).ready(function() {
-        $('#dataTable').DataTable();
+        $(document).ready(function () {
+            $('#dataTable').DataTable();
 
-        $('.btnEdit').on('click', function() {
-            var id = $(this).data('id');
-            var name = $(this).data('name');
-            var key = $(this).data('key');
-            var type = $(this).data('type');
-            var active = $(this).data('active');
-            
-            $('#edit_name').val(name);
-            $('#edit_api_key').val(key);
-            $('#edit_type').val(type);
-            $('#edit_active').val(active);
-            
-            $('#formEditDevice').attr('action', '{{ url('devices') }}/' + id);
+            $('.btnEdit').on('click', function () {
+                var id = $(this).data('id');
+                var name = $(this).data('name');
+                var key = $(this).data('key');
+                var type = $(this).data('type');
+                var active = $(this).data('active');
+
+                $('#edit_name').val(name);
+                $('#edit_api_key').val(key);
+                $('#edit_type').val(type);
+                $('#edit_active').val(active);
+
+                $('#formEditDevice').attr('action', '{{ secure_url('devices') }}/' + id);
+            });
+
+            // Hapus
+            $('#dataTable').on('click', '.btnHapus', function () {
+                var id = $(this).data('id');
+                $('#hapus_nama').text($(this).data('nama'));
+                $('#formHapusDevice').attr('action', '{{ secure_url('devices') }}/' + id);
+            });
         });
-
-        $('.btnHapus').on('click', function() {
-            var id = $(this).data('id');
-            var name = $(this).data('name');
-            $('#hapus_name').text(name);
-            $('#formHapusDevice').attr('action', '{{ url('devices') }}/' + id);
-        });
-    });
-</script>
+    </script>
 @endpush

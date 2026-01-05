@@ -58,16 +58,12 @@
                                 <td>{{ $loop->iteration }}</td>
                                 <td>{{ $m->nama_mapel }}</td>
                                 <td>
-                                    <button class="btn btn-sm btn-warning btnEdit"
-                                        data-id="{{ $m->id }}"
-                                        data-nama="{{ $m->nama_mapel }}"
-                                        data-toggle="modal" data-target="#modalEditMapel">
+                                    <button class="btn btn-sm btn-warning btnEdit" data-id="{{ $m->id }}"
+                                        data-nama="{{ $m->nama_mapel }}" data-toggle="modal" data-target="#modalEditMapel">
                                         <i class="fas fa-edit"></i>
                                     </button>
-                                    <button class="btn btn-sm btn-danger btnHapus"
-                                        data-id="{{ $m->id }}"
-                                        data-nama="{{ $m->nama_mapel }}"
-                                        data-toggle="modal" data-target="#modalHapusMapel">
+                                    <button class="btn btn-sm btn-danger btnHapus" data-id="{{ $m->id }}"
+                                        data-nama="{{ $m->nama_mapel }}" data-toggle="modal" data-target="#modalHapusMapel">
                                         <i class="fas fa-trash"></i>
                                     </button>
                                 </td>
@@ -92,7 +88,8 @@
                     <div class="modal-body">
                         <div class="form-group">
                             <label>Nama Mata Pelajaran</label>
-                            <input type="text" name="nama_mapel" class="form-control" placeholder="Contoh: Matematika" required>
+                            <input type="text" name="nama_mapel" class="form-control" placeholder="Contoh: Matematika"
+                                required>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -155,23 +152,23 @@
 @endsection
 
 @push('scripts')
-<script>
-    $(document).ready(function() {
-        $('#dataTable').DataTable();
+    <script>
+        $(document).ready(function () {
+            $('#dataTable').DataTable();
 
-        $('.btnEdit').on('click', function() {
-            var id = $(this).data('id');
-            var nama = $(this).data('nama');
-            $('#edit_nama_mapel').val(nama);
-            $('#formEditMapel').attr('action', '{{ url('mapel') }}/' + id);
-        });
+            $('.btnEdit').on('click', function () {
+                var id = $(this).data('id');
+                var nama = $(this).data('nama');
+                $('#edit_nama_mapel').val(nama);
+                $('#formEditMapel').attr('action', '{{ secure_url('mapel') }}/' + id);
+            });
 
-        $('.btnHapus').on('click', function() {
-            var id = $(this).data('id');
-            var nama = $(this).data('nama');
-            $('#hapus_nama_mapel').text(nama);
-            $('#formHapusMapel').attr('action', '{{ url('mapel') }}/' + id);
+            // Hapus
+            $('#dataTable').on('click', '.btnHapus', function () {
+                var id = $(this).data('id');
+                $('#hapus_nama_mapel').text($(this).data('nama'));
+                $('#formHapusMapel').attr('action', '{{ secure_url('mapel') }}/' + id);
+            });
         });
-    });
-</script>
+    </script>
 @endpush

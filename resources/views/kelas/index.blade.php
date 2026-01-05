@@ -41,7 +41,9 @@
                                 <td>
                                     <form action="{{ route('kelas.toggle-status', $k->id) }}" method="POST">
                                         @csrf
-                                        <button type="submit" class="btn btn-sm btn-{{ $k->is_active_attendance ? 'success' : 'secondary' }}" title="{{ $k->is_active_attendance ? 'Nonaktifkan Absensi' : 'Aktifkan Absensi' }}">
+                                        <button type="submit"
+                                            class="btn btn-sm btn-{{ $k->is_active_attendance ? 'success' : 'secondary' }}"
+                                            title="{{ $k->is_active_attendance ? 'Nonaktifkan Absensi' : 'Aktifkan Absensi' }}">
                                             <i class="fas fa-{{ $k->is_active_attendance ? 'toggle-on' : 'toggle-off' }}"></i>
                                             {{ $k->is_active_attendance ? 'Aktif' : 'Nonaktif' }}
                                         </button>
@@ -171,14 +173,14 @@
 
                 $('#edit_nama_kelas').val(nama);
                 $('#edit_wali_kelas').val(wali).trigger('change');
-                $('#formEditKelas').attr('action', '{{ url('kelas') }}/' + id);
+                $('#formEditKelas').attr('action', '{{ secure_url('kelas') }}/' + id);
             });
 
-            $('.btnHapus').on('click', function () {
+            // Hapus
+            $('#dataTable').on('click', '.btnHapus', function () {
                 var id = $(this).data('id');
-                var nama = $(this).data('nama');
-                $('#hapus_nama_kelas').text(nama);
-                $('#formHapusKelas').attr('action', '{{ url('kelas') }}/' + id);
+                $('#hapus_nama_kelas').text($(this).data('nama')); // Changed to match original target element
+                $('#formHapusKelas').attr('action', '{{ secure_url('kelas') }}/' + id);
             });
         });
     </script>

@@ -172,7 +172,7 @@ class WeeklyAbsenceSummaryCommand extends Command
 
     private function buildGlobalMessage($byClass, $startDate, $endDate)
     {
-        $message = "⚠️ *LAPORAN MINGGUAN KETIDAKHADIRAN BERLEBIHAN*\n";
+        $message = "⚠️ *LAPORAN MINGGUAN*\n";
         $message .= "📅 Periode: " . Carbon::parse($startDate)->format('d/m/Y') . " - " . Carbon::parse($endDate)->format('d/m/Y') . "\n";
         $message .= str_repeat("─", 40) . "\n\n";
 
@@ -209,7 +209,7 @@ class WeeklyAbsenceSummaryCommand extends Command
         $message .= "📅 Periode: " . Carbon::parse($startDate)->format('d/m/Y') . " - " . Carbon::parse($endDate)->format('d/m/Y') . "\n";
         $message .= str_repeat("─", 40) . "\n\n";
 
-        $message .= "Siswa dengan ketidakhadiran berlebihan:\n\n";
+        $message .= "Siswa dengan absen berlebihan:\n\n";
         foreach ($students as $studentData) {
             $s = $studentData['student'];
             $breakdown = [];
@@ -235,7 +235,7 @@ class WeeklyAbsenceSummaryCommand extends Command
     {
         $kelas = $student->kelas->nama_kelas ?? '-';
 
-        $message = "⚠️ *PEMBERITAHUAN KETIDAKHADIRAN*\n\n";
+        $message = "⚠️ *PEMBERITAHUAN*\n\n";
         $message .= "Yth. Orang Tua/Wali dari:\n";
         $message .= "*{$student->nama}* ({$kelas})\n\n";
         $message .= "Kami informasikan bahwa putra/putri Anda memiliki catatan ketidakhadiran dalam periode:\n";

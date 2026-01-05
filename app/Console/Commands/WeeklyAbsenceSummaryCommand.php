@@ -85,29 +85,22 @@ class WeeklyAbsenceSummaryCommand extends Command
 
         $this->info("Found " . $frequentAbsences->count() . " students with frequent absences.");
 
-        // Send notifications
+        // Send global report only
         $this->sendGlobalReport($byClass, $startDate, $endDate);
-        $this->sendWaliKelasReports($byClass, $startDate, $endDate);
-        $this->sendParentNotifications($byClass, $startDate, $endDate);
 
         $this->info("✓ Weekly absence summary sent successfully.");
     }
 
     private function sendGlobalReport($byClass, $startDate, $endDate)
     {
+        $message = $this->buildGlobalMessage($byClass, $startDate, $endDate);
+
         // Send to classes with wa_group_id
         $kelasWithGroupId = Kelas::whereNotNull('wa_group_id')
             ->where('wa_group_id', '!=', '')
             ->where('is_active_attendance', true)
             ->where('is_active_report', true)
             ->get();
-
-        if ($kelasWithGroupId->isEmpty()) {
-            $this->warn("No classes with WhatsApp Group ID configured.");
-            return;
-        }
-
-        $message = $this->buildGlobalMessage($byClass, $startDate, $endDate);
 
         foreach ($kelasWithGroupId as $kelas) {
             MessageQueue::create([
@@ -118,56 +111,22 @@ class WeeklyAbsenceSummaryCommand extends Command
             ]);
             $this->info("Queued global report to {$kelas->nama_kelas} group");
         }
-    }
 
-    private function sendWaliKelasReports($byClass, $startDate, $endDate)
-    {
-        foreach ($byClass as $data) {
-            $kelas = $data['kelas'];
-            $wali = $kelas->waliKelas;
-
-            if (!$wali || !$wali->no_wa) {
-                continue;
-            }
-
-            $message = $this->buildWaliKelasMessage($kelas, $data['students'], $startDate, $endDate);
-
+        // Send to teacher group if configured
+        $teacherGroupId = Setting::where('setting_key', 'report_target_jid')->value('setting_value');
+        if ($teacherGroupId) {
             MessageQueue::create([
-                'phone_number' => $wali->no_wa,
+                'phone_number' => $teacherGroupId,
                 'message' => $message,
                 'status' => 'pending',
                 'created_at' => now()
             ]);
-
-            $this->info("Queued report to wali kelas {$wali->nama} ({$kelas->nama_kelas})");
-        }
-    }
-
-    private function sendParentNotifications($byClass, $startDate, $endDate)
-    {
-        $count = 0;
-        foreach ($byClass as $data) {
-            foreach ($data['students'] as $studentData) {
-                $student = $studentData['student'];
-
-                if (!$student->wa_ortu) {
-                    continue;
-                }
-
-                $message = $this->buildParentMessage($student, $studentData, $startDate, $endDate);
-
-                MessageQueue::create([
-                    'phone_number' => $student->wa_ortu,
-                    'message' => $message,
-                    'status' => 'pending',
-                    'created_at' => now()
-                ]);
-
-                $count++;
-            }
+            $this->info("Queued global report to teacher group");
         }
 
-        $this->info("Queued notifications to $count parents");
+        if ($kelasWithGroupId->isEmpty() && !$teacherGroupId) {
+            $this->warn("No groups configured for sending reports.");
+        }
     }
 
     private function buildGlobalMessage($byClass, $startDate, $endDate)
@@ -199,59 +158,6 @@ class WeeklyAbsenceSummaryCommand extends Command
         $message .= str_repeat("─", 40) . "\n";
         $message .= "Total: *{$totalStudents} siswa* memerlukan perhatian khusus\n\n";
         $message .= "_Mohon tindak lanjut untuk siswa tersebut_";
-
-        return $message;
-    }
-
-    private function buildWaliKelasMessage($kelas, $students, $startDate, $endDate)
-    {
-        $message = "⚠️ *LAPORAN MINGGUAN - {$kelas->nama_kelas}*\n";
-        $message .= "📅 Periode: " . Carbon::parse($startDate)->format('d/m/Y') . " - " . Carbon::parse($endDate)->format('d/m/Y') . "\n";
-        $message .= str_repeat("─", 40) . "\n\n";
-
-        $message .= "Siswa dengan absen berlebihan:\n\n";
-        foreach ($students as $studentData) {
-            $s = $studentData['student'];
-            $breakdown = [];
-            if ($studentData['alpha'] > 0)
-                $breakdown[] = "{$studentData['alpha']} Alpha";
-            if ($studentData['bolos'] > 0)
-                $breakdown[] = "{$studentData['bolos']} Bolos";
-
-            $message .= "• *{$s->nama}*\n";
-            $message .= "  Tidak masuk: {$studentData['total']}x (" . implode(', ', $breakdown) . ")\n";
-            if ($s->wa_ortu) {
-                $message .= "  Ortu: {$s->wa_ortu}\n";
-            }
-            $message .= "\n";
-        }
-
-        $message .= "_Mohon koordinasi dengan orang tua siswa_";
-
-        return $message;
-    }
-
-    private function buildParentMessage($student, $studentData, $startDate, $endDate)
-    {
-        $kelas = $student->kelas->nama_kelas ?? '-';
-
-        $message = "⚠️ *PEMBERITAHUAN*\n\n";
-        $message .= "Yth. Orang Tua/Wali dari:\n";
-        $message .= "*{$student->nama}* ({$kelas})\n\n";
-        $message .= "Kami informasikan bahwa putra/putri Anda memiliki catatan ketidakhadiran dalam periode:\n";
-        $message .= "📅 " . Carbon::parse($startDate)->format('d/m/Y') . " - " . Carbon::parse($endDate)->format('d/m/Y') . "\n\n";
-
-        $message .= "Detail:\n";
-        if ($studentData['alpha'] > 0) {
-            $message .= "• Alpha (Tanpa Keterangan): {$studentData['alpha']}x\n";
-        }
-        if ($studentData['bolos'] > 0) {
-            $message .= "• Bolos (Tidak Absen Pulang): {$studentData['bolos']}x\n";
-        }
-        $message .= "\nTotal: *{$studentData['total']} hari* tidak hadir\n\n";
-
-        $message .= "Mohon perhatian dan bimbingan kepada putra/putri Anda.\n\n";
-        $message .= "_Terima kasih atas kerjasamanya_";
 
         return $message;
     }

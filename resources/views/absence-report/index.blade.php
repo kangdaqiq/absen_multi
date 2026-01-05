@@ -24,16 +24,6 @@
                 </div>
 
                 <div class="form-group mr-3 mb-2">
-                    <label class="mr-2">Dari:</label>
-                    <input type="date" name="start_date" class="form-control" value="{{ $startDate }}" required>
-                </div>
-
-                <div class="form-group mr-3 mb-2">
-                    <label class="mr-2">Sampai:</label>
-                    <input type="date" name="end_date" class="form-control" value="{{ $endDate }}" required>
-                </div>
-
-                <div class="form-group mr-3 mb-2">
                     <label class="mr-2">Threshold:</label>
                     <input type="number" name="threshold" class="form-control" value="{{ $customThreshold }}" min="1"
                         max="30" style="width: 80px;" required>
@@ -54,8 +44,8 @@
                 <small class="text-muted">
                     <i class="fas fa-info-circle"></i>
                     Menampilkan siswa dengan ketidakhadiran (Alpha/Bolos) >= {{ $customThreshold }} hari
-                    dalam periode {{ \Carbon\Carbon::parse($startDate)->format('d/m/Y') }} -
-                    {{ \Carbon\Carbon::parse($endDate)->format('d/m/Y') }}
+                    dalam {{ $periodDays }} hari terakhir ({{ \Carbon\Carbon::parse($startDate)->format('d/m/Y') }} -
+                    {{ \Carbon\Carbon::parse($endDate)->format('d/m/Y') }})
                 </small>
             </div>
         </div>

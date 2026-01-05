@@ -20,9 +20,11 @@ class AbsenceReportController extends Controller
 
         // Get filter parameters
         $kelasId = $request->get('kelas_id');
-        $startDate = $request->get('start_date', now()->subDays($periodDays)->format('Y-m-d'));
-        $endDate = $request->get('end_date', now()->format('Y-m-d'));
         $customThreshold = $request->get('threshold', $threshold);
+
+        // Calculate date range from period
+        $startDate = now()->subDays($periodDays)->format('Y-m-d');
+        $endDate = now()->format('Y-m-d');
 
         // Query students with frequent absences
         $query = Attendance::selectRaw('student_id, COUNT(*) as absence_count')
@@ -91,11 +93,17 @@ class AbsenceReportController extends Controller
 
     public function export(Request $request)
     {
+        // Get settings
+        $threshold = (int) Setting::where('setting_key', 'absence_threshold_days')->value('setting_value') ?? 3;
+        $periodDays = (int) Setting::where('setting_key', 'absence_check_period_days')->value('setting_value') ?? 7;
+
         // Get filter parameters
         $kelasId = $request->get('kelas_id');
-        $startDate = $request->get('start_date');
-        $endDate = $request->get('end_date');
-        $customThreshold = $request->get('threshold', 3);
+        $customThreshold = $request->get('threshold', $threshold);
+
+        // Calculate date range from period
+        $startDate = now()->subDays($periodDays)->format('Y-m-d');
+        $endDate = now()->format('Y-m-d');
 
         // Query students with frequent absences
         $query = Attendance::selectRaw('student_id, COUNT(*) as absence_count')

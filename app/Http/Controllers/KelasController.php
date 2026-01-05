@@ -59,4 +59,20 @@ class KelasController extends Controller
         $status = $kelas->is_active_attendance ? 'aktif' : 'nonaktif';
         return redirect()->route('kelas.index')->with('success', "Status absensi kelas berhasil diubah menjadi $status.");
     }
+
+    public function toggleReport($id)
+    {
+        $kelas = Kelas::findOrFail($id);
+
+        // Only allow toggle if attendance is active
+        if (!$kelas->is_active_attendance) {
+            return redirect()->route('kelas.index')->with('error', 'Tidak dapat mengaktifkan report jika absensi nonaktif.');
+        }
+
+        $kelas->is_active_report = !$kelas->is_active_report;
+        $kelas->save();
+
+        $status = $kelas->is_active_report ? 'aktif' : 'nonaktif';
+        return redirect()->route('kelas.index')->with('success', "Status report WA kelas berhasil diubah menjadi $status.");
+    }
 }

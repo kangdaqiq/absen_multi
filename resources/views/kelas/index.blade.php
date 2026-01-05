@@ -24,6 +24,7 @@
                             <th>Wali Kelas</th>
                             <th>ID Grup WA</th>
                             <th>Status Absen</th>
+                            <th>Status Report</th>
                             <th width="15%">Aksi</th>
                         </tr>
                     </thead>
@@ -56,6 +57,21 @@
                                             {{ $k->is_active_attendance ? 'Aktif' : 'Nonaktif' }}
                                         </button>
                                     </form>
+                                </td>
+                                <td>
+                                    @if(!$k->is_active_attendance)
+                                        <span class="badge badge-secondary">Auto Nonaktif</span>
+                                    @else
+                                        <form action="{{ route('kelas.toggle-report', $k->id) }}" method="POST">
+                                            @csrf
+                                            <button type="submit"
+                                                class="btn btn-sm btn-{{ $k->is_active_report ? 'info' : 'secondary' }}"
+                                                title="{{ $k->is_active_report ? 'Nonaktifkan Report WA' : 'Aktifkan Report WA' }}">
+                                                <i class="fas fa-{{ $k->is_active_report ? 'bell' : 'bell-slash' }}"></i>
+                                                {{ $k->is_active_report ? 'Aktif' : 'Nonaktif' }}
+                                            </button>
+                                        </form>
+                                    @endif
                                 </td>
                                 <td>
                                     <button class="btn btn-sm btn-warning btnEdit" data-id="{{ $k->id }}"

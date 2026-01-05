@@ -24,6 +24,7 @@ Route::middleware('auth')->group(function () {
     Route::middleware('role:admin,teacher')->group(function () {
         // Master Data (Siswa/Guru) - Ideally Teacher is Read Only, but for now we allow access
         Route::post('kelas/{id}/toggle-status', [KelasController::class, 'toggleStatus'])->name('kelas.toggle-status');
+        Route::post('kelas/{id}/toggle-report', [KelasController::class, 'toggleReport'])->name('kelas.toggle-report');
         Route::resource('kelas', KelasController::class)->except(['create', 'show', 'edit']);
         Route::resource('guru', GuruController::class)->except(['create', 'show', 'edit']);
         Route::resource('siswa', SiswaController::class)->except(['create', 'show', 'edit']);

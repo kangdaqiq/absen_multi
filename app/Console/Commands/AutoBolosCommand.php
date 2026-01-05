@@ -105,6 +105,7 @@ class AutoBolosCommand extends Command
         $kelasWithGroupId = \App\Models\Kelas::whereNotNull('wa_group_id')
             ->where('wa_group_id', '!=', '')
             ->where('is_active_attendance', true)
+            ->where('is_active_report', true)
             ->get();
 
         $legacyTarget = Setting::where('setting_key', 'report_target_jid')->value('setting_value');

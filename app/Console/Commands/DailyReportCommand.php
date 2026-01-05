@@ -29,6 +29,7 @@ class DailyReportCommand extends Command
         $kelasWithGroupId = Kelas::whereNotNull('wa_group_id')
             ->where('wa_group_id', '!=', '')
             ->where('is_active_attendance', true)
+            ->where('is_active_report', true)
             ->get();
 
         if ($kelasWithGroupId->isEmpty() && !$targetJid) {

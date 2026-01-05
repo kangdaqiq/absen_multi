@@ -86,9 +86,6 @@ Route::middleware('auth')->group(function () {
         // Settings
         Route::get('/settings', [App\Http\Controllers\SettingsController::class, 'index'])->name('settings.index');
         Route::put('/settings', [App\Http\Controllers\SettingsController::class, 'update'])->name('settings.update');
-        Route::post('/settings/groups', [App\Http\Controllers\SettingsController::class, 'storeGroup'])->name('settings.store-group');
-        Route::post('/settings/groups/{id}/toggle', [App\Http\Controllers\SettingsController::class, 'toggleGroup'])->name('settings.toggle-group');
-        Route::delete('/settings/groups/{id}', [App\Http\Controllers\SettingsController::class, 'deleteGroup'])->name('settings.delete-group');
 
         // Backups
         Route::get('/backups', [App\Http\Controllers\BackupController::class, 'index'])->name('backups.index');

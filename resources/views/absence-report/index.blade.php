@@ -108,8 +108,8 @@
             @else
                 <div class="alert alert-success text-center">
                     <i class="fas fa-check-circle fa-3x mb-3"></i>
-                    <h5>Tidak ada siswa dengan ketidakhadiran berlebihan</h5>
-                    <p class="mb-0">Semua siswa memiliki tingkat kehadiran yang baik dalam periode yang dipilih.</p>
+                    <h5>Tidak ada siswa dengan absensi berlebihan</h5>
+                    <p class="mb-0">Semua siswa memiliki tingkat absensi yang baik dalam periode yang dipilih.</p>
                 </div>
             @endif
         </div>
@@ -120,7 +120,7 @@
         <div class="modal-dialog modal-lg" role="document">
             <div class="modal-content">
                 <div class="modal-header bg-info text-white">
-                    <h5 class="modal-title">Detail Ketidakhadiran</h5>
+                    <h5 class="modal-title">Detail Absensi</h5>
                     <button type="button" class="close text-white" data-dismiss="modal">&times;</button>
                 </div>
                 <div class="modal-body">

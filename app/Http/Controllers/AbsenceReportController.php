@@ -36,7 +36,7 @@ class AbsenceReportController extends Controller
                 }
             })
             ->groupBy('student_id')
-            ->havingRaw('COUNT(*) >= ?', [$customThreshold]);
+            ->havingRaw('COUNT(*) >= ?', [$threshold]);
 
         $frequentAbsences = $query->with(['student.kelas'])->get();
 
@@ -113,7 +113,7 @@ class AbsenceReportController extends Controller
                 }
             })
             ->groupBy('student_id')
-            ->havingRaw('COUNT(*) >= ?', [$customThreshold]);
+            ->havingRaw('COUNT(*) >= ?', [$threshold]);
 
         $frequentAbsences = $query->with(['student.kelas'])->get();
 

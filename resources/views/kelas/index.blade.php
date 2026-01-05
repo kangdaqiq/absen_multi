@@ -22,6 +22,7 @@
                             <th width="5%">No</th>
                             <th>Nama Kelas</th>
                             <th>Wali Kelas</th>
+                            <th>ID Grup WA</th>
                             <th>Status Absen</th>
                             <th width="15%">Aksi</th>
                         </tr>
@@ -39,6 +40,13 @@
                                     @endif
                                 </td>
                                 <td>
+                                    @if($k->wa_group_id)
+                                        <span class="badge badge-success">{{ $k->wa_group_id }}</span>
+                                    @else
+                                        <span class="badge badge-secondary">-</span>
+                                    @endif
+                                </td>
+                                <td>
                                     <form action="{{ route('kelas.toggle-status', $k->id) }}" method="POST">
                                         @csrf
                                         <button type="submit"
@@ -51,7 +59,8 @@
                                 </td>
                                 <td>
                                     <button class="btn btn-sm btn-warning btnEdit" data-id="{{ $k->id }}"
-                                        data-nama="{{ $k->nama_kelas }}" data-wali="{{ $k->wali_kelas_id }}" data-toggle="modal"
+                                        data-nama="{{ $k->nama_kelas }}" data-wali="{{ $k->wali_kelas_id }}"
+                                        data-wa-group-id="{{ $k->wa_group_id }}" data-toggle="modal"
                                         data-target="#modalEditKelas">
                                         <i class="fas fa-edit"></i>
                                     </button>
@@ -92,6 +101,13 @@
                                 @endforeach
                             </select>
                         </div>
+                        <div class="form-group">
+                            <label>ID Grup WhatsApp</label>
+                            <input type="text" name="wa_group_id" class="form-control"
+                                placeholder="Contoh: 120363XXXXXX@g.us">
+                            <small class="form-text text-muted">Opsional. ID Grup WhatsApp untuk broadcast ke kelas
+                                ini.</small>
+                        </div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-dismiss="modal">Batal</button>
@@ -126,6 +142,13 @@
                                     <option value="{{ $g->id }}">{{ $g->nama }}</option>
                                 @endforeach
                             </select>
+                        </div>
+                        <div class="form-group">
+                            <label>ID Grup WhatsApp</label>
+                            <input type="text" name="wa_group_id" id="edit_wa_group_id" class="form-control"
+                                placeholder="Contoh: 120363XXXXXX@g.us">
+                            <small class="form-text text-muted">Opsional. ID Grup WhatsApp untuk broadcast ke kelas
+                                ini.</small>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -170,9 +193,11 @@
                 var id = $(this).data('id');
                 var nama = $(this).data('nama');
                 var wali = $(this).data('wali');
+                var waGroupId = $(this).data('wa-group-id');
 
                 $('#edit_nama_kelas').val(nama);
                 $('#edit_wali_kelas').val(wali).trigger('change');
+                $('#edit_wa_group_id').val(waGroupId);
                 $('#formEditKelas').attr('action', '{{ secure_url('kelas') }}/' + id);
             });
 

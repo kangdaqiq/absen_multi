@@ -33,15 +33,6 @@
                     </a>
                 @endif
             </form>
-
-            <div class="mt-3">
-                <small class="text-muted">
-                    <i class="fas fa-info-circle"></i>
-                    Menampilkan siswa dengan ketidakhadiran (Alpha/Bolos) >= {{ $threshold }} hari
-                    dalam {{ $periodDays }} hari terakhir ({{ \Carbon\Carbon::parse($startDate)->format('d/m/Y') }} -
-                    {{ \Carbon\Carbon::parse($endDate)->format('d/m/Y') }})
-                </small>
-            </div>
         </div>
     </div>
 

@@ -81,13 +81,10 @@
                                         <i class="fas fa-fingerprint"></i>
                                     </button>
                                     <button class="btn btn-sm btn-warning btnEdit" data-id="{{ $s->id }}"
-                                        data-nama="{{ $s->nama }}" data-nis="{{ $s->nis }}"
-                                        data-tgl_lahir="{{ $s->tgl_lahir }}"
-                                        data-kelas="{{ $s->kelas_id }}"
-                                        data-wa="{{ $s->no_wa }}" 
-                                        data-wa_ortu="{{ $s->wa_ortu }}"
-                                        data-uid="{{ $s->uid_rfid }}"
-                                        data-toggle="modal" data-target="#modalEditSiswa">
+                                        data-nama="{{ $s->nama }}" data-nis="{{ $s->nis }}" data-tgl_lahir="{{ $s->tgl_lahir }}"
+                                        data-kelas="{{ $s->kelas_id }}" data-wa="{{ $s->no_wa }}"
+                                        data-wa_ortu="{{ $s->wa_ortu }}" data-uid="{{ $s->uid_rfid }}" data-toggle="modal"
+                                        data-target="#modalEditSiswa">
                                         <i class="fas fa-edit"></i>
                                     </button>
                                     <button class="btn btn-sm btn-danger btnHapus" data-id="{{ $s->id }}"
@@ -245,7 +242,7 @@
                     </div>
                     <div class="modal-body">
                         <div class="alert alert-info">
-                            <i class="fas fa-info-circle"></i> Gunakan file Excel (.xlsx) dengan format kolom: <strong>Nama, 
+                            <i class="fas fa-info-circle"></i> Gunakan file Excel (.xlsx) dengan format kolom: <strong>Nama,
                                 NIS, Tgl Lahir, Kelas, WA Siswa, WA Ortu</strong>.
                         </div>
                         <div class="form-group">
@@ -372,7 +369,7 @@
                 $('#edit_wa_ortu').val(wa_ortu);
                 $('#edit_uid_rfid').val(uid);
 
-                $('#formEditSiswa').attr('action', '{{ url('siswa') }}/' + id);
+                $('#formEditSiswa').attr('action', '{{ secure_url('siswa') }}/' + id);
             });
 
 
@@ -381,7 +378,7 @@
                 var id = $(this).data('id');
                 var nama = $(this).data('nama');
                 $('#hapus_nama').text(nama);
-                $('#formHapusSiswa').attr('action', '{{ url('siswa') }}/' + id);
+                $('#formHapusSiswa').attr('action', '{{ secure_url('siswa') }}/' + id);
             });
 
             // ==========================
@@ -415,7 +412,7 @@
                 $('#enroll_status').html('<div class="spinner-border text-primary" role="status"></div><br><span class="text-info blink">Silakan tempelkan kartu RFID...</span>');
 
                 // Request Enroll
-                $.post('{{ url('siswa') }}/' + enrollSiswaId + '/enroll', {
+                $.post('{{ secure_url('siswa') }}/' + enrollSiswaId + '/enroll', {
                     _token: '{{ csrf_token() }}'
                 }, function (res) {
                     if (res.ok) {
@@ -438,7 +435,7 @@
                         return;
                     }
 
-                    $.get('{{ url('siswa') }}/' + id + '/enroll-check', function (res) {
+                    $.get('{{ secure_url('siswa') }}/' + id + '/enroll-check', function (res) {
                         if (res.ok && res.uid) {
                             clearInterval(enrollInterval);
                             $('#enroll_uid').text(res.uid);
@@ -457,7 +454,7 @@
                 if (!enrollSiswaId) return;
                 if (!confirm('Hapus UID RFID siswa ini?')) return;
 
-                $.post('{{ url('siswa') }}/' + enrollSiswaId + '/delete-uid', {
+                $.post('{{ secure_url('siswa') }}/' + enrollSiswaId + '/delete-uid', {
                     _token: '{{ csrf_token() }}'
                 }, function (res) {
                     if (res.ok) {
@@ -475,7 +472,7 @@
 
                 // Cancel request if pending
                 if (enrollSiswaId) {
-                    $.post('{{ url('siswa') }}/' + enrollSiswaId + '/enroll-cancel', {
+                    $.post('{{ secure_url('siswa') }}/' + enrollSiswaId + '/enroll-cancel', {
                         _token: '{{ csrf_token() }}'
                     });
                 }
@@ -521,7 +518,7 @@
                 $('#enroll_finger_status').html('<div class="spinner-border text-success" role="status"></div><br><span class="text-info blink">Silakan tempelkan jari pada sensor...</span>');
 
                 // Request Enroll with device_id
-                $.post('{{ url('siswa') }}/' + enrollFingerSiswaId + '/enroll-finger', {
+                $.post('{{ secure_url('siswa') }}/' + enrollFingerSiswaId + '/enroll-finger', {
                     _token: '{{ csrf_token() }}',
                     device_id: deviceId
                 }, function (res) {
@@ -545,7 +542,7 @@
                         return;
                     }
 
-                    $.get('{{ url('siswa') }}/' + id + '/enroll-finger-check', function (res) {
+                    $.get('{{ secure_url('siswa') }}/' + id + '/enroll-finger-check', function (res) {
                         if (res.ok && res.id_finger && res.status === 'done') {
                             clearInterval(enrollFingerInterval);
                             $('#enroll_finger_id').text(res.id_finger);
@@ -563,7 +560,7 @@
                 if (!enrollFingerSiswaId) return;
                 if (!confirm('Hapus sidik jari siswa ini dari semua device?')) return;
 
-                $.post('{{ url('siswa') }}/' + enrollFingerSiswaId + '/delete-finger', {
+                $.post('{{ secure_url('siswa') }}/' + enrollFingerSiswaId + '/delete-finger', {
                     _token: '{{ csrf_token() }}'
                 }, function (res) {
                     if (res.ok) {
@@ -581,7 +578,7 @@
 
                 // Cancel request if pending
                 if (enrollFingerSiswaId) {
-                    $.post('{{ url('siswa') }}/' + enrollFingerSiswaId + '/enroll-finger-cancel', {
+                    $.post('{{ secure_url('siswa') }}/' + enrollFingerSiswaId + '/enroll-finger-cancel', {
                         _token: '{{ csrf_token() }}'
                     });
                 }

@@ -8,7 +8,6 @@ use App\Models\Setting;
 use App\Models\MessageQueue;
 use App\Models\Siswa;
 use App\Models\Attendance;
-use App\Models\ReportGroup;
 use Carbon\Carbon;
 
 class AutoBolosCommand extends Command
@@ -102,12 +101,16 @@ class AutoBolosCommand extends Command
 
     private function sendAbsenceReport($today)
     {
-        // Get active report groups
-        $reportGroups = ReportGroup::where('is_active', true)->get();
+        // Get classes with WhatsApp Group ID
+        $kelasWithGroupId = \App\Models\Kelas::whereNotNull('wa_group_id')
+            ->where('wa_group_id', '!=', '')
+            ->where('is_active_attendance', true)
+            ->get();
+
         $legacyTarget = Setting::where('setting_key', 'report_target_jid')->value('setting_value');
 
-        if ($reportGroups->isEmpty() && !$legacyTarget) {
-            $this->warn("No active report groups and legacy target not set. Skipping absence report.");
+        if ($kelasWithGroupId->isEmpty() && !$legacyTarget) {
+            $this->warn("No classes with WhatsApp Group ID and legacy target not set. Skipping absence report.");
             return;
         }
 
@@ -163,10 +166,10 @@ class AutoBolosCommand extends Command
         $message .= "Total: *{$totalAbsent} Siswa* tidak hadir\n";
         $message .= "\n_Laporan otomatis setelah proses harian_";
 
-        // Queue message to all active groups
-        foreach ($reportGroups as $group) {
+        // Queue message to all classes with WhatsApp Group ID
+        foreach ($kelasWithGroupId as $kelas) {
             MessageQueue::create([
-                'phone_number' => $group->jid,
+                'phone_number' => $kelas->wa_group_id,
                 'message' => $message,
                 'status' => 'pending',
                 'created_at' => now()
@@ -183,6 +186,6 @@ class AutoBolosCommand extends Command
             ]);
         }
 
-        $this->info("✓ Absence report queued to " . ($reportGroups->count() + ($legacyTarget ? 1 : 0)) . " recipients ({$totalAbsent} absent students)");
+        $this->info("✓ Absence report queued to " . ($kelasWithGroupId->count() + ($legacyTarget ? 1 : 0)) . " recipients ({$totalAbsent} absent students)");
     }
 }

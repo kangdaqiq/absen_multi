@@ -23,12 +23,6 @@
                     </select>
                 </div>
 
-                <div class="form-group mr-3 mb-2">
-                    <label class="mr-2">Threshold:</label>
-                    <input type="number" name="threshold" class="form-control" value="{{ $customThreshold }}" min="1"
-                        max="30" style="width: 80px;" required>
-                </div>
-
                 <button type="submit" class="btn btn-primary mb-2 mr-2">
                     <i class="fas fa-search"></i> Filter
                 </button>
@@ -43,7 +37,7 @@
             <div class="mt-3">
                 <small class="text-muted">
                     <i class="fas fa-info-circle"></i>
-                    Menampilkan siswa dengan ketidakhadiran (Alpha/Bolos) >= {{ $customThreshold }} hari
+                    Menampilkan siswa dengan ketidakhadiran (Alpha/Bolos) >= {{ $threshold }} hari
                     dalam {{ $periodDays }} hari terakhir ({{ \Carbon\Carbon::parse($startDate)->format('d/m/Y') }} -
                     {{ \Carbon\Carbon::parse($endDate)->format('d/m/Y') }})
                 </small>

@@ -20,7 +20,6 @@ class AbsenceReportController extends Controller
 
         // Get filter parameters
         $kelasId = $request->get('kelas_id');
-        $customThreshold = $request->get('threshold', $threshold);
 
         // Calculate date range from period
         $startDate = now()->subDays($periodDays)->format('Y-m-d');
@@ -85,7 +84,6 @@ class AbsenceReportController extends Controller
             'kelasId',
             'startDate',
             'endDate',
-            'customThreshold',
             'threshold',
             'periodDays'
         ));
@@ -99,7 +97,6 @@ class AbsenceReportController extends Controller
 
         // Get filter parameters
         $kelasId = $request->get('kelas_id');
-        $customThreshold = $request->get('threshold', $threshold);
 
         // Calculate date range from period
         $startDate = now()->subDays($periodDays)->format('Y-m-d');

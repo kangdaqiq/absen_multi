@@ -85,7 +85,7 @@
                 <li class="nav-item {{ request()->routeIs('absence-report.*') ? 'active' : '' }}">
                     <a class="nav-link" href="{{ route('absence-report.index') }}">
                         <i class="fas fa-exclamation-triangle"></i>
-                        <span>Laporan Ketidakhadiran</span>
+                        <span>Laporan Absensi</span>
                     </a>
                 </li>
             @endif

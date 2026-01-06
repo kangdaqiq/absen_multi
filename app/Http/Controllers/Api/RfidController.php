@@ -355,9 +355,14 @@ class RfidController extends Controller
 
                 // Pulang
                 $masuk = Carbon::parse($att->jam_masuk);
-                $totalSeconds = $now->diffInSeconds($masuk); // diff is absolute, ensures positive
-                // Ensure correct order? diffInSeconds is absolute.
-                // We want now - masuk.
+                // Calculate duration from check-in to check-out
+                // Use diffInSeconds with proper order: from $masuk to $now
+                $totalSeconds = $masuk->diffInSeconds($now, false); // false = signed difference
+
+                // Ensure positive value (in case of clock issues)
+                if ($totalSeconds < 0) {
+                    $totalSeconds = abs($totalSeconds);
+                }
 
                 $att->update([
                     'jam_pulang' => $now->toTimeString(),

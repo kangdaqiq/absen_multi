@@ -394,27 +394,18 @@ class RfidController extends Controller
                 $keterangan = null;
 
                 if ($now->gt($batasTelat)) {
-                    $diff = $now->diffInSeconds($awalAbsenMasuk); // Legacy used $awalAbsenMasuk? No, usually $jamMasuk.
-                    // Legacy: $diff = $now->getTimestamp() - $awalAbsenMasuk->getTimestamp();
-                    // Let's stick to legacy logic: diff from start of window? Or start of schedule?
-                    // Logic says: "Telat {$jam} jam".
-                    // Usually late is from Jam Masuk.
-                    // Legacy code: $diff = $now->getTimestamp() - $awalAbsenMasuk->getTimestamp();  <-- Wait, Awal Absen Masuk is 1 hr before.
-                    // This creates a weird "Late by 1 hour" even if just on time?
-                    // Ah, legacy logic was: $diff = $now - $awalAbsenMasuk.
-                    // If I scan exactly at Jam Masuk (1 hr after Awal), diff is 1 hour.
-                    // That seems odd. But I will port EXACT legacy logic to ensure consistency.
-                    // Actually, let's fix it to be meaningful if possible, or stick to exact port.
-                    // Exact port:
-                    $diff = $now->timestamp - $awalAbsenMasuk->timestamp;
+                    // Calculate late duration from the tolerance deadline (batasTelat)
+                    // This ensures accurate late time calculation
+                    $diff = $now->timestamp - $batasTelat->timestamp;
                     $jam = floor($diff / 3600);
                     $menit = floor(($diff % 3600) / 60);
-                    $keterangan = "Telat {$jam} jam {$menit} menit";
-                    // Note: If I am on time (Jam Masuk), $diff is 3600 (1 hour). Keterangan: "Telat 1 jam...".
-                    // This seems like a bug in legacy or intentional.
-                    // Given "Telat" implies late, maybe I should check if it's actually late?
-                    // Logic: if ($now > $batasTelat) -> set keterangan.
-                    // So yes, it only runs when late.
+
+                    // Format the late message
+                    if ($jam > 0) {
+                        $keterangan = "Telat {$jam} jam {$menit} menit";
+                    } else {
+                        $keterangan = "Telat {$menit} menit";
+                    }
                 }
 
                 Attendance::create([

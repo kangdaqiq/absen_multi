@@ -42,34 +42,53 @@ class RfidController extends Controller
     private function handleTeacherScan($uid, $teacher, $apiKey)
     {
         try {
-            // Clean expired
+            // Clean expired sessions
             TeacherCheckoutSession::where('expires_at', '<', now())->delete();
 
-            TeacherCheckoutSession::create([
-                'teacher_id' => $teacher->id,
-                'teacher_name' => $teacher->nama,
-                'uid_rfid' => $uid,
-                'expires_at' => now()->addMinutes(30),
-                'created_at' => now()
-            ]);
+            // Check if teacher has an active open session
+            $activeSession = TeacherCheckoutSession::where('teacher_id', $teacher->id)
+                ->where('status', 'open')
+                ->where('expires_at', '>', now())
+                ->orderBy('created_at', 'desc')
+                ->first();
 
-            // CHECK ATTENDANCE SCHEDULE REMOVED (Gate Only)
-            // $attnResult = $this->attendanceService->handleAttendance($teacher);
+            if ($activeSession) {
+                // CLOSE GATE: Teacher taps again to close the gate
+                $activeSession->update(['status' => 'closed']);
 
-            $message = 'Guru authorized. Siswa dapat absen pulang.';
-            $extra = [
-                'type' => 'teacher_authorization',
-                'teacher_name' => $teacher->nama,
-                'valid_until' => now()->addMinutes(30)->format('Y-m-d H:i:s')
-            ];
+                $message = 'Gerbang ditutup. Siswa tidak dapat absen pulang.';
+                $extra = [
+                    'type' => 'gate_closed',
+                    'teacher_name' => $teacher->nama,
+                    'closed_at' => now()->format('Y-m-d H:i:s')
+                ];
 
-            // Attendance info removed from response
+                $this->logRequest($apiKey, 'gate_closed', $uid, true, 'Gate closed by: ' . $teacher->nama);
+                return $this->response(true, 'success', $message, 'ok', $extra);
+            } else {
+                // OPEN GATE: Create new session with 15-minute expiry
+                TeacherCheckoutSession::create([
+                    'teacher_id' => $teacher->id,
+                    'teacher_name' => $teacher->nama,
+                    'uid_rfid' => $uid,
+                    'status' => 'open',
+                    'expires_at' => now()->addMinutes(15),
+                    'created_at' => now()
+                ]);
 
-            $this->logRequest($apiKey, 'teacher_auth', $uid, true, 'Teacher authorized (Gate): ' . $teacher->nama);
-            return $this->response(true, 'success', $message, 'ok', $extra);
+                $message = 'Gerbang dibuka. Siswa dapat absen pulang selama 15 menit.';
+                $extra = [
+                    'type' => 'gate_opened',
+                    'teacher_name' => $teacher->nama,
+                    'valid_until' => now()->addMinutes(15)->format('Y-m-d H:i:s')
+                ];
+
+                $this->logRequest($apiKey, 'gate_opened', $uid, true, 'Gate opened by: ' . $teacher->nama);
+                return $this->response(true, 'success', $message, 'ok', $extra);
+            }
         } catch (\Exception $e) {
             Log::error("Teacher scan error: " . $e->getMessage());
-            return $this->response(false, 'gagal', 'Gagal membuat session authorization', 'error', ['type' => 'teacher_auth_failed']);
+            return $this->response(false, 'gagal', 'Gagal memproses permintaan', 'error', ['type' => 'teacher_scan_failed']);
         }
     }
 
@@ -317,8 +336,11 @@ class RfidController extends Controller
 
             // Case 2: Sudah Masuk, Belum Pulang
             if ($att && !$att->jam_pulang) {
-                // Check Teacher Session
-                $teacherSession = TeacherCheckoutSession::where('expires_at', '>', now())->orderBy('created_at', 'desc')->first();
+                // Check Teacher Session (only open gates)
+                $teacherSession = TeacherCheckoutSession::where('expires_at', '>', now())
+                    ->where('status', 'open')
+                    ->orderBy('created_at', 'desc')
+                    ->first();
 
                 // If still in check-in window and no teacher session, warn
                 if (!$teacherSession && $now->between($awalAbsenMasuk, $akhirAbsenMasuk)) {

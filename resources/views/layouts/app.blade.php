@@ -33,8 +33,14 @@
         <ul class="navbar-nav bg-gradient-primary sidebar sidebar-dark accordion" id="accordionSidebar">
 
             <!-- Sidebar - Brand -->
-            <a class="sidebar-brand d-flex align-items-center justify-content-center" href="{{ route('dashboard') }}">
-                <div class="sidebar-brand-text">Sistem Absensi</div>
+            <a class="sidebar-brand d-flex flex-column align-items-center justify-content-center py-4 mb-2"
+                href="{{ route('dashboard') }}" style="height: auto;">
+                <div class="sidebar-brand-icon mb-2">
+                    <img src="{{ asset('img/logo.png') }}" alt="Logo"
+                        style="width: 80px; height: 80px; object-fit: contain;">
+                </div>
+                <div class="sidebar-brand-text mx-3 small font-weight-bold"
+                    style="line-height: 1.2; text-align: center;">SMK Assuniyah<br>Tumijajar</div>
             </a>
 
             <hr class="sidebar-divider my-0">
@@ -201,13 +207,7 @@
 
             <hr class="sidebar-divider d-none d-md-block">
 
-            <!-- Logo at Bottom -->
-            <div class="text-center d-none d-md-block mb-3">
-                <img src="{{ asset('img/logo.png') }}" alt="Logo Sekolah" style="width: 80px; height: 80px; object-fit: contain; opacity: 0.9;">
-                <div class="mt-2">
-                    <small class="text-white-50">SMK Assuniyah Tumijajar</small>
-                </div>
-            </div>
+            <!-- Logo at Bottom Removed -->
 
             <div class="text-center d-none d-md-inline">
                 <button class="rounded-circle border-0" id="sidebarToggle"></button>
@@ -347,9 +347,9 @@
 
     <script>
         $(document).ready(function () {
-            // Auto-close alerts after 3 seconds
+            // Auto-close alerts after 3 seconds, excluding those with 'alert-static' class
             window.setTimeout(function () {
-                $(".alert").fadeTo(500, 0).slideUp(500, function () {
+                $(".alert:not(.alert-static)").fadeTo(500, 0).slideUp(500, function () {
                     $(this).remove();
                 });
             }, 3000);

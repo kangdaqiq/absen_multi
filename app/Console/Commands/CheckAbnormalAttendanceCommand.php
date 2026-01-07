@@ -10,10 +10,10 @@ use App\Models\MessageQueue;
 use App\Models\Setting;
 use Carbon\Carbon;
 
-class WeeklyAbsenceSummaryCommand extends Command
+class CheckAbnormalAttendanceCommand extends Command
 {
-    protected $signature = 'absen:weekly-absence-summary';
-    protected $description = 'Send weekly summary of students with frequent absences (Alpha/Bolos)';
+    protected $signature = 'absen:check-abnormal';
+    protected $description = 'Daily check for students with abnormal attendance (Alpha/Bolos) > Threshold';
 
     public function handle()
     {
@@ -23,17 +23,18 @@ class WeeklyAbsenceSummaryCommand extends Command
         $enabled = Setting::where('setting_key', 'absence_notification_enabled')->value('setting_value') ?? 'true';
 
         if ($enabled !== 'true') {
-            $this->info("Weekly absence summary is disabled in settings.");
+            $this->info("Abnormal attendance check is disabled in settings.");
             return;
         }
 
         $startDate = now()->subDays($periodDays)->format('Y-m-d');
         $endDate = now()->format('Y-m-d');
+        $today = now()->format('Y-m-d');
 
         $this->info("Checking absences from $startDate to $endDate (threshold: $threshold)...");
 
-        // Query students with frequent absences
-        $frequentAbsences = Attendance::selectRaw('student_id, COUNT(*) as absence_count')
+        // 1. First, find students who exceed the threshold in the period
+        $candidates = Attendance::selectRaw('student_id, COUNT(*) as absence_count')
             ->whereBetween('tanggal', [$startDate, $endDate])
             ->whereIn('status', ['A', 'B'])
             ->whereHas('student.kelas', function ($q) {
@@ -44,8 +45,26 @@ class WeeklyAbsenceSummaryCommand extends Command
             ->with(['student.kelas.waliKelas'])
             ->get();
 
-        if ($frequentAbsences->isEmpty()) {
+        if ($candidates->isEmpty()) {
             $this->info("No students with frequent absences found.");
+            return;
+        }
+
+        // 2. Filter: Only report if they are ALSO absent TODAY (A or B)
+        $frequentAbsences = collect();
+        foreach ($candidates as $candidate) {
+            $isAbsentToday = Attendance::where('student_id', $candidate->student_id)
+                ->where('tanggal', $today)
+                ->whereIn('status', ['A', 'B'])
+                ->exists();
+
+            if ($isAbsentToday) {
+                $frequentAbsences->push($candidate);
+            }
+        }
+
+        if ($frequentAbsences->isEmpty()) {
+            $this->info("Students found with high absences, but none are absent today. No report sent.");
             return;
         }
 
@@ -83,12 +102,12 @@ class WeeklyAbsenceSummaryCommand extends Command
             ];
         }
 
-        $this->info("Found " . $frequentAbsences->count() . " students with frequent absences.");
+        $this->info("Found " . $frequentAbsences->count() . " students to report.");
 
         // Send global report only
         $this->sendGlobalReport($byClass, $startDate, $endDate);
 
-        $this->info("✓ Weekly absence summary sent successfully.");
+        $this->info("✓ Abnormal attendance report sent successfully.");
     }
 
     private function sendGlobalReport($byClass, $startDate, $endDate)
@@ -109,7 +128,7 @@ class WeeklyAbsenceSummaryCommand extends Command
                 'status' => 'pending',
                 'created_at' => now()
             ]);
-            $this->info("Queued global report to {$kelas->nama_kelas} group");
+            $this->info("Queued report to {$kelas->nama_kelas} group");
         }
 
         // Send to teacher group if configured
@@ -121,7 +140,7 @@ class WeeklyAbsenceSummaryCommand extends Command
                 'status' => 'pending',
                 'created_at' => now()
             ]);
-            $this->info("Queued global report to teacher group");
+            $this->info("Queued report to teacher group");
         }
 
         if ($kelasWithGroupId->isEmpty() && !$teacherGroupId) {
@@ -131,8 +150,9 @@ class WeeklyAbsenceSummaryCommand extends Command
 
     private function buildGlobalMessage($byClass, $startDate, $endDate)
     {
-        $message = "⚠️ *LAPORAN MINGGUAN*\n";
-        $message .= "📅 Periode: " . Carbon::parse($startDate)->format('d/m/Y') . " - " . Carbon::parse($endDate)->format('d/m/Y') . "\n";
+        $message = "⚠️ *PERINGATAN SISWA BERMASALAH*\n";
+        $message .= "📅 Cek Periode: " . Carbon::parse($startDate)->format('d/m/Y') . " - " . Carbon::parse($endDate)->format('d/m/Y') . "\n";
+        $message .= "ℹ️ *Siswa di bawah ini Absen/Bolos HARI INI dan sudah melebihi batas toleransi.*\n";
         $message .= str_repeat("─", 40) . "\n\n";
 
         $totalStudents = 0;
@@ -150,14 +170,14 @@ class WeeklyAbsenceSummaryCommand extends Command
                 if ($studentData['bolos'] > 0)
                     $breakdown[] = "{$studentData['bolos']} Bolos";
 
-                $message .= "  • {$s->nama} - {$studentData['total']}x (" . implode(', ', $breakdown) . ")\n";
+                $message .= "  • {$s->nama} - Total {$studentData['total']}x (" . implode(', ', $breakdown) . ")\n";
             }
             $message .= "\n";
         }
 
         $message .= str_repeat("─", 40) . "\n";
-        $message .= "Total: *{$totalStudents} siswa* memerlukan perhatian khusus\n\n";
-        $message .= "_Mohon tindak lanjut untuk siswa tersebut_";
+        $message .= "Total: *{$totalStudents} siswa* bermasalah hari ini\n\n";
+        $message .= "_Laporan otomatis sistem absensi_";
 
         return $message;
     }

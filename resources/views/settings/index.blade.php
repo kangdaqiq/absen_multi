@@ -139,9 +139,17 @@
                                 <div class="form-group">
                                     <label>Periode Pengecekan (hari)</label>
                                     <input type="number" name="absence_check_period_days" class="form-control"
-                                        value="{{ $settings['absence_check_period_days'] ?? '7' }}" min="1" max="30">
-                                    <small class="text-muted">Periode pengecekan dalam hari (default: 7 hari
-                                        terakhir)</small>
+                                        value="{{ $settings['absence_check_period_days'] ?? '7' }}" min="1" max="180">
+                                    <small class="text-muted">Periode pengecekan dalam hari (default: 7 hari, max: 180
+                                        hari)</small>
+                                </div>
+
+                                <div class="form-group">
+                                    <label>Waktu Laporan Harian</label>
+                                    <input type="time" name="schedule_check_abnormal" class="form-control"
+                                        value="{{ $settings['schedule_check_abnormal'] ?? '16:00' }}">
+                                    <small class="text-muted">Waktu pengiriman laporan siswa bermasalah (default:
+                                        16:00)</small>
                                 </div>
 
                                 <div class="form-group">
@@ -150,17 +158,17 @@
                                             id="absence_notification_enabled" name="absence_notification_enabled"
                                             value="true" {{ ($settings['absence_notification_enabled'] ?? 'true') === 'true' ? 'checked' : '' }}>
                                         <label class="custom-control-label" for="absence_notification_enabled">
-                                            Aktifkan Notifikasi Mingguan
+                                            Aktifkan Notifikasi Harian Siswa Bermasalah
                                         </label>
                                     </div>
-                                    <small class="text-muted">Laporan dikirim setiap Senin jam 08:00 ke wali kelas dan orang
-                                        tua</small>
+                                    <small class="text-muted">Laporan dikirim setiap hari jam 16:00 jika ada siswa
+                                        bermasalah yang tidak hadir.</small>
                                 </div>
 
                                 <div class="alert alert-warning alert-static mt-2">
-                                    <strong>Laporan Mingguan:</strong> Sistem akan mengirim laporan siswa dengan
+                                    <strong>Laporan Harian:</strong> Sistem akan mengirim laporan siswa yang melebihi batas
                                     ketidakhadiran
-                                    berlebihan setiap Senin jam 08:00 ke wali kelas dan orang tua siswa.
+                                    dan <b>sedang tidak hadir hari ini</b>. Laporan dikirim ke grup kelas dan grup guru.
                                 </div>
                             </div>
                         </div>
@@ -245,15 +253,15 @@
                         let html = '';
                         data.groups.forEach(group => {
                             html += `
-                                        <button type="button" class="list-group-item list-group-item-action" 
-                                            onclick="selectWaGroup('${group.jid}')">
-                                            <div class="d-flex w-100 justify-content-between">
-                                                <h6 class="mb-1 font-weight-bold">${group.name}</h6>
-                                                <small class="text-muted">ID: ${group.jid.split('@')[0]}</small> 
-                                            </div>
-                                            <small class="text-muted d-block text-truncate">${group.jid}</small>
-                                        </button>
-                                    `;
+                                                <button type="button" class="list-group-item list-group-item-action" 
+                                                    onclick="selectWaGroup('${group.jid}')">
+                                                    <div class="d-flex w-100 justify-content-between">
+                                                        <h6 class="mb-1 font-weight-bold">${group.name}</h6>
+                                                        <small class="text-muted">ID: ${group.jid.split('@')[0]}</small> 
+                                                    </div>
+                                                    <small class="text-muted d-block text-truncate">${group.jid}</small>
+                                                </button>
+                                            `;
                         });
                         $('#waGroupList').html(html);
                     } else {

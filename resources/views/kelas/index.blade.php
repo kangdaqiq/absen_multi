@@ -119,8 +119,16 @@
                         </div>
                         <div class="form-group">
                             <label>ID Grup WhatsApp</label>
-                            <input type="text" name="wa_group_id" class="form-control"
-                                placeholder="Contoh: 120363XXXXXX@g.us">
+                            <div class="input-group">
+                                <input type="text" name="wa_group_id" id="tambah_wa_group_id" class="form-control"
+                                    placeholder="Contoh: 120363XXXXXX@g.us">
+                                <div class="input-group-append">
+                                    <button class="btn btn-primary" type="button"
+                                        onclick="loadWaGroups('tambah_wa_group_id')">
+                                        <i class="fab fa-whatsapp"></i> Pilih
+                                    </button>
+                                </div>
+                            </div>
                             <small class="form-text text-muted">Opsional. ID Grup WhatsApp untuk broadcast ke kelas
                                 ini.</small>
                         </div>
@@ -161,8 +169,16 @@
                         </div>
                         <div class="form-group">
                             <label>ID Grup WhatsApp</label>
-                            <input type="text" name="wa_group_id" id="edit_wa_group_id" class="form-control"
-                                placeholder="Contoh: 120363XXXXXX@g.us">
+                            <div class="input-group">
+                                <input type="text" name="wa_group_id" id="edit_wa_group_id" class="form-control"
+                                    placeholder="Contoh: 120363XXXXXX@g.us">
+                                <div class="input-group-append">
+                                    <button class="btn btn-primary" type="button"
+                                        onclick="loadWaGroups('edit_wa_group_id')">
+                                        <i class="fab fa-whatsapp"></i> Pilih
+                                    </button>
+                                </div>
+                            </div>
                             <small class="form-text text-muted">Opsional. ID Grup WhatsApp untuk broadcast ke kelas
                                 ini.</small>
                         </div>
@@ -200,6 +216,33 @@
     </div>
 @endsection
 
+<!-- WA Group Modal -->
+<div class="modal fade" id="waGroupModal" tabindex="-1" role="dialog" aria-labelledby="waGroupModalLabel"
+    aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="waGroupModalLabel">Pilih Grup WhatsApp</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div id="waGroupLoading" class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="sr-only">Loading...</span>
+                    </div>
+                    <p class="mt-2 text-muted">Mengambil daftar grup...</p>
+                </div>
+                <div id="waGroupError" class="alert alert-danger d-none"></div>
+                <div class="list-group" id="waGroupList">
+                    <!-- Groups will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 @push('scripts')
     <script>
         $(document).ready(function () {
@@ -220,9 +263,64 @@
             // Hapus
             $('#dataTable').on('click', '.btnHapus', function () {
                 var id = $(this).data('id');
-                $('#hapus_nama_kelas').text($(this).data('nama')); // Changed to match original target element
+                $('#hapus_nama_kelas').text($(this).data('nama'));
                 $('#formHapusKelas').attr('action', '{{ secure_url('kelas') }}/' + id);
             });
         });
+
+        // WA Group Selector Logic
+        let targetInputId = '';
+
+        function loadWaGroups(inputId) {
+            targetInputId = inputId;
+            $('#waGroupModal').modal('show');
+
+            // Reset state
+            $('#waGroupLoading').removeClass('d-none');
+            $('#waGroupList').html('');
+            $('#waGroupError').addClass('d-none');
+
+            // Fetch groups
+            fetch('{{ route("api.whatsapp.groups") }}')
+                .then(response => response.json())
+                .then(data => {
+                    $('#waGroupLoading').addClass('d-none');
+                    if (data.success) {
+                        if (data.groups.length === 0) {
+                            $('#waGroupList').html('<div class="text-center text-muted p-3">Tidak ada grup ditemukan.</div>');
+                            return;
+                        }
+
+                        let html = '';
+                        data.groups.forEach(group => {
+                            html += `
+                                    <button type="button" class="list-group-item list-group-item-action" 
+                                        onclick="selectWaGroup('${group.JID}')">
+                                        <div class="d-flex w-100 justify-content-between">
+                                            <h6 class="mb-1 font-weight-bold">${group.Name}</h6>
+                                            <small class="text-muted">${group.id}</small> 
+                                        </div>
+                                        <small class="text-muted d-block text-truncate">${group.JID}</small>
+                                    </button>
+                                `;
+                        });
+                        $('#waGroupList').html(html);
+                    } else {
+                        $('#waGroupError').text(data.message || 'Gagal mengambil data grup.').removeClass('d-none');
+                    }
+                })
+                .catch(error => {
+                    $('#waGroupLoading').addClass('d-none');
+                    $('#waGroupError').text('Terjadi kesalahan koneksi.').removeClass('d-none');
+                    console.error('Error:', error);
+                });
+        }
+
+        function selectWaGroup(jid) {
+            if (targetInputId) {
+                document.getElementById(targetInputId).value = jid;
+            }
+            $('#waGroupModal').modal('hide');
+        }
     </script>
 @endpush

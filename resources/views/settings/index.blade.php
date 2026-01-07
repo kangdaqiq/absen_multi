@@ -109,15 +109,24 @@
 
                                 <div class="form-group">
                                     <label>Target Jadwal Guru (Nomor WA)</label>
-                                    <input type="text" name="report_target_jid" class="form-control"
-                                        value="{{ $settings['report_target_jid'] ?? '' }}"
-                                        placeholder="Contoh: 628123456789@s.whatsapp.net">
+                                    <div class="input-group">
+                                        <input type="text" name="report_target_jid" id="report_target_jid"
+                                            class="form-control" value="{{ $settings['report_target_jid'] ?? '' }}"
+                                            placeholder="Contoh: 628123456789@s.whatsapp.net">
+                                        <div class="input-group-append">
+                                            <button class="btn btn-primary" type="button"
+                                                onclick="loadWaGroups('report_target_jid')">
+                                                <i class="fab fa-whatsapp"></i> Pilih Grup
+                                            </button>
+                                        </div>
+                                    </div>
                                     <small class="text-muted">Khusus untuk jadwal guru jam 06:00. Format:
                                         628xxx@s.whatsapp.net (Grup/Pribadi)</small>
                                 </div>
 
                                 <div class="alert alert-info alert-static mt-2 mb-4">
-                                    <strong>Tips:</strong> Untuk mendapatkan ID Grup WhatsApp (`@g.us`), gunakan fitur "Get Group ID"
+                                    <strong>Tips:</strong> Untuk mendapatkan ID Grup WhatsApp (`@g.us`), gunakan fitur "Get
+                                    Group ID"
                                     pada tools WA Gateway Anda, atau gunakan nomor pribadi (`@s.whatsapp.net`).
                                 </div>
 
@@ -153,7 +162,8 @@
                                 </div>
 
                                 <div class="alert alert-warning alert-static mt-2">
-                                    <strong>Laporan Mingguan:</strong> Sistem akan mengirim laporan siswa dengan ketidakhadiran
+                                    <strong>Laporan Mingguan:</strong> Sistem akan mengirim laporan siswa dengan
+                                    ketidakhadiran
                                     berlebihan setiap Senin jam 08:00 ke wali kelas dan orang tua siswa.
                                 </div>
                             </div>
@@ -170,6 +180,33 @@
     </div>
 @endsection
 
+<!-- WA Group Modal -->
+<div class="modal fade" id="waGroupModal" tabindex="-1" role="dialog" aria-labelledby="waGroupModalLabel"
+    aria-hidden="true">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="waGroupModalLabel">Pilih Grup WhatsApp</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div id="waGroupLoading" class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="sr-only">Loading...</span>
+                    </div>
+                    <p class="mt-2 text-muted">Mengambil daftar grup...</p>
+                </div>
+                <div id="waGroupError" class="alert alert-danger d-none"></div>
+                <div class="list-group" id="waGroupList">
+                    <!-- Groups will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 @push('scripts')
     <script>
         // Logo preview
@@ -183,5 +220,60 @@
                 reader.readAsDataURL(file);
             }
         });
+
+        // WA Group Selector Logic
+        let targetInputId = '';
+
+        function loadWaGroups(inputId) {
+            targetInputId = inputId;
+            $('#waGroupModal').modal('show');
+
+            // Reset state
+            $('#waGroupLoading').removeClass('d-none');
+            $('#waGroupList').html('');
+            $('#waGroupError').addClass('d-none');
+
+            // Fetch groups
+            fetch('{{ route("api.whatsapp.groups") }}')
+                .then(response => response.json())
+                .then(data => {
+                    $('#waGroupLoading').addClass('d-none');
+                    if (data.success) {
+                        if (data.groups.length === 0) {
+                            $('#waGroupList').html('<div class="text-center text-muted p-3">Tidak ada grup ditemukan.</div>');
+                            return;
+                        }
+
+                        let html = '';
+                        data.groups.forEach(group => {
+                            html += `
+                                    <button type="button" class="list-group-item list-group-item-action" 
+                                        onclick="selectWaGroup('${group.JID}')">
+                                        <div class="d-flex w-100 justify-content-between">
+                                            <h6 class="mb-1 font-weight-bold">${group.Name}</h6>
+                                            <small class="text-muted">${group.id}</small> 
+                                        </div>
+                                        <small class="text-muted d-block text-truncate">${group.JID}</small>
+                                    </button>
+                                `;
+                        });
+                        $('#waGroupList').html(html);
+                    } else {
+                        $('#waGroupError').text(data.message || 'Gagal mengambil data grup.').removeClass('d-none');
+                    }
+                })
+                .catch(error => {
+                    $('#waGroupLoading').addClass('d-none');
+                    $('#waGroupError').text('Terjadi kesalahan koneksi.').removeClass('d-none');
+                    console.error('Error:', error);
+                });
+        }
+
+        function selectWaGroup(jid) {
+            if (targetInputId) {
+                document.getElementById(targetInputId).value = jid;
+            }
+            $('#waGroupModal').modal('hide');
+        }
     </script>
 @endpush

@@ -112,6 +112,9 @@ Route::middleware('auth')->group(function () {
         // Absence Report
         Route::get('/absence-report', [App\Http\Controllers\AbsenceReportController::class, 'index'])->name('absence-report.index');
         Route::get('/absence-report/export', [App\Http\Controllers\AbsenceReportController::class, 'export'])->name('absence-report.export');
+
+        // WA Groups Proxy
+        Route::get('/api/whatsapp/groups', [App\Http\Controllers\Api\WhatsappController::class, 'getGroups'])->name('api.whatsapp.groups');
     });
 });
 

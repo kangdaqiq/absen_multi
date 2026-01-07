@@ -74,7 +74,7 @@
                                         data-pulang="{{ $row->jam_pulang }}" data-toggle="modal" data-target="#modalEditStatus">
                                         <i class="fas fa-edit"></i>
                                     </button>
-                                    @if($row->jam_masuk != '-' || $row->jam_pulang != '-')
+                                    @if($row->absen_id)
                                         <button class="btn btn-sm btn-danger btnHapus" data-id="{{ $row->id }}"
                                             data-nama="{{ $row->nama }}" data-toggle="modal" data-target="#modalHapus">
                                             <i class="fas fa-trash"></i>

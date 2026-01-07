@@ -15,7 +15,26 @@ class SettingsController extends Controller
 
     public function update(Request $request)
     {
-        $data = $request->except('_token', '_method');
+        // Handle logo upload
+        if ($request->hasFile('logo')) {
+            $request->validate([
+                'logo' => 'required|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
+            ]);
+
+            $file = $request->file('logo');
+            $filename = 'logo.' . $file->getClientOriginalExtension();
+
+            // Move to public/img directory
+            $file->move(public_path('img'), $filename);
+
+            // Save logo filename to settings
+            Setting::updateOrCreate(
+                ['setting_key' => 'logo_filename'],
+                ['setting_value' => $filename]
+            );
+        }
+
+        $data = $request->except('_token', '_method', 'logo');
 
         foreach ($data as $key => $value) {
             Setting::updateOrCreate(

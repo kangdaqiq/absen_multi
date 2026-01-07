@@ -82,21 +82,18 @@
         }
 
         .login-icon {
-            width: 80px;
-            height: 80px;
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 50%;
+            width: 120px;
+            height: 120px;
             display: flex;
             align-items: center;
             justify-content: center;
             margin: 0 auto 20px;
-            backdrop-filter: blur(10px);
-            border: 3px solid rgba(255, 255, 255, 0.3);
         }
 
-        .login-icon i {
-            font-size: 40px;
-            color: white;
+        .login-icon img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
         }
 
         .login-header h1 {
@@ -220,7 +217,7 @@
                 <div class="card login-card border-0">
                     <div class="login-header">
                         <div class="login-icon">
-                            <i class="fas fa-graduation-cap"></i>
+                            <img src="{{ asset('img/logo.png') }}" alt="Logo Sekolah">
                         </div>
                         <h1>Selamat Datang</h1>
                         <p>Sistem Absensi SMK Assuniyah Tumijajar</p>

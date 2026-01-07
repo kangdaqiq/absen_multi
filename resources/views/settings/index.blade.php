@@ -12,7 +12,7 @@
                     <h6 class="m-0 font-weight-bold text-primary">Konfigurasi Umum</h6>
                 </div>
                 <div class="card-body">
-                    <form action="{{ route('settings.update') }}" method="POST">
+                    <form action="{{ route('settings.update') }}" method="POST" enctype="multipart/form-data">
                         @csrf
                         @method('PUT')
 
@@ -40,6 +40,18 @@
                                 value="{{ $settings['checkout_tolerance_minutes'] ?? '15' }}" min="0" max="60"
                                 placeholder="15">
                             <small class="text-muted">Guru bisa buka absensi pulang x menit sebelum jam pulang</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Logo Sekolah</label>
+                            <div class="mb-2">
+                                <img src="{{ asset('img/' . ($settings['logo_filename'] ?? 'logo.png')) }}" 
+                                     alt="Logo" 
+                                     id="logo-preview" 
+                                     style="max-width: 150px; max-height: 150px; border: 1px solid #ddd; padding: 5px; border-radius: 5px;">
+                            </div>
+                            <input type="file" name="logo" class="form-control-file" id="logo-input" accept="image/*">
+                            <small class="text-muted">Format: JPG, PNG, GIF, SVG. Maksimal 2MB</small>
                         </div>
 
                         <hr>
@@ -147,3 +159,19 @@
         </div>
     </div>
 @endsection
+
+@push('scripts')
+<script>
+    // Logo preview
+    document.getElementById('logo-input').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById('logo-preview').src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+</script>
+@endpush

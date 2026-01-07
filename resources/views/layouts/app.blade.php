@@ -34,10 +34,7 @@
 
             <!-- Sidebar - Brand -->
             <a class="sidebar-brand d-flex align-items-center justify-content-center" href="{{ route('dashboard') }}">
-                <div class="sidebar-brand-icon" style="width: 50px; height: 50px;">
-                    <img src="{{ asset('img/logo.png') }}" alt="Logo" style="width: 100%; height: auto;">
-                </div>
-                <!-- <div class="sidebar-brand-text mx-3">Absensi</div> -->
+                <div class="sidebar-brand-text">Sistem Absensi</div>
             </a>
 
             <hr class="sidebar-divider my-0">
@@ -203,6 +200,14 @@
             @endif
 
             <hr class="sidebar-divider d-none d-md-block">
+
+            <!-- Logo at Bottom -->
+            <div class="text-center d-none d-md-block mb-3">
+                <img src="{{ asset('img/logo.png') }}" alt="Logo Sekolah" style="width: 80px; height: 80px; object-fit: contain; opacity: 0.9;">
+                <div class="mt-2">
+                    <small class="text-white-50">SMK Assuniyah Tumijajar</small>
+                </div>
+            </div>
 
             <div class="text-center d-none d-md-inline">
                 <button class="rounded-circle border-0" id="sidebarToggle"></button>

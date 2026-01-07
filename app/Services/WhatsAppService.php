@@ -82,8 +82,7 @@ class WhatsAppService
                 "Assalamualaikum, *{$name}*,\n\n" .
                 "📍 Jam Masuk: {$jamMasuk}\n" .
                 "🕐 Jam Pulang: {$time}\n" .
-                "⏱️ Durasi: {$hours} jam {$mins} menit\n" .
-                "👤 Diizinkan oleh: {$authorizer}\n\n" .
+                "⏱️ Durasi Belajar: {$hours} jam {$mins} menit\n" .
                 "Terima kasih telah mengikuti kegiatan hari ini.\n\n" .
                 "Hati-hati di jalan! 🙏";
             $this->queueMessage($phone, $msg);
@@ -95,8 +94,7 @@ class WhatsAppService
                 "Assalamualaikum, Anak Anda, *{$name}*, telah absen pulang.\n\n" .
                 "📍 Jam Masuk: {$jamMasuk}\n" .
                 "🕐 Jam Pulang: {$time}\n" .
-                "⏱️ Durasi: {$hours} jam {$mins} menit\n" .
-                "👤 Diizinkan oleh: {$authorizer}\n\n" .
+                "⏱️ Durasi Belajar: {$hours} jam {$mins} menit\n" .
                 "_Notifikasi otomatis dari sistem absensi sekolah._";
             $this->queueMessage($phoneOrtu, $msgOrtu);
         }

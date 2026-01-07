@@ -35,11 +35,21 @@ class WhatsappController extends Controller
 
                 // Flexible parser: seek array check keys 'results' or 'data' or use body if array
                 $rawGroups = [];
-                if (isset($responseBody['results']) && is_array($responseBody['results'])) {
+
+                // Case: results.data (As per User Provided JSON)
+                if (isset($responseBody['results']['data']) && is_array($responseBody['results']['data'])) {
+                    $rawGroups = $responseBody['results']['data'];
+                }
+                // Case: results (Direct array)
+                elseif (isset($responseBody['results']) && is_array($responseBody['results'])) {
                     $rawGroups = $responseBody['results'];
-                } elseif (isset($responseBody['data']) && is_array($responseBody['data'])) {
+                }
+                // Case: data (Direct array)
+                elseif (isset($responseBody['data']) && is_array($responseBody['data'])) {
                     $rawGroups = $responseBody['data'];
-                } elseif (is_array($responseBody)) {
+                }
+                // Case: Root array
+                elseif (is_array($responseBody)) {
                     $rawGroups = $responseBody;
                 }
 

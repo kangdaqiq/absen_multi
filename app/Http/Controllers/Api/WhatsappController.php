@@ -30,15 +30,37 @@ class WhatsappController extends Controller
                 ->get($endpoint);
 
             if ($response->successful()) {
-                $data = $response->json();
+                $responseBody = $response->json();
+                Log::info("WA Get Groups Response: " . json_encode($responseBody)); // Debug log
 
-                // Assuming data structure matches documentation: 
-                // { "code": 200, "message": "Success", "results": [ { "JID": "...", "Name": "..." } ] }
+                // Flexible parser: seek array check keys 'results' or 'data' or use body if array
+                $rawGroups = [];
+                if (isset($responseBody['results']) && is_array($responseBody['results'])) {
+                    $rawGroups = $responseBody['results'];
+                } elseif (isset($responseBody['data']) && is_array($responseBody['data'])) {
+                    $rawGroups = $responseBody['data'];
+                } elseif (is_array($responseBody)) {
+                    $rawGroups = $responseBody;
+                }
 
-                $groups = $data['results'] ?? [];
+                // Standardize Output
+                $groups = [];
+                foreach ($rawGroups as $g) {
+                    // Handle variations in key names (case insensitive search or check common keys)
+                    $name = $g['name'] ?? $g['Name'] ?? $g['subject'] ?? $g['Subject'] ?? 'Unknown Group'; // Handle Name/Subject
+                    $jid = $g['id'] ?? $g['jid'] ?? $g['JID'] ?? $g['chatId'] ?? null; // Handle ID/JID
+
+                    if ($jid) {
+                        $groups[] = [
+                            'name' => $name,
+                            'jid' => $jid
+                        ];
+                    }
+                }
+
                 // Sort by name
                 usort($groups, function ($a, $b) {
-                    return strcasecmp($a['Name'], $b['Name']);
+                    return strcasecmp($a['name'], $b['name']);
                 });
 
                 return response()->json([

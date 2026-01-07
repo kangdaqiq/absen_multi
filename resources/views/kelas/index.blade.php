@@ -285,6 +285,8 @@
                 .then(response => response.json())
                 .then(data => {
                     $('#waGroupLoading').addClass('d-none');
+                    console.log("WA Groups Data:", data); // Debug
+
                     if (data.success) {
                         if (data.groups.length === 0) {
                             $('#waGroupList').html('<div class="text-center text-muted p-3">Tidak ada grup ditemukan.</div>');
@@ -295,12 +297,12 @@
                         data.groups.forEach(group => {
                             html += `
                                     <button type="button" class="list-group-item list-group-item-action" 
-                                        onclick="selectWaGroup('${group.JID}')">
+                                        onclick="selectWaGroup('${group.jid}')">
                                         <div class="d-flex w-100 justify-content-between">
-                                            <h6 class="mb-1 font-weight-bold">${group.Name}</h6>
-                                            <small class="text-muted">${group.id}</small> 
+                                            <h6 class="mb-1 font-weight-bold">${group.name}</h6>
+                                            <small class="text-muted">ID: ${group.jid.split('@')[0]}</small> 
                                         </div>
-                                        <small class="text-muted d-block text-truncate">${group.JID}</small>
+                                        <small class="text-muted d-block text-truncate">${group.jid}</small>
                                     </button>
                                 `;
                         });

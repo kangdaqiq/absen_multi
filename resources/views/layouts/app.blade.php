@@ -37,11 +37,11 @@
             <a class="sidebar-brand d-flex flex-column align-items-center justify-content-center py-4 mb-2"
                 href="{{ route('dashboard') }}" style="height: auto;">
                 <div class="sidebar-brand-icon mb-2">
-                    <img src="{{ asset('img/logo.png') }}" alt="Logo"
+                    <img src="{{ asset('img/' . $school_logo) }}" alt="Logo"
                         style="width: 80px; height: 80px; object-fit: contain;">
                 </div>
                 <div class="sidebar-brand-text mx-3 small font-weight-bold"
-                    style="line-height: 1.2; text-align: center;">SMK Assuniyah<br>Tumijajar</div>
+                    style="line-height: 1.2; text-align: center;">{{ $school_name }}</div>
             </a>
 
             <hr class="sidebar-divider my-0">
@@ -230,7 +230,7 @@
                         <i class="fa fa-bars"></i>
                     </button>
 
-                    <h5 class="font-weight-bold mb-0 ml-3">Sistem Absensi SMK Assuniyah Tumijajar</h5>
+                    <h5 class="font-weight-bold mb-0 ml-3">Sistem Absensi {{ $school_name }}</h5>
 
                     <ul class="navbar-nav ml-auto">
 
@@ -292,7 +292,7 @@
             <footer class="sticky-footer bg-white">
                 <div class="container my-auto">
                     <div class="copyright text-center my-auto">
-                        <span>&copy; {{ date('Y') }} SMK Assuniyah Tumijajar - developed with ❤️ by KangDaQiQ</span>
+                        <span>&copy; {{ date('Y') }} {{ $school_name }} - developed with ❤️ by KangDaQiQ</span>
                     </div>
                 </div>
             </footer>

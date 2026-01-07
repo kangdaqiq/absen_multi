@@ -217,10 +217,10 @@
                 <div class="card login-card border-0">
                     <div class="login-header">
                         <div class="login-icon">
-                            <img src="{{ asset('img/logo.png') }}" alt="Logo Sekolah">
+                            <img src="{{ asset('img/' . $school_logo) }}" alt="Logo Sekolah">
                         </div>
                         <h1>Selamat Datang</h1>
-                        <p>Sistem Absensi SMK Assuniyah Tumijajar</p>
+                        <p>Sistem Absensi {{ $school_name }}</p>
                     </div>
 
                     <div class="login-body">

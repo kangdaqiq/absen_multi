@@ -124,11 +124,7 @@
                                         628xxx@s.whatsapp.net (Grup/Pribadi)</small>
                                 </div>
 
-                                <div class="alert alert-info alert-static mt-2 mb-4">
-                                    <strong>Tips:</strong> Untuk mendapatkan ID Grup WhatsApp (`@g.us`), gunakan fitur "Get
-                                    Group ID"
-                                    pada tools WA Gateway Anda, atau gunakan nomor pribadi (`@s.whatsapp.net`).
-                                </div>
+
 
                                 <hr>
                                 <h6 class="font-weight-bold text-primary">Deteksi Ketidakhadiran Berlebihan</h6>
@@ -249,15 +245,15 @@
                         let html = '';
                         data.groups.forEach(group => {
                             html += `
-                                    <button type="button" class="list-group-item list-group-item-action" 
-                                        onclick="selectWaGroup('${group.jid}')">
-                                        <div class="d-flex w-100 justify-content-between">
-                                            <h6 class="mb-1 font-weight-bold">${group.name}</h6>
-                                            <small class="text-muted">ID: ${group.jid.split('@')[0]}</small> 
-                                        </div>
-                                        <small class="text-muted d-block text-truncate">${group.jid}</small>
-                                    </button>
-                                `;
+                                        <button type="button" class="list-group-item list-group-item-action" 
+                                            onclick="selectWaGroup('${group.jid}')">
+                                            <div class="d-flex w-100 justify-content-between">
+                                                <h6 class="mb-1 font-weight-bold">${group.name}</h6>
+                                                <small class="text-muted">ID: ${group.jid.split('@')[0]}</small> 
+                                            </div>
+                                            <small class="text-muted d-block text-truncate">${group.jid}</small>
+                                        </button>
+                                    `;
                         });
                         $('#waGroupList').html(html);
                     } else {

@@ -218,7 +218,7 @@
 
 <!-- WA Group Modal -->
 <div class="modal fade" id="waGroupModal" tabindex="-1" role="dialog" aria-labelledby="waGroupModalLabel"
-    aria-hidden="true">
+    aria-hidden="true" style="z-index: 100000;">
     <div class="modal-dialog modal-lg" role="document">
         <div class="modal-content">
             <div class="modal-header">

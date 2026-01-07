@@ -182,7 +182,7 @@
 
 <!-- WA Group Modal -->
 <div class="modal fade" id="waGroupModal" tabindex="-1" role="dialog" aria-labelledby="waGroupModalLabel"
-    aria-hidden="true">
+    aria-hidden="true" style="z-index: 100000;">
     <div class="modal-dialog modal-lg" role="document">
         <div class="modal-content">
             <div class="modal-header">
@@ -247,15 +247,15 @@
                         let html = '';
                         data.groups.forEach(group => {
                             html += `
-                                    <button type="button" class="list-group-item list-group-item-action" 
-                                        onclick="selectWaGroup('${group.JID}')">
-                                        <div class="d-flex w-100 justify-content-between">
-                                            <h6 class="mb-1 font-weight-bold">${group.Name}</h6>
-                                            <small class="text-muted">${group.id}</small> 
-                                        </div>
-                                        <small class="text-muted d-block text-truncate">${group.JID}</small>
-                                    </button>
-                                `;
+                                        <button type="button" class="list-group-item list-group-item-action" 
+                                            onclick="selectWaGroup('${group.JID}')">
+                                            <div class="d-flex w-100 justify-content-between">
+                                                <h6 class="mb-1 font-weight-bold">${group.Name}</h6>
+                                                <small class="text-muted">${group.id}</small> 
+                                            </div>
+                                            <small class="text-muted d-block text-truncate">${group.JID}</small>
+                                        </button>
+                                    `;
                         });
                         $('#waGroupList').html(html);
                     } else {

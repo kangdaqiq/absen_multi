@@ -6,7 +6,7 @@ use App\Models\MessageQueue;
 
 class WhatsAppService
 {
-    public function sendEnrollSuccess($name, $phone, $uid, $type = 'Kartu RFID')
+    public function sendEnrollSuccess($name, $phone, $uid, $type = 'Kartu RFID', $phoneOrtu = null)
     {
         if (!$phone)
             return;
@@ -19,11 +19,22 @@ class WhatsAppService
             "_Terima kasih telah melakukan registrasi._ 🙏";
 
         $this->queueMessage($phone, $msg);
+
+        // Send to parent if phone number exists
+        if ($phoneOrtu) {
+            $msgOrtu = "✨ *PENDAFTARAN BERHASIL* ✨\n\n" .
+                "Anak Anda, *{$name}* 👋,\n\n" .
+                "Kartu/Perangkat *{$type}* telah berhasil didaftarkan ke sistem absensi sekolah.\n\n" .
+                "🆔 ID Kartu: `{$uid}`\n" .
+                "📅 Tanggal: " . now()->translatedFormat('l, d F Y') . "\n\n" .
+                "_Terima kasih telah melakukan registrasi._ 🙏";
+            $this->queueMessage($phoneOrtu, $msgOrtu);
+        }
     }
 
 
 
-    public function sendCheckIn($name, $phone, $time, $status, $keterangan = null)
+    public function sendCheckIn($name, $phone, $time, $status, $keterangan = null, $phoneOrtu = null)
     {
         if (!$phone)
             return;
@@ -34,15 +45,26 @@ class WhatsAppService
         $msg = "✅ Absen Masuk Berhasil\n\n" .
             "Halo *{$name}*,\n\n" .
             "📅 Tanggal: " . now()->format('d/m/Y') . "\n" .
-            "� Jam Masuk: {$time}\n" .
+            "🕐 Jam Masuk: {$time}\n" .
             "📊 Status: {$statusText}{$ketText}\n\n" .
             "Selamat belajar! 📚\n\n" .
             "Jangan lupa absen pulang ya!";
 
         $this->queueMessage($phone, $msg);
+
+        // Send to parent if phone number exists
+        if ($phoneOrtu) {
+            $msgOrtu = "✅ Absen Masuk Berhasil\n\n" .
+                "Anak Anda, *{$name}*, telah absen masuk.\n\n" .
+                "📅 Tanggal: " . now()->format('d/m/Y') . "\n" .
+                "🕐 Jam Masuk: {$time}\n" .
+                "📊 Status: {$statusText}{$ketText}\n\n" .
+                "_Notifikasi otomatis dari sistem absensi sekolah._";
+            $this->queueMessage($phoneOrtu, $msgOrtu);
+        }
     }
 
-    public function sendCheckOut($name, $phone, $time, $hours, $mins, $authorizer, $jamMasuk = '-')
+    public function sendCheckOut($name, $phone, $time, $hours, $mins, $authorizer, $jamMasuk = '-', $phoneOrtu = null)
     {
         if (!$phone)
             return;
@@ -50,13 +72,25 @@ class WhatsAppService
         $msg = "🏠 Absen Pulang Berhasil\n\n" .
             "Halo *{$name}*,\n\n" .
             "📍 Jam Masuk: {$jamMasuk}\n" .
-            "� Jam Pulang: {$time}\n" .
+            "🕐 Jam Pulang: {$time}\n" .
             "⏱️ Durasi: {$hours} jam {$mins} menit\n" .
-            "� Diizinkan oleh: {$authorizer}\n\n" .
+            "👤 Diizinkan oleh: {$authorizer}\n\n" .
             "Terima kasih telah mengikuti kegiatan hari ini.\n\n" .
             "Hati-hati di jalan! 🙏";
 
         $this->queueMessage($phone, $msg);
+
+        // Send to parent if phone number exists
+        if ($phoneOrtu) {
+            $msgOrtu = "🏠 Absen Pulang Berhasil\n\n" .
+                "Anak Anda, *{$name}*, telah absen pulang.\n\n" .
+                "📍 Jam Masuk: {$jamMasuk}\n" .
+                "🕐 Jam Pulang: {$time}\n" .
+                "⏱️ Durasi: {$hours} jam {$mins} menit\n" .
+                "👤 Diizinkan oleh: {$authorizer}\n\n" .
+                "_Notifikasi otomatis dari sistem absensi sekolah._";
+            $this->queueMessage($phoneOrtu, $msgOrtu);
+        }
     }
 
     private function queueMessage($phone, $message)

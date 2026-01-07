@@ -237,7 +237,7 @@ class RfidController extends Controller
 
                 // WA Notification
                 try {
-                    $this->wa->sendEnrollSuccess($siswa->nama, $siswa->no_wa, $uid, 'Kartu Siswa');
+                    $this->wa->sendEnrollSuccess($siswa->nama, $siswa->no_wa, $uid, 'Kartu Siswa', $siswa->wa_ortu);
                 } catch (\Exception $e) {
                     Log::error("WA Enroll Error: " . $e->getMessage());
                 }
@@ -374,7 +374,7 @@ class RfidController extends Controller
                 // WA
                 $hours = floor($totalSeconds / 3600);
                 $mins = floor(($totalSeconds % 3600) / 60);
-                $this->wa->sendCheckOut($siswa->nama, $siswa->no_wa, $now->format('H:i'), $hours, $mins, $teacherSession->teacher_name, $masuk->format('H:i'));
+                $this->wa->sendCheckOut($siswa->nama, $siswa->no_wa, $now->format('H:i'), $hours, $mins, $teacherSession->teacher_name, $masuk->format('H:i'), $siswa->wa_ortu);
 
                 $this->logRequest($apiKey, 'checkout_success', $uid, true, 'Pulang: ' . $siswa->nama);
                 return $this->response(true, 'success', 'Absen pulang berhasil', 'ok', [
@@ -423,7 +423,7 @@ class RfidController extends Controller
                 ]);
                 DB::commit();
 
-                $this->wa->sendCheckIn($siswa->nama, $siswa->no_wa, $now->format('H:i'), $status, $keterangan);
+                $this->wa->sendCheckIn($siswa->nama, $siswa->no_wa, $now->format('H:i'), $status, $keterangan, $siswa->wa_ortu);
 
                 $this->logRequest($apiKey, 'checkin_success', $uid, true, 'Masuk: ' . $siswa->nama);
                 return $this->response(true, 'success', 'Absen masuk berhasil', 'ok', [

@@ -232,6 +232,82 @@ class DailyReportCommand extends Command
             $this->info("Queued report for {$kelas->nama_kelas} -> {$wali->nama} ({$wali->no_wa})");
         }
 
+
+        // --- NEW: Send Notifications to Alpha Students and Parents ---
+        $this->info("Processing alpha student notifications...");
+
+        // Get all alpha students with their full data
+        $alphaStudentIds = [];
+        foreach ($siswaAll as $s) {
+            if (!$attendance->has($s->id)) {
+                // No attendance record = Alpha
+                $alphaStudentIds[] = $s->id;
+            }
+        }
+
+        if (!empty($alphaStudentIds)) {
+            $alphaStudents = Siswa::with('kelas')
+                ->whereIn('id', $alphaStudentIds)
+                ->get();
+
+            foreach ($alphaStudents as $student) {
+                $studentName = $student->nama;
+                $studentPhone = $student->no_wa;
+                $parentPhone = $student->wa_ortu;
+                $kelasName = $student->kelas->nama_kelas ?? '-';
+
+                // Send to student if phone exists
+                if ($studentPhone) {
+                    $msgStudent = "❌ *Pemberitahuan Ketidakhadiran*\n\n" .
+                        "Assalamualaikum, *{$studentName}*,\n\n" .
+                        "📅 Tanggal: " . now()->format('d/m/Y') . "\n" .
+                        "📊 Status: Alpha (Tidak Hadir)\n\n" .
+                        "Anda tercatat tidak hadir hari ini tanpa keterangan.\n" .
+                        "Mohon segera konfirmasi ke wali kelas atau bagian kesiswaan.\n\n" .
+                        "_Notifikasi otomatis dari sistem absensi sekolah._";
+
+                    MessageQueue::create([
+                        'phone_number' => $studentPhone,
+                        'message' => $msgStudent,
+                        'status' => 'pending',
+                        'created_at' => now()
+                    ]);
+
+                    $this->info("Queued alpha notification to student: {$studentName} ({$studentPhone})");
+                }
+
+                // Send to parent if phone exists
+                if ($parentPhone) {
+                    $msgParent = "❌ *Pemberitahuan Ketidakhadiran Anak*\n\n" .
+                        "Assalamualaikum, Orang Tua/Wali dari *{$studentName}*,\n\n" .
+                        "📅 Tanggal: " . now()->format('d/m/Y') . "\n" .
+                        "📊 Status: Alpha (Tidak Hadir)\n" .
+                        "⚠️ Kelas: {$kelasName}\n\n" .
+                        "Anak Anda tercatat tidak hadir hari ini tanpa keterangan.\n" .
+                        "Mohon konfirmasi kepada wali kelas atau bagian kesiswaan.\n\n" .
+                        "_Notifikasi otomatis dari sistem absensi sekolah._";
+
+                    MessageQueue::create([
+                        'phone_number' => $parentPhone,
+                        'message' => $msgParent,
+                        'status' => 'pending',
+                        'created_at' => now()
+                    ]);
+
+                    $this->info("Queued alpha notification to parent: {$studentName} ({$parentPhone})");
+                }
+
+                // Log if student has no contact numbers
+                if (!$studentPhone && !$parentPhone) {
+                    $this->warn("No contact numbers for alpha student: {$studentName}");
+                }
+            }
+
+            $this->info("Alpha notifications queued for " . count($alphaStudents) . " students.");
+        } else {
+            $this->info("No alpha students today. Skipping alpha notifications.");
+        }
+
         // Mark done
         Setting::updateOrCreate(
             ['setting_key' => 'last_daily_report_date'],

@@ -54,6 +54,15 @@ class AbsenceReportController extends Controller
             $alphaCount = $details->where('status', 'A')->count();
             $bolosCount = $details->where('status', 'B')->count();
 
+            // Convert details to array for JSON serialization
+            $detailsArray = $details->map(function ($item) {
+                return [
+                    'tanggal' => $item->tanggal,
+                    'status' => $item->status,
+                    'keterangan' => $item->keterangan
+                ];
+            })->toArray();
+
             $students[] = [
                 'id' => $student->id,
                 'nama' => $student->nama,
@@ -64,7 +73,7 @@ class AbsenceReportController extends Controller
                 'total' => $record->absence_count,
                 'alpha' => $alphaCount,
                 'bolos' => $bolosCount,
-                'details' => $details
+                'details' => $detailsArray
             ];
         }
 

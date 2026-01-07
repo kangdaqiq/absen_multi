@@ -93,7 +93,9 @@
                         </div>
                         <div class="form-group">
                             <label>No WhatsApp</label>
-                            <input type="text" name="no_wa" class="form-control" required>
+                            <input type="text" name="no_wa" class="form-control" placeholder="08xxx atau 628xxx"
+                                pattern="^(08|628)[0-9]{8,13}$" required>
+                            <small class="form-text text-muted">Format: 08xxx atau 628xxx (8-13 digit)</small>
                         </div>
 
                     </div>
@@ -128,7 +130,9 @@
                         </div>
                         <div class="form-group">
                             <label>No WhatsApp</label>
-                            <input type="text" name="no_wa" id="edit_wa" class="form-control" required>
+                            <input type="text" name="no_wa" id="edit_wa" class="form-control"
+                                placeholder="08xxx atau 628xxx" pattern="^(08|628)[0-9]{8,13}$" required>
+                            <small class="form-text text-muted">Format: 08xxx atau 628xxx (8-13 digit)</small>
                         </div>
                         <div class="form-group">
                             <label>UID RFID</label>

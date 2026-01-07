@@ -149,7 +149,7 @@
     </div>
 @endsection
 
-@section('scripts')
+@push('scripts')
     <script>
         $(document).ready(function () {
             $('#dataTable').DataTable({
@@ -204,4 +204,4 @@
             });
         });
     </script>
-@endsection
+@endpush

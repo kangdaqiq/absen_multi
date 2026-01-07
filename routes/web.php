@@ -36,6 +36,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/absensi/guru', [App\Http\Controllers\TeacherAttendanceReportController::class, 'index'])->name('absensi-guru.index');
         Route::post('/absensi/guru/store', [App\Http\Controllers\TeacherAttendanceReportController::class, 'store'])->name('absensi-guru.store');
         Route::post('/absensi/update', [App\Http\Controllers\AttendanceController::class, 'update'])->name('absensi.update');
+        Route::delete('/absensi/destroy', [App\Http\Controllers\AttendanceController::class, 'destroy'])->name('absensi.destroy');
 
         // Rekap
         Route::get('/rekap', [App\Http\Controllers\RekapController::class, 'index'])->name('rekap.index');

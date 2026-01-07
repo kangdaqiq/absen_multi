@@ -20,7 +20,7 @@ class GuruController extends Controller
         $request->validate([
             'nama' => 'required|string|max:100',
             'nip' => 'nullable|string|max:50',
-            'no_wa' => 'required|string|max:20|unique:guru,no_wa',
+            'no_wa' => 'required|string|max:20|unique:guru,no_wa|regex:/^(08|628)[0-9]{8,13}$/',
             'uid_rfid' => 'nullable|string|max:20|unique:guru,uid_rfid',
         ]);
 
@@ -40,7 +40,7 @@ class GuruController extends Controller
         $request->validate([
             'nama' => 'required|string|max:100',
             'nip' => 'nullable|string|max:50',
-            'no_wa' => 'required|string|max:20|unique:guru,no_wa,' . $guruModel->id,
+            'no_wa' => 'required|string|max:20|unique:guru,no_wa,' . $guruModel->id . '|regex:/^(08|628)[0-9]{8,13}$/',
             'uid_rfid' => 'nullable|string|max:20|unique:guru,uid_rfid,' . $guruModel->id,
         ]);
 
@@ -115,11 +115,11 @@ class GuruController extends Controller
         // --- Push Notification to Selected Device ---
         $device = \App\Models\Device::find($request->device_id);
         if ($device) {
-             // Find last known IP from ApiLog
-             $lastLog = \App\Models\ApiLog::where('api_key', $device->api_key)
-                        ->whereNotNull('ip_address')
-                        ->orderBy('created_at', 'desc')
-                        ->first();
+            // Find last known IP from ApiLog
+            $lastLog = \App\Models\ApiLog::where('api_key', $device->api_key)
+                ->whereNotNull('ip_address')
+                ->orderBy('created_at', 'desc')
+                ->first();
 
             if ($lastLog && $lastLog->ip_address) {
                 \Illuminate\Support\Facades\Log::info("Pushing Enroll to ESP: {$lastLog->ip_address} for Guru ID: {$guru->id}");
@@ -152,11 +152,11 @@ class GuruController extends Controller
     public function enrollFingerCheck($id)
     {
         $guru = Guru::findOrFail($id);
-        
+
         if ($guru->enroll_finger_status === 'done' && $guru->id_finger) {
             return response()->json(['ok' => true, 'id_finger' => $guru->id_finger, 'status' => 'done']);
         }
-        
+
 
 
         return response()->json(['ok' => true, 'id_finger' => null, 'status' => 'requested']);
@@ -165,7 +165,7 @@ class GuruController extends Controller
     public function deleteFingerId($id)
     {
         $guru = Guru::findOrFail($id);
-        
+
         // 1. Get all fingerprints
         $fingerprints = $guru->fingerprints()->with('device')->get();
 
@@ -173,10 +173,10 @@ class GuruController extends Controller
             if ($fp->device) {
                 // Find last IP
                 $lastLog = \App\Models\ApiLog::where('api_key', $fp->device->api_key)
-                        ->whereNotNull('ip_address')
-                        ->orderBy('created_at', 'desc')
-                        ->first();
-                
+                    ->whereNotNull('ip_address')
+                    ->orderBy('created_at', 'desc')
+                    ->first();
+
                 if ($lastLog && $lastLog->ip_address) {
                     \Illuminate\Support\Facades\Log::info("Pushing Delete to ESP: {$lastLog->ip_address} for Finger ID: {$fp->finger_id}");
                     try {
@@ -184,7 +184,7 @@ class GuruController extends Controller
                         \Illuminate\Support\Facades\Http::timeout(2)
                             ->get("http://{$lastLog->ip_address}/delete-finger?id=" . $fp->finger_id);
                     } catch (\Exception $e) {
-                         \Illuminate\Support\Facades\Log::error("Failed to push delete to ESP {$lastLog->ip_address}: " . $e->getMessage());
+                        \Illuminate\Support\Facades\Log::error("Failed to push delete to ESP {$lastLog->ip_address}: " . $e->getMessage());
                     }
                 }
             }
@@ -192,10 +192,10 @@ class GuruController extends Controller
 
         // 2. Delete all fingerprints for this guru from DB
         $guru->fingerprints()->delete();
-        
+
         // 3. Clear legacy columns
         $guru->update(['id_finger' => null, 'enroll_finger_status' => 'none']);
-        
+
         return response()->json(['ok' => true]);
     }
 
@@ -218,7 +218,10 @@ class GuruController extends Controller
             $firstRow = true;
 
             foreach ($rows as $row) {
-                if ($firstRow) { $firstRow = false; continue; }
+                if ($firstRow) {
+                    $firstRow = false;
+                    continue;
+                }
 
                 $nama = trim($row[0] ?? '');
                 $nip = trim($row[1] ?? '');
@@ -230,7 +233,8 @@ class GuruController extends Controller
                 $wa = isset($row[2]) ? trim($row[2]) : null;
 
                 if ($nama === '') {
-                    $countSkip++; continue;
+                    $countSkip++;
+                    continue;
                 }
 
                 $normalizedWa = $this->normalizeWa($wa);
@@ -245,7 +249,8 @@ class GuruController extends Controller
                 }
 
                 if ($exists) {
-                    $countSkip++; continue;
+                    $countSkip++;
+                    continue;
                 }
 
                 Guru::create([
@@ -280,8 +285,8 @@ class GuruController extends Controller
         $sheet->setCellValue('C2', '081234567890');
 
         $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
-        
-        $response = new \Symfony\Component\HttpFoundation\StreamedResponse(function() use ($writer) {
+
+        $response = new \Symfony\Component\HttpFoundation\StreamedResponse(function () use ($writer) {
             $writer->save('php://output');
         });
 
@@ -292,8 +297,10 @@ class GuruController extends Controller
         return $response;
     }
 
-    private function normalizeWa($wa) {
-        if (!$wa) return null;
+    private function normalizeWa($wa)
+    {
+        if (!$wa)
+            return null;
         $wa = preg_replace('/[^0-9]/', '', $wa);
         if (strpos($wa, '08') === 0) {
             $wa = '62' . substr($wa, 1);

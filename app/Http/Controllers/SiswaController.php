@@ -33,8 +33,8 @@ class SiswaController extends Controller
             'nis' => 'required|string|max:20|unique:siswa,nis',
             'tgl_lahir' => 'nullable|date',
             'kelas_id' => 'required|exists:kelas,id',
-            'no_wa' => 'nullable|string|max:20|unique:siswa,no_wa',
-            'wa_ortu' => 'nullable|string|max:20',
+            'no_wa' => 'nullable|string|max:20|unique:siswa,no_wa|regex:/^(08|628)[0-9]{8,13}$/',
+            'wa_ortu' => 'nullable|string|max:20|regex:/^(08|628)[0-9]{8,13}$/',
             'user_id' => 'nullable|exists:users,id',
         ]);
 
@@ -64,8 +64,8 @@ class SiswaController extends Controller
             'nis' => 'required|string|max:20|unique:siswa,nis,' . $siswa->id,
             'tgl_lahir' => 'nullable|date',
             'kelas_id' => 'required|exists:kelas,id',
-            'no_wa' => 'nullable|string|max:20|unique:siswa,no_wa,' . $siswa->id,
-            'wa_ortu' => 'nullable|string|max:20',
+            'no_wa' => 'nullable|string|max:20|unique:siswa,no_wa,' . $siswa->id . '|regex:/^(08|628)[0-9]{8,13}$/',
+            'wa_ortu' => 'nullable|string|max:20|regex:/^(08|628)[0-9]{8,13}$/',
             'uid_rfid' => 'nullable|string|max:50',
             'user_id' => 'nullable|exists:users,id',
         ]);

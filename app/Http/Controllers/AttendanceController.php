@@ -14,7 +14,7 @@ class AttendanceController extends Controller
     {
         // Filter by Date (default today)
         $tanggal = $request->input('tanggal', date('Y-m-d'));
-        
+
         // Filter by Class (optional)
         $kelasId = $request->input('kelas_id');
 
@@ -92,5 +92,27 @@ class AttendanceController extends Controller
         }
 
         return back()->with('success', 'Status absensi berhasil diperbarui.');
+    }
+
+    // Delete Attendance Record
+    public function destroy(Request $request)
+    {
+        $request->validate([
+            'student_id' => 'required',
+            'tanggal' => 'required|date',
+        ]);
+
+        $studentId = $request->student_id;
+        $date = $request->tanggal;
+
+        // Find and delete the attendance record
+        $att = Attendance::where('student_id', $studentId)->where('tanggal', $date)->first();
+
+        if ($att) {
+            $att->delete();
+            return back()->with('success', 'Data absensi berhasil dihapus.');
+        }
+
+        return back()->with('error', 'Data absensi tidak ditemukan.');
     }
 }

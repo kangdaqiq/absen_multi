@@ -15,7 +15,7 @@ class WhatsAppService
         // Send to student if phone exists
         if ($phone) {
             $msg = "✨ *PENDAFTARAN BERHASIL* ✨\n\n" .
-                "Halo *{$name}* 👋,\n\n" .
+                "Assalamualaikum, *{$name}* 👋,\n\n" .
                 "Kartu/Perangkat *{$type}* Anda telah berhasil didaftarkan ke sistem absensi sekolah.\n\n" .
                 "🆔 ID Kartu: `{$uid}`\n" .
                 "📅 Tanggal: " . now()->translatedFormat('l, d F Y') . "\n\n" .
@@ -26,7 +26,7 @@ class WhatsAppService
         // Send to parent if phone number exists
         if ($phoneOrtu) {
             $msgOrtu = "✨ *PENDAFTARAN BERHASIL* ✨\n\n" .
-                "Anak Anda, *{$name}* 👋,\n\n" .
+                "Assalamualaikum, Anak Anda, *{$name}* 👋,\n\n" .
                 "Kartu/Perangkat *{$type}* telah berhasil didaftarkan ke sistem absensi sekolah.\n\n" .
                 "🆔 ID Kartu: `{$uid}`\n" .
                 "📅 Tanggal: " . now()->translatedFormat('l, d F Y') . "\n\n" .
@@ -49,7 +49,7 @@ class WhatsAppService
         // Send to student if phone exists
         if ($phone) {
             $msg = "✅ Absen Masuk Berhasil\n\n" .
-                "Halo *{$name}*,\n\n" .
+                "Assalamualaikum, *{$name}*,\n\n" .
                 "📅 Tanggal: " . now()->format('d/m/Y') . "\n" .
                 "🕐 Jam Masuk: {$time}\n" .
                 "📊 Status: {$statusText}{$ketText}\n\n" .
@@ -61,7 +61,7 @@ class WhatsAppService
         // Send to parent if phone number exists
         if ($phoneOrtu) {
             $msgOrtu = "✅ Absen Masuk Berhasil\n\n" .
-                "Anak Anda, *{$name}*, telah absen masuk.\n\n" .
+                "Assalamualaikum, Anak Anda, *{$name}*, telah absen masuk.\n\n" .
                 "📅 Tanggal: " . now()->format('d/m/Y') . "\n" .
                 "🕐 Jam Masuk: {$time}\n" .
                 "📊 Status: {$statusText}{$ketText}\n\n" .
@@ -79,7 +79,7 @@ class WhatsAppService
         // Send to student if phone exists
         if ($phone) {
             $msg = "🏠 Absen Pulang Berhasil\n\n" .
-                "Halo *{$name}*,\n\n" .
+                "Assalamualaikum, *{$name}*,\n\n" .
                 "📍 Jam Masuk: {$jamMasuk}\n" .
                 "🕐 Jam Pulang: {$time}\n" .
                 "⏱️ Durasi: {$hours} jam {$mins} menit\n" .
@@ -92,7 +92,7 @@ class WhatsAppService
         // Send to parent if phone number exists
         if ($phoneOrtu) {
             $msgOrtu = "🏠 Absen Pulang Berhasil\n\n" .
-                "Anak Anda, *{$name}*, telah absen pulang.\n\n" .
+                "Assalamualaikum, Anak Anda, *{$name}*, telah absen pulang.\n\n" .
                 "📍 Jam Masuk: {$jamMasuk}\n" .
                 "🕐 Jam Pulang: {$time}\n" .
                 "⏱️ Durasi: {$hours} jam {$mins} menit\n" .

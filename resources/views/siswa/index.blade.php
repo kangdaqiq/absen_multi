@@ -249,7 +249,7 @@
                         <button type="button" class="close text-white" data-dismiss="modal">&times;</button>
                     </div>
                     <div class="modal-body">
-                        <div class="alert alert-info">
+                        <div class="alert alert-info alert-static">
                             <i class="fas fa-info-circle"></i> Gunakan file Excel (.xlsx) dengan format kolom: <strong>Nama,
                                 NIS, Tgl Lahir, Kelas, WA Siswa, WA Ortu</strong>.
                         </div>

@@ -22,7 +22,7 @@ class AppServiceProvider extends ServiceProvider
     {
         \Illuminate\Pagination\Paginator::useBootstrap();
 
-        if($this->app->environment('production') && $this->app['request']->server('HTTP_X_FORWARDED_PROTO') === 'https') {
+        if (config('app.env') !== 'local') {
             URL::forceScheme('https');
         }
     }

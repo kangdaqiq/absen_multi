@@ -25,30 +25,21 @@ class BroadcastController extends Controller
     public function send(Request $request)
     {
         $request->validate([
-            'target_class_id' => 'required',
+            'target_class_ids' => 'required|array|min:1',
+            'target_class_ids.*' => 'exists:kelas,id',
             'message' => 'required|string|min:5',
         ]);
 
-        $targetClassId = $request->target_class_id;
+        $targetClassIds = $request->target_class_ids;
         $messageBody = $request->message;
-        $students = [];
 
-        if ($targetClassId === 'all') {
-            // Get all active students
-            $students = Siswa::whereHas('kelas', function ($q) {
-                // Optional: Check if class is active? 
-                // Usually for broadcast we might want to send to everyone regardless of attendance status?
-                // Let's assume sending to all registered students.
-            })->whereNotNull('no_wa')->get();
-        } else {
-            // Get students in specific class
-            $students = Siswa::where('kelas_id', $targetClassId)
-                ->whereNotNull('no_wa')
-                ->get();
-        }
+        // Get students from selected classes
+        $students = Siswa::whereIn('kelas_id', $targetClassIds)
+            ->whereNotNull('no_wa')
+            ->get();
 
         if ($students->isEmpty()) {
-            return back()->with('error', 'Tidak ada siswa dengan nomor WhatsApp di target yang dipilih.');
+            return back()->with('error', 'Tidak ada siswa dengan nomor WhatsApp di kelas yang dipilih.');
         }
 
         $count = 0;

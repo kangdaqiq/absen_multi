@@ -6,7 +6,7 @@
     <h1 class="h3 mb-4 text-gray-800">Pengaturan Sekolah</h1>
 
     <div class="row">
-        <div class="col-lg-6">
+        <div class="col-lg-12">
             <div class="card shadow mb-4">
                 <div class="card-header py-3">
                     <h6 class="m-0 font-weight-bold text-primary">Konfigurasi Umum</h6>
@@ -116,6 +116,11 @@
                                         628xxx@s.whatsapp.net (Grup/Pribadi)</small>
                                 </div>
 
+                                <div class="alert alert-info alert-static mt-2 mb-4">
+                                    <strong>Tips:</strong> Untuk mendapatkan ID Grup WhatsApp (`@g.us`), gunakan fitur "Get Group ID"
+                                    pada tools WA Gateway Anda, atau gunakan nomor pribadi (`@s.whatsapp.net`).
+                                </div>
+
                                 <hr>
                                 <h6 class="font-weight-bold text-primary">Deteksi Ketidakhadiran Berlebihan</h6>
 
@@ -146,6 +151,11 @@
                                     <small class="text-muted">Laporan dikirim setiap Senin jam 08:00 ke wali kelas dan orang
                                         tua</small>
                                 </div>
+
+                                <div class="alert alert-warning alert-static mt-2">
+                                    <strong>Laporan Mingguan:</strong> Sistem akan mengirim laporan siswa dengan ketidakhadiran
+                                    berlebihan setiap Senin jam 08:00 ke wali kelas dan orang tua siswa.
+                                </div>
                             </div>
                         </div>
 
@@ -154,30 +164,6 @@
                         </button>
 
                     </form>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-lg-6">
-            <div class="card shadow mb-4">
-                <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-info">Informasi</h6>
-                </div>
-                <div class="card-body">
-                    <p>Pengaturan ini digunakan untuk:</p>
-                    <ul>
-                        <li>Fitur Laporan Harian (Scheduler)</li>
-                        <li>Deteksi Ketidakhadiran Berlebihan (Mingguan)</li>
-                        <li>Kop Surat / Laporan (Mendatang)</li>
-                    </ul>
-                    <div class="alert alert-info alert-static">
-                        <strong>Tips:</strong> Untuk mendapatkan ID Grup WhatsApp (`@g.us`), gunakan fitur "Get Group ID"
-                        pada tools WA Gateway Anda, atau gunakan nomor pribadi (`@s.whatsapp.net`).
-                    </div>
-                    <div class="alert alert-warning alert-static">
-                        <strong>Laporan Mingguan:</strong> Sistem akan mengirim laporan siswa dengan ketidakhadiran
-                        berlebihan setiap Senin jam 08:00 ke wali kelas dan orang tua siswa.
-                    </div>
                 </div>
             </div>
         </div>

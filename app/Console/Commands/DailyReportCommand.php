@@ -60,22 +60,22 @@ class DailyReportCommand extends Command
 
         $this->info("Generating report for $today...");
 
-        // --- AUTO-EXTEND IZIN/SAKIT FROM YESTERDAY ---
+        // --- AUTO-EXTEND SAKIT FROM YESTERDAY (2 DAYS) ---
         $yesterday = now()->subDay()->format('Y-m-d');
 
-        // Find students who were Izin or Sakit yesterday
-        $yesterdayIzinSakit = Attendance::where('tanggal', $yesterday)
-            ->whereIn('status', ['I', 'S'])
+        // Find students who were SAKIT yesterday (only S, not I)
+        $yesterdaySakit = Attendance::where('tanggal', $yesterday)
+            ->where('status', 'S')
             ->get();
 
         $autoExtendCount = 0;
-        foreach ($yesterdayIzinSakit as $att) {
+        foreach ($yesterdaySakit as $att) {
             // Check if student already has attendance record for today
             $existsToday = Attendance::where('student_id', $att->student_id)
                 ->where('tanggal', $today)
                 ->exists();
 
-            // Only create if no record exists
+            // Only create if no record exists (student hasn't checked in)
             if (!$existsToday) {
                 Attendance::create([
                     'student_id' => $att->student_id,
@@ -83,8 +83,8 @@ class DailyReportCommand extends Command
                     'jam_masuk' => null,
                     'jam_pulang' => null,
                     'jam_kerja' => null,
-                    'status' => $att->status, // Same status (I or S)
-                    'keterangan' => '[Auto-Lanjut] ' . ($att->status === 'I' ? 'Izin' : 'Sakit') . ' (Hari ke-2)',
+                    'status' => 'S',
+                    'keterangan' => '[Auto-Lanjut] Sakit (Hari ke-2)',
                     'lokasi_masuk' => 'System',
                     'created_at' => now(),
                     'updated_at' => now()
@@ -93,7 +93,7 @@ class DailyReportCommand extends Command
             }
         }
 
-        $this->info("Auto-extended $autoExtendCount Izin/Sakit records from yesterday.");
+        $this->info("Auto-extended $autoExtendCount Sakit records from yesterday.");
 
 
         $siswaAll = Siswa::whereHas('kelas', function ($q) {

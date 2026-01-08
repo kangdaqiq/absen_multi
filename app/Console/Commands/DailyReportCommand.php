@@ -64,8 +64,13 @@ class DailyReportCommand extends Command
         $yesterday = now()->subDay()->format('Y-m-d');
 
         // Find students who were SAKIT yesterday (only S, not I)
+        // Exclude auto-extended records to prevent loop (only extend manual entries)
         $yesterdaySakit = Attendance::where('tanggal', $yesterday)
             ->where('status', 'S')
+            ->where(function ($q) {
+                $q->whereNull('keterangan')
+                    ->orWhere('keterangan', 'NOT LIKE', '%[Auto-Lanjut]%');
+            })
             ->get();
 
         $autoExtendCount = 0;

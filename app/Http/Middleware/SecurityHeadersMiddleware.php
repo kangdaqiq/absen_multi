@@ -11,8 +11,8 @@ class SecurityHeadersMiddleware
     {
         $response = $next($request);
 
-        // Pastikan response adalah instance dari Response (bukan StreamedResponse dll yang mungkin repot, tapi umumnya aman)
-        if (method_exists($response, 'header')) {
+        // Only enforce HTTPS upgrade on production domain
+        if (method_exists($response, 'header') && str_contains($request->getHost(), 'smkassuniyah.sch.id')) {
             $response->header('Content-Security-Policy', 'upgrade-insecure-requests');
         }
 

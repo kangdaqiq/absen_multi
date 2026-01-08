@@ -199,14 +199,14 @@
                 $('#edit_toleransi').val(tol);
                 $('#edit_active').prop('checked', active == 1);
 
-                $('#formEditJadwal').attr('action', '{{ secure_url('jadwal') }}/' + id);
+                $('#formEditJadwal').attr('action', '{{ url('jadwal') }}/' + id);
             });
 
             $('.btnHapus').on('click', function () {
                 var id = $(this).data('id');
                 var hari = $(this).data('hari');
                 $('#hapus_hari').text(hari);
-                $('#formHapusJadwal').attr('action', '{{ secure_url('jadwal') }}/' + id);
+                $('#formHapusJadwal').attr('action', '{{ url('jadwal') }}/' + id);
             });
         });
     </script>

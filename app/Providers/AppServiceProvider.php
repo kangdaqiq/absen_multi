@@ -22,7 +22,8 @@ class AppServiceProvider extends ServiceProvider
     {
         \Illuminate\Pagination\Paginator::useBootstrap();
 
-        if (config('app.env') !== 'local' || str_contains(request()->getHost(), 'smkassuniyah.sch.id')) {
+        // Only force HTTPS on production domain
+        if (str_contains(request()->getHost(), 'smkassuniyah.sch.id')) {
             URL::forceScheme('https');
         }
 

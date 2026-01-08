@@ -299,7 +299,7 @@
                 $('#edit_wa').val(wa);
                 $('#edit_rfid').val(rfid);
 
-                $('#formEditGuru').attr('action', '{{ secure_url('guru') }}/' + id);
+                $('#formEditGuru').attr('action', '{{ url('guru') }}/' + id);
             });
 
             // HAPUS LOGIC
@@ -307,7 +307,7 @@
                 var id = $(this).data('id');
                 var nama = $(this).data('nama');
                 $('#hapus_nama').text(nama);
-                $('#formHapusGuru').attr('action', '{{ secure_url('guru') }}/' + id);
+                $('#formHapusGuru').attr('action', '{{ url('guru') }}/' + id);
             });
 
             // ==========================
@@ -341,7 +341,7 @@
                 $('#enroll_status').html('<div class="spinner-border text-primary" role="status"></div><br><span class="text-info blink">Silakan tempelkan kartu RFID...</span>');
 
                 // Request Enroll
-                $.post('{{ secure_url('guru') }}/' + enrollGuruId + '/enroll', {
+                $.post('{{ url('guru') }}/' + enrollGuruId + '/enroll', {
                     _token: '{{ csrf_token() }}'
                 }, function (res) {
                     if (res.ok) {
@@ -364,7 +364,7 @@
                         return;
                     }
 
-                    $.get('{{ secure_url('guru') }}/' + id + '/enroll-check', function (res) {
+                    $.get('{{ url('guru') }}/' + id + '/enroll-check', function (res) {
                         if (res.ok && res.uid) {
                             clearInterval(enrollInterval);
                             $('#enroll_uid').text(res.uid);
@@ -382,7 +382,7 @@
                 if (!enrollGuruId) return;
                 if (!confirm('Hapus UID RFID guru ini?')) return;
 
-                $.post('{{ secure_url('guru') }}/' + enrollGuruId + '/delete-uid', {
+                $.post('{{ url('guru') }}/' + enrollGuruId + '/delete-uid', {
                     _token: '{{ csrf_token() }}'
                 }, function (res) {
                     if (res.ok) {
@@ -400,7 +400,7 @@
 
                 // Cancel request if pending
                 if (enrollGuruId) {
-                    $.post('{{ secure_url('guru') }}/' + enrollGuruId + '/enroll-cancel', {
+                    $.post('{{ url('guru') }}/' + enrollGuruId + '/enroll-cancel', {
                         _token: '{{ csrf_token() }}'
                     });
                 }
@@ -445,7 +445,7 @@
                 $('#enroll_finger_status').html('<div class="spinner-border text-primary" role="status"></div><br><span class="text-info blink">Silakan tempelkan jari di sensor device...</span>');
 
                 // Request Enroll
-                $.post('{{ secure_url('guru') }}/' + enrollFingerId + '/enroll-finger', {
+                $.post('{{ url('guru') }}/' + enrollFingerId + '/enroll-finger', {
                     _token: '{{ csrf_token() }}',
                     device_id: deviceId
                 }, function (res) {
@@ -469,7 +469,7 @@
                         return;
                     }
 
-                    $.get('{{ secure_url('guru') }}/' + id + '/enroll-finger-check', function (res) {
+                    $.get('{{ url('guru') }}/' + id + '/enroll-finger-check', function (res) {
                         if (res.ok && res.id_finger) {
                             clearInterval(enrollFingerInterval);
                             $('#enroll_finger_id').text(res.id_finger);
@@ -488,7 +488,7 @@
                 if (!enrollFingerId) return;
                 if (!confirm('Hapus Sidik Jari guru ini?')) return;
 
-                $.post('{{ secure_url('guru') }}/' + enrollFingerId + '/delete-finger', {
+                $.post('{{ url('guru') }}/' + enrollFingerId + '/delete-finger', {
                     _token: '{{ csrf_token() }}'
                 }, function (res) {
                     if (res.ok) {
@@ -510,7 +510,7 @@
 
                 // Cancel request if pending
                 if (enrollFingerId) {
-                    $.post('{{ secure_url('guru') }}/' + enrollFingerId + '/enroll-finger-cancel', {
+                    $.post('{{ url('guru') }}/' + enrollFingerId + '/enroll-finger-cancel', {
                         _token: '{{ csrf_token() }}'
                     });
                 }

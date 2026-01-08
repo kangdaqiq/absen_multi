@@ -377,7 +377,7 @@
                 $('#edit_wa_ortu').val(wa_ortu);
                 $('#edit_uid_rfid').val(uid);
 
-                $('#formEditSiswa').attr('action', '{{ secure_url('siswa') }}/' + id);
+                $('#formEditSiswa').attr('action', '{{ url('siswa') }}/' + id);
             });
 
 
@@ -386,7 +386,7 @@
                 var id = $(this).data('id');
                 var nama = $(this).data('nama');
                 $('#hapus_nama').text(nama);
-                $('#formHapusSiswa').attr('action', '{{ secure_url('siswa') }}/' + id);
+                $('#formHapusSiswa').attr('action', '{{ url('siswa') }}/' + id);
             });
 
             // ==========================
@@ -420,7 +420,7 @@
                 $('#enroll_status').html('<div class="spinner-border text-primary" role="status"></div><br><span class="text-info blink">Silakan tempelkan kartu RFID...</span>');
 
                 // Request Enroll
-                $.post('{{ secure_url('siswa') }}/' + enrollSiswaId + '/enroll', {
+                $.post('{{ url('siswa') }}/' + enrollSiswaId + '/enroll', {
                     _token: '{{ csrf_token() }}'
                 }, function (res) {
                     if (res.ok) {
@@ -443,7 +443,7 @@
                         return;
                     }
 
-                    $.get('{{ secure_url('siswa') }}/' + id + '/enroll-check', function (res) {
+                    $.get('{{ url('siswa') }}/' + id + '/enroll-check', function (res) {
                         if (res.ok && res.uid) {
                             clearInterval(enrollInterval);
                             $('#enroll_uid').text(res.uid);
@@ -462,7 +462,7 @@
                 if (!enrollSiswaId) return;
                 if (!confirm('Hapus UID RFID siswa ini?')) return;
 
-                $.post('{{ secure_url('siswa') }}/' + enrollSiswaId + '/delete-uid', {
+                $.post('{{ url('siswa') }}/' + enrollSiswaId + '/delete-uid', {
                     _token: '{{ csrf_token() }}'
                 }, function (res) {
                     if (res.ok) {
@@ -480,7 +480,7 @@
 
                 // Cancel request if pending
                 if (enrollSiswaId) {
-                    $.post('{{ secure_url('siswa') }}/' + enrollSiswaId + '/enroll-cancel', {
+                    $.post('{{ url('siswa') }}/' + enrollSiswaId + '/enroll-cancel', {
                         _token: '{{ csrf_token() }}'
                     });
                 }
@@ -526,7 +526,7 @@
                 $('#enroll_finger_status').html('<div class="spinner-border text-success" role="status"></div><br><span class="text-info blink">Silakan tempelkan jari pada sensor...</span>');
 
                 // Request Enroll with device_id
-                $.post('{{ secure_url('siswa') }}/' + enrollFingerSiswaId + '/enroll-finger', {
+                $.post('{{ url('siswa') }}/' + enrollFingerSiswaId + '/enroll-finger', {
                     _token: '{{ csrf_token() }}',
                     device_id: deviceId
                 }, function (res) {
@@ -550,7 +550,7 @@
                         return;
                     }
 
-                    $.get('{{ secure_url('siswa') }}/' + id + '/enroll-finger-check', function (res) {
+                    $.get('{{ url('siswa') }}/' + id + '/enroll-finger-check', function (res) {
                         if (res.ok && res.id_finger && res.status === 'done') {
                             clearInterval(enrollFingerInterval);
                             $('#enroll_finger_id').text(res.id_finger);
@@ -568,7 +568,7 @@
                 if (!enrollFingerSiswaId) return;
                 if (!confirm('Hapus sidik jari siswa ini dari semua device?')) return;
 
-                $.post('{{ secure_url('siswa') }}/' + enrollFingerSiswaId + '/delete-finger', {
+                $.post('{{ url('siswa') }}/' + enrollFingerSiswaId + '/delete-finger', {
                     _token: '{{ csrf_token() }}'
                 }, function (res) {
                     if (res.ok) {
@@ -586,7 +586,7 @@
 
                 // Cancel request if pending
                 if (enrollFingerSiswaId) {
-                    $.post('{{ secure_url('siswa') }}/' + enrollFingerSiswaId + '/enroll-finger-cancel', {
+                    $.post('{{ url('siswa') }}/' + enrollFingerSiswaId + '/enroll-finger-cancel', {
                         _token: '{{ csrf_token() }}'
                     });
                 }

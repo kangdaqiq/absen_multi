@@ -257,14 +257,14 @@
                 $('#edit_nama_kelas').val(nama);
                 $('#edit_wali_kelas').val(wali).trigger('change');
                 $('#edit_wa_group_id').val(waGroupId);
-                $('#formEditKelas').attr('action', '{{ secure_url('kelas') }}/' + id);
+                $('#formEditKelas').attr('action', '{{ url('kelas') }}/' + id);
             });
 
             // Hapus
             $('#dataTable').on('click', '.btnHapus', function () {
                 var id = $(this).data('id');
                 $('#hapus_nama_kelas').text($(this).data('nama'));
-                $('#formHapusKelas').attr('action', '{{ secure_url('kelas') }}/' + id);
+                $('#formHapusKelas').attr('action', '{{ url('kelas') }}/' + id);
             });
         });
 

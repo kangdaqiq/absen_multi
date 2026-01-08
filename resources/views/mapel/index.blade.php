@@ -160,14 +160,14 @@
                 var id = $(this).data('id');
                 var nama = $(this).data('nama');
                 $('#edit_nama_mapel').val(nama);
-                $('#formEditMapel').attr('action', '{{ secure_url('mapel') }}/' + id);
+                $('#formEditMapel').attr('action', '{{ url('mapel') }}/' + id);
             });
 
             // Hapus
             $('#dataTable').on('click', '.btnHapus', function () {
                 var id = $(this).data('id');
                 $('#hapus_nama_mapel').text($(this).data('nama'));
-                $('#formHapusMapel').attr('action', '{{ secure_url('mapel') }}/' + id);
+                $('#formHapusMapel').attr('action', '{{ url('mapel') }}/' + id);
             });
         });
     </script>

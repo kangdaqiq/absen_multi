@@ -218,14 +218,14 @@
                 $('#edit_type').val(type);
                 $('#edit_active').val(active);
 
-                $('#formEditDevice').attr('action', '{{ secure_url('devices') }}/' + id);
+                $('#formEditDevice').attr('action', '{{ url('devices') }}/' + id);
             });
 
             // Hapus
             $('#dataTable').on('click', '.btnHapus', function () {
                 var id = $(this).data('id');
                 $('#hapus_nama').text($(this).data('nama'));
-                $('#formHapusDevice').attr('action', '{{ secure_url('devices') }}/' + id);
+                $('#formHapusDevice').attr('action', '{{ url('devices') }}/' + id);
             });
         });
     </script>

@@ -67,10 +67,7 @@ class DailyReportCommand extends Command
         // Exclude auto-extended records to prevent loop (only extend manual entries)
         $yesterdaySakit = Attendance::where('tanggal', $yesterday)
             ->where('status', 'S')
-            ->where(function ($q) {
-                $q->whereNull('keterangan')
-                    ->orWhere('keterangan', 'NOT LIKE', '%[Auto-Lanjut]%');
-            })
+            ->where('is_auto_extended', false) // Only manual entries
             ->get();
 
         $autoExtendCount = 0;
@@ -90,6 +87,7 @@ class DailyReportCommand extends Command
                     'jam_kerja' => null,
                     'status' => 'S',
                     'keterangan' => '[Auto-Lanjut] Sakit (Hari ke-2)',
+                    'is_auto_extended' => true, // Mark as auto-extended
                     'lokasi_masuk' => 'System',
                     'created_at' => now(),
                     'updated_at' => now()

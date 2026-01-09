@@ -32,7 +32,8 @@
     <div class="card shadow mb-4">
         <div class="card-header py-3">
             <h6 class="m-0 font-weight-bold text-primary">Log Absensi:
-                {{ \Carbon\Carbon::parse($tanggal)->format('d-m-Y') }}</h6>
+                {{ \Carbon\Carbon::parse($tanggal)->format('d-m-Y') }}
+            </h6>
         </div>
         <div class="card-body">
             <div class="table-responsive">
@@ -70,8 +71,10 @@
                                 <td>
                                     <button class="btn btn-sm btn-primary btnEditStatus" data-id="{{ $row->id }}"
                                         data-nama="{{ $row->nama }}" data-status="{{ $row->status }}"
-                                        data-keterangan="{{ $row->keterangan }}" data-masuk="{{ $row->jam_masuk }}"
-                                        data-pulang="{{ $row->jam_pulang }}" data-toggle="modal" data-target="#modalEditStatus">
+                                        data-keterangan="{{ $row->keterangan }}"
+                                        data-masuk="{{ $row->jam_masuk != '-' ? \Carbon\Carbon::parse($row->jam_masuk)->format('H:i') : '' }}"
+                                        data-pulang="{{ $row->jam_pulang != '-' ? \Carbon\Carbon::parse($row->jam_pulang)->format('H:i') : '' }}"
+                                        data-toggle="modal" data-target="#modalEditStatus">
                                         <i class="fas fa-edit"></i>
                                     </button>
                                     @if($row->absen_id)
@@ -189,14 +192,7 @@
                 $('#edit_nama_label').text(nama);
                 $('#edit_status').val(status);
 
-                // Handle time input value (needs HH:mm format)
-                if (masuk === '-') masuk = '';
-                if (pulang === '-') pulang = '';
-
-                // Assuming time in DB is HH:mm:ss, input type=time needs HH:mm
-                if (masuk.length > 5) masuk = masuk.substring(0, 5);
-                if (pulang.length > 5) pulang = pulang.substring(0, 5);
-
+                // Values are already in HH:mm format or empty string from the view
                 $('#edit_jam_masuk').val(masuk);
                 $('#edit_jam_pulang').val(pulang);
 

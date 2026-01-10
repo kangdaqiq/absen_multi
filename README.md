@@ -1,59 +1,288 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# 📚 Sistem Absensi Sekolah
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Sistem absensi berbasis web untuk sekolah dengan dukungan RFID dan Fingerprint, dilengkapi dengan notifikasi WhatsApp otomatis dan laporan kehadiran real-time.
 
-## About Laravel
+## ✨ Fitur Utama
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+### 🎯 Absensi Multi-Mode
+- **RFID Card** - Absensi menggunakan kartu RFID
+- **Fingerprint** - Absensi menggunakan sidik jari
+- **Mode Fleksibel** - Pilih antara absensi 1x (masuk saja) atau 2x (masuk + pulang)
+- **Gate Control** - Sistem buka/tutup gerbang dengan otorisasi guru
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+### 📱 Notifikasi WhatsApp
+- Notifikasi check-in otomatis ke siswa dan orang tua
+- Notifikasi check-out dengan durasi kehadiran
+- Laporan harian kehadiran ke grup kelas
+- Laporan siswa bermasalah (Alpha/Bolos berlebihan)
+- Broadcast pesan ke kelas tertentu atau semua siswa
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+### 📊 Manajemen & Laporan
+- Dashboard real-time kehadiran
+- Laporan harian, mingguan, dan bulanan
+- Export data ke Excel/CSV
+- Import data siswa dari Excel/CSV
+- Deteksi otomatis siswa Alpha dan Bolos
+- Laporan siswa dengan ketidakhadiran berlebihan
 
-## Learning Laravel
+### 👥 Manajemen Pengguna
+- Multi-role: Admin, Guru, Siswa
+- Manajemen kelas dan mata pelajaran
+- Jadwal pelajaran dan guru mengajar
+- Wali kelas untuk laporan per kelas
+- Registrasi siswa via WhatsApp Bot
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+### ⚙️ Konfigurasi Fleksibel
+- **Toggle Absen Pulang** - Aktifkan/nonaktifkan absen pulang
+- Pengaturan jadwal otomatis (scheduler)
+- Konfigurasi toleransi keterlambatan
+- Hari libur custom
+- Mode aktif/nonaktif per kelas
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+### 🤖 WhatsApp Bot
+- Registrasi siswa otomatis
+- Cek rekap kehadiran
+- Notifikasi otomatis
+- Pesan broadcast
 
-## Laravel Sponsors
+## 🛠️ Teknologi
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+- **Backend**: Laravel 11.x
+- **Frontend**: Bootstrap 5, jQuery
+- **Database**: MySQL/MariaDB
+- **Hardware**: ESP8266/ESP32 (RFID/Fingerprint)
+- **WhatsApp**: Evolution API
+- **Scheduler**: Laravel Task Scheduling
 
-### Premium Partners
+## 📋 Persyaratan Sistem
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+- PHP >= 8.2
+- Composer
+- MySQL/MariaDB >= 5.7
+- Node.js & NPM (untuk asset compilation)
+- Web Server (Apache/Nginx)
+- Evolution API untuk WhatsApp (opsional)
 
-## Contributing
+## 🚀 Instalasi
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+### 1. Clone Repository
 
-## Code of Conduct
+```bash
+git clone https://github.com/kangdaqiq/absen_pro.git
+cd absen_pro
+```
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+### 2. Install Dependencies
 
-## Security Vulnerabilities
+```bash
+composer install
+npm install
+```
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+### 3. Konfigurasi Environment
 
-## License
+```bash
+cp .env.example .env
+php artisan key:generate
+```
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+Edit file `.env` dan sesuaikan konfigurasi database:
+
+```env
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=absen_db
+DB_USERNAME=root
+DB_PASSWORD=
+```
+
+### 4. Import Database
+
+Import file SQL ke database:
+
+```bash
+mysql -u root -p absen_db < database/migrations/absen.sql
+```
+
+Atau jalankan migration:
+
+```bash
+php artisan migrate
+```
+
+### 5. Seed Data (Opsional)
+
+```bash
+php artisan db:seed
+```
+
+### 6. Build Assets
+
+```bash
+npm run build
+```
+
+### 7. Jalankan Server
+
+```bash
+php artisan serve
+```
+
+Akses aplikasi di: `http://localhost:8000`
+
+### 8. Setup Scheduler (Production)
+
+Tambahkan cron job untuk menjalankan scheduler:
+
+```bash
+* * * * * cd /path-to-your-project && php artisan schedule:run >> /dev/null 2>&1
+```
+
+## 🔧 Konfigurasi Hardware
+
+### ESP8266/ESP32 RFID
+
+Upload kode dari folder `esp8266_code/` ke ESP8266/ESP32 dengan konfigurasi:
+
+```cpp
+const char* ssid = "YOUR_WIFI_SSID";
+const char* password = "YOUR_WIFI_PASSWORD";
+const char* serverUrl = "http://your-server.com/api/rfid";
+const char* apiKey = "YOUR_API_KEY";
+```
+
+### Fingerprint Scanner
+
+Gunakan sensor fingerprint yang kompatibel dengan ESP32 dan upload kode yang sesuai.
+
+## 📖 Penggunaan
+
+### Login Default
+
+- **Admin**: 
+  - Email: `admin@example.com`
+  - Password: `password`
+
+### Fitur Toggle Absen Pulang
+
+1. Login sebagai admin
+2. Buka menu **Pengaturan Sekolah**
+3. Di tab **Umum**, cari toggle **"Aktifkan Absen Pulang"**
+4. **ON** = Sistem 2x scan (masuk + pulang dengan otorisasi guru)
+5. **OFF** = Sistem 1x scan (hanya masuk)
+6. Klik **Simpan Pengaturan**
+
+### Cara Kerja Absensi
+
+#### Mode 2x Scan (Absen Pulang Aktif)
+1. Siswa scan RFID/fingerprint pagi → Absen masuk berhasil
+2. Siswa scan lagi sebelum jam pulang → "Sudah Absen Masuk"
+3. Guru tap kartu untuk buka gerbang → Gerbang dibuka (15 menit)
+4. Siswa scan lagi → Absen pulang berhasil + notifikasi WhatsApp
+
+#### Mode 1x Scan (Absen Pulang Nonaktif)
+1. Siswa scan RFID/fingerprint pagi → Absen masuk berhasil
+2. Siswa scan lagi kapan saja → "Absen Lengkap" (tidak perlu otorisasi guru)
+3. Tidak ada proses check-out
+4. Auto-bolos tidak akan menandai siswa sebagai "Bolos"
+
+### WhatsApp Bot Commands
+
+- `daftar` - Registrasi siswa baru
+- `rekap` - Lihat rekap kehadiran
+- `help` - Bantuan penggunaan bot
+
+## 📁 Struktur Folder
+
+```
+absen_pro/
+├── app/
+│   ├── Console/Commands/      # Scheduled commands
+│   ├── Http/Controllers/      # Controllers
+│   ├── Models/                # Eloquent models
+│   └── Services/              # Business logic services
+├── database/
+│   └── migrations/            # Database migrations & SQL
+├── esp8266_code/              # ESP8266/ESP32 firmware
+├── public/                    # Public assets
+├── resources/
+│   └── views/                 # Blade templates
+└── routes/                    # Route definitions
+```
+
+## 🔄 Update & Maintenance
+
+### Update Kode dari Git
+
+```bash
+git pull origin main
+composer install
+php artisan migrate
+php artisan cache:clear
+php artisan config:clear
+```
+
+### Backup Database
+
+```bash
+php artisan db:backup
+```
+
+Atau gunakan fitur backup otomatis yang sudah terjadwal.
+
+## 🐛 Troubleshooting
+
+### Error: "Class not found"
+```bash
+composer dump-autoload
+php artisan optimize:clear
+```
+
+### Scheduler tidak berjalan
+Pastikan cron job sudah ditambahkan dan berjalan:
+```bash
+crontab -l  # Lihat cron jobs
+crontab -e  # Edit cron jobs
+```
+
+### WhatsApp tidak terkirim
+1. Cek koneksi Evolution API
+2. Pastikan nomor WhatsApp sudah terdaftar
+3. Cek log di `storage/logs/laravel.log`
+
+## 📝 Changelog
+
+### v1.1.0 (2026-01-10)
+- ✨ Fitur toggle absen pulang (1x atau 2x scan)
+- 🔧 Auto-bolos menyesuaikan dengan mode absensi
+- 📱 Update UI settings untuk toggle absen pulang
+- 🐛 Fix berbagai bug minor
+
+### v1.0.0 (2025-12-01)
+- 🎉 Rilis awal sistem absensi
+- ✨ Dukungan RFID dan Fingerprint
+- 📱 Integrasi WhatsApp
+- 📊 Dashboard dan laporan
+
+## 🤝 Kontribusi
+
+Kontribusi sangat diterima! Silakan buat pull request atau laporkan issue.
+
+## 📄 Lisensi
+
+Project ini dilisensikan di bawah [MIT License](LICENSE).
+
+## 👨‍💻 Developer
+
+Dikembangkan oleh **Ahmad Daqiqi** ([@kangdaqiq](https://github.com/kangdaqiq))
+
+## 📞 Support
+
+Jika ada pertanyaan atau butuh bantuan:
+- Email: kangdaqiq@gmail.com
+- GitHub Issues: [Create Issue](https://github.com/kangdaqiq/absen_pro/issues)
+
+---
+
+⭐ Jika project ini membantu, jangan lupa beri star di GitHub!

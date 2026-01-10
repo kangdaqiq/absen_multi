@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\MessageQueue;
+use App\Services\WhatsAppMessageTemplates;
 
 class WhatsAppService
 {
@@ -43,29 +44,58 @@ class WhatsAppService
         if (!$phone && !$phoneOrtu)
             return;
 
-        $statusText = $keterangan ? 'Terlambat' : 'Tepat Waktu';
-        $ketText = $keterangan ? "\n📝 Keterangan: {$keterangan}" : "";
+        // Determine if late based on keterangan
+        $isLate = !empty($keterangan);
+
+        // Get student's class (we'll need to pass this from controller)
+        // For now, use a placeholder or extract from keterangan if available
+        $kelas = '-'; // This should be passed from controller
 
         // Send to student if phone exists
         if ($phone) {
-            $msg = "✅ Absen Masuk Berhasil\n\n" .
-                "Assalamualaikum, *{$name}*,\n\n" .
-                "📅 Tanggal: " . now()->format('d/m/Y') . "\n" .
-                "🕐 Jam Masuk: {$time}\n" .
-                "📊 Status: {$statusText}{$ketText}\n\n" .
-                "Selamat belajar! 📚\n\n" .
-                "Jangan lupa absen pulang ya!";
+            if ($isLate) {
+                // Extract late minutes from keterangan if possible
+                preg_match('/(\d+)\s*menit/', $keterangan ?? '', $matches);
+                $lateMinutes = $matches[1] ?? 0;
+
+                $msg = WhatsAppMessageTemplates::checkInLate(
+                    nama: $name,
+                    jamMasuk: $time,
+                    kelas: $kelas,
+                    lateMinutes: (int) $lateMinutes
+                );
+            } else {
+                $msg = WhatsAppMessageTemplates::checkIn(
+                    nama: $name,
+                    jamMasuk: $time,
+                    kelas: $kelas,
+                    status: $status
+                );
+            }
             $this->queueMessage($phone, $msg);
         }
 
         // Send to parent if phone number exists
         if ($phoneOrtu) {
-            $msgOrtu = "✅ Absen Masuk Berhasil\n\n" .
-                "Assalamualaikum, Anak Anda, *{$name}*, telah absen masuk.\n\n" .
-                "📅 Tanggal: " . now()->format('d/m/Y') . "\n" .
-                "🕐 Jam Masuk: {$time}\n" .
-                "📊 Status: {$statusText}{$ketText}\n\n" .
-                "_Notifikasi otomatis dari sistem absensi sekolah._";
+            // Use same template for parent
+            if ($isLate) {
+                preg_match('/(\d+)\s*menit/', $keterangan ?? '', $matches);
+                $lateMinutes = $matches[1] ?? 0;
+
+                $msgOrtu = WhatsAppMessageTemplates::checkInLate(
+                    nama: $name,
+                    jamMasuk: $time,
+                    kelas: $kelas,
+                    lateMinutes: (int) $lateMinutes
+                );
+            } else {
+                $msgOrtu = WhatsAppMessageTemplates::checkIn(
+                    nama: $name,
+                    jamMasuk: $time,
+                    kelas: $kelas,
+                    status: $status
+                );
+            }
             $this->queueMessage($phoneOrtu, $msgOrtu);
         }
     }
@@ -78,24 +108,27 @@ class WhatsAppService
 
         // Send to student if phone exists
         if ($phone) {
-            $msg = "🏠 Absen Pulang Berhasil\n\n" .
-                "Assalamualaikum, *{$name}*,\n\n" .
-                "📍 Jam Masuk: {$jamMasuk}\n" .
-                "🕐 Jam Pulang: {$time}\n" .
-                "⏱️ Durasi Belajar: {$hours} jam {$mins} menit\n" .
-                "Terima kasih telah mengikuti kegiatan hari ini.\n\n" .
-                "Hati-hati di jalan! 🙏";
+            $msg = WhatsAppMessageTemplates::checkOut(
+                nama: $name,
+                jamMasuk: $jamMasuk,
+                jamPulang: $time,
+                hours: $hours,
+                minutes: $mins,
+                authorizedBy: $authorizer
+            );
             $this->queueMessage($phone, $msg);
         }
 
         // Send to parent if phone number exists
         if ($phoneOrtu) {
-            $msgOrtu = "🏠 Absen Pulang Berhasil\n\n" .
-                "Assalamualaikum, Anak Anda, *{$name}*, telah absen pulang.\n\n" .
-                "📍 Jam Masuk: {$jamMasuk}\n" .
-                "🕐 Jam Pulang: {$time}\n" .
-                "⏱️ Durasi Belajar: {$hours} jam {$mins} menit\n" .
-                "_Notifikasi otomatis dari sistem absensi sekolah._";
+            $msgOrtu = WhatsAppMessageTemplates::checkOut(
+                nama: $name,
+                jamMasuk: $jamMasuk,
+                jamPulang: $time,
+                hours: $hours,
+                minutes: $mins,
+                authorizedBy: $authorizer
+            );
             $this->queueMessage($phoneOrtu, $msgOrtu);
         }
     }

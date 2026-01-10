@@ -36,6 +36,18 @@ class SettingsController extends Controller
 
         $data = $request->except('_token', '_method', 'logo');
 
+        // Handle checkboxes (they don't send data when unchecked)
+        $checkboxSettings = [
+            'enable_checkout_attendance',
+            'absence_notification_enabled'
+        ];
+
+        foreach ($checkboxSettings as $checkbox) {
+            if (!isset($data[$checkbox])) {
+                $data[$checkbox] = 'false';
+            }
+        }
+
         foreach ($data as $key => $value) {
             Setting::updateOrCreate(
                 ['setting_key' => $key],

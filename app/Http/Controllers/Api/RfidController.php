@@ -433,7 +433,8 @@ class RfidController extends Controller
                 ]);
                 DB::commit();
 
-                $this->wa->sendCheckIn($siswa->nama, $siswa->no_wa, $now->format('H:i'), $status, $keterangan, $siswa->wa_ortu);
+                $this->wa->sendCheckIn($siswa->nama, $siswa->no_wa, $now->format('H:i'), $status, $keterangan, $siswa->wa_ortu, $siswa->kelas->nama_kelas ?? '-');
+
 
                 $this->logRequest($apiKey, 'checkin_success', $uid, true, 'Masuk: ' . $siswa->nama);
                 return $this->response(true, 'success', 'Absen masuk berhasil', 'ok', [

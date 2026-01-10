@@ -38,7 +38,7 @@ class WhatsAppService
 
 
 
-    public function sendCheckIn($name, $phone, $time, $status, $keterangan = null, $phoneOrtu = null)
+    public function sendCheckIn($name, $phone, $time, $status, $keterangan = null, $phoneOrtu = null, $kelas = '-')
     {
         // Skip if both phone numbers are empty
         if (!$phone && !$phoneOrtu)
@@ -46,10 +46,6 @@ class WhatsAppService
 
         // Determine if late based on keterangan
         $isLate = !empty($keterangan);
-
-        // Get student's class (we'll need to pass this from controller)
-        // For now, use a placeholder or extract from keterangan if available
-        $kelas = '-'; // This should be passed from controller
 
         // Send to student if phone exists
         if ($phone) {

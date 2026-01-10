@@ -59,6 +59,18 @@
                                 </div>
 
                                 <div class="form-group">
+                                    <div class="custom-control custom-switch">
+                                        <input type="checkbox" class="custom-control-input"
+                                            id="enable_checkout_attendance" name="enable_checkout_attendance"
+                                            value="true" {{ ($settings['enable_checkout_attendance'] ?? 'true') === 'true' ? 'checked' : '' }}>
+                                        <label class="custom-control-label" for="enable_checkout_attendance">
+                                            Aktifkan Absen Pulang
+                                        </label>
+                                    </div>
+                                    <small class="text-muted">Jika dinonaktifkan, siswa hanya perlu absen masuk (1x scan). Jika diaktifkan, siswa perlu absen masuk dan pulang (2x scan).</small>
+                                </div>
+
+                                <div class="form-group">
                                     <label>Logo Sekolah</label>
                                     <div class="mb-2">
                                         <img src="{{ asset('img/' . ($settings['logo_filename'] ?? 'logo.png')) }}"

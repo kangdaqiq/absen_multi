@@ -1084,6 +1084,7 @@ INSERT INTO `settings` (`setting_key`, `setting_value`, `updated_at`) VALUES
 ('alamat_sekolah', 'Jalan Murnijaya, Desa Murnijaya, Kec. Tumijajar, Kab. Tulang Bawang Barat, Lampung', '2025-12-26 13:33:53'),
 ('alamat_ttd', 'Tumijajar', '2025-12-26 13:33:53'),
 ('checkout_tolerance_minutes', '15', '2025-12-28 05:00:17'),
+('enable_checkout_attendance', 'true', CURRENT_TIMESTAMP),
 ('last_daily_report_date', NULL, '2025-12-24 06:53:10'),
 ('nama_sekolah', 'SMK Assuniyah Tumijajar', '2025-12-26 13:32:12'),
 ('report_target_jid', '120363421672356407@g.us', '2025-12-24 06:53:10');

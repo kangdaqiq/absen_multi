@@ -41,22 +41,33 @@ class AutoBolosCommand extends Command
         }
 
         // --- STEP 1: Mark BOLOS (Checked In but No Checkout) ---
-        // Only for students in Active Attendance Classes
-        $countB = DB::table('attendance')
-            ->join('siswa', 'attendance.student_id', '=', 'siswa.id')
-            ->join('kelas', 'siswa.kelas_id', '=', 'kelas.id')
-            ->where('attendance.tanggal', $today)
-            ->whereNotNull('attendance.jam_masuk')
-            ->whereNull('attendance.jam_pulang')
-            ->whereNotIn('attendance.status', ['I', 'S'])
-            ->where('kelas.is_active_attendance', true)
-            ->update([
-                'attendance.status' => 'B',
-                'attendance.keterangan' => DB::raw("CONCAT(IFNULL(attendance.keterangan, ''), ' [Auto: Tidak Absen Pulang]')"),
-                'attendance.updated_at' => now()
-            ]);
+        // Only if checkout attendance is enabled
+        $checkoutEnabled = Setting::where('setting_key', 'enable_checkout_attendance')
+            ->value('setting_value') ?? 'true';
 
-        $this->info("Marked $countB records as Bolos (B).");
+        $countB = 0;
+        if ($checkoutEnabled === 'true') {
+            // Only mark as Bolos if checkout is enabled
+            // Only for students in Active Attendance Classes
+            $countB = DB::table('attendance')
+                ->join('siswa', 'attendance.student_id', '=', 'siswa.id')
+                ->join('kelas', 'siswa.kelas_id', '=', 'kelas.id')
+                ->where('attendance.tanggal', $today)
+                ->whereNotNull('attendance.jam_masuk')
+                ->whereNull('attendance.jam_pulang')
+                ->whereNotIn('attendance.status', ['I', 'S'])
+                ->where('kelas.is_active_attendance', true)
+                ->update([
+                    'attendance.status' => 'B',
+                    'attendance.keterangan' => DB::raw("CONCAT(IFNULL(attendance.keterangan, ''), ' [Auto: Tidak Absen Pulang]')"),
+                    'attendance.updated_at' => now()
+                ]);
+
+            $this->info("Marked $countB records as Bolos (B).");
+        } else {
+            $this->info("Checkout attendance is disabled. Skipping Bolos marking.");
+        }
+
 
 
         // --- STEP 2: Mark ALPHA (No Record at all) ---

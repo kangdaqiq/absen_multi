@@ -336,6 +336,16 @@ class RfidController extends Controller
 
             // Case 2: Sudah Masuk, Belum Pulang
             if ($att && !$att->jam_pulang) {
+                // Check if checkout is enabled in settings
+                $checkoutEnabled = \App\Models\Setting::where('setting_key', 'enable_checkout_attendance')
+                    ->value('setting_value') ?? 'true';
+
+                // If checkout is disabled, treat as complete attendance
+                if ($checkoutEnabled === 'false') {
+                    DB::rollBack();
+                    return $this->response(true, 'success', 'Absen Lengkap', 'ok', ['type' => 'sudah_lengkap', 'nama' => $siswa->nama]);
+                }
+
                 // Check Teacher Session (only open gates)
                 $teacherSession = TeacherCheckoutSession::where('expires_at', '>', now())
                     ->where('status', 'open')

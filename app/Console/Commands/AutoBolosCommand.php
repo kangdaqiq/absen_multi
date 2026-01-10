@@ -8,6 +8,7 @@ use App\Models\Setting;
 use App\Models\MessageQueue;
 use App\Models\Siswa;
 use App\Models\Attendance;
+use App\Services\WhatsAppMessageTemplates;
 use Carbon\Carbon;
 
 class AutoBolosCommand extends Command
@@ -145,38 +146,11 @@ class AutoBolosCommand extends Command
         // Group by status
         $grouped = $absentStudents->groupBy('status');
 
-        // Build message
-        $message = "📋 *LAPORAN FINAL KETIDAKHADIRAN*\n";
-        $message .= "📅 Tanggal: " . Carbon::parse($today)->format('d/m/Y') . "\n";
-        $message .= str_repeat("─", 30) . "\n\n";
-
-        $statusLabels = [
-            'A' => '❌ Alpha',
-            'B' => '🏃 Bolos (Tidak Absen Pulang)',
-            'I' => '📝 Izin',
-            'S' => '🤒 Sakit'
-        ];
-
-        $totalAbsent = 0;
-        foreach (['A', 'B', 'I', 'S'] as $status) {
-            if (!isset($grouped[$status]))
-                continue;
-
-            $students = $grouped[$status];
-            $count = $students->count();
-            $totalAbsent += $count;
-
-            $message .= "*{$statusLabels[$status]}* ({$count} siswa)\n";
-            foreach ($students as $att) {
-                $kelas = $att->student->kelas->nama_kelas ?? '-';
-                $message .= "  • {$att->student->nama} ({$kelas})\n";
-            }
-            $message .= "\n";
-        }
-
-        $message .= str_repeat("─", 30) . "\n";
-        $message .= "Total: *{$totalAbsent} Siswa* tidak hadir\n";
-        $message .= "\n_Laporan otomatis setelah proses harian_";
+        // Use template for final absence report
+        $message = WhatsAppMessageTemplates::finalAbsenceReport(
+            totalAbsent: $absentStudents->count(),
+            absentStudentsGrouped: $grouped
+        );
 
         // Queue message to all classes with WhatsApp Group ID
         foreach ($kelasWithGroupId as $kelas) {
@@ -198,6 +172,7 @@ class AutoBolosCommand extends Command
             ]);
         }
 
-        $this->info("✓ Absence report queued to " . ($kelasWithGroupId->count() + ($legacyTarget ? 1 : 0)) . " recipients ({$totalAbsent} absent students)");
+        $this->info("✓ Absence report queued to " . ($kelasWithGroupId->count() + ($legacyTarget ? 1 : 0)) . " recipients (" . $absentStudents->count() . " absent students)");
+
     }
 }

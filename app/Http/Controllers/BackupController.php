@@ -11,6 +11,11 @@ class BackupController extends Controller
 {
     public function index()
     {
+        // OLD BACKUP (FULL SQL) - SUPER ADMIN ONLY
+        if (!auth()->user()->isSuperAdmin()) {
+            abort(403, 'Akses Ditolak. Fitur backup database penuh hanya untuk Super Admin.');
+        }
+
         $path = storage_path("app/backups");
         if (!file_exists($path)) {
             mkdir($path, 0755, true);
@@ -45,7 +50,7 @@ class BackupController extends Controller
     public function download($filename)
     {
         $path = storage_path("app/backups/$filename");
-        
+
         if (!file_exists($path)) {
             return back()->with('error', 'File tidak ditemukan.');
         }
@@ -56,7 +61,7 @@ class BackupController extends Controller
     public function delete($filename)
     {
         $path = storage_path("app/backups/$filename");
-        
+
         if (file_exists($path)) {
             unlink($path);
             return back()->with('success', 'Backup berhasil dihapus.');

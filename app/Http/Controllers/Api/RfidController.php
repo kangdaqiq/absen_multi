@@ -28,6 +28,7 @@ class RfidController extends Controller
     // Logging context
     private $currentApiKey = null;
     private $currentUid = null;
+    private $currentSchoolId = null;
     private $hasLogged = false;
     protected $attendanceService;
 
@@ -179,6 +180,8 @@ class RfidController extends Controller
             $this->logRequest($apiKey, 'auth_failed', '', false, 'Invalid API key');
             return null;
         }
+
+        $this->currentSchoolId = $device->school_id;
 
         // Update last used (manual query to avoid timestamp interfering if model timestamps disabled)
         DB::table('api_keys')->where('id', $device->id)->update(['last_used_at' => now()]);
@@ -550,6 +553,7 @@ class RfidController extends Controller
         $this->hasLogged = true;
 
         ApiLog::create([
+            'school_id' => $this->currentSchoolId,
             'api_key' => $apiKey,
             'action' => $action,
             'uid' => $uid,

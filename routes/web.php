@@ -100,9 +100,13 @@ Route::middleware('auth')->group(function () {
         Route::resource('jadwal', App\Http\Controllers\JadwalController::class)->except(['create', 'show', 'edit']);
         Route::resource('hari-libur', App\Http\Controllers\HariLiburController::class)->only(['index', 'store', 'destroy']);
 
-        // Settings
-        Route::get('/settings', [App\Http\Controllers\SettingsController::class, 'index'])->name('settings.index');
-        Route::put('/settings', [App\Http\Controllers\SettingsController::class, 'update'])->name('settings.update');
+        // Setting
+        Route::resource('settings', App\Http\Controllers\SettingsController::class);
+
+        // Backup & Restore
+        Route::get('/backup', [App\Http\Controllers\SchoolBackupController::class, 'index'])->name('backup.index');
+        Route::get('/backup/download', [App\Http\Controllers\SchoolBackupController::class, 'download'])->name('backup.download');
+        Route::post('/backup/restore', [App\Http\Controllers\SchoolBackupController::class, 'restore'])->name('backup.restore');
 
         // Backups
         Route::get('/backups', [App\Http\Controllers\BackupController::class, 'index'])->name('backups.index');

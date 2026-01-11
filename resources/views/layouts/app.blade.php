@@ -89,7 +89,20 @@
                         <span>Data Guru</span>
                     </a>
                 </li>
-
+                <!-- Nav Item - Settings -->
+                @if(auth()->user()->role == 'super_admin')
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ route('settings.index') }}">
+                            <i class="fas fa-fw fa-cogs"></i>
+                            <span>Pengaturan Global</span></a>
+                    </li>
+                @elseif(auth()->user()->role == 'admin')
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ route('settings.index') }}">
+                            <i class="fas fa-fw fa-cogs"></i>
+                            <span>Pengaturan Sekolah</span></a>
+                    </li>
+                @endif
                 <!-- Broadcast WA -->
                 <li class="nav-item {{ request()->routeIs('broadcast.*') ? 'active' : '' }}">
                     <a class="nav-link" href="{{ route('broadcast.index') }}">
@@ -197,6 +210,7 @@
                 <!-- Sistem Collapse -->
                 @php
                     $isSistemActive = request()->routeIs('users.*') ||
+                        request()->routeIs('backup.*') || 
                         request()->routeIs('backups.*') ||
                         request()->routeIs('whatsapp-logs.*') ||
                         request()->routeIs('api-logs.*');
@@ -213,8 +227,15 @@
                             <div class="bg-white py-2 collapse-inner rounded">
                                 <a class="collapse-item {{ request()->routeIs('users.*') ? 'active' : '' }}"
                                     href="{{ route('users.index') }}">Manajemen User</a>
-                                <a class="collapse-item {{ request()->routeIs('backups.*') ? 'active' : '' }}"
-                                    href="{{ route('backups.index') }}">Backup & Restore</a>
+                                
+                                <a class="collapse-item {{ request()->routeIs('backup.index') ? 'active' : '' }}"
+                                    href="{{ route('backup.index') }}">Backup & Restore</a>
+
+                                @if(auth()->user()->role === 'super_admin')
+                                    <a class="collapse-item {{ request()->routeIs('backups.*') ? 'active' : '' }}"
+                                        href="{{ route('backups.index') }}">Backup Sistem (SQL)</a>
+                                @endif
+
                                 <a class="collapse-item {{ request()->routeIs('whatsapp-logs.*') ? 'active' : '' }}"
                                     href="{{ route('whatsapp-logs.index') }}">Log WhatsApp</a>
                                 <a class="collapse-item {{ request()->routeIs('api-logs.*') ? 'active' : '' }}"

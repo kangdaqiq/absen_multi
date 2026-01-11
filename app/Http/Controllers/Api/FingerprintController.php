@@ -42,6 +42,7 @@ class FingerprintController extends Controller
 {
 private $currentApiKey = null;
 private $currentId = null;
+private $currentSchoolId = null;
 protected $wa;
 protected $attendanceService;
 
@@ -72,6 +73,7 @@ $this->currentId = $fingerId;
 // Check for Ping (Boot Notification)
 if ($request->has('ping')) {
 ApiLog::create([
+'school_id' => $this->currentSchoolId,
 'api_key' => $apiKey,
 'action' => 'ping',
 'uid' => null,
@@ -218,6 +220,7 @@ $gateAuth = $this->checkGateAuthorization($guru, $device->school_id);
 if ($gateAuth['authorized']) {
 // Create Teacher Checkout Session
 TeacherCheckoutSession::create([
+'school_id' => $this->currentSchoolId,
 'teacher_id' => $guru->id,
 'teacher_name' => $guru->nama,
 'uid_rfid' => $guru->uid_rfid ?? 'FINGERPRINT',
@@ -226,6 +229,7 @@ TeacherCheckoutSession::create([
 ]);
 
 ApiLog::create([
+'school_id' => $this->currentSchoolId,
 'api_key' => $this->currentApiKey,
 'action' => 'teacher_gate_auth_finger',
 'uid' => $fingerId,
@@ -250,6 +254,7 @@ $message = $attnResult['message'];
 $extra = ['attendance_info' => $attnResult, 'type' => 'teacher_attendance'];
 
 ApiLog::create([
+'school_id' => $this->currentSchoolId,
 'api_key' => $this->currentApiKey,
 'action' => 'teacher_attendance_finger',
 'uid' => $fingerId,
@@ -261,6 +266,7 @@ ApiLog::create([
 return $this->response(true, 'success', $message, 'ok', $extra);
 } else {
 ApiLog::create([
+'school_id' => $this->currentSchoolId,
 'api_key' => $this->currentApiKey,
 'action' => 'teacher_attendance_finger',
 'uid' => $fingerId,
@@ -396,6 +402,7 @@ $att->update([
 DB::commit();
 
 ApiLog::create([
+'school_id' => $this->currentSchoolId,
 'api_key' => $this->currentApiKey,
 'action' => 'student_checkout_finger',
 'uid' => $fingerId,
@@ -452,6 +459,7 @@ Attendance::create([
 DB::commit();
 
 ApiLog::create([
+'school_id' => $this->currentSchoolId,
 'api_key' => $this->currentApiKey,
 'action' => 'student_checkin_finger',
 'uid' => $fingerId,
@@ -520,6 +528,7 @@ return null;
 // Use full namespace model if needed, or imported. Imported 'Device' above.
 $device = Device::where('api_key', $apiKey)->where('active', true)->first();
 if ($device) {
+$this->currentSchoolId = $device->school_id;
 DB::table('api_keys')->where('id', $device->id)->update(['last_used_at' => now()]);
 }
 return $device;

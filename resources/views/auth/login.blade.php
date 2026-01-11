@@ -217,10 +217,14 @@
                 <div class="card login-card border-0">
                     <div class="login-header">
                         <div class="login-icon">
-                            <img src="{{ asset('img/' . $school_logo) }}" alt="Logo Sekolah">
+                            @php
+                                $isStorage = \Illuminate\Support\Str::startsWith($school_logo, 'schools/');
+                                $logoUrl = $isStorage ? asset('storage/' . $school_logo) : asset('img/' . $school_logo);
+                            @endphp
+                            <img src="{{ $logoUrl }}" alt="Logo Sekolah">
                         </div>
                         <h1>Selamat Datang</h1>
-                        <p>Sistem Absensi {{ $school_name }}</p>
+                        <p>Silakan login untuk mengakses sistem absensi</p>
                     </div>
 
                     <div class="login-body">

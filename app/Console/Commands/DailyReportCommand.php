@@ -20,55 +20,92 @@ class DailyReportCommand extends Command
     public function handle()
     {
         $targetJid = $this->argument('targetJid');
+        $today = now()->format('Y-m-d');
 
-        // Look up setting if not provided (legacy support)
-        if (!$targetJid) {
-            $targetJid = Setting::where('setting_key', 'report_target_jid')->value('setting_value');
+        // Global Sunday check REMOVED to support per-school schedules
+        // if (now()->isSunday()) { ... }
+
+        // Iterate through ALL Active Schools
+        $schools = \App\Models\School::where('is_active', true)->get();
+
+        foreach ($schools as $school) {
+            $this->processSchoolReport($school, $today, $targetJid);
+        }
+    }
+
+    private function processSchoolReport($school, $today, $targetJidOverride = null)
+    {
+        $schoolId = $school->id;
+        $this->info("------------------------------------------------");
+        $this->info("Processing Daily Report for School: {$school->nama_sekolah} (ID: $schoolId)");
+
+        // 1. Check Hari Libur (Per School - Manual Dates)
+        if (HariLibur::where('school_id', $schoolId)->where('tanggal', $today)->exists()) {
+            $this->info("Today is Holiday ($today) for this school. Skipped.");
+            return;
         }
 
-        // Get classes with WhatsApp Group ID
-        $kelasWithGroupId = Kelas::whereNotNull('wa_group_id')
+        // 2. Check Weekly Holiday via Schedule (Jadwal)
+        $dayIndex = now()->dayOfWeekIso; // 1-7
+        $isSchoolDay = \App\Models\Jadwal::where('school_id', $schoolId)
+            ->where('index_hari', $dayIndex)
+            ->where('is_active', true) // Only active days
+            ->exists();
+
+        if (!$isSchoolDay) {
+            $this->info("Today (Day $dayIndex) is NOT an active school day (No Schedule). Skipped.");
+            return;
+        }
+
+
+        // 2. Check Schedule Time (Per School)
+        $scheduleTime = Setting::where('school_id', $schoolId)
+            ->where('setting_key', 'schedule_daily_report')
+            ->value('setting_value') ?? '08:15';
+
+        if (now()->format('H:i') < $scheduleTime) {
+            // Too early
+            return;
+        }
+
+        // 3. Look up setting (Per School)
+        $targetJid = $targetJidOverride;
+        if (!$targetJid) {
+            $targetJid = Setting::where('school_id', $schoolId)->where('setting_key', 'report_target_jid')->value('setting_value');
+        }
+
+        // 4. Debounce check (Per School)
+        $lastRun = Setting::where('school_id', $schoolId)->where('setting_key', 'last_daily_report_date')->value('setting_value');
+        if ($lastRun === $today) {
+            $this->info("DailyReport already ran today for this school.");
+            return;
+        }
+
+        // 4. Get classes with WhatsApp Group ID (Per School)
+        $kelasWithGroupId = Kelas::where('school_id', $schoolId)
+            ->whereNotNull('wa_group_id')
             ->where('wa_group_id', '!=', '')
             ->where('is_active_attendance', true)
             ->where('is_active_report', true)
             ->get();
 
         if ($kelasWithGroupId->isEmpty() && !$targetJid) {
-            $this->error("No classes with WhatsApp Group ID and target JID not found in settings.");
+            $this->warn("No classes with WhatsApp Group ID and no target JID found for this school.");
             return;
         }
 
-        $today = now()->format('Y-m-d');
-
-        // CHECK 1: Sunday
-        if (now()->isSunday()) {
-            $this->info("Today is Sunday. Report Skipped.");
-            return;
-        }
-
-        // CHECK 2: Holiday (Hari Libur)
-        if (HariLibur::where('tanggal', $today)->exists()) {
-            $this->info("Today is Holiday ($today). Report Skipped.");
-            return;
-        }
-
-        // Debounce check
-        $lastRun = Setting::where('setting_key', 'last_daily_report_date')->value('setting_value');
-        if ($lastRun === $today) {
-            $this->info("DailyReport already ran today ($today).");
-            return;
-        }
-
-        $this->info("Generating report for $today...");
+        $this->info("Generating report...");
 
         // --- AUTO-EXTEND SAKIT FROM YESTERDAY (2 DAYS) ---
         $yesterday = now()->subDay()->format('Y-m-d');
 
-        // Find students who were SAKIT yesterday (only S, not I)
-        // Exclude auto-extended records to prevent loop (only extend manual entries)
+        // Find students who were SAKIT yesterday SCOPED
         $yesterdaySakit = Attendance::where('tanggal', $yesterday)
+            ->whereHas('student', function ($q) use ($schoolId) {
+                $q->where('school_id', $schoolId);
+            })
             ->where('status', 'S')
-            ->where('is_auto_extended', false) // Only manual entries
+            ->where('is_auto_extended', false)
             ->get();
 
         $autoExtendCount = 0;
@@ -78,7 +115,7 @@ class DailyReportCommand extends Command
                 ->where('tanggal', $today)
                 ->exists();
 
-            // Only create if no record exists (student hasn't checked in)
+            // Only create if no record exists
             if (!$existsToday) {
                 Attendance::create([
                     'student_id' => $att->student_id,
@@ -88,7 +125,7 @@ class DailyReportCommand extends Command
                     'jam_kerja' => null,
                     'status' => 'S',
                     'keterangan' => '[Auto-Lanjut] Sakit (Hari ke-2)',
-                    'is_auto_extended' => true, // Mark as auto-extended
+                    'is_auto_extended' => true,
                     'lokasi_masuk' => 'System',
                     'created_at' => now(),
                     'updated_at' => now()
@@ -96,15 +133,21 @@ class DailyReportCommand extends Command
                 $autoExtendCount++;
             }
         }
+        $this->info("Auto-extended $autoExtendCount Sakit records.");
 
-        $this->info("Auto-extended $autoExtendCount Sakit records from yesterday.");
+        // Get All Students SCOPED
+        $siswaAll = Siswa::where('school_id', $schoolId)
+            ->whereHas('kelas', function ($q) {
+                $q->where('is_active_attendance', true);
+            })->with('kelas')->orderBy('nama')->get();
 
-
-        $siswaAll = Siswa::whereHas('kelas', function ($q) {
-            $q->where('is_active_attendance', true);
-        })->with('kelas')->orderBy('nama')->get();
-
-        $attendance = Attendance::where('tanggal', $today)->get()->keyBy('student_id');
+        // Get Attendance SCOPED (Implicit by student_id, but good to optimize)
+        // We can just fetch all attendance for today and filter by student IDs in memory or query
+        $studentIds = $siswaAll->pluck('id');
+        $attendance = Attendance::where('tanggal', $today)
+            ->whereIn('student_id', $studentIds)
+            ->get()
+            ->keyBy('student_id');
 
         $totalMasuk = 0;
         $absentByStatus = [
@@ -120,7 +163,6 @@ class DailyReportCommand extends Command
                 if ($att->status === 'H') {
                     $totalMasuk++;
                 } else {
-                    // Group by status
                     $status = $att->status;
                     if (isset($absentByStatus[$status])) {
                         $kelas = $s->kelas->nama_kelas ?? '-';
@@ -145,15 +187,12 @@ class DailyReportCommand extends Command
         $studentsByClass = $siswaAll->groupBy('kelas_id');
 
         foreach ($kelasWithGroupId as $kelas) {
-            // Get students only from this class
             $siswaKelas = $studentsByClass[$kelas->id] ?? collect();
 
             if ($siswaKelas->isEmpty()) {
-                $this->warn("No students in class {$kelas->nama_kelas}. Skipping group report.");
                 continue;
             }
 
-            $totalSiswa = $siswaKelas->count();
             $masuk = 0;
             $tidakMasuk = 0;
             $absentByStatusClass = [
@@ -176,13 +215,11 @@ class DailyReportCommand extends Command
                         }
                     }
                 } else {
-                    // No record = Alpha
                     $tidakMasuk++;
                     $absentByStatusClass['A'][] = $s->nama;
                 }
             }
 
-            // Use template for class-specific message
             $msgClass = WhatsAppMessageTemplates::dailyReportClass(
                 namaKelas: $kelas->nama_kelas,
                 masuk: $masuk,
@@ -190,20 +227,18 @@ class DailyReportCommand extends Command
                 absentByStatus: $absentByStatusClass
             );
 
-            // Queue Class-Specific Message
             MessageQueue::create([
+                'school_id' => $schoolId,
                 'phone_number' => $kelas->wa_group_id,
                 'message' => $msgClass,
                 'status' => 'pending',
                 'created_at' => now()
             ]);
-
-            $this->info("Queued class-specific report to {$kelas->nama_kelas} group ({$kelas->wa_group_id})");
+            $this->info("Queued class report: {$kelas->nama_kelas}");
         }
 
-        // --- SEND GLOBAL REPORT TO LEGACY TARGET (if exists) ---
+        // --- SEND GLOBAL REPORT TO LEGACY TARGET ---
         if ($targetJid) {
-            // Use template for global message
             $msg = WhatsAppMessageTemplates::dailyReportGlobal(
                 totalMasuk: $totalMasuk,
                 totalTidakMasuk: $totalTidakMasuk,
@@ -211,33 +246,29 @@ class DailyReportCommand extends Command
             );
 
             MessageQueue::create([
+                'school_id' => $schoolId,
                 'phone_number' => $targetJid,
                 'message' => $msg,
                 'status' => 'pending',
                 'created_at' => now()
             ]);
-            $this->info("Queued global report to legacy target ({$targetJid})");
+            $this->info("Queued global report to admin ($targetJid)");
         }
 
-
-
-        // --- NEW: Laporan Per Wali Kelas ---
+        // --- LAPORAN PER WALI KELAS ---
         $this->info("Processing Wali Kelas reports...");
-
-        $kelasWithWali = \App\Models\Kelas::whereNotNull('wali_kelas_id')->with('waliKelas')->get();
-        $studentsByClass = $siswaAll->groupBy('kelas_id');
+        $kelasWithWali = \App\Models\Kelas::where('school_id', $schoolId)
+            ->whereNotNull('wali_kelas_id')
+            ->with('waliKelas')
+            ->get();
 
         foreach ($kelasWithWali as $kelas) {
             $wali = $kelas->waliKelas;
-
-            // Skip if Wali Kelas has no phone number or no students
             if (!$wali || !$wali->no_wa || !isset($studentsByClass[$kelas->id])) {
                 continue;
             }
 
             $siswaKelas = $studentsByClass[$kelas->id];
-            $totalSiswa = $siswaKelas->count();
-
             $masuk = 0;
             $tidakMasuk = 0;
             $listAbsen = [];
@@ -264,7 +295,6 @@ class DailyReportCommand extends Command
                 }
             }
 
-            // Use template for wali kelas message
             $msgWali = WhatsAppMessageTemplates::dailyReportWaliKelas(
                 namaKelas: $kelas->nama_kelas,
                 namaWali: $wali->nama,
@@ -273,26 +303,21 @@ class DailyReportCommand extends Command
                 listAbsen: $listAbsen
             );
 
-            // Queue Message
             MessageQueue::create([
+                'school_id' => $schoolId,
                 'phone_number' => $wali->no_wa,
                 'message' => $msgWali,
                 'status' => 'pending',
                 'created_at' => now()
             ]);
-
-            $this->info("Queued report for {$kelas->nama_kelas} -> {$wali->nama} ({$wali->no_wa})");
         }
 
-
-        // --- NEW: Send Notifications to Alpha Students and Parents ---
-        $this->info("Processing alpha student notifications...");
-
-        // Get all alpha students with their full data
+        // --- ALPHA NOTIFICATIONS ---
+        $this->info("Processing alpha notifications...");
+        // Filter alphaStudentIds for THIS SCHOOL
         $alphaStudentIds = [];
         foreach ($siswaAll as $s) {
             if (!$attendance->has($s->id)) {
-                // No attendance record = Alpha
                 $alphaStudentIds[] = $s->id;
             }
         }
@@ -300,70 +325,62 @@ class DailyReportCommand extends Command
         if (!empty($alphaStudentIds)) {
             $alphaStudents = Siswa::with('kelas')
                 ->whereIn('id', $alphaStudentIds)
-                ->get();
+                ->get(); // Already scoped by $siswaAll
 
             foreach ($alphaStudents as $student) {
-                $studentName = $student->nama;
-                $studentPhone = $student->no_wa;
-                $parentPhone = $student->wa_ortu;
-                $kelasName = $student->kelas->nama_kelas ?? '-';
-
-                // Send to student if phone exists
-                if ($studentPhone) {
-                    $msgStudent = "❌ *Pemberitahuan Ketidakhadiran*\n\n" .
-                        "Assalamualaikum, *{$studentName}*,\n\n" .
-                        "📅 Tanggal: " . now()->format('d/m/Y') . "\n" .
-                        "📊 Status: Alpha (Tidak Hadir)\n\n" .
-                        "Anda tercatat tidak hadir hari ini tanpa keterangan.\n" .
-                        "Mohon segera konfirmasi ke wali kelas atau bagian kesiswaan.\n\n" .
-                        "_Notifikasi otomatis dari sistem absensi sekolah._";
-
-                    MessageQueue::create([
-                        'phone_number' => $studentPhone,
-                        'message' => $msgStudent,
-                        'status' => 'pending',
-                        'created_at' => now()
-                    ]);
-
-                    $this->info("Queued alpha notification to student: {$studentName} ({$studentPhone})");
-                }
-
-                // Send to parent if phone exists
-                if ($parentPhone) {
-                    $msgParent = "❌ *Pemberitahuan Ketidakhadiran Anak*\n\n" .
-                        "Assalamualaikum, Orang Tua/Wali dari *{$studentName}*,\n\n" .
-                        "📅 Tanggal: " . now()->format('d/m/Y') . "\n" .
-                        "📊 Status: Alpha (Tidak Hadir)\n" .
-                        "⚠️ Kelas: {$kelasName}\n\n" .
-                        "Anak Anda tercatat tidak hadir hari ini tanpa keterangan.\n" .
-                        "Mohon konfirmasi kepada wali kelas atau bagian kesiswaan.\n\n" .
-                        "_Notifikasi otomatis dari sistem absensi sekolah._";
-
-                    MessageQueue::create([
-                        'phone_number' => $parentPhone,
-                        'message' => $msgParent,
-                        'status' => 'pending',
-                        'created_at' => now()
-                    ]);
-
-                    $this->info("Queued alpha notification to parent: {$studentName} ({$parentPhone})");
-                }
-
-                // Log if student has no contact numbers
-                if (!$studentPhone && !$parentPhone) {
-                    $this->warn("No contact numbers for alpha student: {$studentName}");
-                }
+                $this->sendAlphaNotification($student, $schoolId);
             }
-
-            $this->info("Alpha notifications queued for " . count($alphaStudents) . " students.");
-        } else {
-            $this->info("No alpha students today. Skipping alpha notifications.");
         }
 
-        // Mark done
+        // Mark done for this school
         Setting::updateOrCreate(
-            ['setting_key' => 'last_daily_report_date'],
+            ['school_id' => $schoolId, 'setting_key' => 'last_daily_report_date'],
             ['setting_value' => $today]
         );
+    }
+
+    private function sendAlphaNotification($student, $schoolId)
+    {
+        $studentName = $student->nama;
+        $studentPhone = $student->no_wa;
+        $parentPhone = $student->wa_ortu;
+        $kelasName = $student->kelas->nama_kelas ?? '-';
+
+        if ($studentPhone) {
+            $msgStudent = "❌ *Pemberitahuan Ketidakhadiran*\n\n" .
+                "Assalamualaikum, *{$studentName}*,\n\n" .
+                "📅 Tanggal: " . now()->format('d/m/Y') . "\n" .
+                "📊 Status: Alpha (Tidak Hadir)\n\n" .
+                "Anda tercatat tidak hadir hari ini tanpa keterangan.\n" .
+                "Mohon segera konfirmasi ke wali kelas atau bagian kesiswaan.\n\n" .
+                "_Notifikasi otomatis dari sistem absensi sekolah._";
+
+            MessageQueue::create([
+                'school_id' => $schoolId,
+                'phone_number' => $studentPhone,
+                'message' => $msgStudent,
+                'status' => 'pending',
+                'created_at' => now()
+            ]);
+        }
+
+        if ($parentPhone) {
+            $msgParent = "❌ *Pemberitahuan Ketidakhadiran Anak*\n\n" .
+                "Assalamualaikum, Orang Tua/Wali dari *{$studentName}*,\n\n" .
+                "📅 Tanggal: " . now()->format('d/m/Y') . "\n" .
+                "📊 Status: Alpha (Tidak Hadir)\n" .
+                "⚠️ Kelas: {$kelasName}\n\n" .
+                "Anak Anda tercatat tidak hadir hari ini tanpa keterangan.\n" .
+                "Mohon konfirmasi kepada wali kelas atau bagian kesiswaan.\n\n" .
+                "_Notifikasi otomatis dari sistem absensi sekolah._";
+
+            MessageQueue::create([
+                'school_id' => $schoolId,
+                'phone_number' => $parentPhone,
+                'message' => $msgParent,
+                'status' => 'pending',
+                'created_at' => now()
+            ]);
+        }
     }
 }

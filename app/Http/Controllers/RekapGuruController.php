@@ -18,23 +18,35 @@ class RekapGuruController extends Controller
         $endDate = $request->input('end_date', now()->format('Y-m-d'));
         $guruId = $request->input('guru_id');
 
-        $query = AbsensiGuru::with(['guru', 'jadwal.mapel', 'jadwal.kelas'])
+        // Query Absensi Harian (jadwal_pelajaran_id IS NULL)
+        $query = AbsensiGuru::with(['guru'])
+            ->whereNull('jadwal_pelajaran_id')
             ->whereBetween('tanggal', [$startDate, $endDate])
             ->orderBy('tanggal', 'desc')
-            ->orderBy('waktu_hadir', 'desc');
+            ->orderBy('jam_masuk', 'desc');
 
         if ($guruId) {
             $query->where('guru_id', $guruId);
         }
 
+        // Filter by school_id for non-super admin users
+        if (auth()->user() && !auth()->user()->isSuperAdmin()) {
+            $query->where('school_id', auth()->user()->school_id);
+        }
+
         $absensi = $query->get();
-        $gurus = Guru::orderBy('nama')->get();
+
+        $gurusQuery = Guru::orderBy('nama');
+        if (auth()->user() && !auth()->user()->isSuperAdmin()) {
+            $gurusQuery->where('school_id', auth()->user()->school_id);
+        }
+        $gurus = $gurusQuery->get();
 
         // Statistics
         $stats = [
             'total' => $absensi->count(),
             'hadir' => $absensi->where('status', 'Hadir')->count(),
-            'tidak_hadir' => $absensi->where('status', 'Tidak Hadir')->count(),
+            'tidak_hadir' => $absensi->where('status', '!=', 'Hadir')->count(), // Assuming anything not 'Hadir' is absent/late/etc
         ];
 
         return view('rekap-guru.index', compact('absensi', 'gurus', 'startDate', 'endDate', 'guruId', 'stats'));

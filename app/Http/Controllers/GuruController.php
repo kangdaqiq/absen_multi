@@ -4,12 +4,20 @@ namespace App\Http\Controllers;
 
 use App\Models\Guru;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class GuruController extends Controller
 {
     public function index()
     {
-        $guru = Guru::orderBy('nama')->get();
+        $query = Guru::orderBy('nama');
+
+        // Filter by school_id for non-super admin users
+        if (auth()->user() && !auth()->user()->isSuperAdmin()) {
+            $query->where('school_id', auth()->user()->school_id);
+        }
+
+        $guru = $query->get();
         // Fetch active devices for enrollment dropdowns
         $devices = \App\Models\Device::where('active', 1)->get();
         return view('guru.index', compact('guru', 'devices'));
@@ -17,17 +25,36 @@ class GuruController extends Controller
 
     public function store(Request $request)
     {
+        $schoolId = auth()->user()->isSuperAdmin() ? null : auth()->user()->school_id;
+
         $request->validate([
             'nama' => 'required|string|max:100',
             'nip' => 'nullable|string|max:50',
-            'no_wa' => 'required|string|max:20|unique:guru,no_wa|regex:/^(08|628)[0-9]{8,13}$/',
-            'uid_rfid' => 'nullable|string|max:20|unique:guru,uid_rfid',
+            'no_wa' => [
+                'required',
+                'string',
+                'max:20',
+                'regex:/^(08|628)[0-9]{8,13}$/',
+                Rule::unique('guru')->where(fn($q) => $q->where('school_id', $schoolId))
+            ],
+            'uid_rfid' => [
+                'nullable',
+                'string',
+                'max:20',
+                Rule::unique('guru')->where(fn($q) => $q->where('school_id', $schoolId))
+            ],
         ]);
 
         $data = $request->all();
         if (isset($data['no_wa'])) {
             $data['no_wa'] = $this->normalizeWa($data['no_wa']);
         }
+
+        // Add school_id from authenticated user
+        if (auth()->user() && !auth()->user()->isSuperAdmin()) {
+            $data['school_id'] = auth()->user()->school_id;
+        }
+
         Guru::create($data);
 
         return redirect()->route('guru.index')->with('success', 'Guru berhasil ditambahkan.');
@@ -36,12 +63,24 @@ class GuruController extends Controller
     public function update(Request $request, $guru)
     {
         $guruModel = Guru::findOrFail($guru);
+        $schoolId = auth()->user()->isSuperAdmin() ? null : auth()->user()->school_id;
 
         $request->validate([
             'nama' => 'required|string|max:100',
             'nip' => 'nullable|string|max:50',
-            'no_wa' => 'required|string|max:20|unique:guru,no_wa,' . $guruModel->id . '|regex:/^(08|628)[0-9]{8,13}$/',
-            'uid_rfid' => 'nullable|string|max:20|unique:guru,uid_rfid,' . $guruModel->id,
+            'no_wa' => [
+                'required',
+                'string',
+                'max:20',
+                'regex:/^(08|628)[0-9]{8,13}$/',
+                Rule::unique('guru')->ignore($guruModel->id)->where(fn($q) => $q->where('school_id', $schoolId))
+            ],
+            'uid_rfid' => [
+                'nullable',
+                'string',
+                'max:20',
+                Rule::unique('guru')->ignore($guruModel->id)->where(fn($q) => $q->where('school_id', $schoolId))
+            ],
         ]);
 
         $data = $request->all();
@@ -64,11 +103,19 @@ class GuruController extends Controller
     // Enrollment Methods
     public function enrollRequest($id)
     {
-        // Cancel others (Siswa & Guru) to ensure Single Active Request
-        \App\Models\Siswa::where('enroll_status', 'requested')->update(['enroll_status' => 'none']);
-        Guru::where('enroll_status', 'requested')->update(['enroll_status' => 'none']);
-
+        // Cancel others (Siswa & Guru) to ensure Single Active Request - SCOPED
         $guru = Guru::findOrFail($id);
+        $schoolId = $guru->school_id;
+
+        \App\Models\Siswa::where('enroll_status', 'requested')
+            ->where('school_id', $schoolId)
+            ->update(['enroll_status' => 'none']);
+
+        Guru::where('enroll_status', 'requested')
+            ->where('school_id', $schoolId)
+            ->where('id', '!=', $id) // exclude self just in case, though usually update is next
+            ->update(['enroll_status' => 'none']);
+
         $guru->update(['enroll_status' => 'requested']);
         // Push notification removed for RFID as per user request
         return response()->json(['ok' => true]);
@@ -106,10 +153,15 @@ class GuruController extends Controller
             'device_id' => 'required|exists:api_keys,id',
         ]);
 
-        // Cancel others to ensure Single Active Request
-        Guru::where('enroll_finger_status', 'requested')->update(['enroll_finger_status' => 'none']);
-
+        // Cancel others to ensure Single Active Request - SCOPED
         $guru = Guru::findOrFail($id);
+        $schoolId = $guru->school_id;
+
+        Guru::where('enroll_finger_status', 'requested')
+            ->where('school_id', $schoolId)
+            ->where('id', '!=', $id)
+            ->update(['enroll_finger_status' => 'none']);
+
         $guru->update(['enroll_finger_status' => 'requested']);
 
         // --- Push Notification to Selected Device ---
@@ -239,13 +291,22 @@ class GuruController extends Controller
 
                 $normalizedWa = $this->normalizeWa($wa);
 
-                // Check duplicate by WA or NIP if present
+                $schoolId = auth()->user()->isSuperAdmin() ? null : auth()->user()->school_id;
+
+                // Check duplicate by WA or NIP if present - SCOPED
                 $exists = false;
                 if ($normalizedWa) {
-                    $exists = Guru::where('no_wa', $normalizedWa)->exists();
+                    $queryWa = Guru::where('no_wa', $normalizedWa);
+                    if ($schoolId)
+                        $queryWa->where('school_id', $schoolId);
+                    $exists = $queryWa->exists();
                 }
+
                 if (!$exists && $nip) {
-                    $exists = Guru::where('nip', $nip)->exists();
+                    $queryNip = Guru::where('nip', $nip);
+                    if ($schoolId)
+                        $queryNip->where('school_id', $schoolId);
+                    $exists = $queryNip->exists();
                 }
 
                 if ($exists) {
@@ -257,6 +318,7 @@ class GuruController extends Controller
                     'nama' => $nama,
                     'nip' => $nip,
                     'no_wa' => $normalizedWa,
+                    'school_id' => $schoolId,
                 ]);
 
                 $countSuccess++;

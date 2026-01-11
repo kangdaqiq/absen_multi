@@ -7,8 +7,8 @@ use Illuminate\Database\Eloquent\Model;
 class HariLibur extends Model
 {
     protected $table = 'hari_libur';
-    
-    protected $fillable = ['tanggal', 'keterangan'];
+
+    protected $fillable = ['tanggal', 'keterangan', 'school_id'];
 
     protected $casts = [
         'tanggal' => 'date',

@@ -37,8 +37,11 @@
             <a class="sidebar-brand d-flex flex-column align-items-center justify-content-center py-4 mb-2"
                 href="{{ route('dashboard') }}" style="height: auto;">
                 <div class="sidebar-brand-icon mb-2">
-                    <img src="{{ asset('img/' . $school_logo) }}" alt="Logo"
-                        style="width: 80px; height: 80px; object-fit: contain;">
+                    @php
+                        $isStorage = \Illuminate\Support\Str::startsWith($school_logo, 'schools/');
+                        $logoUrl = $isStorage ? asset('storage/' . $school_logo) : asset('img/' . $school_logo);
+                    @endphp
+                    <img src="{{ $logoUrl }}" alt="Logo" style="width: 80px; height: 80px; object-fit: contain;">
                 </div>
                 <div class="sidebar-brand-text mx-3 small font-weight-bold"
                     style="line-height: 1.2; text-align: center;">{{ $school_name }}</div>
@@ -47,8 +50,10 @@
             <hr class="sidebar-divider my-0">
 
             <!-- Dashboard -->
-            <li class="nav-item {{ request()->routeIs('dashboard') ? 'active' : '' }}">
-                <a class="nav-link" href="{{ route('dashboard') }}">
+            <li
+                class="nav-item {{ request()->routeIs('dashboard') || request()->routeIs('super-admin.dashboard') ? 'active' : '' }}">
+                <a class="nav-link"
+                    href="{{ auth()->user()->role === 'super_admin' ? route('super-admin.dashboard') : route('dashboard') }}">
                     <i class="fas fa-fw fa-tachometer-alt"></i>
                     <span>Dashboard</span>
                 </a>
@@ -57,6 +62,16 @@
             <hr class="sidebar-divider">
 
             <div class="sidebar-heading">Menu</div>
+
+            <!-- Super Admin Menu -->
+            @if(auth()->user()->role === 'super_admin')
+                <li class="nav-item {{ request()->routeIs('super-admin.schools.*') ? 'active' : '' }}">
+                    <a class="nav-link" href="{{ route('super-admin.schools.index') }}">
+                        <i class="fas fa-school"></i>
+                        <span>Data Sekolah</span>
+                    </a>
+                </li>
+            @endif
 
             <!-- Data Siswa -->
             @if(in_array(auth()->user()->role, ['admin', 'teacher']))
@@ -95,32 +110,34 @@
             @endif
 
             <!-- Absensi Collapse -->
-            @php
-                $isAbsensiActive = request()->routeIs('absensi.*') ||
-                    request()->routeIs('absensi-guru.*') ||
-                    request()->routeIs('rekap.*') ||
-                    request()->routeIs('rekap-guru.*');
-            @endphp
-            <li class="nav-item {{ $isAbsensiActive ? 'active' : '' }}">
-                <a class="nav-link {{ $isAbsensiActive ? '' : 'collapsed' }}" href="#" data-toggle="collapse"
-                    data-target="#collapseAbsensi" aria-expanded="true" aria-controls="collapseAbsensi">
-                    <i class="fas fa-calendar-check"></i>
-                    <span>Absensi</span>
-                </a>
-                <div id="collapseAbsensi" class="collapse {{ $isAbsensiActive ? 'show' : '' }}"
-                    aria-labelledby="headingAbsensi" data-parent="#accordionSidebar">
-                    <div class="bg-white py-2 collapse-inner rounded">
-                        <a class="collapse-item {{ request()->routeIs('absensi.*') ? 'active' : '' }}"
-                            href="{{ route('absensi.index') }}">Absensi Siswa</a>
-                        <a class="collapse-item {{ request()->routeIs('absensi-guru.*') ? 'active' : '' }}"
-                            href="{{ route('absensi-guru.index') }}">Absensi Guru</a>
-                        <a class="collapse-item {{ request()->routeIs('rekap.index') ? 'active' : '' }}"
-                            href="{{ route('rekap.index') }}">Rekap Siswa</a>
-                        <a class="collapse-item {{ request()->routeIs('rekap-guru.*') ? 'active' : '' }}"
-                            href="{{ route('rekap-guru.index') }}">Rekap Guru</a>
+            @if(in_array(auth()->user()->role, ['admin', 'teacher']))
+                @php
+                    $isAbsensiActive = request()->routeIs('absensi.*') ||
+                        request()->routeIs('absensi-guru.*') ||
+                        request()->routeIs('rekap.*') ||
+                        request()->routeIs('rekap-guru.*');
+                @endphp
+                <li class="nav-item {{ $isAbsensiActive ? 'active' : '' }}">
+                    <a class="nav-link {{ $isAbsensiActive ? '' : 'collapsed' }}" href="#" data-toggle="collapse"
+                        data-target="#collapseAbsensi" aria-expanded="true" aria-controls="collapseAbsensi">
+                        <i class="fas fa-calendar-check"></i>
+                        <span>Absensi</span>
+                    </a>
+                    <div id="collapseAbsensi" class="collapse {{ $isAbsensiActive ? 'show' : '' }}"
+                        aria-labelledby="headingAbsensi" data-parent="#accordionSidebar">
+                        <div class="bg-white py-2 collapse-inner rounded">
+                            <a class="collapse-item {{ request()->routeIs('absensi.*') ? 'active' : '' }}"
+                                href="{{ route('absensi.index') }}">Absensi Siswa</a>
+                            <a class="collapse-item {{ request()->routeIs('absensi-guru.*') ? 'active' : '' }}"
+                                href="{{ route('absensi-guru.index') }}">Absensi Guru</a>
+                            <a class="collapse-item {{ request()->routeIs('rekap.index') ? 'active' : '' }}"
+                                href="{{ route('rekap.index') }}">Rekap Siswa</a>
+                            <a class="collapse-item {{ request()->routeIs('rekap-guru.*') ? 'active' : '' }}"
+                                href="{{ route('rekap-guru.index') }}">Rekap Guru</a>
+                        </div>
                     </div>
-                </div>
-            </li>
+                </li>
+            @endif
 
 
             <!-- Master Data Collapse -->
@@ -184,27 +201,31 @@
                         request()->routeIs('whatsapp-logs.*') ||
                         request()->routeIs('api-logs.*');
                 @endphp
-                <li class="nav-item {{ $isSistemActive ? 'active' : '' }}">
-                    <a class="nav-link {{ $isSistemActive ? '' : 'collapsed' }}" href="#" data-toggle="collapse"
-                        data-target="#collapseSistem" aria-expanded="true" aria-controls="collapseSistem">
-                        <i class="fas fa-server"></i>
-                        <span>Sistem</span>
-                    </a>
-                    <div id="collapseSistem" class="collapse {{ $isSistemActive ? 'show' : '' }}"
-                        aria-labelledby="headingSistem" data-parent="#accordionSidebar">
-                        <div class="bg-white py-2 collapse-inner rounded">
-                            <a class="collapse-item {{ request()->routeIs('users.*') ? 'active' : '' }}"
-                                href="{{ route('users.index') }}">Manajemen User</a>
-                            <a class="collapse-item {{ request()->routeIs('backups.*') ? 'active' : '' }}"
-                                href="{{ route('backups.index') }}">Backup & Restore</a>
-                            <a class="collapse-item {{ request()->routeIs('whatsapp-logs.*') ? 'active' : '' }}"
-                                href="{{ route('whatsapp-logs.index') }}">Log WhatsApp</a>
-                            <a class="collapse-item {{ request()->routeIs('api-logs.*') ? 'active' : '' }}"
-                                href="{{ route('api-logs.index') }}">Log API</a>
+                @if(in_array(auth()->user()->role, ['admin', 'super_admin']))
+                    <li class="nav-item {{ $isSistemActive ? 'active' : '' }}">
+                        <a class="nav-link {{ $isSistemActive ? '' : 'collapsed' }}" href="#" data-toggle="collapse"
+                            data-target="#collapseSistem" aria-expanded="true" aria-controls="collapseSistem">
+                            <i class="fas fa-server"></i>
+                            <span>Sistem</span>
+                        </a>
+                        <div id="collapseSistem" class="collapse {{ $isSistemActive ? 'show' : '' }}"
+                            aria-labelledby="headingSistem" data-parent="#accordionSidebar">
+                            <div class="bg-white py-2 collapse-inner rounded">
+                                <a class="collapse-item {{ request()->routeIs('users.*') ? 'active' : '' }}"
+                                    href="{{ route('users.index') }}">Manajemen User</a>
+                                <a class="collapse-item {{ request()->routeIs('backups.*') ? 'active' : '' }}"
+                                    href="{{ route('backups.index') }}">Backup & Restore</a>
+                                <a class="collapse-item {{ request()->routeIs('whatsapp-logs.*') ? 'active' : '' }}"
+                                    href="{{ route('whatsapp-logs.index') }}">Log WhatsApp</a>
+                                <a class="collapse-item {{ request()->routeIs('api-logs.*') ? 'active' : '' }}"
+                                    href="{{ route('api-logs.index') }}">Log API</a>
+                            </div>
                         </div>
-                    </div>
-                </li>
+                    </li>
+                @endif
             @endif
+
+
 
             <hr class="sidebar-divider d-none d-md-block">
 

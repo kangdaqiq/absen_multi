@@ -7,7 +7,7 @@ use App\Services\WhatsAppMessageTemplates;
 
 class WhatsAppService
 {
-    public function sendEnrollSuccess($name, $phone, $uid, $type = 'Kartu RFID', $phoneOrtu = null)
+    public function sendEnrollSuccess($name, $phone, $uid, $schoolId, $type = 'Kartu RFID', $phoneOrtu = null)
     {
         // Skip if both phone numbers are empty
         if (!$phone && !$phoneOrtu)
@@ -21,7 +21,7 @@ class WhatsAppService
                 "🆔 ID Kartu: `{$uid}`\n" .
                 "📅 Tanggal: " . now()->translatedFormat('l, d F Y') . "\n\n" .
                 "_Terima kasih telah melakukan registrasi._ 🙏";
-            $this->queueMessage($phone, $msg);
+            $this->queueMessage($phone, $msg, $schoolId);
         }
 
         // Send to parent if phone number exists
@@ -32,13 +32,13 @@ class WhatsAppService
                 "🆔 ID Kartu: `{$uid}`\n" .
                 "📅 Tanggal: " . now()->translatedFormat('l, d F Y') . "\n\n" .
                 "_Terima kasih telah melakukan registrasi._ 🙏";
-            $this->queueMessage($phoneOrtu, $msgOrtu);
+            $this->queueMessage($phoneOrtu, $msgOrtu, $schoolId);
         }
     }
 
 
 
-    public function sendCheckIn($name, $phone, $time, $status, $keterangan = null, $phoneOrtu = null, $kelas = '-')
+    public function sendCheckIn($name, $phone, $time, $status, $schoolId, $keterangan = null, $phoneOrtu = null, $kelas = '-')
     {
         // Skip if both phone numbers are empty
         if (!$phone && !$phoneOrtu)
@@ -68,7 +68,7 @@ class WhatsAppService
                     status: $status
                 );
             }
-            $this->queueMessage($phone, $msg);
+            $this->queueMessage($phone, $msg, $schoolId);
         }
 
         // Send to parent if phone number exists
@@ -92,11 +92,11 @@ class WhatsAppService
                     status: $status
                 );
             }
-            $this->queueMessage($phoneOrtu, $msgOrtu);
+            $this->queueMessage($phoneOrtu, $msgOrtu, $schoolId);
         }
     }
 
-    public function sendCheckOut($name, $phone, $time, $hours, $mins, $authorizer, $jamMasuk = '-', $phoneOrtu = null)
+    public function sendCheckOut($name, $phone, $time, $hours, $mins, $authorizer, $schoolId, $jamMasuk = '-', $phoneOrtu = null)
     {
         // Skip if both phone numbers are empty
         if (!$phone && !$phoneOrtu)
@@ -112,7 +112,7 @@ class WhatsAppService
                 minutes: $mins,
                 authorizedBy: $authorizer
             );
-            $this->queueMessage($phone, $msg);
+            $this->queueMessage($phone, $msg, $schoolId);
         }
 
         // Send to parent if phone number exists
@@ -125,11 +125,11 @@ class WhatsAppService
                 minutes: $mins,
                 authorizedBy: $authorizer
             );
-            $this->queueMessage($phoneOrtu, $msgOrtu);
+            $this->queueMessage($phoneOrtu, $msgOrtu, $schoolId);
         }
     }
 
-    private function queueMessage($phone, $message)
+    private function queueMessage($phone, $message, $schoolId = null)
     {
         $originalPhone = $phone;
         $phone = $this->formatPhone($phone);
@@ -137,6 +137,7 @@ class WhatsAppService
         if ($phone) {
             try {
                 MessageQueue::create([
+                    'school_id' => $schoolId,
                     'phone_number' => $phone,
                     'message' => $message,
                     'status' => 'pending',

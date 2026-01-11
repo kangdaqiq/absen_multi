@@ -9,29 +9,61 @@ class SettingsController extends Controller
 {
     public function index()
     {
-        $settings = Setting::all()->pluck('setting_value', 'setting_key');
+        if (auth()->user() && !auth()->user()->isSuperAdmin()) {
+            $schoolId = auth()->user()->school_id;
+
+            // Only get settings for this specific school
+            $settings = Setting::where('school_id', $schoolId)
+                ->get()
+                ->pluck('setting_value', 'setting_key')
+                ->toArray();
+
+            // Merge with Global Settings for display
+            $globalSettings = Setting::where('school_id', 0)
+                ->get()
+                ->pluck('setting_value', 'setting_key')
+                ->toArray();
+
+            // Union: School settings take precedence
+            $settings = collect($settings + $globalSettings);
+        } else {
+            // Super admin sees global settings (school_id = 0)
+            $settings = Setting::where('school_id', 0)
+                ->get()
+                ->pluck('setting_value', 'setting_key');
+        }
+
         return view('settings.index', compact('settings'));
     }
 
     public function update(Request $request)
     {
         // Handle logo upload
+        // Handle logo upload
         if ($request->hasFile('logo')) {
             $request->validate([
-                'logo' => 'required|image|mimes:jpeg,png,jpg,gif,svg|max:2048',
+                'logo' => 'required|image|mimes:jpeg,png,jpg,gif,svg|max:10240', // 10MB
             ]);
 
-            $file = $request->file('logo');
-            $filename = 'logo.' . $file->getClientOriginalExtension();
+            // Get school_id (0 for Super Admin)
+            $schoolId = auth()->user()->school_id ?? 0;
 
-            // Move to public/img directory
-            $file->move(public_path('img'), $filename);
+            // Upload to storage (same as SchoolController)
+            $path = $request->file('logo')->store('schools/logos', 'public');
 
-            // Save logo filename to settings
-            Setting::updateOrCreate(
-                ['setting_key' => 'logo_filename'],
-                ['setting_value' => $filename]
+            // Save full path to settings using DB facade to handle composite key correctly
+            \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(
+                [
+                    'setting_key' => 'logo_filename',
+                    'school_id' => $schoolId
+                ],
+                ['setting_value' => $path]
             );
+
+            // Also update the School table for consistency (Only for actual schools)
+            if ($schoolId && $schoolId > 0) {
+                \App\Models\School::where('id', $schoolId)->update(['logo' => $path]);
+            }
         }
 
         $data = $request->except('_token', '_method', 'logo');
@@ -48,9 +80,20 @@ class SettingsController extends Controller
             }
         }
 
+        // Get and validate school_id
+        $schoolId = auth()->user()->school_id ?? 0;
+
+        // Ensure school_id is valid (allow 0 for Super Admin)
+        if ((!$schoolId && $schoolId !== 0) && !auth()->user()->isSuperAdmin()) {
+            return back()->with('error', 'User tidak memiliki school_id yang valid. Hubungi Super Admin.');
+        }
+
         foreach ($data as $key => $value) {
-            Setting::updateOrCreate(
-                ['setting_key' => $key],
+            \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(
+                [
+                    'setting_key' => $key,
+                    'school_id' => $schoolId
+                ],
                 ['setting_value' => $value]
             );
         }

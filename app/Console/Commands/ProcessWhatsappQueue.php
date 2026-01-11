@@ -16,23 +16,46 @@ class ProcessWhatsappQueue extends Command
     {
         $limit = $this->option('limit');
 
-        $messages = MessageQueue::where('status', 'pending')
-            ->orderBy('created_at', 'asc')
-            ->limit($limit)
-            ->get();
+        // 1. ATOMIC LOCK & UPDATE
+        // Prevent multiple workers from picking the same messages
+        $messages = [];
 
-        if ($messages->isEmpty()) {
-            $this->info('No pending messages.');
+        \Illuminate\Support\Facades\DB::transaction(function () use ($limit, &$messages) {
+            $candidates = MessageQueue::query()
+                ->select('message_queue.*')
+                ->leftJoin('schools', 'message_queue.school_id', '=', 'schools.id')
+                ->where('message_queue.status', 'pending')
+                ->where(function ($q) {
+                    $q->whereNull('message_queue.school_id')
+                        ->orWhere('schools.wa_enabled', true);
+                })
+                ->orderBy('message_queue.created_at', 'asc')
+                ->limit($limit)
+                ->lockForUpdate()
+                ->get();
+
+            if ($candidates->isNotEmpty()) {
+                $ids = $candidates->pluck('id');
+                // Mark as processing immediately so other workers skip them
+                MessageQueue::whereIn('id', $ids)->update(['status' => 'processing', 'updated_at' => now()]);
+                $messages = $candidates;
+            }
+        });
+
+        if (empty($messages)) {
+            // $this->info('No pending messages.'); // Reduce noise
             return;
         }
 
-        $this->info("Found {$messages->count()} messages. Processing...");
+        $this->info("Found " . count($messages) . " messages. Processing...");
 
         foreach ($messages as $msg) {
-            $msg->update(['status' => 'processing']);
+            // Use fresh instance or just use data (status is already 'processing')
+            // $msg->status = 'processing'; 
 
             $success = $this->sendMessage($msg->phone_number, $msg->message);
 
+            // Final Update
             $msg->update([
                 'status' => $success ? 'sent' : 'failed',
                 'updated_at' => now(),

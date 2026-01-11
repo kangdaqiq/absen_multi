@@ -58,6 +58,8 @@
                                         pulang</small>
                                 </div>
 
+
+
                                 <div class="form-group">
                                     <div class="custom-control custom-switch">
                                         <input type="checkbox" class="custom-control-input"
@@ -73,7 +75,12 @@
                                 <div class="form-group">
                                     <label>Logo Sekolah</label>
                                     <div class="mb-2">
-                                        <img src="{{ asset('img/' . ($settings['logo_filename'] ?? 'logo.png')) }}"
+                                        @php
+                                            $logo = $settings['logo_filename'] ?? 'logo.png';
+                                            $isStorage = \Illuminate\Support\Str::startsWith($logo, 'schools/');
+                                            $logoUrl = $isStorage ? asset('storage/' . $logo) : asset('img/' . $logo);
+                                        @endphp
+                                        <img src="{{ $logoUrl }}"
                                             alt="Logo" id="logo-preview"
                                             style="max-width: 150px; max-height: 150px; border: 1px solid #ddd; padding: 5px; border-radius: 5px;">
                                     </div>

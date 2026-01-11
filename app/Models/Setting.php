@@ -8,7 +8,7 @@ class Setting extends Model
 {
     protected $table = 'settings';
     public $timestamps = false;
-    protected $fillable = ['setting_key', 'setting_value'];
+    protected $fillable = ['setting_key', 'setting_value', 'school_id'];
     protected $primaryKey = 'setting_key'; // Assuming key is primary or unique
     public $incrementing = false;
     protected $keyType = 'string';

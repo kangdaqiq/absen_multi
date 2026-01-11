@@ -37,6 +37,20 @@ class ProfileController extends Controller
         $user->email = $request->email;
         $user->save();
 
+        if ($request->hasFile('global_logo') && $user->isSuperAdmin()) {
+            $request->validate([
+                'global_logo' => 'image|mimes:jpeg,png,jpg,gif,svg|max:10240',
+            ]);
+
+            $path = $request->file('global_logo')->store('schools/logos', 'public');
+
+            // Save as global setting (school_id = 0)
+            \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(
+                ['setting_key' => 'logo_filename', 'school_id' => 0],
+                ['setting_value' => $path]
+            );
+        }
+
         return back()->with('success', 'Profil berhasil diperbarui.');
     }
 }

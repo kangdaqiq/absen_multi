@@ -25,12 +25,46 @@ class AuthController extends Controller
         // Try to login with email first
         if (Auth::attempt(['email' => $loginField, 'password' => $password])) {
             $request->session()->regenerate();
+
+            // Check if user's school is active (skip for super admin)
+            $user = Auth::user();
+            if ($user->school_id && $user->school) {
+                if (!$user->school->is_active) {
+                    Auth::logout();
+                    return back()->withErrors([
+                        'email' => 'Sekolah Anda sedang nonaktif. Hubungi Super Admin untuk informasi lebih lanjut.',
+                    ])->onlyInput('email');
+                }
+            }
+
+            // Redirect based on role
+            if ($user->role === 'super_admin') {
+                return redirect()->intended(route('super-admin.dashboard'));
+            }
+
             return redirect()->intended(route('dashboard'));
         }
 
         // If email login fails, try with username
         if (Auth::attempt(['username' => $loginField, 'password' => $password])) {
             $request->session()->regenerate();
+
+            // Check if user's school is active (skip for super admin)
+            $user = Auth::user();
+            if ($user->school_id && $user->school) {
+                if (!$user->school->is_active) {
+                    Auth::logout();
+                    return back()->withErrors([
+                        'email' => 'Sekolah Anda sedang nonaktif. Hubungi Super Admin untuk informasi lebih lanjut.',
+                    ])->onlyInput('email');
+                }
+            }
+
+            // Redirect based on role
+            if ($user->role === 'super_admin') {
+                return redirect()->intended(route('super-admin.dashboard'));
+            }
+
             return redirect()->intended(route('dashboard'));
         }
 

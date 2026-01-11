@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class Device extends Model
 {
     protected $table = 'api_keys';
-    
+
     // Legacy code inserts created_at=NOW(), so timestamps likely enabled.
     // However, does it have updated_at?
     // UPDATE query: UPDATE api_keys SET ... WHERE id = :id. No updated_at mentioned.
@@ -17,7 +17,7 @@ class Device extends Model
     // So created_at is managed manually.
     // I'll set public $timestamps = false; and fill created_at in creating event or just leave it if DB has default.
     // Safest matches legacy: timestamps = false;
-    
+
     public $timestamps = false;
 
     protected $fillable = [
@@ -25,7 +25,8 @@ class Device extends Model
         'api_key',
         'type',
         'active',
-        'created_at'
+        'created_at',
+        'school_id'
     ];
 
     protected $casts = [

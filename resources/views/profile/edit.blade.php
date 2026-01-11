@@ -12,13 +12,14 @@
                     <h6 class="m-0 font-weight-bold text-primary">Informasi Akun</h6>
                 </div>
                 <div class="card-body">
-                    <form action="{{ route('profile.update') }}" method="POST">
+                    <form action="{{ route('profile.update') }}" method="POST" enctype="multipart/form-data">
                         @csrf
                         @method('PUT')
 
                         <div class="form-group">
                             <label>Nama Lengkap</label>
-                            <input type="text" name="name" class="form-control @error('name') is-invalid @enderror" value="{{ old('name', $user->name) }}" required>
+                            <input type="text" name="name" class="form-control @error('name') is-invalid @enderror"
+                                value="{{ old('name', $user->name) }}" required>
                             @error('name')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
@@ -26,18 +27,45 @@
 
                         <div class="form-group">
                             <label>Email Address</label>
-                            <input type="email" name="email" class="form-control @error('email') is-invalid @enderror" value="{{ old('email', $user->email) }}" required>
+                            <input type="email" name="email" class="form-control @error('email') is-invalid @enderror"
+                                value="{{ old('email', $user->email) }}" required>
                             @error('email')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
                         </div>
 
                         <hr>
+                        
+                        <!-- Global Logo (Super Admin Only) -->
+                        @if(auth()->user()->isSuperAdmin())
+                            <h6 class="font-weight-bold text-primary mb-3">Logo Global (Super Admin)</h6>
+                            <div class="form-group">
+                                <label>Upload Logo Baru</label>
+                                <div class="mb-2">
+                                     @if(isset($school_logo))
+                                        @php
+                                            $logo = $school_logo;
+                                            $isStorage = \Illuminate\Support\Str::startsWith($logo, 'schools/');
+                                            $logoUrl = $isStorage ? asset('storage/' . $logo) : asset('img/' . $logo);
+                                        @endphp
+                                        <img src="{{ $logoUrl }}" alt="Current Logo" style="max-height: 100px; border: 1px solid #ddd; padding: 5px; border-radius: 5px;">
+                                     @endif
+                                </div>
+                                <input type="file" name="global_logo" class="form-control-file" accept="image/*">
+                                <small class="text-muted">Logo ini akan tampil di Halaman Login dan Dashboard Super Admin (Global).</small>
+                                @error('global_logo')
+                                    <div class="text-danger small mt-1">{{ $message }}</div>
+                                @enderror
+                            </div>
+                            <hr>
+                        @endif
+
                         <h6 class="font-weight-bold text-primary mb-3">Ganti Password (Opsional)</h6>
 
                         <div class="form-group">
                             <label>Password Saat Ini</label>
-                            <input type="password" name="current_password" class="form-control @error('current_password') is-invalid @enderror">
+                            <input type="password" name="current_password"
+                                class="form-control @error('current_password') is-invalid @enderror">
                             @error('current_password')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
@@ -45,8 +73,10 @@
 
                         <div class="form-group">
                             <label>Password Baru</label>
-                            <input type="password" name="new_password" class="form-control @error('new_password') is-invalid @enderror">
-                            <small class="text-muted">Minimal 8 karakter. Kosongkan jika tidak ingin mengganti password.</small>
+                            <input type="password" name="new_password"
+                                class="form-control @error('new_password') is-invalid @enderror">
+                            <small class="text-muted">Minimal 8 karakter. Kosongkan jika tidak ingin mengganti
+                                password.</small>
                             @error('new_password')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror

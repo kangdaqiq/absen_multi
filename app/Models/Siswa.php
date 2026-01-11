@@ -31,7 +31,8 @@ class Siswa extends Model
         'id_finger',
         'enroll_finger_status',
         'created_at',
-        'updated_at'
+        'updated_at',
+        'school_id'
     ];
 
     public function kelas()

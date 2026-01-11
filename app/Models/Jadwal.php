@@ -8,5 +8,5 @@ class Jadwal extends Model
 {
     protected $table = 'jadwal';
     public $timestamps = true;
-    protected $fillable = ['hari', 'index_hari', 'jam_masuk', 'jam_pulang', 'toleransi', 'is_active'];
+    protected $fillable = ['hari', 'index_hari', 'jam_masuk', 'jam_pulang', 'toleransi', 'is_active', 'school_id'];
 }

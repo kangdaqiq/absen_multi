@@ -14,6 +14,11 @@ class UserController extends Controller
         $role = $request->query('role');
         $query = User::orderBy('full_name');
 
+        // Filter by school_id for non-super admin users
+        if (auth()->user() && !auth()->user()->isSuperAdmin()) {
+            $query->where('school_id', auth()->user()->school_id);
+        }
+
         if ($role && in_array($role, ['admin', 'teacher', 'student'])) {
             $query->where('role', $role);
         }
@@ -98,7 +103,7 @@ class UserController extends Controller
         $currentUserId = auth()->id();
 
         // Remove current user from the list if present
-        $userIds = array_filter($userIds, function($id) use ($currentUserId) {
+        $userIds = array_filter($userIds, function ($id) use ($currentUserId) {
             return $id != $currentUserId;
         });
 

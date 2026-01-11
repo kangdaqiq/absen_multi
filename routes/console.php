@@ -19,20 +19,14 @@ $getTime = function ($key, $default) {
     }
 };
 
-Schedule::command('db:backup')->dailyAt($getTime('schedule_backup_db', '23:59'));
-Schedule::command('absen:process-daily')
-    ->dailyAt($getTime('schedule_process_daily', '13:30'))
-    ->days([1, 2, 3, 4, 5, 6]); // Mon-Sat
+// Run every minute to allow per-school scheduling logic in Commands
+Schedule::command('absen:process-daily')->everyMinute()->withoutOverlapping();
+Schedule::command('absen:daily-report')->everyMinute()->withoutOverlapping();
+Schedule::command('schedule:send-teacher-schedule')->everyMinute()->withoutOverlapping();
+Schedule::command('wa:process')->everyMinute()->withoutOverlapping();
 
-Schedule::command('wa:process')->everyMinute();
-Schedule::command('schedule:send-teacher-schedule')->dailyAt($getTime('schedule_send_teacher_schedule', '07:30'));
-Schedule::command('absen:daily-report')
-    ->dailyAt($getTime('schedule_daily_report', '08:15'))
-    ->days([1, 2, 3, 4, 5, 6]); // Mon-Sat
-
-// Daily Abnormal Attendance Check - Daily at Custom Time (Default 16:00)
-Schedule::command('absen:check-abnormal')
-    ->dailyAt($getTime('schedule_check_abnormal', '16:00'))
+// Daily Abnormal Attendance Check
+Schedule::command('absen:check-abnormal')->everyMinute()->withoutOverlapping()
     ->when(function () {
         try {
             return \App\Models\Setting::where('setting_key', 'absence_notification_enabled')

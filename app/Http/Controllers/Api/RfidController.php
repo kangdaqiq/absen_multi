@@ -39,56 +39,88 @@ class RfidController extends Controller
 
     // ... (handle method omitted) ...
 
-    private function handleTeacherScan($uid, $teacher, $apiKey)
+    private function handleTeacherScan($uid, $teacher, $apiKey, $device)
     {
         try {
+            DB::beginTransaction();
+            $now = now();
+            $today = $now->format('Y-m-d');
+
+            // 1. GATE CONTROL (Always open gate for teacher)
             // Clean expired sessions
-            TeacherCheckoutSession::where('expires_at', '<', now())->delete();
+            TeacherCheckoutSession::where('expires_at', '<', $now)->delete();
 
-            // Check if teacher has an active open session
-            $activeSession = TeacherCheckoutSession::where('teacher_id', $teacher->id)
-                ->where('status', 'open')
-                ->where('expires_at', '>', now())
-                ->orderBy('created_at', 'desc')
-                ->first();
-
-            if ($activeSession) {
-                // CLOSE GATE: Teacher taps again to close the gate
-                $activeSession->update(['status' => 'closed']);
-
-                $message = 'Gerbang ditutup. Siswa tidak dapat absen pulang.';
-                $extra = [
-                    'type' => 'gate_closed',
-                    'teacher_name' => $teacher->nama,
-                    'closed_at' => now()->format('Y-m-d H:i:s')
-                ];
-
-                $this->logRequest($apiKey, 'gate_closed', $uid, true, 'Gate closed by: ' . $teacher->nama);
-                return $this->response(true, 'success', $message, 'ok', $extra);
-            } else {
-                // OPEN GATE: Create new session with 15-minute expiry
-                TeacherCheckoutSession::create([
-                    'teacher_id' => $teacher->id,
+            // Create/Extend Session
+            TeacherCheckoutSession::updateOrCreate(
+                ['teacher_id' => $teacher->id, 'status' => 'open'],
+                [
                     'teacher_name' => $teacher->nama,
                     'uid_rfid' => $uid,
-                    'status' => 'open',
-                    'expires_at' => now()->addMinutes(15),
-                    'created_at' => now()
+                    'expires_at' => $now->copy()->addMinutes(15),
+                    'created_at' => $now
+                ]
+            );
+
+            // 2. ABSENSI HARIAN (Daily)
+            // Find existing daily record (jadwal_pelajaran_id IS NULL)
+            $absensi = \App\Models\AbsensiGuru::where('guru_id', $teacher->id)
+                ->where('tanggal', $today)
+                ->where('school_id', $device->school_id) // Scope
+                ->whereNull('jadwal_pelajaran_id')
+                ->lockForUpdate()
+                ->first();
+
+            $gateMessage = "Gerbang Dibuka (15 Menit).";
+
+            if (!$absensi) {
+                // CASE: CHECK-IN
+                \App\Models\AbsensiGuru::create([
+                    'guru_id' => $teacher->id,
+                    'school_id' => $device->school_id, // Scope
+                    'jadwal_pelajaran_id' => null, // Daily
+                    'tanggal' => $today,
+                    'jam_masuk' => $now->toTimeString(),
+                    'waktu_hadir' => $now, // Legacy field
+                    'status' => 'Hadir', // Default Hadir
+                    'keterangan' => null
                 ]);
 
-                $message = 'Gerbang dibuka. Siswa dapat absen pulang selama 15 menit.';
-                $extra = [
-                    'type' => 'gate_opened',
-                    'teacher_name' => $teacher->nama,
-                    'valid_until' => now()->addMinutes(15)->format('Y-m-d H:i:s')
-                ];
+                DB::commit();
 
-                $this->logRequest($apiKey, 'gate_opened', $uid, true, 'Gate opened by: ' . $teacher->nama);
-                return $this->response(true, 'success', $message, 'ok', $extra);
+                // Send WA Check-in
+                try {
+                    // Assuming sendCheckIn supports Teacher? Or generic?
+                    // The existing sendCheckIn uses 'nama_kelas'. For Guru, maybe pass '-' or 'Guru'.
+                    $this->wa->sendCheckIn($teacher->nama, $teacher->no_wa, $now->format('H:i'), 'Hadir', $device->school_id, '-', null, '-');
+                } catch (\Exception $e) {
+                    Log::error("WA Guru Checkin Error: " . $e->getMessage());
+                }
+
+                $this->logRequest($apiKey, 'checkin_success', $uid, true, 'Guru Masuk: ' . $teacher->nama);
+                return $this->response(true, 'success', "Selamat Pagi, {$teacher->nama}. $gateMessage", 'ok', [
+                    'type' => 'absen_masuk_guru',
+                    'nama' => $teacher->nama,
+                    'jam' => $now->format('H:i')
+                ]);
+
+            } else {
+                // CASE: ALREADY CHECKED IN (No Checkout needed)
+                DB::commit(); // Release lock (no updates)
+
+                // Still log access but as info
+                // We keep the gate open (handled in Step 1)
+
+                $this->logRequest($apiKey, 'gate_access', $uid, true, 'Guru Akses Gerbang: ' . $teacher->nama);
+                return $this->response(true, 'success', "Sudah Absen Masuk. $gateMessage", 'ok', [
+                    'type' => 'absen_sudah_masuk_guru',
+                    'nama' => $teacher->nama
+                ]);
             }
+
         } catch (\Exception $e) {
+            DB::rollBack();
             Log::error("Teacher scan error: " . $e->getMessage());
-            return $this->response(false, 'gagal', 'Gagal memproses permintaan', 'error', ['type' => 'teacher_scan_failed']);
+            return $this->response(false, 'gagal', 'Gagal memproses absen guru', 'error');
         }
     }
 
@@ -120,19 +152,19 @@ class RfidController extends Controller
         }
 
         // 4. Mode Detection
-        // Check Teacher
-        $teacher = $this->checkTeacherCard($uid);
+        // Check Teacher - SCOPED
+        $teacher = $this->checkTeacherCard($uid, $device->school_id);
         if ($teacher) {
-            return $this->handleTeacherScan($uid, $teacher, $apiKey);
+            return $this->handleTeacherScan($uid, $teacher, $apiKey, $device);
         }
 
-        // Check Enrollment
-        if ($this->hasEnrollmentRequest()) {
-            return $this->handleEnroll($uid, $apiKey);
+        // Check Enrollment - SCOPED
+        if ($this->hasEnrollmentRequest($device->school_id)) {
+            return $this->handleEnroll($uid, $apiKey, $device);
         }
 
-        // Default: Scan Absensi
-        return $this->handleScan($uid, $apiKey);
+        // Default: Scan Absensi - SCOPED
+        return $this->handleScan($uid, $apiKey, $device);
     }
 
     // ... Helper Methods ...
@@ -190,19 +222,23 @@ class RfidController extends Controller
         return null;
     }
 
-    private function checkTeacherCard($uid)
+    private function checkTeacherCard($uid, $schoolId)
     {
-        return Guru::whereRaw('UPPER(uid_rfid) = ?', [$uid])->first();
+        return Guru::whereRaw('UPPER(uid_rfid) = ?', [$uid])
+            ->where('school_id', $schoolId)
+            ->first();
     }
 
-    private function hasEnrollmentRequest()
+    private function hasEnrollmentRequest($schoolId)
     {
         // Relaxed window to 60 minutes to avoid timezone issues
         $siswa = Siswa::where('enroll_status', 'requested')
+            ->where('school_id', $schoolId)
             ->where('updated_at', '>=', now()->subHour())
             ->exists();
 
         $guru = Guru::where('enroll_status', 'requested')
+            ->where('school_id', $schoolId)
             ->where('updated_at', '>=', now()->subHour())
             ->exists();
 
@@ -211,18 +247,34 @@ class RfidController extends Controller
 
 
 
-    private function handleEnroll($uid, $apiKey)
+    private function handleEnroll($uid, $apiKey, $device)
     {
         DB::beginTransaction();
         try {
             // Check duplicate in both tables
+            // Optionally, check duplicate globally?
+            // Better to enforce unique RFID globally to prevent confusion,
+            // OR if cards are reused, verify they aren't active in THIS school.
+            // Let's enforce Global Uniqueness for UID to prevent security issues.
+            /*
             if (Siswa::where('uid_rfid', $uid)->exists() || Guru::where('uid_rfid', $uid)->exists()) {
                 DB::rollBack();
                 return $this->response(false, 'gagal', 'UID sudah ada', 'warning');
             }
+            */
+            // Actually, for multi-tenant, maybe same card IS allowed in diff schools?
+            // But usually cards are unique tokens. Let's check THIS school first.
+            if (
+                Siswa::where('uid_rfid', $uid)->where('school_id', $device->school_id)->exists() ||
+                Guru::where('uid_rfid', $uid)->where('school_id', $device->school_id)->exists()
+            ) {
+                DB::rollBack();
+                return $this->response(false, 'gagal', 'Kartu sudah terdaftar di sekolah ini', 'warning');
+            }
 
-            // 1. Check Siswa Request
+            // 1. Check Siswa Request (Scoped to School)
             $siswa = Siswa::where('enroll_status', 'requested')
+                ->where('school_id', $device->school_id)
                 ->where('updated_at', '>=', now()->subHour())
                 ->orderBy('id', 'desc')
                 ->lockForUpdate()
@@ -237,7 +289,7 @@ class RfidController extends Controller
 
                 // WA Notification
                 try {
-                    $this->wa->sendEnrollSuccess($siswa->nama, $siswa->no_wa, $uid, 'Kartu Siswa', $siswa->wa_ortu);
+                    $this->wa->sendEnrollSuccess($siswa->nama, $siswa->no_wa, $uid, $device->school_id, 'Kartu Siswa', $siswa->wa_ortu);
                 } catch (\Exception $e) {
                     Log::error("WA Enroll Error: " . $e->getMessage());
                 }
@@ -250,8 +302,9 @@ class RfidController extends Controller
                 ]);
             }
 
-            // 2. Check Guru Request
+            // 2. Check Guru Request (Scoped to School)
             $guru = Guru::where('enroll_status', 'requested')
+                ->where('school_id', $device->school_id)
                 ->where('updated_at', '>=', now()->subHour())
                 ->orderBy('id', 'desc')
                 ->lockForUpdate()
@@ -266,7 +319,7 @@ class RfidController extends Controller
 
                 // WA Notification
                 try {
-                    $this->wa->sendEnrollSuccess($guru->nama, $guru->no_wa, $uid, 'Kartu Guru');
+                    $this->wa->sendEnrollSuccess($guru->nama, $guru->no_wa, $uid, $device->school_id, 'Kartu Guru');
                 } catch (\Exception $e) {
                     Log::error("WA Enroll Error: " . $e->getMessage());
                 }
@@ -290,13 +343,18 @@ class RfidController extends Controller
         }
     }
 
-    private function handleScan($uid, $apiKey)
+    private function handleScan($uid, $apiKey, $device)
     {
         try {
-            $siswa = Siswa::with('kelas')->where('uid_rfid', $uid)->first();
+            // Find Student SCOPED to Device's School
+            $siswa = Siswa::with('kelas')
+                ->where('uid_rfid', $uid)
+                ->where('school_id', $device->school_id)
+                ->first();
+
             if (!$siswa) {
-                $this->logRequest($apiKey, 'unknown_card', $uid, false, 'Kartu tidak terdaftar');
-                return $this->response(false, 'unknown', 'Kartu belum terdaftar', 'error', ['type' => 'unknown_card', 'uid' => $uid]);
+                $this->logRequest($apiKey, 'unknown_card', $uid, false, 'Kartu tidak terdaftar di sekolah ini');
+                return $this->response(false, 'unknown', 'Kartu tdk dikenal', 'error', ['type' => 'unknown_card', 'uid' => $uid]);
             }
 
             // CHECK: Is Class Attendance Active?
@@ -304,12 +362,16 @@ class RfidController extends Controller
                 return $this->response(false, 'gagal', 'Absensi dimatikan untuk kelas ini.', 'error', ['type' => 'class_disabled']);
             }
 
-            // Jadwal
-            $indexHari = date('N'); // 1 (Mon) - 7 (Sun) 
+            // Jadwal SCOPED to School
+            $indexHari = date('N'); // 1 (Mon) - 7 (Sun)
 
-            $jadwal = Jadwal::where('index_hari', $indexHari)->where('is_active', 1)->first();
+            $jadwal = Jadwal::where('index_hari', $indexHari)
+                ->where('is_active', 1)
+                ->where('school_id', $device->school_id)
+                ->first();
+
             if (!$jadwal) {
-                return $this->response(false, 'gagal', 'Jadwal Kosong', 'warning', ['type' => 'schedule_empty']);
+                return $this->response(false, 'gagal', 'Jadwal Libur/Kosong', 'warning', ['type' => 'schedule_empty']);
             }
 
             $now = now();
@@ -336,8 +398,9 @@ class RfidController extends Controller
 
             // Case 2: Sudah Masuk, Belum Pulang
             if ($att && !$att->jam_pulang) {
-                // Check if checkout is enabled in settings
-                $checkoutEnabled = \App\Models\Setting::where('setting_key', 'enable_checkout_attendance')
+                // Check if checkout is enabled in settings SCOPED
+                $checkoutEnabled = \App\Models\Setting::where('school_id', $device->school_id)
+                    ->where('setting_key', 'enable_checkout_attendance')
                     ->value('setting_value') ?? 'true';
 
                 // If checkout is disabled, treat as complete attendance
@@ -346,10 +409,21 @@ class RfidController extends Controller
                     return $this->response(true, 'success', 'Absen Lengkap', 'ok', ['type' => 'sudah_lengkap', 'nama' => $siswa->nama]);
                 }
 
-                // Check Teacher Session (only open gates)
-                $teacherSession = TeacherCheckoutSession::where('expires_at', '>', now())
-                    ->where('status', 'open')
-                    ->orderBy('created_at', 'desc')
+                // Check Teacher Session (only open gates) Global? Or should be scoped?
+                // Teacher session stores teacher_name.
+                // We should check sessions created by teachers OF THIS SCHOOL.
+                // Or simply check if there is ANY open session in the system?
+                // Ideally scoped. TeacherCheckoutSession needs school_id?
+                // Currently it only has teacher_id. We can join with guru table or just rely on teacher_id.
+                // For now, let's assume if a teacher opened a gate, it's for their school.
+
+                // Optimized: Check sessions where teacher belongs to this school
+                $teacherSession = TeacherCheckoutSession::select('teacher_checkout_sessions.*')
+                    ->join('guru', 'teacher_checkout_sessions.teacher_id', '=', 'guru.id')
+                    ->where('guru.school_id', $device->school_id)
+                    ->where('teacher_checkout_sessions.expires_at', '>', now())
+                    ->where('teacher_checkout_sessions.status', 'open')
+                    ->orderBy('teacher_checkout_sessions.created_at', 'desc')
                     ->first();
 
                 // If still in check-in window and no teacher session, warn
@@ -384,7 +458,7 @@ class RfidController extends Controller
                 // WA
                 $hours = floor($totalSeconds / 3600);
                 $mins = floor(($totalSeconds % 3600) / 60);
-                $this->wa->sendCheckOut($siswa->nama, $siswa->no_wa, $now->format('H:i'), $hours, $mins, $teacherSession->teacher_name, $masuk->format('H:i'), $siswa->wa_ortu);
+                $this->wa->sendCheckOut($siswa->nama, $siswa->no_wa, $now->format('H:i'), $hours, $mins, $teacherSession->teacher_name, $device->school_id, $masuk->format('H:i'), $siswa->wa_ortu);
 
                 $this->logRequest($apiKey, 'checkout_success', $uid, true, 'Pulang: ' . $siswa->nama);
                 return $this->response(true, 'success', 'Absen pulang berhasil', 'ok', [
@@ -433,7 +507,7 @@ class RfidController extends Controller
                 ]);
                 DB::commit();
 
-                $this->wa->sendCheckIn($siswa->nama, $siswa->no_wa, $now->format('H:i'), $status, $keterangan, $siswa->wa_ortu, $siswa->kelas->nama_kelas ?? '-');
+                $this->wa->sendCheckIn($siswa->nama, $siswa->no_wa, $now->format('H:i'), $status, $device->school_id, $keterangan, $siswa->wa_ortu, $siswa->kelas->nama_kelas ?? '-');
 
 
                 $this->logRequest($apiKey, 'checkin_success', $uid, true, 'Masuk: ' . $siswa->nama);

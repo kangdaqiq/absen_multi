@@ -14,9 +14,11 @@ class AbsenceReportController extends Controller
 {
     public function index(Request $request)
     {
+        $schoolId = (auth()->user() && !auth()->user()->isSuperAdmin()) ? auth()->user()->school_id : 3; // Default to 3 (Default School) if Super Admin or fetch from request if implemented
+
         // Get settings
-        $threshold = (int) Setting::where('setting_key', 'absence_threshold_days')->value('setting_value') ?? 3;
-        $periodDays = (int) Setting::where('setting_key', 'absence_check_period_days')->value('setting_value') ?? 7;
+        $threshold = (int) Setting::where('school_id', $schoolId)->where('setting_key', 'absence_threshold_days')->value('setting_value') ?? 3;
+        $periodDays = (int) Setting::where('school_id', $schoolId)->where('setting_key', 'absence_check_period_days')->value('setting_value') ?? 7;
 
         // Get filter parameters
         $kelasId = $request->get('kelas_id');
@@ -29,6 +31,11 @@ class AbsenceReportController extends Controller
         $query = Attendance::selectRaw('student_id, COUNT(*) as absence_count')
             ->whereBetween('tanggal', [$startDate, $endDate])
             ->whereIn('status', ['A', 'B'])
+            ->whereHas('student', function ($q) use ($schoolId) {
+                if ($schoolId) {
+                    $q->where('school_id', $schoolId);
+                }
+            })
             ->whereHas('student.kelas', function ($q) use ($kelasId) {
                 $q->where('is_active_attendance', true);
                 if ($kelasId) {
@@ -83,9 +90,15 @@ class AbsenceReportController extends Controller
         });
 
         // Get all classes for filter
-        $kelasList = Kelas::where('is_active_attendance', true)
-            ->orderBy('nama_kelas')
-            ->get();
+        $kelasQuery = Kelas::where('is_active_attendance', true)
+            ->orderBy('nama_kelas');
+
+        // Filter by school_id for non-super admin users
+        if (auth()->user() && !auth()->user()->isSuperAdmin()) {
+            $kelasQuery->where('school_id', auth()->user()->school_id);
+        }
+
+        $kelasList = $kelasQuery->get();
 
         return view('absence-report.index', compact(
             'students',
@@ -100,9 +113,11 @@ class AbsenceReportController extends Controller
 
     public function export(Request $request)
     {
+        $schoolId = (auth()->user() && !auth()->user()->isSuperAdmin()) ? auth()->user()->school_id : 3;
+
         // Get settings
-        $threshold = (int) Setting::where('setting_key', 'absence_threshold_days')->value('setting_value') ?? 3;
-        $periodDays = (int) Setting::where('setting_key', 'absence_check_period_days')->value('setting_value') ?? 7;
+        $threshold = (int) Setting::where('school_id', $schoolId)->where('setting_key', 'absence_threshold_days')->value('setting_value') ?? 3;
+        $periodDays = (int) Setting::where('school_id', $schoolId)->where('setting_key', 'absence_check_period_days')->value('setting_value') ?? 7;
 
         // Get filter parameters
         $kelasId = $request->get('kelas_id');
@@ -115,6 +130,11 @@ class AbsenceReportController extends Controller
         $query = Attendance::selectRaw('student_id, COUNT(*) as absence_count')
             ->whereBetween('tanggal', [$startDate, $endDate])
             ->whereIn('status', ['A', 'B'])
+            ->whereHas('student', function ($q) use ($schoolId) {
+                if ($schoolId) {
+                    $q->where('school_id', $schoolId);
+                }
+            })
             ->whereHas('student.kelas', function ($q) use ($kelasId) {
                 $q->where('is_active_attendance', true);
                 if ($kelasId) {

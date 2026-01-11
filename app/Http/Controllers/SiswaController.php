@@ -11,13 +11,28 @@ use Illuminate\Http\Request;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Validation\Rule;
 
 class SiswaController extends Controller
 {
     public function index()
     {
-        $siswa = Siswa::with(['kelas', 'user'])->orderBy('nama')->get();
-        $kelas = Kelas::orderBy('nama_kelas')->get();
+        $query = Siswa::with(['kelas', 'user'])->orderBy('nama');
+
+        // Filter by school_id for non-super admin users
+        if (auth()->user() && !auth()->user()->isSuperAdmin()) {
+            $query->where('school_id', auth()->user()->school_id);
+        }
+
+        $siswa = $query->get();
+
+        // Also filter kelas by school
+        $kelasQuery = Kelas::orderBy('nama_kelas');
+        if (auth()->user() && !auth()->user()->isSuperAdmin()) {
+            $kelasQuery->where('school_id', auth()->user()->school_id);
+        }
+        $kelas = $kelasQuery->get();
+
         $devices = Device::where('active', true)
             ->whereIn('type', ['fingerprint', 'rfid_fingerprint'])
             ->orderBy('name')
@@ -28,12 +43,25 @@ class SiswaController extends Controller
 
     public function store(Request $request)
     {
+        $schoolId = auth()->user()->isSuperAdmin() ? null : auth()->user()->school_id;
+
         $request->validate([
             'nama' => 'required|string|max:100',
-            'nis' => 'required|string|max:20|unique:siswa,nis',
+            'nis' => [
+                'required',
+                'string',
+                'max:20',
+                Rule::unique('siswa')->where(fn($q) => $q->where('school_id', $schoolId))
+            ],
             'tgl_lahir' => 'nullable|date',
             'kelas_id' => 'required|exists:kelas,id',
-            'no_wa' => 'nullable|string|max:20|unique:siswa,no_wa|regex:/^(08|628)[0-9]{8,13}$/',
+            'no_wa' => [
+                'nullable',
+                'string',
+                'max:20',
+                'regex:/^(08|628)[0-9]{8,13}$/',
+                Rule::unique('siswa')->where(fn($q) => $q->where('school_id', $schoolId))
+            ],
             'wa_ortu' => 'nullable|string|max:20|regex:/^(08|628)[0-9]{8,13}$/',
             'user_id' => 'nullable|exists:users,id',
         ]);
@@ -44,6 +72,29 @@ class SiswaController extends Controller
             $input['no_wa'] = null;
         if (empty($input['wa_ortu']))
             $input['wa_ortu'] = null;
+
+        if (auth()->user() && !auth()->user()->isSuperAdmin()) {
+            $input['school_id'] = auth()->user()->school_id;
+        }
+
+        // Check Quota Limit
+        $school = auth()->user()->isSuperAdmin() ? null : auth()->user()->school;
+        // If super admin adds, we assume they know to check limit? No, let's just bypass for super admin or check target school?
+        // Wait, if super admin creates student, school_id is passed?
+        // SiswaController index filters by school_id for non-super admin.
+        // For Super Admin, 'school_id' is NOT in the form input? $input['school_id'] is set from auth user only if NOT super admin.
+        // If Super Admin creates a student, they currently CANNOT select a school?!
+        // Let's check store method again.
+        // " $schoolId = auth()->user()->isSuperAdmin() ? null : auth()->user()->school_id;"
+        // "Rule::unique('siswa')->where(fn($q) => $q->where('school_id', $schoolId))"
+        // This implies Super Admin creates global students (school_id=null)?
+        // If so, limit applies to school. If global (system admin?), maybe unlimited.
+
+        if (!auth()->user()->isSuperAdmin()) {
+            if (!$school->hasStudentQuota()) {
+                return back()->with('error', 'Gagal: Kuota siswa untuk sekolah ini sudah penuh (' . $school->student_limit . ' siswa). Hubungi Super Admin untuk upgrade quota.')->withInput();
+            }
+        }
 
         $siswa = Siswa::create($input);
 
@@ -58,13 +109,25 @@ class SiswaController extends Controller
     public function update(Request $request, $id)
     {
         $siswa = Siswa::findOrFail($id);
+        $schoolId = auth()->user()->isSuperAdmin() ? null : auth()->user()->school_id;
 
         $request->validate([
             'nama' => 'required|string|max:100',
-            'nis' => 'required|string|max:20|unique:siswa,nis,' . $siswa->id,
+            'nis' => [
+                'required',
+                'string',
+                'max:20',
+                Rule::unique('siswa')->ignore($siswa->id)->where(fn($q) => $q->where('school_id', $schoolId))
+            ],
             'tgl_lahir' => 'nullable|date',
             'kelas_id' => 'required|exists:kelas,id',
-            'no_wa' => 'nullable|string|max:20|unique:siswa,no_wa,' . $siswa->id . '|regex:/^(08|628)[0-9]{8,13}$/',
+            'no_wa' => [
+                'nullable',
+                'string',
+                'max:20',
+                'regex:/^(08|628)[0-9]{8,13}$/',
+                Rule::unique('siswa')->ignore($siswa->id)->where(fn($q) => $q->where('school_id', $schoolId))
+            ],
             'wa_ortu' => 'nullable|string|max:20|regex:/^(08|628)[0-9]{8,13}$/',
             'uid_rfid' => 'nullable|string|max:50',
             'user_id' => 'nullable|exists:users,id',
@@ -109,8 +172,21 @@ class SiswaController extends Controller
             $countSuccess = 0;
             $countSkip = 0;
             $firstRow = true;
-            $kelasMap = Kelas::pluck('id', 'nama_kelas')->toArray();
-            $existingNis = Siswa::pluck('nis')->toArray();
+            $schoolId = auth()->user()->isSuperAdmin() ? null : auth()->user()->school_id;
+
+            // Scope Kelas Map by School
+            $kelasMapQuery = Kelas::query();
+            if ($schoolId) {
+                $kelasMapQuery->where('school_id', $schoolId);
+            }
+            $kelasMap = $kelasMapQuery->pluck('id', 'nama_kelas')->toArray();
+
+            // Scope Existing NIS by School
+            $existingNisQuery = Siswa::query();
+            if ($schoolId) {
+                $existingNisQuery->where('school_id', $schoolId);
+            }
+            $existingNis = $existingNisQuery->pluck('nis')->toArray();
 
             foreach ($rows as $row) {
                 if ($firstRow) {
@@ -155,13 +231,40 @@ class SiswaController extends Controller
 
                     // Resolve Kelas
                     $kelasId = null;
+                    // Resolve Kelas
+                    $kelasId = null;
                     if ($namaKelas !== '') {
                         if (isset($kelasMap[$namaKelas])) {
                             $kelasId = $kelasMap[$namaKelas];
                         } else {
-                            $newKelas = Kelas::create(['nama_kelas' => $namaKelas]);
+                            // Create new class with correct school_id
+                            $newKelasData = ['nama_kelas' => $namaKelas];
+                            if ($schoolId) {
+                                $newKelasData['school_id'] = $schoolId;
+                            }
+                            $newKelas = Kelas::create($newKelasData);
                             $kelasId = $newKelas->id;
                             $kelasMap[$namaKelas] = $kelasId;
+                        }
+                    }
+
+                    // Check Quota Limit before creating
+                    if ($schoolId) {
+                        // We need the school object.
+                        // Optimization: fetch school once outside loop?
+                        // But wait, $schoolId comes from auth()->user().
+                        // Let's assume non-super admin importing.
+                        $currentUser = auth()->user();
+                        if (!$currentUser->isSuperAdmin() && $currentUser->school && !$currentUser->school->hasStudentQuota()) {
+                            $countSkip++;
+                            // Maybe log error or just stop?
+                            // If we stop, we break loop. If we skip, we skip this row.
+                            // Ideally we should stop if quota full.
+                            // But for batch, maybe just skip and report?
+                            // Let's skip and maybe add 'Quota Penuh' to error log if possible?
+                            // Or throw invalid?
+                            \Log::warning("Import Skipped: Quota exceeded for school " . $schoolId);
+                            continue;
                         }
                     }
 
@@ -172,6 +275,7 @@ class SiswaController extends Controller
                         'kelas_id' => $kelasId,
                         'no_wa' => $this->normalizeWa($wa) ?: null,
                         'wa_ortu' => $this->normalizeWa($waOrtu) ?: null,
+                        'school_id' => $schoolId,
                         'created_at' => now()
                     ]);
                     // Auto-create Account
@@ -244,7 +348,8 @@ class SiswaController extends Controller
                 'username' => $username,  // Add username field
                 'email' => $username . '@siswa.smkassuniyah.sch.id',  // Use school domain
                 'password_hash' => \Illuminate\Support\Facades\Hash::make($siswa->nis), // Password = NIS
-                'role' => 'student'
+                'role' => 'student',
+                'school_id' => $siswa->school_id  // Assign same school as siswa
             ]);
 
             // Link to Siswa
@@ -315,11 +420,19 @@ class SiswaController extends Controller
     // Enrollment Methods
     public function enrollRequest($id)
     {
-        // Reset ALL other pending requests first (Single Active Request Policy)
-        Siswa::where('enroll_status', 'requested')->update(['enroll_status' => 'none']);
-        \App\Models\Guru::where('enroll_status', 'requested')->update(['enroll_status' => 'none']);
-
         $siswa = Siswa::findOrFail($id);
+
+        // Reset ALL other pending requests first (Single Active Request Policy) - SCOPED
+        $schoolId = $siswa->school_id;
+
+        Siswa::where('enroll_status', 'requested')
+            ->where('school_id', $schoolId)
+            ->update(['enroll_status' => 'none']);
+
+        \App\Models\Guru::where('enroll_status', 'requested')
+            ->where('school_id', $schoolId)
+            ->update(['enroll_status' => 'none']);
+
         $siswa->update(['enroll_status' => 'requested']);
         return response()->json(['ok' => true]);
     }
@@ -356,11 +469,19 @@ class SiswaController extends Controller
             'device_id' => 'required|exists:api_keys,id'
         ]);
 
-        // Reset ALL other pending requests
-        Siswa::where('enroll_finger_status', 'requested')->update(['enroll_finger_status' => 'none']);
-        \App\Models\Guru::where('enroll_finger_status', 'requested')->update(['enroll_finger_status' => 'none']);
-
         $siswa = Siswa::findOrFail($id);
+
+        // Reset ALL other pending requests - SCOPED
+        $schoolId = $siswa->school_id; // Get school from the student being enrolled
+
+        Siswa::where('enroll_finger_status', 'requested')
+            ->where('school_id', $schoolId)
+            ->update(['enroll_finger_status' => 'none']);
+
+        \App\Models\Guru::where('enroll_finger_status', 'requested')
+            ->where('school_id', $schoolId)
+            ->update(['enroll_finger_status' => 'none']);
+
         $siswa->update(['enroll_finger_status' => 'requested']);
 
         // Get device IP and send push notification

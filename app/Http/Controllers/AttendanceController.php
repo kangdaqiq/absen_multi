@@ -20,6 +20,12 @@ class AttendanceController extends Controller
 
         // Fetch all students (filtered by class if needed) to ensure we list everyone
         $siswaQuery = Siswa::with('kelas')->orderBy('nama');
+
+        // Filter by school_id for non-super admin users
+        if (auth()->user() && !auth()->user()->isSuperAdmin()) {
+            $siswaQuery->where('school_id', auth()->user()->school_id);
+        }
+
         if ($kelasId) {
             $siswaQuery->where('kelas_id', $kelasId);
         }
@@ -44,7 +50,14 @@ class AttendanceController extends Controller
             ];
         }
 
-        $allKelas = Kelas::orderBy('nama_kelas')->get();
+        $kelasQuery = Kelas::orderBy('nama_kelas');
+
+        // Filter by school_id for non-super admin users
+        if (auth()->user() && !auth()->user()->isSuperAdmin()) {
+            $kelasQuery->where('school_id', auth()->user()->school_id);
+        }
+
+        $allKelas = $kelasQuery->get();
 
         return view('absensi.index', compact('data', 'tanggal', 'allKelas', 'kelasId'));
     }

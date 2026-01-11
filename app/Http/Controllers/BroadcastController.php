@@ -15,7 +15,14 @@ class BroadcastController extends Controller
      */
     public function index()
     {
-        $kelas = Kelas::orderBy('nama_kelas')->get();
+        $kelasQuery = Kelas::orderBy('nama_kelas');
+
+        // Filter by school_id for non-super admin users
+        if (auth()->user() && !auth()->user()->isSuperAdmin()) {
+            $kelasQuery->where('school_id', auth()->user()->school_id);
+        }
+
+        $kelas = $kelasQuery->get();
         return view('broadcast.index', compact('kelas'));
     }
 
@@ -34,9 +41,15 @@ class BroadcastController extends Controller
         $messageBody = $request->message;
 
         // Get students from selected classes
-        $students = Siswa::whereIn('kelas_id', $targetClassIds)
-            ->whereNotNull('no_wa')
-            ->get();
+        $studentsQuery = Siswa::whereIn('kelas_id', $targetClassIds)
+            ->whereNotNull('no_wa');
+
+        // Filter by school_id for non-super admin users
+        if (auth()->user() && !auth()->user()->isSuperAdmin()) {
+            $studentsQuery->where('school_id', auth()->user()->school_id);
+        }
+
+        $students = $studentsQuery->get();
 
         if ($students->isEmpty()) {
             return back()->with('error', 'Tidak ada siswa dengan nomor WhatsApp di kelas yang dipilih.');
@@ -64,6 +77,7 @@ class BroadcastController extends Controller
                 $finalMessage .= "_Dikirim oleh Admin_";
 
                 MessageQueue::create([
+                    'school_id' => $student->school_id,
                     'phone_number' => $phone,
                     'message' => $finalMessage,
                     'status' => 'pending',

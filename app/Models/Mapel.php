@@ -8,11 +8,11 @@ use Illuminate\Database\Eloquent\Model;
 class Mapel extends Model
 {
     use HasFactory;
-    
+
     protected $table = 'mapel';
-    
-    protected $fillable = ['nama_mapel'];
-    
+
+    protected $fillable = ['nama_mapel', 'school_id'];
+
     public function jadwals()
     {
         return $this->hasMany(JadwalPelajaran::class, 'mapel_id');

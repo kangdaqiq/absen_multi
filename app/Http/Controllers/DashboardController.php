@@ -16,10 +16,12 @@ class DashboardController extends Controller
     {
         $user = auth()->user();
         $today = Carbon::today();
+        $isSuperAdmin = $user->isSuperAdmin();
+        $schoolId = $isSuperAdmin ? null : $user->school_id;
 
         if ($user->role === 'student') {
             $siswa = $user->student; // relasi hasOne
-            
+
             if (!$siswa) {
                 return view('dashboard-student', [
                     'linked' => false
@@ -37,37 +39,52 @@ class DashboardController extends Controller
 
             // Recent Logs (My Logs)
             $recentLogs = Attendance::where('student_id', $siswa->id)
-                            ->orderBy('tanggal', 'desc')
-                            ->take(5)
-                            ->get();
+                ->orderBy('tanggal', 'desc')
+                ->take(5)
+                ->get();
 
             return view('dashboard-student', compact('siswa', 'stats', 'recentLogs') + ['linked' => true]);
         }
 
         // Admin / Teacher View
-        // 1. Counts
-        $countSiswa = Siswa::count();
-        $countGuru = Guru::count();
-        $countKelas = Kelas::count();
-        
-        // 2. Attendance Today
-        $countHadir = Attendance::whereDate('tanggal', $today)->where('status', 'H')->count();
-        $countTelat = Attendance::whereDate('tanggal', $today)
-                        ->where('status', 'H')
-                        ->where('keterangan', 'like', 'Telat%')
-                        ->count();
-        
-        // 3. Recent Activity (Last 5)
-        $recentLogs = Attendance::with('student.kelas')
-                        ->whereDate('tanggal', $today)
-                        ->orderBy('updated_at', 'desc')
-                        ->take(5)
-                        ->get();
+        // 1. Counts SCOPED
+        $countSiswa = Siswa::when(!$isSuperAdmin, fn($q) => $q->where('school_id', $schoolId))->count();
+        $countGuru = Guru::when(!$isSuperAdmin, fn($q) => $q->where('school_id', $schoolId))->count();
+        $countKelas = Kelas::when(!$isSuperAdmin, fn($q) => $q->where('school_id', $schoolId))->count();
 
-        // 4. Chart Data (Last 7 Days)
+        // 2. Attendance Today SCOPED [Via Student]
+        $countHadir = Attendance::whereDate('tanggal', $today)
+            ->where('status', 'H')
+            ->when(!$isSuperAdmin, function ($q) use ($schoolId) {
+                $q->whereHas('student', fn($sub) => $sub->where('school_id', $schoolId));
+            })
+            ->count();
+
+        $countTelat = Attendance::whereDate('tanggal', $today)
+            ->where('status', 'H')
+            ->where('keterangan', 'like', 'Telat%')
+            ->when(!$isSuperAdmin, function ($q) use ($schoolId) {
+                $q->whereHas('student', fn($sub) => $sub->where('school_id', $schoolId));
+            })
+            ->count();
+
+        // 3. Recent Activity (Last 5) SCOPED
+        $recentLogs = Attendance::with('student.kelas')
+            ->whereDate('tanggal', $today)
+            ->when(!$isSuperAdmin, function ($q) use ($schoolId) {
+                $q->whereHas('student', fn($sub) => $sub->where('school_id', $schoolId));
+            })
+            ->orderBy('updated_at', 'desc')
+            ->take(5)
+            ->get();
+
+        // 4. Chart Data (Last 7 Days) SCOPED
         $dates = [];
         $chartData = [
-            'H' => [], 'I' => [], 'S' => [], 'A' => []
+            'H' => [],
+            'I' => [],
+            'S' => [],
+            'A' => []
         ];
 
         for ($i = 6; $i >= 0; $i--) {
@@ -75,15 +92,18 @@ class DashboardController extends Controller
             $dates[] = Carbon::today()->subDays($i)->format('d M'); // Label: 26 Dec
 
             $dailyStats = Attendance::whereDate('tanggal', $date)
-                            ->selectRaw('status, count(*) as count')
-                            ->groupBy('status')
-                            ->pluck('count', 'status')
-                            ->toArray();
-            
+                ->when(!$isSuperAdmin, function ($q) use ($schoolId) {
+                    $q->whereHas('student', fn($sub) => $sub->where('school_id', $schoolId));
+                })
+                ->selectRaw('status, count(*) as count')
+                ->groupBy('status')
+                ->pluck('count', 'status')
+                ->toArray();
+
             // Map legacy T to H for chart consistency if needed, or just normal counting
             // Note: Our previous refactor counts T as H in reports, but DB might still store T or H.
             // Let's sum them up carefully.
-            
+
             $hCount = ($dailyStats['H'] ?? 0) + ($dailyStats['Hadir'] ?? 0) + ($dailyStats['T'] ?? 0) + ($dailyStats['Terlambat'] ?? 0);
             $iCount = ($dailyStats['I'] ?? 0) + ($dailyStats['Izin'] ?? 0);
             $sCount = ($dailyStats['S'] ?? 0) + ($dailyStats['Sakit'] ?? 0);
@@ -96,9 +116,14 @@ class DashboardController extends Controller
         }
 
         return view('dashboard', compact(
-            'countSiswa', 'countGuru', 'countKelas', 
-            'countHadir', 'countTelat', 'recentLogs',
-            'dates', 'chartData'
+            'countSiswa',
+            'countGuru',
+            'countKelas',
+            'countHadir',
+            'countTelat',
+            'recentLogs',
+            'dates',
+            'chartData'
         ));
     }
 }

@@ -14,6 +14,20 @@ Route::get('/login', [AuthController::class, 'showLoginForm'])->name('login');
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
+// Super Admin Routes
+Route::middleware(['auth'])->prefix('super-admin')->name('super-admin.')->group(function () {
+    Route::middleware('role:super_admin')->group(function () {
+        Route::get('/dashboard', [App\Http\Controllers\SuperAdmin\DashboardController::class, 'index'])->name('dashboard');
+
+        // Schools Management
+        Route::resource('schools', App\Http\Controllers\SuperAdmin\SchoolController::class);
+
+        // School Admins Management (nested resource)
+        Route::resource('schools.admins', App\Http\Controllers\SuperAdmin\SchoolAdminController::class);
+    });
+});
+
+
 Route::middleware('auth')->group(function () {
     // Common Routes (All Authenticated)
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
@@ -50,8 +64,8 @@ Route::middleware('auth')->group(function () {
         Route::get('/rekap/{id}/export', [App\Http\Controllers\RekapController::class, 'exportDetail'])->name('rekap.exportDetail');
     });
 
-    // Admin Only Routes
-    Route::middleware('role:admin')->group(function () {
+    // Admin & Super Admin Routes
+    Route::middleware('role:admin,super_admin')->group(function () {
         // Guru Import
         Route::post('/guru/import', [GuruController::class, 'import'])->name('guru.import');
         Route::get('/guru/template', [GuruController::class, 'downloadTemplate'])->name('guru.template');
@@ -82,6 +96,7 @@ Route::middleware('auth')->group(function () {
 
         // Management
         Route::resource('devices', DeviceController::class)->except(['create', 'show', 'edit']);
+        Route::post('/jadwal/update-all', [App\Http\Controllers\JadwalController::class, 'updateAll'])->name('jadwal.update-all');
         Route::resource('jadwal', App\Http\Controllers\JadwalController::class)->except(['create', 'show', 'edit']);
         Route::resource('hari-libur', App\Http\Controllers\HariLiburController::class)->only(['index', 'store', 'destroy']);
 

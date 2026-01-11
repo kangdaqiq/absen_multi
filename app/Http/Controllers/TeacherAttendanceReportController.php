@@ -15,8 +15,7 @@ class TeacherAttendanceReportController extends Controller
         // 1. Determine Date (default Today)
         $dateStr = $request->input('tanggal', Carbon::now()->format('Y-m-d'));
         $date = Carbon::parse($dateStr);
-        
-        // 2. Determine Day Name (Indonesian)
+
         $dayNames = [
             'Sunday' => 'Minggu',
             'Monday' => 'Senin',
@@ -28,25 +27,39 @@ class TeacherAttendanceReportController extends Controller
         ];
         $dayName = $dayNames[$date->format('l')];
 
-        // 3. Filter Options
-        $guruId = $request->input('guru_id');
+        // 2. Get School ID
+        $schoolId = (auth()->user() && !auth()->user()->isSuperAdmin()) ? auth()->user()->school_id : null;
 
-        // 4. Query Schedule (JadwalPelajaran) for that Day
-        $query = JadwalPelajaran::with(['guru', 'kelas', 'mapel', 'absensis' => function($q) use ($dateStr) {
-            $q->where('tanggal', $dateStr);
-        }])
-        ->where('hari', $dayName);
-
-        if ($guruId) {
-            $query->where('guru_id', $guruId);
+        // 3. Get Teachers
+        $guruQuery = Guru::orderBy('nama');
+        if ($schoolId) {
+            $guruQuery->where('school_id', $schoolId);
         }
+        $gurus = $guruQuery->get();
 
-        $schedules = $query->orderBy('jam_mulai')->get();
+        // 4. Get Attendance for Date
+        $attendanceQuery = AbsensiGuru::where('tanggal', $dateStr)
+            ->whereNull('jadwal_pelajaran_id'); // Only daily records
 
-        // 5. Get List of Teachers for Filter
-        $gurus = Guru::orderBy('nama')->get();
+        if ($schoolId) {
+            $attendanceQuery->where('school_id', $schoolId);
+        }
+        $attendances = $attendanceQuery->get()->keyBy('guru_id');
 
-        return view('teacher-attendance.index', compact('schedules', 'gurus', 'dateStr', 'dayName'));
+        // 5. Merge Data
+        $report = $gurus->map(function ($guru) use ($attendances) {
+            $att = $attendances->get($guru->id);
+            return [
+                'guru' => $guru,
+                'status' => $att ? $att->status : 'Belum Absen',
+                'jam_masuk' => $att ? $att->jam_masuk : '-',
+                'jam_pulang' => $att ? $att->jam_pulang : '-',
+                'keterangan' => $att ? $att->keterangan : '',
+                'attendance_id' => $att ? $att->id : null
+            ];
+        });
+
+        return view('teacher-attendance.index', compact('report', 'dateStr', 'dayName'));
     }
 
     public function store(Request $request)
@@ -67,17 +80,17 @@ class TeacherAttendanceReportController extends Controller
         // Jika Hadir, set waktu_hadir sekarang (jika belum ada) atau tetap
         // Tapi biasanya admin yang input, jadi waktu_hadir bisa null atau now()
         // Kita set now() jika status Hadir dan belum punya waktu_hadir
-        
+
         $updateData = [
             'status' => $request->status,
         ];
 
         if ($request->status == 'Hadir') {
-             // Opsional: set waktu hadir jika record baru
-             $updateData['waktu_hadir'] = Carbon::now(); 
+            // Opsional: set waktu hadir jika record baru
+            $updateData['waktu_hadir'] = Carbon::now();
         } else {
-             $updateData['waktu_hadir'] = null; // Reset jika tidak hadir? Atau biarkan? 
-             // Better to nullify if not Present
+            $updateData['waktu_hadir'] = null; // Reset jika tidak hadir? Atau biarkan? 
+            // Better to nullify if not Present
         }
 
         AbsensiGuru::updateOrCreate($data, $updateData);

@@ -10,7 +10,14 @@ class DeviceController extends Controller
 {
     public function index()
     {
-        $devices = Device::orderBy('created_at', 'desc')->get();
+        $query = Device::orderBy('created_at', 'desc');
+
+        // Filter by school_id for non-super admin users
+        if (auth()->user() && !auth()->user()->isSuperAdmin()) {
+            $query->where('school_id', auth()->user()->school_id);
+        }
+
+        $devices = $query->get();
         return view('devices.index', compact('devices'));
     }
 
@@ -23,7 +30,14 @@ class DeviceController extends Controller
             'active' => 'required|boolean',
         ]);
 
-        Device::create($request->all());
+        $data = $request->all();
+
+        // Add school_id for non-super admin users
+        if (auth()->user() && !auth()->user()->isSuperAdmin()) {
+            $data['school_id'] = auth()->user()->school_id;
+        }
+
+        Device::create($data);
 
         return redirect()->route('devices.index')->with('success', 'Device berhasil ditambahkan.');
     }

@@ -31,6 +31,12 @@ class RekapController extends Controller
         }
 
         $siswaQuery = Siswa::with('kelas')->orderBy('nama');
+
+        // Filter by school_id for non-super admin users
+        if (auth()->user() && !auth()->user()->isSuperAdmin()) {
+            $siswaQuery->where('school_id', auth()->user()->school_id);
+        }
+
         if ($kelasId) {
             $siswaQuery->where('kelas_id', $kelasId);
         }
@@ -40,11 +46,16 @@ class RekapController extends Controller
         $attendances = Attendance::whereBetween('tanggal', [$startDate, $endDate])->get();
         // Group by student_id then date? Or just keep raw and map in view logic.
         // Better: Map[student_id] => [H=>count, I=>count...] for summary
-        
+
         $summary = [];
         foreach ($allSiswa as $s) {
             $summary[$s->id] = [
-                'H' => 0, 'I' => 0, 'S' => 0, 'A' => 0, 'B' => 0, 'T' => 0
+                'H' => 0,
+                'I' => 0,
+                'S' => 0,
+                'A' => 0,
+                'B' => 0,
+                'T' => 0
             ];
         }
 
@@ -66,8 +77,15 @@ class RekapController extends Controller
         // Complex. Let's provide the raw summary of WHAT IS RECORDED + ability to drill down.
         // Or simpy: Count H, I, S, A, B, T.
         // If system auto-generates Alpha (via AutoBolos or manual crons), database reflects reality.
-        
-        $allKelas = Kelas::orderBy('nama_kelas')->get();
+
+        $kelasQuery = Kelas::orderBy('nama_kelas');
+
+        // Filter by school_id for non-super admin users
+        if (auth()->user() && !auth()->user()->isSuperAdmin()) {
+            $kelasQuery->where('school_id', auth()->user()->school_id);
+        }
+
+        $allKelas = $kelasQuery->get();
 
         return view('rekap.index', compact('allSiswa', 'summary', 'startDate', 'endDate', 'allKelas', 'kelasId'));
     }
@@ -80,6 +98,12 @@ class RekapController extends Controller
 
         // Fetch Data Same as Index
         $siswaQuery = Siswa::with('kelas')->orderBy('nama');
+
+        // Filter by school_id for non-super admin users
+        if (auth()->user() && !auth()->user()->isSuperAdmin()) {
+            $siswaQuery->where('school_id', auth()->user()->school_id);
+        }
+
         if ($kelasId) {
             $siswaQuery->where('kelas_id', $kelasId);
         }
@@ -94,13 +118,15 @@ class RekapController extends Controller
             if (isset($summary[$att->student_id])) {
                 $status = $att->status;
                 // Normalize legacy T to H
-                if ($status == 'T') $status = 'H';
-                if ($status == 'Hadir') $status = 'H'; // strict check
-                
+                if ($status == 'T')
+                    $status = 'H';
+                if ($status == 'Hadir')
+                    $status = 'H'; // strict check
+
                 if (isset($summary[$att->student_id][$status])) {
                     $summary[$att->student_id][$status]++;
                 } elseif ($status == 'H') { // Fallback if T was mapped to H but H key exists
-                     $summary[$att->student_id]['H']++;
+                    $summary[$att->student_id]['H']++;
                 }
             }
         }
@@ -108,7 +134,7 @@ class RekapController extends Controller
         // Create Spreadsheet
         $spreadsheet = new Spreadsheet();
         $sheet = $spreadsheet->getActiveSheet();
-        
+
         // Header
         $sheet->setCellValue('A1', 'REKAP ABSENSI');
         $sheet->setCellValue('A2', "Periode: $startDate - $endDate");
@@ -126,30 +152,30 @@ class RekapController extends Controller
         $no = 1;
         foreach ($allSiswa as $s) {
             $sum = $summary[$s->id];
-            $sheet->setCellValue('A'.$row, $no++);
-            $sheet->setCellValue('B'.$row, $s->nis);
-            $sheet->setCellValue('C'.$row, $s->nama);
-            $sheet->setCellValue('D'.$row, $s->kelas->nama_kelas ?? '-');
-            $sheet->setCellValue('E'.$row, $sum['H']);
-            $sheet->setCellValue('F'.$row, $sum['S']);
-            $sheet->setCellValue('G'.$row, $sum['I']);
-            $sheet->setCellValue('H'.$row, $sum['B']);
-            $sheet->setCellValue('I'.$row, $sum['A']);
+            $sheet->setCellValue('A' . $row, $no++);
+            $sheet->setCellValue('B' . $row, $s->nis);
+            $sheet->setCellValue('C' . $row, $s->nama);
+            $sheet->setCellValue('D' . $row, $s->kelas->nama_kelas ?? '-');
+            $sheet->setCellValue('E' . $row, $sum['H']);
+            $sheet->setCellValue('F' . $row, $sum['S']);
+            $sheet->setCellValue('G' . $row, $sum['I']);
+            $sheet->setCellValue('H' . $row, $sum['B']);
+            $sheet->setCellValue('I' . $row, $sum['A']);
             $row++;
         }
 
         $writer = new Xlsx($spreadsheet);
         $fileName = "rekap_absensi_{$startDate}_{$endDate}.xlsx";
-        
+
         header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        header('Content-Disposition: attachment; filename="'. urlencode($fileName).'"');
+        header('Content-Disposition: attachment; filename="' . urlencode($fileName) . '"');
         $writer->save('php://output');
         exit;
     }
     public function show($id, Request $request)
     {
         $siswa = Siswa::with('kelas')->findOrFail($id);
-        
+
         $startDate = $request->input('start_date', Carbon::now()->startOfMonth()->format('Y-m-d'));
         $endDate = $request->input('end_date', Carbon::now()->endOfMonth()->format('Y-m-d'));
 
@@ -194,21 +220,21 @@ class RekapController extends Controller
         $row = 7;
         $no = 1;
         foreach ($attendance as $att) {
-            $sheet->setCellValue('A'.$row, $no++);
-            $sheet->setCellValue('B'.$row, $att->tanggal);
-            $sheet->setCellValue('C'.$row, $att->jam_masuk);
-            $sheet->setCellValue('D'.$row, $att->jam_pulang);
-            $sheet->setCellValue('E'.$row, $att->status);
-            $sheet->setCellValue('F'.$row, $att->keterangan);
+            $sheet->setCellValue('A' . $row, $no++);
+            $sheet->setCellValue('B' . $row, $att->tanggal);
+            $sheet->setCellValue('C' . $row, $att->jam_masuk);
+            $sheet->setCellValue('D' . $row, $att->jam_pulang);
+            $sheet->setCellValue('E' . $row, $att->status);
+            $sheet->setCellValue('F' . $row, $att->keterangan);
             $row++;
         }
 
         $writer = new Xlsx($spreadsheet);
         $cleanName = preg_replace('/[^A-Za-z0-9]/', '_', $siswa->nama);
         $fileName = "detail_absensi_{$cleanName}_{$startDate}_{$endDate}.xlsx";
-        
+
         header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        header('Content-Disposition: attachment; filename="'. urlencode($fileName).'"');
+        header('Content-Disposition: attachment; filename="' . urlencode($fileName) . '"');
         $writer->save('php://output');
         exit;
     }
@@ -221,6 +247,12 @@ class RekapController extends Controller
 
         // Fetch Data Same as Index
         $siswaQuery = Siswa::with('kelas')->orderBy('nama');
+
+        // Filter by school_id for non-super admin users
+        if (auth()->user() && !auth()->user()->isSuperAdmin()) {
+            $siswaQuery->where('school_id', auth()->user()->school_id);
+        }
+
         if ($kelasId) {
             $siswaQuery->where('kelas_id', $kelasId);
         }
@@ -232,7 +264,11 @@ class RekapController extends Controller
         foreach ($allSiswa as $s) {
             $summary[$s->id] = [
                 'nama' => $s->nama,
-                'hadir' => 0, 'izin' => 0, 'sakit' => 0, 'alpha' => 0, 'bolos' => 0
+                'hadir' => 0,
+                'izin' => 0,
+                'sakit' => 0,
+                'alpha' => 0,
+                'bolos' => 0
             ];
         }
 
@@ -241,18 +277,23 @@ class RekapController extends Controller
             if (isset($summary[$att->student_id])) {
                 $status = $att->status;
                 $key = strtolower($status == 'H' ? 'hadir' : ($status == 'I' ? 'izin' : ($status == 'S' ? 'sakit' : ($status == 'A' ? 'alpha' : ($status == 'B' ? 'bolos' : 'telat')))));
-                
+
                 // Fallback for simple mapping codes
                 // Assuming status is single char uppercase: H, I, S, A, B, T? 
                 // Or full word? Let's check DB. It's varchar(20). 
                 // Previous logic used $att->status directly as key.
                 // Let's normalize to lowercase keys used in view.
-                
-                if ($status == 'H' || $status == 'Hadir' || $status == 'T' || $status == 'Telat') $summary[$att->student_id]['hadir']++;
-                elseif ($status == 'I' || $status == 'Izin') $summary[$att->student_id]['izin']++;
-                elseif ($status == 'S' || $status == 'Sakit') $summary[$att->student_id]['sakit']++;
-                elseif ($status == 'A' || $status == 'Alpha') $summary[$att->student_id]['alpha']++;
-                elseif ($status == 'B' || $status == 'Bolos') $summary[$att->student_id]['bolos']++;
+
+                if ($status == 'H' || $status == 'Hadir' || $status == 'T' || $status == 'Telat')
+                    $summary[$att->student_id]['hadir']++;
+                elseif ($status == 'I' || $status == 'Izin')
+                    $summary[$att->student_id]['izin']++;
+                elseif ($status == 'S' || $status == 'Sakit')
+                    $summary[$att->student_id]['sakit']++;
+                elseif ($status == 'A' || $status == 'Alpha')
+                    $summary[$att->student_id]['alpha']++;
+                elseif ($status == 'B' || $status == 'Bolos')
+                    $summary[$att->student_id]['bolos']++;
             }
         }
 
@@ -261,7 +302,7 @@ class RekapController extends Controller
         $schoolName = \App\Models\Setting::where('setting_key', 'nama_sekolah')->value('setting_value');
         $schoolAddress = \App\Models\Setting::where('setting_key', 'alamat_sekolah')->value('setting_value');
         $signatureLocation = \App\Models\Setting::where('setting_key', 'alamat_ttd')->value('setting_value');
-        
+
         // Defaults
         $schoolName = $schoolName ?? 'SMK Negeri Contoh';
         $schoolAddress = $schoolAddress ?? 'Jl. Contoh No. 1';
@@ -272,7 +313,7 @@ class RekapController extends Controller
 
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('rekap.pdf', compact('rekap', 'startDate', 'endDate', 'kelas', 'schoolName', 'schoolAddress', 'signatureLocation'));
         $pdf->setPaper('a4', 'portrait');
-        
+
         return $pdf->stream('rekap_absensi.pdf');
     }
 }

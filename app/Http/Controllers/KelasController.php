@@ -4,25 +4,51 @@ namespace App\Http\Controllers;
 
 use App\Models\Kelas;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class KelasController extends Controller
 {
     public function index()
     {
-        $kelas = Kelas::with('waliKelas')->orderBy('nama_kelas')->get();
-        $gurus = \App\Models\Guru::orderBy('nama')->get();
+        $kelasQuery = Kelas::with('waliKelas')->orderBy('nama_kelas');
+        $gurusQuery = \App\Models\Guru::orderBy('nama');
+
+        // Filter by school_id for non-super admin users
+        if (auth()->user() && !auth()->user()->isSuperAdmin()) {
+            $kelasQuery->where('school_id', auth()->user()->school_id);
+            $gurusQuery->where('school_id', auth()->user()->school_id);
+        }
+
+        $kelas = $kelasQuery->get();
+        $gurus = $gurusQuery->get();
         return view('kelas.index', compact('kelas', 'gurus'));
     }
 
     public function store(Request $request)
     {
+        $schoolId = auth()->user()->isSuperAdmin() ? null : auth()->user()->school_id;
+
         $request->validate([
-            'nama_kelas' => 'required|string|max:50|unique:kelas,nama_kelas',
+            'nama_kelas' => [
+                'required',
+                'string',
+                'max:50',
+                Rule::unique('kelas')->where(function ($query) use ($schoolId) {
+                    return $query->where('school_id', $schoolId);
+                })
+            ],
             'wali_kelas_id' => 'nullable|exists:guru,id',
             'wa_group_id' => 'nullable|string|max:100',
         ]);
 
-        Kelas::create($request->all());
+        $data = $request->all();
+
+        // Add school_id from authenticated user
+        if ($schoolId) {
+            $data['school_id'] = $schoolId;
+        }
+
+        Kelas::create($data);
 
         return redirect()->route('kelas.index')->with('success', 'Kelas berhasil ditambahkan.');
     }
@@ -30,9 +56,17 @@ class KelasController extends Controller
     public function update(Request $request, $id)
     {
         $kelas = Kelas::findOrFail($id);
+        $schoolId = auth()->user()->isSuperAdmin() ? null : auth()->user()->school_id;
 
         $request->validate([
-            'nama_kelas' => 'required|string|max:50|unique:kelas,nama_kelas,' . $kelas->id,
+            'nama_kelas' => [
+                'required',
+                'string',
+                'max:50',
+                Rule::unique('kelas')->ignore($kelas->id)->where(function ($query) use ($schoolId) {
+                    return $query->where('school_id', $schoolId);
+                })
+            ],
             'wali_kelas_id' => 'nullable|exists:guru,id',
             'wa_group_id' => 'nullable|string|max:100',
         ]);

@@ -334,8 +334,8 @@ class SiswaController extends Controller
     // Helper to auto-create User
     private function createUserForSiswa($siswa)
     {
-        // Use NIS as username
-        $username = $siswa->nis;
+        // Use SchoolID + NIS as username to ensure global uniqueness across schools
+        $username = $siswa->school_id . $siswa->nis;
 
         // Check if user exists (to prevent dupes if re-generating)
         $existingUser = \App\Models\User::where('email', $username)

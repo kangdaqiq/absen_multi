@@ -86,7 +86,17 @@ class RekapGuruController extends Controller
             'tidak_hadir' => $absensi->where('status', 'Tidak Hadir')->count(),
         ];
 
-        $pdf = Pdf::loadView('rekap-guru.pdf', compact('absensi', 'startDate', 'endDate', 'stats'));
+        // Fetch Metadata for Header
+        $schoolId = auth()->user()->isSuperAdmin() ? ($guruId ? Guru::find($guruId)->school_id : null) : auth()->user()->school_id;
+        // If super admin and no guru specific selected, maybe pick first from result?
+        if (!$schoolId && $absensi->count() > 0) {
+            $schoolId = $absensi->first()->school_id;
+        }
+
+        $schoolName = \App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'nama_sekolah')->value('setting_value');
+        $schoolAddress = \App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'alamat_sekolah')->value('setting_value');
+
+        $pdf = Pdf::loadView('rekap-guru.pdf', compact('absensi', 'startDate', 'endDate', 'stats', 'schoolName', 'schoolAddress'));
         $pdf->setPaper('a4', 'landscape');
 
         return $pdf->download('rekap-absensi-guru-' . $startDate . '-to-' . $endDate . '.pdf');

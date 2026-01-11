@@ -299,9 +299,20 @@ class RekapController extends Controller
 
         // Fetch Metadata
         // Fetch Metadata
-        $schoolName = \App\Models\Setting::where('setting_key', 'nama_sekolah')->value('setting_value');
-        $schoolAddress = \App\Models\Setting::where('setting_key', 'alamat_sekolah')->value('setting_value');
-        $signatureLocation = \App\Models\Setting::where('setting_key', 'alamat_ttd')->value('setting_value');
+        $schoolId = auth()->user()->isSuperAdmin() ? $allSiswa->first()->school_id ?? null : auth()->user()->school_id;
+
+        if (!$schoolId && $kelasId) {
+            $kelas = Kelas::find($kelasId);
+            $schoolId = $kelas ? $kelas->school_id : null;
+        }
+
+        $schoolName = \App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'nama_sekolah')->value('setting_value');
+        $schoolAddress = \App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'alamat_sekolah')->value('setting_value');
+        $signatureLocation = \App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'kota_lokasi_ttd')->value('setting_value'); // key is 'kota_lokasi_ttd' based on default settings created
+        // Backup check just in case key name differs or was 'alamat_ttd' in old code
+        if (!$signatureLocation) {
+            $signatureLocation = \App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'alamat_ttd')->value('setting_value');
+        }
 
         // Defaults
         $schoolName = $schoolName ?? 'SMK Negeri Contoh';

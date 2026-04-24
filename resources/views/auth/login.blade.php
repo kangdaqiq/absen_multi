@@ -218,10 +218,12 @@
                     <div class="login-header">
                         <div class="login-icon">
                             @php
-                                $isStorage = \Illuminate\Support\Str::startsWith($school_logo, 'schools/');
-                                $logoUrl = $isStorage ? asset('storage/' . $school_logo) : asset('img/' . $school_logo);
+                                $globalSettingLogo = \App\Models\Setting::where('school_id', 0)->where('setting_key', 'logo_filename')->value('setting_value');
+                                $globalLogo = $globalSettingLogo ?: 'logo.png';
+                                $isStorage = \Illuminate\Support\Str::startsWith($globalLogo, 'schools/');
+                                $logoUrl = $isStorage ? asset('storage/' . $globalLogo) : asset('img/' . $globalLogo);
                             @endphp
-                            <img src="{{ $logoUrl }}" alt="Logo Sekolah">
+                            <img src="{{ $logoUrl }}" alt="Logo Global">
                         </div>
                         <h1>Selamat Datang</h1>
                         <p>Silakan login untuk mengakses sistem absensi</p>

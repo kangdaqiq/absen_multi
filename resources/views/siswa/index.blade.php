@@ -12,13 +12,6 @@
             <button class="btn btn-success shadow-sm ml-2" data-toggle="modal" data-target="#modalImportSiswa">
                 <i class="fas fa-file-excel fa-sm"></i> Import Excel
             </button>
-            <form action="{{ route('siswa.generateAccounts') }}" method="POST" class="d-inline ml-2"
-                onsubmit="return confirm('PERHATIAN: Semua akun siswa akan dihapus dan dibuat ulang! Username=NIS, Password=NIS. Lanjutkan?');">
-                @csrf
-                <button type="submit" class="btn btn-warning shadow-sm">
-                    <i class="fas fa-key fa-sm"></i> Generate Akun
-                </button>
-            </form>
         </div>
     </div>
 
@@ -38,7 +31,6 @@
                             <th>Kelas</th>
                             <th>No WhatsApp</th>
                             <th>No WA Ortu</th>
-                            <th>Akun User</th>
                             <th>UID RFID</th>
                             <th>ID Finger</th>
                             <th width="20%">Aksi</th>
@@ -54,13 +46,6 @@
                                 <td>{{ $s->kelas->nama_kelas ?? '-' }}</td>
                                 <td>{{ $s->no_wa }}</td>
                                 <td>{{ $s->wa_ortu }}</td>
-                                <td>
-                                    @if($s->user)
-                                        <span class="badge badge-success">{{ $s->user->username }}</span>
-                                    @else
-                                        <span class="badge badge-secondary">Belum Terhubung</span>
-                                    @endif
-                                </td>
                                 <td>{{ $s->uid_rfid }}</td>
                                 <td>
                                     @if($s->id_finger)

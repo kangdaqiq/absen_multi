@@ -22,7 +22,7 @@ $getTime = function ($key, $default) {
 // Run every minute to allow per-school scheduling logic in Commands
 Schedule::command('absen:process-daily')->everyMinute()->withoutOverlapping();
 Schedule::command('absen:daily-report')->everyMinute()->withoutOverlapping();
-Schedule::command('schedule:send-teacher-schedule')->everyMinute()->withoutOverlapping();
+
 Schedule::command('wa:process')->everyMinute()->withoutOverlapping();
 
 // Daily Abnormal Attendance Check
@@ -35,3 +35,6 @@ Schedule::command('absen:check-abnormal')->everyMinute()->withoutOverlapping()
             return true; // Default enabled
         }
     });
+
+// Daily Full SQL Database Backup (Runs at 02:00 AM)
+Schedule::command('db:backup')->dailyAt('02:00')->withoutOverlapping();

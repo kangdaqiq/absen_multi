@@ -8,6 +8,7 @@ use App\Models\Siswa;
 use App\Models\Guru;
 use App\Models\Kelas;
 use App\Models\Attendance;
+use App\Models\Announcement;
 use Carbon\Carbon;
 
 class DashboardController extends Controller
@@ -115,6 +116,12 @@ class DashboardController extends Controller
             $chartData['A'][] = $aCount;
         }
 
+        // Fetch active announcements ONLY if user is admin
+        $announcements = collect();
+        if ($user->role === 'admin') {
+            $announcements = Announcement::where('is_active', true)->latest()->get();
+        }
+
         return view('dashboard', compact(
             'countSiswa',
             'countGuru',
@@ -123,7 +130,8 @@ class DashboardController extends Controller
             'countTelat',
             'recentLogs',
             'dates',
-            'chartData'
+            'chartData',
+            'announcements'
         ));
     }
 }

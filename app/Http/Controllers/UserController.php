@@ -11,20 +11,16 @@ class UserController extends Controller
 {
     public function index(Request $request)
     {
-        $role = $request->query('role');
-        $query = User::orderBy('full_name');
+        $query = User::whereIn('role', ['admin', 'super_admin'])->orderBy('full_name');
 
         // Filter by school_id for non-super admin users
         if (auth()->user() && !auth()->user()->isSuperAdmin()) {
-            $query->where('school_id', auth()->user()->school_id);
-        }
-
-        if ($role && in_array($role, ['admin', 'teacher', 'student'])) {
-            $query->where('role', $role);
+            $query->where('school_id', auth()->user()->school_id)
+                  ->where('role', 'admin');
         }
 
         $users = $query->get();
-        return view('users.index', compact('users', 'role'));
+        return view('users.index', compact('users'));
     }
 
     public function create()
@@ -39,7 +35,7 @@ class UserController extends Controller
             'username' => 'required|string|max:255|unique:users',
             'email' => 'required|string|max:255|unique:users',
             'password' => 'required|string|min:8|confirmed',
-            'role' => 'required|in:admin,teacher,student',
+            'role' => 'required|in:admin,super_admin',
         ]);
 
         User::create([
@@ -65,7 +61,7 @@ class UserController extends Controller
             'username' => ['required', 'string', 'max:255', Rule::unique('users')->ignore($user->id)],
             'email' => ['required', 'string', 'max:255', Rule::unique('users')->ignore($user->id)],
             'password' => 'nullable|string|min:4|confirmed',
-            'role' => 'required|in:admin,teacher,student',
+            'role' => 'required|in:admin,super_admin',
         ]);
 
         $user->full_name = $request->name;

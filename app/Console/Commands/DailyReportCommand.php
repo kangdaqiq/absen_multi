@@ -7,7 +7,7 @@ use App\Models\Siswa;
 use App\Models\Attendance;
 use App\Models\MessageQueue;
 use App\Models\Setting;
-use App\Models\HariLibur;
+
 use App\Models\Kelas;
 use App\Services\WhatsAppMessageTemplates;
 use Carbon\Carbon;
@@ -39,9 +39,14 @@ class DailyReportCommand extends Command
         $this->info("------------------------------------------------");
         $this->info("Processing Daily Report for School: {$school->nama_sekolah} (ID: $schoolId)");
 
-        // 1. Check Hari Libur (Per School - Manual Dates)
-        if (HariLibur::where('school_id', $schoolId)->where('tanggal', $today)->exists()) {
-            $this->info("Today is Holiday ($today) for this school. Skipped.");
+        // 1. Check for Holiday (Dynamic: if no student attendance exists today, assume holiday)
+        $hasAttendance = \App\Models\Attendance::where('tanggal', $today)
+            ->whereHas('student', function ($q) use ($schoolId) {
+                $q->where('school_id', $schoolId);
+            })->exists();
+
+        if (!$hasAttendance) {
+            $this->info("Today has no student attendance for school ID $schoolId. Assumed Holiday. Skipped.");
             return;
         }
 

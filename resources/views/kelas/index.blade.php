@@ -22,7 +22,10 @@
                             <th width="5%">No</th>
                             <th>Nama Kelas</th>
                             <th>Wali Kelas</th>
+                            @if(auth()->user()->school && auth()->user()->school->wa_enabled)
                             <th>ID Grup WA</th>
+                            @endif
+
                             <th>Status Absen</th>
                             <th>Status Report</th>
                             <th width="15%">Aksi</th>
@@ -40,6 +43,7 @@
                                         -
                                     @endif
                                 </td>
+                                @if(auth()->user()->school && auth()->user()->school->wa_enabled)
                                 <td>
                                     @if($k->wa_group_id)
                                         <span class="badge badge-success">{{ $k->wa_group_id }}</span>
@@ -47,6 +51,7 @@
                                         <span class="badge badge-secondary">-</span>
                                     @endif
                                 </td>
+                                @endif
                                 <td>
                                     <form action="{{ route('kelas.toggle-status', $k->id) }}" method="POST">
                                         @csrf
@@ -117,6 +122,7 @@
                                 @endforeach
                             </select>
                         </div>
+                        @if(auth()->user()->school && auth()->user()->school->wa_enabled)
                         <div class="form-group">
                             <label>ID Grup WhatsApp</label>
                             <div class="input-group">
@@ -132,6 +138,7 @@
                             <small class="form-text text-muted">Opsional. ID Grup WhatsApp untuk broadcast ke kelas
                                 ini.</small>
                         </div>
+                        @endif
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-dismiss="modal">Batal</button>
@@ -167,6 +174,7 @@
                                 @endforeach
                             </select>
                         </div>
+                        @if(auth()->user()->school && auth()->user()->school->wa_enabled)
                         <div class="form-group">
                             <label>ID Grup WhatsApp</label>
                             <div class="input-group">
@@ -182,6 +190,7 @@
                             <small class="form-text text-muted">Opsional. ID Grup WhatsApp untuk broadcast ke kelas
                                 ini.</small>
                         </div>
+                        @endif
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-dismiss="modal">Batal</button>
@@ -214,34 +223,33 @@
             </form>
         </div>
     </div>
-@endsection
-
-<!-- WA Group Modal -->
-<div class="modal fade" id="waGroupModal" tabindex="-1" role="dialog" aria-labelledby="waGroupModalLabel"
-    aria-hidden="true" style="z-index: 100000;">
-    <div class="modal-dialog modal-lg" role="document">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="waGroupModalLabel">Pilih Grup WhatsApp</h5>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>
-            <div class="modal-body">
-                <div id="waGroupLoading" class="text-center py-4">
-                    <div class="spinner-border text-primary" role="status">
-                        <span class="sr-only">Loading...</span>
-                    </div>
-                    <p class="mt-2 text-muted">Mengambil daftar grup...</p>
+    <!-- WA Group Modal -->
+    <div class="modal fade" id="waGroupModal" tabindex="-1" role="dialog" aria-labelledby="waGroupModalLabel"
+        aria-hidden="true" style="z-index: 100000;">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="waGroupModalLabel">Pilih Grup WhatsApp</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
                 </div>
-                <div id="waGroupError" class="alert alert-danger d-none"></div>
-                <div class="list-group" id="waGroupList">
-                    <!-- Groups will be loaded here -->
+                <div class="modal-body">
+                    <div id="waGroupLoading" class="text-center py-4">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="sr-only">Loading...</span>
+                        </div>
+                        <p class="mt-2 text-muted">Mengambil daftar grup...</p>
+                    </div>
+                    <div id="waGroupError" class="alert alert-danger d-none"></div>
+                    <div class="list-group" id="waGroupList">
+                        <!-- Groups will be loaded here -->
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-</div>
+@endsection
 
 @push('scripts')
     <script>

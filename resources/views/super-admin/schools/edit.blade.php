@@ -31,13 +31,10 @@
                         </div>
 
                         <div class="form-group">
-                            <label for="code">Kode Sekolah <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control @error('code') is-invalid @enderror" id="code"
-                                name="code" value="{{ old('code', $school->code) }}" required>
-                            <small class="form-text text-muted">Kode unik untuk sekolah</small>
-                            @error('code')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
+                            <label for="code">Kode Sekolah</label>
+                            <input type="text" class="form-control" id="code"
+                                value="{{ $school->code }}" readonly disabled>
+                            <small class="form-text text-muted">Kode unik sekolah tidak dapat diubah.</small>
                         </div>
 
                         <div class="form-group">
@@ -70,6 +67,28 @@
                                     @enderror
                                 </div>
                             </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="operator_phone">
+                                <i class="fas fa-headset text-primary mr-1"></i>
+                                Nomor Operator / PIC Sekolah
+                            </label>
+                            <div class="input-group">
+                                <div class="input-group-prepend">
+                                    <span class="input-group-text"><i class="fas fa-phone"></i></span>
+                                </div>
+                                <input type="text" class="form-control @error('operator_phone') is-invalid @enderror"
+                                    id="operator_phone" name="operator_phone"
+                                    value="{{ old('operator_phone', $school->operator_phone) }}"
+                                    placeholder="Contoh: 08123456789">
+                            </div>
+                            <small class="form-text text-muted">
+                                Nomor WhatsApp operator/PIC yang dapat dihubungi untuk koordinasi teknis sekolah ini.
+                            </small>
+                            @error('operator_phone')
+                                <div class="text-danger small mt-1">{{ $message }}</div>
+                            @enderror
                         </div>
 
                         <div class="form-group">

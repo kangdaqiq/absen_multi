@@ -36,14 +36,19 @@ class SchoolController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'code' => 'required|string|max:50|unique:schools,code',
             'address' => 'nullable|string',
             'phone' => 'nullable|string|max:20',
-            'email' => 'nullable|email|max:255',
+            'operator_phone' => 'nullable|string|max:20',
             'email' => 'nullable|email|max:255',
             'logo' => 'nullable|image|max:10240',
             'student_limit' => 'nullable|integer|min:0',
         ]);
+
+        // Auto-generate code
+        do {
+            $code = 'SCH-' . strtoupper(\Illuminate\Support\Str::random(6));
+        } while (\App\Models\School::where('code', $code)->exists());
+        $validated['code'] = $code;
 
         // Handle logo upload
         if ($request->hasFile('logo')) {
@@ -82,6 +87,9 @@ class SchoolController extends Controller
             }
         }
 
+        // Sync WA Device
+        $this->syncWaDevice($school);
+
         return redirect()
             ->route('super-admin.schools.index')
             ->with('success', 'Sekolah berhasil ditambahkan dan pengaturan default telah dibuat.');
@@ -112,9 +120,9 @@ class SchoolController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'code' => 'required|string|max:50|unique:schools,code,' . $school->id,
             'address' => 'nullable|string',
             'phone' => 'nullable|string|max:20',
+            'operator_phone' => 'nullable|string|max:20',
             'email' => 'nullable|email|max:255',
             'logo' => 'nullable|image|max:10240',
             'student_limit' => 'nullable|integer|min:0',
@@ -156,6 +164,9 @@ class SchoolController extends Controller
             ['setting_value' => $validated['address'] ?? '']
         );
 
+        // Sync WA Device
+        $this->syncWaDevice($school);
+
         return redirect()
             ->route('super-admin.schools.index')
             ->with('success', 'Sekolah berhasil diperbarui.');
@@ -176,8 +187,7 @@ class SchoolController extends Controller
             // Settings
             \App\Models\Setting::where('school_id', $school->id)->delete();
 
-            // Hari Libur
-            \App\Models\HariLibur::where('school_id', $school->id)->delete();
+            // Hari Libur (Removed)
 
             // Jadwal
             \App\Models\Jadwal::where('school_id', $school->id)->delete();
@@ -218,6 +228,9 @@ class SchoolController extends Controller
 
             \Illuminate\Support\Facades\DB::commit();
 
+            // Delete WA Device
+            $this->deleteWaDevice($school);
+
             return redirect()
                 ->route('super-admin.schools.index')
                 ->with('success', 'Sekolah dan seluruh data terkait berhasil dihapus.');
@@ -227,6 +240,47 @@ class SchoolController extends Controller
             return redirect()
                 ->route('super-admin.schools.index')
                 ->with('error', 'Gagal menghapus sekolah: ' . $e->getMessage());
+        }
+    }
+
+    private function syncWaDevice(School $school)
+    {
+        $base = rtrim(env('WA_API_BASE_URL', 'http://localhost:3000'), '/');
+        $user = env('WA_API_USER', 'admin');
+        $pass = env('WA_API_PASS', '04112000');
+        $deviceId = (string)$school->id;
+
+        try {
+            if ($school->wa_enabled) {
+                \Illuminate\Support\Facades\Http::timeout(5)
+                    ->withBasicAuth($user, $pass)
+                    ->post("{$base}/devices", [
+                        'device_id' => $deviceId,
+                        'description' => 'WA Device for ' . $school->name
+                    ]);
+            } else {
+                \Illuminate\Support\Facades\Http::timeout(5)
+                    ->withBasicAuth($user, $pass)
+                    ->delete("{$base}/devices/{$deviceId}");
+            }
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error("Failed to sync WA device for school {$school->id}: " . $e->getMessage());
+        }
+    }
+
+    private function deleteWaDevice(School $school)
+    {
+        $base = rtrim(env('WA_API_BASE_URL', 'http://localhost:3000'), '/');
+        $user = env('WA_API_USER', 'admin');
+        $pass = env('WA_API_PASS', '04112000');
+        $deviceId = (string)$school->id;
+
+        try {
+            \Illuminate\Support\Facades\Http::timeout(5)
+                ->withBasicAuth($user, $pass)
+                ->delete("{$base}/devices/{$deviceId}");
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error("Failed to delete WA device for school {$school->id}: " . $e->getMessage());
         }
     }
 }

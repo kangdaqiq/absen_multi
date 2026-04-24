@@ -49,14 +49,7 @@
                                         value="{{ $settings['alamat_ttd'] ?? 'Jakarta' }}" placeholder="Contoh: Jakarta">
                                 </div>
 
-                                <div class="form-group">
-                                    <label>Toleransi Buka Absensi Pulang(menit)</label>
-                                    <input type="number" name="checkout_tolerance_minutes" class="form-control"
-                                        value="{{ $settings['checkout_tolerance_minutes'] ?? '15' }}" min="0" max="60"
-                                        placeholder="15">
-                                    <small class="text-muted">Guru bisa buka absensi pulang x menit sebelum jam
-                                        pulang</small>
-                                </div>
+
 
 
 
@@ -123,6 +116,7 @@
                                         value="{{ $settings['schedule_backup_db'] ?? '23:59' }}">
                                 </div>
 
+                                @if(auth()->user()->school && auth()->user()->school->wa_enabled)
                                 <hr>
                                 <h6 class="font-weight-bold text-primary">Notifikasi WhatsApp</h6>
 
@@ -142,53 +136,11 @@
                                     <small class="text-muted">Khusus untuk jadwal guru jam 06:00. Format:
                                         628xxx@s.whatsapp.net (Grup/Pribadi)</small>
                                 </div>
+                                @endif
 
 
 
-                                <hr>
-                                <h6 class="font-weight-bold text-primary">Deteksi Ketidakhadiran Berlebihan</h6>
 
-                                <div class="form-group">
-                                    <label>Threshold Ketidakhadiran (hari)</label>
-                                    <input type="number" name="absence_threshold_days" class="form-control"
-                                        value="{{ $settings['absence_threshold_days'] ?? '3' }}" min="1" max="30">
-                                    <small class="text-muted">Jumlah hari Alpha/Bolos yang dianggap berlebihan</small>
-                                </div>
-
-                                <div class="form-group">
-                                    <label>Periode Pengecekan (hari)</label>
-                                    <input type="number" name="absence_check_period_days" class="form-control"
-                                        value="{{ $settings['absence_check_period_days'] ?? '7' }}" min="1" max="180">
-                                    <small class="text-muted">Periode pengecekan dalam hari (default: 7 hari, max: 180
-                                        hari)</small>
-                                </div>
-
-                                <div class="form-group">
-                                    <label>Waktu Laporan Harian</label>
-                                    <input type="time" name="schedule_check_abnormal" class="form-control"
-                                        value="{{ $settings['schedule_check_abnormal'] ?? '16:00' }}">
-                                    <small class="text-muted">Waktu pengiriman laporan siswa bermasalah (default:
-                                        16:00)</small>
-                                </div>
-
-                                <div class="form-group">
-                                    <div class="custom-control custom-switch">
-                                        <input type="checkbox" class="custom-control-input"
-                                            id="absence_notification_enabled" name="absence_notification_enabled"
-                                            value="true" {{ ($settings['absence_notification_enabled'] ?? 'true') === 'true' ? 'checked' : '' }}>
-                                        <label class="custom-control-label" for="absence_notification_enabled">
-                                            Aktifkan Notifikasi Harian Siswa Bermasalah
-                                        </label>
-                                    </div>
-                                    <small class="text-muted">Laporan dikirim setiap hari jam 16:00 jika ada siswa
-                                        bermasalah yang tidak hadir.</small>
-                                </div>
-
-                                <div class="alert alert-warning alert-static mt-2">
-                                    <strong>Laporan Harian:</strong> Sistem akan mengirim laporan siswa yang melebihi batas
-                                    ketidakhadiran
-                                    dan <b>sedang tidak hadir hari ini</b>. Laporan dikirim ke grup kelas dan grup guru.
-                                </div>
                             </div>
                         </div>
 
@@ -201,34 +153,33 @@
             </div>
         </div>
     </div>
-@endsection
-
-<!-- WA Group Modal -->
-<div class="modal fade" id="waGroupModal" tabindex="-1" role="dialog" aria-labelledby="waGroupModalLabel"
-    aria-hidden="true" style="z-index: 100000;">
-    <div class="modal-dialog modal-lg" role="document">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="waGroupModalLabel">Pilih Grup WhatsApp</h5>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>
-            <div class="modal-body">
-                <div id="waGroupLoading" class="text-center py-4">
-                    <div class="spinner-border text-primary" role="status">
-                        <span class="sr-only">Loading...</span>
-                    </div>
-                    <p class="mt-2 text-muted">Mengambil daftar grup...</p>
+    <!-- WA Group Modal -->
+    <div class="modal fade" id="waGroupModal" tabindex="-1" role="dialog" aria-labelledby="waGroupModalLabel"
+        aria-hidden="true" style="z-index: 100000;">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="waGroupModalLabel">Pilih Grup WhatsApp</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
                 </div>
-                <div id="waGroupError" class="alert alert-danger d-none"></div>
-                <div class="list-group" id="waGroupList">
-                    <!-- Groups will be loaded here -->
+                <div class="modal-body">
+                    <div id="waGroupLoading" class="text-center py-4">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="sr-only">Loading...</span>
+                        </div>
+                        <p class="mt-2 text-muted">Mengambil daftar grup...</p>
+                    </div>
+                    <div id="waGroupError" class="alert alert-danger d-none"></div>
+                    <div class="list-group" id="waGroupList">
+                        <!-- Groups will be loaded here -->
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-</div>
+@endsection
 
 @push('scripts')
     <script>

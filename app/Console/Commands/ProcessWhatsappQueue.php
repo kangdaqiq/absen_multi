@@ -53,7 +53,7 @@ class ProcessWhatsappQueue extends Command
             // Use fresh instance or just use data (status is already 'processing')
             // $msg->status = 'processing'; 
 
-            $success = $this->sendMessage($msg->phone_number, $msg->message);
+            $success = $this->sendMessage($msg->phone_number, $msg->message, $msg->school_id);
 
             // Final Update
             $msg->update([
@@ -69,18 +69,21 @@ class ProcessWhatsappQueue extends Command
         }
     }
 
-    private function sendMessage($phone, $message)
+    private function sendMessage($phone, $message, $schoolId = null)
     {
-        // Config from env
-        $url = env('WA_API_URL', 'http://localhost:3000/send/message');
-        $user = env('WA_API_USER', 'admin');
-        $pass = env('WA_API_PASS', '04112000');
+        $baseUrl = rtrim(env('WA_API_BASE_URL', 'http://localhost:3000'), '/');
+        $url     = $baseUrl . '/send/message';
+        $user    = env('WA_API_USER', 'admin');
+        $pass    = env('WA_API_PASS', '04112000');
+
+        $headers = $schoolId ? ['X-Device-Id' => (string)$schoolId] : [];
 
         try {
             $response = Http::timeout(20)
                 ->withBasicAuth($user, $pass)
+                ->withHeaders($headers)
                 ->post($url, [
-                    'phone' => $phone,
+                    'phone'   => $phone,
                     'message' => $message,
                 ]);
 

@@ -64,9 +64,14 @@ class AutoBolosCommand extends Command
             return;
         }
 
-        // 3. Check Hari Libur (Per School)
-        if (\App\Models\HariLibur::where('school_id', $schoolId)->where('tanggal', $today)->exists()) {
-            $this->info("Today is Holiday for school ID $schoolId. Process skipped.");
+        // 3. Check for Holiday (Dynamic: if no student attendance exists today, assume holiday)
+        $hasAttendance = \App\Models\Attendance::where('tanggal', $today)
+            ->whereHas('student', function ($q) use ($schoolId) {
+                $q->where('school_id', $schoolId);
+            })->exists();
+
+        if (!$hasAttendance) {
+            $this->info("Today has no student attendance for school ID $schoolId. Assumed Holiday. Process skipped.");
             return;
         }
 

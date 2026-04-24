@@ -16,7 +16,7 @@
         </div>
         <div class="card-body">
             <div class="alert alert-info alert-static">
-                <strong>Info:</strong> Backup otomatis berjalan setiap hari pukul 23:59. File disimpan di folder server
+                <strong>Info:</strong> Backup otomatis berjalan setiap hari pukul 02:00 AM. File disimpan di folder server
                 <code>storage/app/backups</code>.
             </div>
 

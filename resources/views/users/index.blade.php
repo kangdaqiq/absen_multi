@@ -19,20 +19,7 @@
         </div>
         <div class="card-body">
             
-            <ul class="nav nav-pills mb-4">
-                <li class="nav-item">
-                    <a class="nav-link {{ request('role') == null ? 'active' : '' }}" href="{{ route('users.index') }}">Semua</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link {{ request('role') == 'admin' ? 'active' : '' }}" href="{{ route('users.index', ['role' => 'admin']) }}">Admin</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link {{ request('role') == 'teacher' ? 'active' : '' }}" href="{{ route('users.index', ['role' => 'teacher']) }}">Guru / Piket</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link {{ request('role') == 'student' ? 'active' : '' }}" href="{{ route('users.index', ['role' => 'student']) }}">Siswa</a>
-                </li>
-            </ul>
+
 
             <form id="bulkDeleteForm" action="{{ route('users.bulk-destroy') }}" method="POST">
                 @csrf
@@ -47,7 +34,7 @@
                                 </th>
                                 <th>Nama Lengkap</th>
                                 <th>Email</th>
-                                <th>Role</th>
+
                                 <th>Aksi</th>
                             </tr>
                         </thead>
@@ -61,12 +48,7 @@
                                 </td>
                                 <td>{{ $user->full_name }}</td>
                                 <td>{{ $user->email }}</td>
-                                <td>
-                                    @if($user->role == 'admin') <span class="badge badge-primary">Admin</span>
-                                    @elseif($user->role == 'teacher') <span class="badge badge-success">Guru Piket</span>
-                                    @else <span class="badge badge-secondary">{{ ucfirst($user->role) }}</span>
-                                    @endif
-                                </td>
+
                                 <td>
                                     <a href="{{ route('users.edit', $user->id) }}" class="btn btn-sm btn-info">
                                         <i class="fas fa-edit"></i>

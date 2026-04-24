@@ -43,7 +43,11 @@
                                         <i class="fas fa-phone"></i> {{ $school->phone }}<br>
                                     @endif
                                     @if($school->email)
-                                        <i class="fas fa-envelope"></i> {{ $school->email }}
+                                        <i class="fas fa-envelope"></i> {{ $school->email }}<br>
+                                    @endif
+                                    @if($school->operator_phone)
+                                        <i class="fas fa-headset text-primary"></i>
+                                        <small><strong>Operator:</strong> {{ $school->operator_phone }}</small>
                                     @endif
                                 </td>
                                 <td class="text-center">{{ $school->siswa_count }}</td>
@@ -69,6 +73,10 @@
                                         <a href="{{ route('super-admin.schools.admins.index', $school) }}"
                                             class="btn btn-sm btn-info" title="Kelola Admin">
                                             <i class="fas fa-users-cog"></i>
+                                        </a>
+                                        <a href="{{ route('super-admin.schools.devices.index', $school) }}"
+                                            class="btn btn-sm btn-indigo text-white" style="background-color: #6610f2;" title="Kelola Device">
+                                            <i class="fas fa-microchip"></i>
                                         </a>
                                         <button type="button" class="btn btn-sm btn-danger"
                                             onclick="confirmDelete({{ $school->id }})" title="Hapus">

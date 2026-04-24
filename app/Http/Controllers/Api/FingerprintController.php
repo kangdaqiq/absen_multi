@@ -44,13 +44,10 @@ private $currentApiKey = null;
 private $currentId = null;
 private $currentSchoolId = null;
 protected $wa;
-protected $attendanceService;
 
-public function __construct(\App\Services\WhatsAppService $wa, \App\Services\TeacherAttendanceService
-$attendanceService)
+public function __construct(\App\Services\WhatsAppService $wa)
 {
 $this->wa = $wa;
-$this->attendanceService = $attendanceService;
 }
 
 // ... (handle and checkEnrollRequest methods omitted for brevity as they are unchanged) ...
@@ -214,76 +211,95 @@ if ($guruFingerprint && $guruFingerprint->guru) {
 $guru = $guruFingerprint->guru;
 
 try {
-// Check Gate Authorization Window SCOPED
-$gateAuth = $this->checkGateAuthorization($guru, $device->school_id);
+                DB::beginTransaction();
+                
+                // ALWAYS Create Teacher Checkout Session
+                TeacherCheckoutSession::updateOrCreate(
+                    ['teacher_id' => $guru->id, 'status' => 'open'],
+                    [
+                        'school_id' => $this->currentSchoolId,
+                        'teacher_name' => $guru->nama,
+                        'uid_rfid' => $guru->uid_rfid ?? 'FINGERPRINT',
+                        'expires_at' => now()->addMinutes(30),
+                        'created_at' => now()
+                    ]
+                );
 
-if ($gateAuth['authorized']) {
-// Create Teacher Checkout Session
-TeacherCheckoutSession::create([
-'school_id' => $this->currentSchoolId,
-'teacher_id' => $guru->id,
-'teacher_name' => $guru->nama,
-'uid_rfid' => $guru->uid_rfid ?? 'FINGERPRINT',
-'expires_at' => now()->addMinutes(30),
-'created_at' => now()
-]);
+                $now = now();
+                $today = $now->format('Y-m-d');
 
-ApiLog::create([
-'school_id' => $this->currentSchoolId,
-'api_key' => $this->currentApiKey,
-'action' => 'teacher_gate_auth_finger',
-'uid' => $fingerId,
-'success' => true,
-'message' => 'Gate Auth: ' . $guru->nama,
-'created_at' => now()
-]);
+                // ABSENSI HARIAN (Daily)
+                $absensi = \App\Models\AbsensiGuru::where('guru_id', $guru->id)
+                    ->where('tanggal', $today)
+                    ->where('school_id', $device->school_id) // Scope
+                    ->whereNull('jadwal_pelajaran_id')
+                    ->lockForUpdate()
+                    ->first();
 
-return $this->response(true, 'success', 'Gerbang Dibuka: ' . $guru->nama, 'ok', [
-'type' => 'teacher_gate_auth',
-'teacher_name' => $guru->nama,
-'valid_until' => now()->addMinutes(30)->format('Y-m-d H:i:s'),
-'message' => $gateAuth['message']
-]);
-}
+                $gateMessage = "Gerbang Dibuka (30 Menit).";
 
-// Not in gate window, process normal attendance
-$attnResult = $this->attendanceService->handleAttendance($guru);
+                if (!$absensi) {
+                    // CASE: CHECK-IN
+                    \App\Models\AbsensiGuru::create([
+                        'guru_id' => $guru->id,
+                        'school_id' => $device->school_id, // Scope
+                        'jadwal_pelajaran_id' => null, // Daily
+                        'tanggal' => $today,
+                        'jam_masuk' => $now->toTimeString(),
+                        'waktu_hadir' => $now, // Legacy field
+                        'status' => 'Hadir', // Default Hadir
+                        'keterangan' => null
+                    ]);
 
-if ($attnResult['mapel']) {
-$message = $attnResult['message'];
-$extra = ['attendance_info' => $attnResult, 'type' => 'teacher_attendance'];
+                    DB::commit();
 
-ApiLog::create([
-'school_id' => $this->currentSchoolId,
-'api_key' => $this->currentApiKey,
-'action' => 'teacher_attendance_finger',
-'uid' => $fingerId,
-'success' => true,
-'message' => 'Attendance: ' . $guru->nama . ' - ' . $attnResult['mapel'],
-'created_at' => now()
-]);
+                    // Send WA Check-in
+                    try {
+                        $this->wa->sendCheckIn($guru->nama, $guru->no_wa, $now->format('H:i'), 'Hadir', $device->school_id, '-', null, '-');
+                    } catch (\Exception $e) {
+                        Log::error("WA Guru Checkin Error: " . $e->getMessage());
+                    }
 
-return $this->response(true, 'success', $message, 'ok', $extra);
-} else {
-ApiLog::create([
-'school_id' => $this->currentSchoolId,
-'api_key' => $this->currentApiKey,
-'action' => 'teacher_attendance_finger',
-'uid' => $fingerId,
-'success' => true,
-'message' => 'Attendance Checked: ' . $guru->nama . ' (No Schedule)',
-'created_at' => now()
-]);
+                    ApiLog::create([
+                        'school_id' => $this->currentSchoolId,
+                        'api_key' => $this->currentApiKey,
+                        'action' => 'checkin_success',
+                        'uid' => $fingerId,
+                        'success' => true,
+                        'message' => 'Guru Masuk: ' . $guru->nama,
+                        'created_at' => now()
+                    ]);
 
-return $this->response(true, 'success', 'Fingerprint Valid (No Schedule)', 'ok', [
-'teacher_name' => $guru->nama,
-'type' => 'teacher_check'
-]);
-}
+                    return $this->response(true, 'success', "Selamat Pagi, {$guru->nama}. $gateMessage", 'ok', [
+                        'type' => 'absen_masuk_guru',
+                        'nama' => $guru->nama,
+                        'jam' => $now->format('H:i')
+                    ]);
+
+                } else {
+                    // CASE: ALREADY CHECKED IN (No Checkout needed)
+                    DB::commit();
+
+                    ApiLog::create([
+                        'school_id' => $this->currentSchoolId,
+                        'api_key' => $this->currentApiKey,
+                        'action' => 'gate_access',
+                        'uid' => $fingerId,
+                        'success' => true,
+                        'message' => 'Guru Akses Gerbang: ' . $guru->nama,
+                        'created_at' => now()
+                    ]);
+
+                    return $this->response(true, 'success', "Sudah Absen Masuk. $gateMessage", 'ok', [
+                        'type' => 'absen_sudah_masuk_guru',
+                        'nama' => $guru->nama
+                    ]);
+                }
 
 } catch (\Exception $e) {
-Log::error("Teacher finger scan error: " . $e->getMessage());
-return $this->response(false, 'error', 'System Error');
+    DB::rollBack();
+    Log::error("Teacher finger scan error: " . $e->getMessage());
+    return $this->response(false, 'error', 'System Error');
 }
 }
 
@@ -474,51 +490,6 @@ return $this->response(true, 'success', 'Absen masuk berhasil', 'ok', [
 'attendance_status' => $status
 ]);
 }
-}
-
-private function checkGateAuthorization($guru, $schoolId)
-{
-// Get today's schedule SCOPED
-$now = now();
-$indexHari = date('N');
-$jadwal = \App\Models\Jadwal::where('index_hari', $indexHari)
-->where('school_id', $schoolId)
-->where('is_active', 1)
-->first();
-
-if (!$jadwal) {
-return ['authorized' => false, 'message' => 'Tidak ada jadwal'];
-}
-
-// Get tolerance from settings SCOPED
-$tolerance = \App\Models\Setting::where('school_id', $schoolId)->where('setting_key',
-'checkout_tolerance_minutes')->value('setting_value') ?? 15;
-
-$jamPulang = \Carbon\Carbon::parse($now->format('Y-m-d') . ' ' . $jadwal->jam_pulang);
-$gateOpenTime = $jamPulang->copy()->subMinutes($tolerance);
-
-// Check if current time is within gate authorization window
-if ($now->gte($gateOpenTime) && $now->lte($jamPulang->copy()->addMinutes(30))) {
-$minutesUntil = $now->diffInMinutes($jamPulang, false);
-if ($minutesUntil > 0) {
-$message = "Gerbang dibuka ({$minutesUntil} menit sebelum jam pulang)";
-} else {
-$message = "Gerbang dibuka (sudah jam pulang)";
-}
-
-return [
-'authorized' => true,
-'message' => $message,
-'jam_pulang' => $jamPulang->format('H:i')
-];
-}
-
-return [
-'authorized' => false,
-'message' => 'Belum waktunya buka gerbang',
-'jam_pulang' => $jamPulang->format('H:i'),
-'gate_opens_at' => $gateOpenTime->format('H:i')
-];
 }
 
 private function authenticate($apiKey)

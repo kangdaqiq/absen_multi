@@ -71,6 +71,18 @@
                         <span>Data Sekolah</span>
                     </a>
                 </li>
+                <li class="nav-item {{ request()->routeIs('super-admin.whatsapp-devices.*') ? 'active' : '' }}">
+                    <a class="nav-link" href="{{ route('super-admin.whatsapp-devices.index') }}">
+                        <i class="fab fa-whatsapp text-success"></i>
+                        <span>Status WA Device</span>
+                    </a>
+                </li>
+                <li class="nav-item {{ request()->routeIs('super-admin.announcements.*') ? 'active' : '' }}">
+                    <a class="nav-link" href="{{ route('super-admin.announcements.index') }}">
+                        <i class="fas fa-bullhorn"></i>
+                        <span>Pengumuman</span>
+                    </a>
+                </li>
             @endif
 
             <!-- Data Siswa -->
@@ -89,38 +101,19 @@
                         <span>Data Guru</span>
                     </a>
                 </li>
-                <!-- Nav Item - Settings -->
-                @if(auth()->user()->role == 'super_admin')
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ route('settings.index') }}">
-                            <i class="fas fa-fw fa-cogs"></i>
-                            <span>Pengaturan Global</span></a>
-                    </li>
-                @elseif(auth()->user()->role == 'admin')
-                    <li class="nav-item">
-                        <a class="nav-link" href="{{ route('settings.index') }}">
-                            <i class="fas fa-fw fa-cogs"></i>
-                            <span>Pengaturan Sekolah</span></a>
+
+                <!-- Broadcast WA -->
+                @if(auth()->user()->school && auth()->user()->school->wa_enabled)
+                    <li class="nav-item {{ request()->routeIs('broadcast.*') ? 'active' : '' }}">
+                        <a class="nav-link" href="{{ route('broadcast.index') }}">
+                            <i class="fab fa-whatsapp"></i>
+                            <span>Broadcast WA</span>
+                        </a>
                     </li>
                 @endif
-                <!-- Broadcast WA -->
-                <li class="nav-item {{ request()->routeIs('broadcast.*') ? 'active' : '' }}">
-                    <a class="nav-link" href="{{ route('broadcast.index') }}">
-                        <i class="fab fa-whatsapp"></i>
-                        <span>Broadcast WA</span>
-                    </a>
-                </li>
             @endif
 
-            <!-- Absence Report (Admin Only) -->
-            @if(auth()->user()->role === 'admin')
-                <li class="nav-item {{ request()->routeIs('absence-report.*') ? 'active' : '' }}">
-                    <a class="nav-link" href="{{ route('absence-report.index') }}">
-                        <i class="fas fa-exclamation-triangle"></i>
-                        <span>Laporan Absensi</span>
-                    </a>
-                </li>
-            @endif
+
 
             <!-- Absensi Collapse -->
             @if(in_array(auth()->user()->role, ['admin', 'teacher']))
@@ -156,9 +149,7 @@
             <!-- Master Data Collapse -->
             @if(auth()->user()->role === 'admin')
                 @php
-                    $isMasterActive = request()->routeIs('kelas.*') ||
-                        request()->routeIs('mapel.*') ||
-                        request()->routeIs('jadwal-pelajaran.*');
+                    $isMasterActive = request()->routeIs('kelas.*');
                 @endphp
                 <li class="nav-item {{ $isMasterActive ? 'active' : '' }}">
                     <a class="nav-link {{ $isMasterActive ? '' : 'collapsed' }}" href="#" data-toggle="collapse"
@@ -171,20 +162,18 @@
                         <div class="bg-white py-2 collapse-inner rounded">
                             <a class="collapse-item {{ request()->routeIs('kelas.*') ? 'active' : '' }}"
                                 href="{{ route('kelas.index') }}">Kelas</a>
-                            <a class="collapse-item {{ request()->routeIs('mapel.*') ? 'active' : '' }}"
-                                href="{{ route('mapel.index') }}">Mata Pelajaran</a>
-                            <a class="collapse-item {{ request()->routeIs('jadwal-pelajaran.*') ? 'active' : '' }}"
-                                href="{{ route('jadwal-pelajaran.index') }}">Jadwal Pelajaran</a>
                         </div>
                     </div>
                 </li>
+            @endif
 
-                <!-- Konfigurasi Collapse -->
+            <!-- Konfigurasi Collapse -->
+            @if(auth()->user()->role === 'admin')
                 @php
                     $isKonfigurasiActive = request()->routeIs('jadwal.*') ||
-                        request()->routeIs('hari-libur.*') ||
                         request()->routeIs('devices.*') ||
-                        request()->routeIs('settings.*');
+                        request()->routeIs('settings.*') ||
+                        request()->routeIs('whatsapp.device.*');
                 @endphp
                 <li class="nav-item {{ $isKonfigurasiActive ? 'active' : '' }}">
                     <a class="nav-link {{ $isKonfigurasiActive ? '' : 'collapsed' }}" href="#" data-toggle="collapse"
@@ -197,20 +186,24 @@
                         <div class="bg-white py-2 collapse-inner rounded">
                             <a class="collapse-item {{ request()->routeIs('jadwal.*') ? 'active' : '' }}"
                                 href="{{ route('jadwal.index') }}">Jam Masuk/Pulang</a>
-                            <a class="collapse-item {{ request()->routeIs('hari-libur.*') ? 'active' : '' }}"
-                                href="{{ route('hari-libur.index') }}">Hari Libur</a>
+
                             <a class="collapse-item {{ request()->routeIs('devices.*') ? 'active' : '' }}"
                                 href="{{ route('devices.index') }}">Device</a>
                             <a class="collapse-item {{ request()->routeIs('settings.*') ? 'active' : '' }}"
                                 href="{{ route('settings.index') }}">Pengaturan Umum</a>
+                            @if(auth()->user()->school && auth()->user()->school->wa_enabled)
+                                <a class="collapse-item {{ request()->routeIs('whatsapp.device.*') ? 'active' : '' }}"
+                                    href="{{ route('whatsapp.device.index') }}">WhatsApp Device</a>
+                            @endif
                         </div>
                     </div>
                 </li>
+            @endif
 
-                <!-- Sistem Collapse -->
-                @php
+            <!-- Sistem Collapse -->
+            @php
                     $isSistemActive = request()->routeIs('users.*') ||
-                        request()->routeIs('backup.*') || 
+                        request()->routeIs('backup.*') ||
                         request()->routeIs('backups.*') ||
                         request()->routeIs('whatsapp-logs.*') ||
                         request()->routeIs('api-logs.*');
@@ -226,8 +219,8 @@
                             aria-labelledby="headingSistem" data-parent="#accordionSidebar">
                             <div class="bg-white py-2 collapse-inner rounded">
                                 <a class="collapse-item {{ request()->routeIs('users.*') ? 'active' : '' }}"
-                                    href="{{ route('users.index') }}">Manajemen User</a>
-                                
+                                    href="{{ route('users.index') }}">Manajemen Admin</a>
+
                                 <a class="collapse-item {{ request()->routeIs('backup.index') ? 'active' : '' }}"
                                     href="{{ route('backup.index') }}">Backup & Restore</a>
 
@@ -244,7 +237,6 @@
                         </div>
                     </li>
                 @endif
-            @endif
 
 
 

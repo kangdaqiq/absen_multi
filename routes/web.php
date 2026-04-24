@@ -24,6 +24,16 @@ Route::middleware(['auth'])->prefix('super-admin')->name('super-admin.')->group(
 
         // School Admins Management (nested resource)
         Route::resource('schools.admins', App\Http\Controllers\SuperAdmin\SchoolAdminController::class);
+        
+        // School Devices Management (nested resource)
+        Route::resource('schools.devices', App\Http\Controllers\SuperAdmin\SchoolDeviceController::class)->except(['create', 'show', 'edit']);
+
+        // Announcements
+        Route::resource('announcements', App\Http\Controllers\SuperAdmin\AnnouncementController::class)->except(['show']);
+
+        // WhatsApp Devices Overview
+        Route::get('/whatsapp-devices', [App\Http\Controllers\SuperAdmin\WhatsappDevicesController::class, 'index'])->name('whatsapp-devices.index');
+        Route::get('/whatsapp-devices/{schoolId}/status', [App\Http\Controllers\SuperAdmin\WhatsappDevicesController::class, 'status'])->name('whatsapp-devices.status');
     });
 });
 
@@ -42,8 +52,6 @@ Route::middleware('auth')->group(function () {
         Route::resource('kelas', KelasController::class)->except(['create', 'show', 'edit']);
         Route::resource('guru', GuruController::class)->except(['create', 'show', 'edit']);
         Route::resource('siswa', SiswaController::class)->except(['create', 'show', 'edit']);
-        Route::resource('mapel', App\Http\Controllers\MapelController::class)->except(['create', 'show', 'edit']);
-        Route::resource('jadwal-pelajaran', App\Http\Controllers\JadwalPelajaranController::class)->except(['create', 'show', 'edit']);
 
         // Absensi
         Route::get('/absensi', [App\Http\Controllers\AttendanceController::class, 'index'])->name('absensi.index');
@@ -83,7 +91,7 @@ Route::middleware('auth')->group(function () {
 
         Route::post('/siswa/import', [SiswaController::class, 'import'])->name('siswa.import');
         Route::get('/siswa/template', [SiswaController::class, 'downloadTemplate'])->name('siswa.template');
-        Route::post('/siswa/generate-accounts', [SiswaController::class, 'generateAccounts'])->name('siswa.generateAccounts');
+
         Route::post('/siswa/{id}/enroll', [SiswaController::class, 'enrollRequest']);
         Route::post('/siswa/{id}/enroll-cancel', [SiswaController::class, 'cancelEnroll']);
         Route::get('/siswa/{id}/enroll-check', [SiswaController::class, 'enrollCheck']);
@@ -98,10 +106,10 @@ Route::middleware('auth')->group(function () {
         Route::resource('devices', DeviceController::class)->except(['create', 'show', 'edit']);
         Route::post('/jadwal/update-all', [App\Http\Controllers\JadwalController::class, 'updateAll'])->name('jadwal.update-all');
         Route::resource('jadwal', App\Http\Controllers\JadwalController::class)->except(['create', 'show', 'edit']);
-        Route::resource('hari-libur', App\Http\Controllers\HariLiburController::class)->only(['index', 'store', 'destroy']);
 
         // Setting
-        Route::resource('settings', App\Http\Controllers\SettingsController::class);
+        Route::get('settings', [App\Http\Controllers\SettingsController::class, 'index'])->name('settings.index');
+        Route::put('settings', [App\Http\Controllers\SettingsController::class, 'update'])->name('settings.update');
 
         // Backup & Restore
         Route::get('/backup', [App\Http\Controllers\SchoolBackupController::class, 'index'])->name('backup.index');
@@ -124,16 +132,22 @@ Route::middleware('auth')->group(function () {
         // API Logs
         Route::get('/api-logs', [App\Http\Controllers\ApiLogController::class, 'index'])->name('api-logs.index');
 
-        // Broadcast WA
-        Route::get('/broadcast', [App\Http\Controllers\BroadcastController::class, 'index'])->name('broadcast.index');
-        Route::post('/broadcast/send', [App\Http\Controllers\BroadcastController::class, 'send'])->name('broadcast.send');
+        // WhatsApp Features (Protected by wa_enabled check)
+        Route::middleware([\App\Http\Middleware\CheckWaFeature::class])->group(function () {
+            // Broadcast WA
+            Route::get('/broadcast', [App\Http\Controllers\BroadcastController::class, 'index'])->name('broadcast.index');
+            Route::post('/broadcast/send', [App\Http\Controllers\BroadcastController::class, 'send'])->name('broadcast.send');
 
-        // Absence Report
-        Route::get('/absence-report', [App\Http\Controllers\AbsenceReportController::class, 'index'])->name('absence-report.index');
-        Route::get('/absence-report/export', [App\Http\Controllers\AbsenceReportController::class, 'export'])->name('absence-report.export');
+            // WA Groups Proxy
+            Route::get('/api/whatsapp/groups', [App\Http\Controllers\Api\WhatsappController::class, 'getGroups'])->name('api.whatsapp.groups');
 
-        // WA Groups Proxy
-        Route::get('/api/whatsapp/groups', [App\Http\Controllers\Api\WhatsappController::class, 'getGroups'])->name('api.whatsapp.groups');
+            // WhatsApp Device Management
+            Route::get('/whatsapp-device', [App\Http\Controllers\WhatsappDeviceController::class, 'index'])->name('whatsapp.device.index');
+            Route::get('/whatsapp-device/status', [App\Http\Controllers\WhatsappDeviceController::class, 'status'])->name('whatsapp.device.status');
+            Route::get('/whatsapp-device/check', [App\Http\Controllers\WhatsappDeviceController::class, 'check'])->name('whatsapp.device.check');
+            Route::post('/whatsapp-device/logout', [App\Http\Controllers\WhatsappDeviceController::class, 'logout'])->name('whatsapp.device.logout');
+            Route::get('/whatsapp-device/qr-proxy', [App\Http\Controllers\WhatsappDeviceController::class, 'qrProxy'])->name('whatsapp.device.qr-proxy');
+        });
     });
 });
 

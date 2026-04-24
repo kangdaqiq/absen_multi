@@ -18,7 +18,8 @@ use App\Models\AbsensiGuru;
 use App\Models\TeacherCheckoutSession;
 use App\Models\MessageQueue;
 use App\Models\JadwalPelajaran;
-use App\Models\HariLibur;
+use App\Models\Mapel;
+
 use App\Models\SiswaFingerprint;
 use App\Models\GuruFingerprint;
 
@@ -84,12 +85,12 @@ class SchoolBackupController extends Controller
             echo '"guru": ' . Guru::where('school_id', $schoolId)->get()->makeVisible(['uid_rfid', 'id_finger'])->toJson() . ',';
             echo '"guru_fingerprints": ' . GuruFingerprint::whereIn('guru_id', $guruIds)->get()->toJson() . ',';
 
-            // 6. Schedules (Jadwal & JadwalPelajaran)
+            // 6. Schedules (Jadwal & JadwalPelajaran & Mapel)
             echo '"jadwal": ' . Jadwal::where('school_id', $schoolId)->get()->toJson() . ',';
+            echo '"mapel": ' . Mapel::where('school_id', $schoolId)->get()->toJson() . ',';
             echo '"jadwal_pelajaran": ' . JadwalPelajaran::where('school_id', $schoolId)->get()->toJson() . ',';
 
-            // 7. Holidays
-            echo '"hari_libur": ' . HariLibur::where('school_id', $schoolId)->get()->toJson() . ',';
+            // 7. Holidays (Removed)
 
             // 8. Devices
             echo '"devices": ' . Device::where('school_id', $schoolId)->get()->toJson() . ',';
@@ -182,8 +183,9 @@ class SchoolBackupController extends Controller
             GuruFingerprint::whereHas('guru', fn($q) => $q->where('school_id', $schoolId))->delete();
 
             JadwalPelajaran::where('school_id', $schoolId)->delete();
+            Mapel::where('school_id', $schoolId)->delete();
             Jadwal::where('school_id', $schoolId)->delete();
-            HariLibur::where('school_id', $schoolId)->delete();
+
 
             Siswa::where('school_id', $schoolId)->delete();
             Guru::where('school_id', $schoolId)->delete();
@@ -202,6 +204,7 @@ class SchoolBackupController extends Controller
             $mapGuru = [];
             $mapSiswa = [];
             $mapJadwal = [];
+            $mapMapel = [];
 
             // 1. Settings
             foreach ($data['settings'] as $item) {
@@ -223,11 +226,11 @@ class SchoolBackupController extends Controller
                 unset($item['id']);
                 $item['school_id'] = $schoolId;
 
-                // Check username collision
-                $exists = User::where('username', $item['username'])->exists();
+                // Check username/email collision
+                $exists = User::where('username', $item['username'])->orWhere('email', $item['email'])->exists();
                 if ($exists) {
                     $item['username'] = $item['username'] . '_restored_' . rand(100, 999);
-                    $item['email'] = $item['email'] . '.restored';
+                    $item['email'] = $item['username'] . '@restored.com';
                 }
 
                 $newUser = User::create($item);
@@ -323,14 +326,24 @@ class SchoolBackupController extends Controller
                 // We should probably recreate them here or handled above.
                 // Better: Create new user for student to ensure credential sync.
                 $username = $schoolId . $item['nis']; // New logic
-                $userSitswa = User::create([
-                    'full_name' => $item['nama'],
-                    'username' => $username,
-                    'email' => $username . '@siswa.smkassuniyah.sch.id',
-                    'password_hash' => \Illuminate\Support\Facades\Hash::make($item['nis']),
-                    'role' => 'student',
-                    'school_id' => $schoolId
-                ]);
+                
+                // Ensure unique email
+                $email = $username . '@siswa.smkassuniyah.sch.id';
+                $emailExists = User::where('email', $email)->exists();
+                if ($emailExists) {
+                    $email = $username . rand(10, 99) . '@siswa.smkassuniyah.sch.id';
+                }
+
+                $userSitswa = User::updateOrCreate(
+                    ['username' => $username],
+                    [
+                        'full_name' => $item['nama'],
+                        'email' => $email,
+                        'password_hash' => \Illuminate\Support\Facades\Hash::make($item['nis']),
+                        'role' => 'student',
+                        'school_id' => $schoolId
+                    ]
+                );
                 $item['user_id'] = $userSitswa->id;
 
                 $newSiswa = Siswa::create($item);
@@ -358,6 +371,15 @@ class SchoolBackupController extends Controller
                 $mapJadwal[$oldId] = $newJadwal->id;
             }
 
+            // 8.5 Mapel
+            foreach ($data['mapel'] ?? [] as $item) {
+                $oldId = $item['id'];
+                unset($item['id']);
+                $item['school_id'] = $schoolId;
+                $newMapel = Mapel::create($item);
+                $mapMapel[$oldId] = $newMapel->id;
+            }
+
             // 9. Jadwal Pelajaran
             foreach ($data['jadwal_pelajaran'] as $item) {
                 unset($item['id']);
@@ -366,24 +388,13 @@ class SchoolBackupController extends Controller
                     $item['kelas_id'] = $mapKelas[$item['kelas_id']];
                 if (isset($mapGuru[$item['guru_id']]))
                     $item['guru_id'] = $mapGuru[$item['guru_id']];
-                // Mapel? Mapels are global? Or scoped? 
-                // Checks Task: MapelController. Scoped?
-                // Mapel model likely has school_id in new schema.
-                // If Mapel was backed up, we need to restore mapels too.
-                // Implementation Plan missed Mapel! 
-                // Let's assume Mapel is usually consistent or we re-create if missing?
-                // Checking previous code... Mapel has school_id (added in migration).
-                // So we SHOULD backup Mapels.
+                if (isset($mapMapel[$item['mapel_id']]))
+                    $item['mapel_id'] = $mapMapel[$item['mapel_id']];
 
                 JadwalPelajaran::create($item);
             }
 
-            // 10. Hari Libur
-            foreach ($data['hari_libur'] as $item) {
-                unset($item['id']);
-                $item['school_id'] = $schoolId;
-                HariLibur::create($item);
-            }
+            // 10. Hari Libur (Removed)
 
             // 11. Attendance
             foreach ($data['attendance'] as $item) {

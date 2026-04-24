@@ -30,12 +30,10 @@ class RfidController extends Controller
     private $currentUid = null;
     private $currentSchoolId = null;
     private $hasLogged = false;
-    protected $attendanceService;
 
-    public function __construct(\App\Services\WhatsAppService $wa, \App\Services\TeacherAttendanceService $attendanceService)
+    public function __construct(\App\Services\WhatsAppService $wa)
     {
         $this->wa = $wa;
-        $this->attendanceService = $attendanceService;
     }
 
     // ... (handle method omitted) ...

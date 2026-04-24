@@ -98,10 +98,7 @@ class SiswaController extends Controller
 
         $siswa = Siswa::create($input);
 
-        // Auto-Generate User Account if not provided
-        if (!$request->user_id) {
-            $this->createUserForSiswa($siswa);
-        }
+
 
         return redirect()->route('siswa.index')->with('success', 'Siswa berhasil ditambahkan.');
     }
@@ -278,8 +275,7 @@ class SiswaController extends Controller
                         'school_id' => $schoolId,
                         'created_at' => now()
                     ]);
-                    // Auto-create Account
-                    $this->createUserForSiswa($siswa);
+
 
                     $existingNis[] = $nis;
                     $countSuccess++;
@@ -331,80 +327,7 @@ class SiswaController extends Controller
         return $response;
     }
 
-    // Helper to auto-create User
-    private function createUserForSiswa($siswa)
-    {
-        // Use SchoolID + NIS as username to ensure global uniqueness across schools
-        $username = $siswa->school_id . $siswa->nis;
 
-        // Check if user exists (to prevent dupes if re-generating)
-        $existingUser = \App\Models\User::where('email', $username)
-            ->orWhere('username', $username)
-            ->first();
-
-        if (!$existingUser) {
-            $user = \App\Models\User::create([
-                'full_name' => $siswa->nama,
-                'username' => $username,  // Add username field
-                'email' => $username . '@siswa.smkassuniyah.sch.id',  // Use school domain
-                'password_hash' => \Illuminate\Support\Facades\Hash::make($siswa->nis), // Password = NIS
-                'role' => 'student',
-                'school_id' => $siswa->school_id  // Assign same school as siswa
-            ]);
-
-            // Link to Siswa
-            $siswa->user_id = $user->id;
-            $siswa->save();
-        } else {
-            // Already exists, just link it if not linked
-            if (!$siswa->user_id) {
-                $siswa->user_id = $existingUser->id;
-                $siswa->save();
-            }
-        }
-    }
-
-    public function generateAccounts()
-    {
-        // Increase execution time and memory for large datasets
-        set_time_limit(300); // 5 minutes
-        ini_set('memory_limit', '256M');
-
-        try {
-            // Drop all existing student users
-            \App\Models\User::where('role', 'student')->delete();
-
-            // Reset user_id for all siswa
-            Siswa::query()->update(['user_id' => null]);
-
-            $count = 0;
-            $errors = 0;
-
-            // Process in chunks to avoid memory issues
-            Siswa::chunk(50, function ($siswas) use (&$count, &$errors) {
-                foreach ($siswas as $siswa) {
-                    try {
-                        $this->createUserForSiswa($siswa);
-                        $count++;
-                    } catch (\Exception $e) {
-                        $errors++;
-                        \Log::error("Failed to create user for siswa {$siswa->id}: " . $e->getMessage());
-                    }
-                }
-            });
-
-            $message = "Berhasil generate $count akun siswa.";
-            if ($errors > 0) {
-                $message .= " Gagal: $errors akun (cek log untuk detail).";
-            }
-
-            return redirect()->route('siswa.index')->with('success', $message);
-
-        } catch (\Exception $e) {
-            \Log::error('Generate accounts error: ' . $e->getMessage());
-            return redirect()->route('siswa.index')->with('error', 'Error: ' . $e->getMessage());
-        }
-    }
 
     private function normalizeWa($wa)
     {

@@ -6,80 +6,75 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Auth;
 
 class WhatsappController extends Controller
 {
+    private function baseUrl(): string
+    {
+        return rtrim(env('WA_API_BASE_URL', 'http://localhost:3000'), '/');
+    }
+
+    private function auth(): array
+    {
+        return [env('WA_API_USER', 'admin'), env('WA_API_PASS', '04112000')];
+    }
+
+    /**
+     * Return list of WA groups for the logged-in school's device.
+     */
     public function getGroups()
     {
-        // Guess Base URL from Send URL
-        $sendUrl = env('WA_API_URL', 'http://localhost:3000/send/message');
+        $base    = $this->baseUrl();
+        [$user, $pass] = $this->auth();
 
-        // Remove '/send/message' from end if exists
-        $baseUrl = preg_replace('/\/send\/message\/?$/', '', $sendUrl);
-        // Ensure no trailing slash
-        $baseUrl = rtrim($baseUrl, '/');
+        // Determine device ID from logged-in user's school
+        $schoolId = Auth::user()?->school_id;
+        $deviceId = $schoolId ? (string)$schoolId : null;
 
-        $endpoint = $baseUrl . '/user/my/groups';
-
-        $user = env('WA_API_USER', 'admin');
-        $pass = env('WA_API_PASS', '04112000');
+        $endpoint = $base . '/user/my/groups';
 
         try {
-            $response = Http::timeout(10)
-                ->withBasicAuth($user, $pass)
-                ->get($endpoint);
+            $req = Http::timeout(15)->withBasicAuth($user, $pass);
+
+            if ($deviceId) {
+                $req = $req->withHeaders(['X-Device-Id' => $deviceId]);
+            }
+
+            $response = $req->get($endpoint);
 
             if ($response->successful()) {
                 $responseBody = $response->json();
-                Log::info("WA Get Groups Response: " . json_encode($responseBody)); // Debug log
+                Log::info("WA Get Groups (device: {$deviceId}): " . json_encode($responseBody));
 
-                // Flexible parser: seek array check keys 'results' or 'data' or use body if array
                 $rawGroups = [];
 
-                // Case: results.data (As per User Provided JSON)
                 if (isset($responseBody['results']['data']) && is_array($responseBody['results']['data'])) {
                     $rawGroups = $responseBody['results']['data'];
-                }
-                // Case: results (Direct array)
-                elseif (isset($responseBody['results']) && is_array($responseBody['results'])) {
+                } elseif (isset($responseBody['results']) && is_array($responseBody['results'])) {
                     $rawGroups = $responseBody['results'];
-                }
-                // Case: data (Direct array)
-                elseif (isset($responseBody['data']) && is_array($responseBody['data'])) {
+                } elseif (isset($responseBody['data']) && is_array($responseBody['data'])) {
                     $rawGroups = $responseBody['data'];
-                }
-                // Case: Root array
-                elseif (is_array($responseBody)) {
+                } elseif (is_array($responseBody)) {
                     $rawGroups = $responseBody;
                 }
 
-                // Standardize Output
                 $groups = [];
                 foreach ($rawGroups as $g) {
-                    // Handle variations in key names (case insensitive search or check common keys)
-                    $name = $g['name'] ?? $g['Name'] ?? $g['subject'] ?? $g['Subject'] ?? 'Unknown Group'; // Handle Name/Subject
-                    $jid = $g['id'] ?? $g['jid'] ?? $g['JID'] ?? $g['chatId'] ?? null; // Handle ID/JID
+                    $name = $g['name'] ?? $g['Name'] ?? $g['subject'] ?? $g['Subject'] ?? 'Unknown Group';
+                    $jid  = $g['id']   ?? $g['jid']  ?? $g['JID']   ?? $g['chatId']  ?? null;
 
                     if ($jid) {
-                        $groups[] = [
-                            'name' => $name,
-                            'jid' => $jid
-                        ];
+                        $groups[] = ['name' => $name, 'jid' => $jid];
                     }
                 }
 
-                // Sort by name
-                usort($groups, function ($a, $b) {
-                    return strcasecmp($a['name'], $b['name']);
-                });
+                usort($groups, fn($a, $b) => strcasecmp($a['name'], $b['name']));
 
-                return response()->json([
-                    'success' => true,
-                    'groups' => $groups
-                ]);
+                return response()->json(['success' => true, 'groups' => $groups]);
             }
 
-            Log::error("WA Get Groups Error: " . $response->body());
+            Log::error("WA Get Groups Error (device: {$deviceId}): " . $response->body());
             return response()->json([
                 'success' => false,
                 'message' => 'Gagal mengambil data dari WA Gateway. Status: ' . $response->status()

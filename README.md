@@ -27,19 +27,21 @@ Sistem absensi berbasis web untuk sekolah dengan dukungan RFID dan Fingerprint, 
 
 ### 👥 Manajemen Pengguna
 - Multi-role: Admin, Guru, Siswa
-- Manajemen kelas dan mata pelajaran
-- Jadwal pelajaran dan guru mengajar
-- Wali kelas untuk laporan per kelas
+- Manajemen kelas dan wali kelas
 - Registrasi siswa via WhatsApp Bot
+
+### 📢 Pengumuman & Informasi
+- Manajemen pengumuman sekolah
+- Tampilan pengumuman interaktif di dashboard
 
 ### ⚙️ Konfigurasi Fleksibel
 - **Toggle Absen Pulang** - Aktifkan/nonaktifkan absen pulang
 - Pengaturan jadwal otomatis (scheduler)
 - Konfigurasi toleransi keterlambatan
-- Hari libur custom
 - Mode aktif/nonaktif per kelas
 
-### 🤖 WhatsApp Bot
+### 🤖 WhatsApp & Multi-Device
+- Support Multi-Device WhatsApp API (Node.js Baileys)
 - Registrasi siswa otomatis
 - Cek rekap kehadiran
 - Notifikasi otomatis
@@ -51,7 +53,7 @@ Sistem absensi berbasis web untuk sekolah dengan dukungan RFID dan Fingerprint, 
 - **Frontend**: Bootstrap 5, jQuery
 - **Database**: MySQL/MariaDB
 - **Hardware**: ESP8266/ESP32 (RFID/Fingerprint)
-- **WhatsApp**: Evolution API
+- **WhatsApp**: Node.js Baileys API (Multi-Session)
 - **Scheduler**: Laravel Task Scheduling
 
 ## 📋 Persyaratan Sistem
@@ -59,9 +61,8 @@ Sistem absensi berbasis web untuk sekolah dengan dukungan RFID dan Fingerprint, 
 - PHP >= 8.2
 - Composer
 - MySQL/MariaDB >= 5.7
-- Node.js & NPM (untuk asset compilation)
+- Node.js & NPM (untuk asset compilation dan WhatsApp API)
 - Web Server (Apache/Nginx)
-- Evolution API untuk WhatsApp (opsional)
 
 ## 🚀 Instalasi
 
@@ -247,7 +248,7 @@ crontab -e  # Edit cron jobs
 ```
 
 ### WhatsApp tidak terkirim
-1. Cek koneksi Evolution API
+1. Cek koneksi WhatsApp API (Node.js)
 2. Pastikan nomor WhatsApp sudah terdaftar
 3. Cek log di `storage/logs/laravel.log`
 

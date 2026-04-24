@@ -26,10 +26,12 @@ Sistem Absensi Sekolah adalah aplikasi berbasis web yang dibangun menggunakan La
   - Toggle status laporan aktif/non-aktif per kelas
   - Integrasi grup WhatsApp per kelas
 
-- **Mata Pelajaran & Jadwal**
-  - Manajemen mata pelajaran
-  - Jadwal pelajaran per kelas
+- **Jadwal Absensi**
   - Jadwal jam masuk dan pulang
+
+- **Pengumuman & Informasi**
+  - Manajemen pengumuman sekolah
+  - Tampilan pengumuman interaktif di dashboard
 
 ### 2. **Sistem Absensi**
 
@@ -104,7 +106,6 @@ Sistem Absensi Sekolah adalah aplikasi berbasis web yang dibangun menggunakan La
   - Lokasi tap (jika tersedia)
 
 - **Untuk Guru:**
-  - Jadwal mengajar harian (pagi)
   - Laporan kehadiran kelas harian
   - Laporan siswa bermasalah
 
@@ -132,7 +133,6 @@ Sistem menjalankan task otomatis setiap hari:
 
 | Waktu | Task | Deskripsi |
 |-------|------|-----------|
-| 07:30 | Jadwal Guru | Kirim jadwal mengajar ke guru |
 | 08:15 | Laporan Pagi | Kirim rekap kehadiran ke grup |
 | 13:30 | Proses Harian | Mark Alpha/Bolos otomatis |
 | 16:00* | Cek Abnormal | Laporan siswa bermasalah |
@@ -142,7 +142,6 @@ Sistem menjalankan task otomatis setiap hari:
 
 **Catatan:** Scheduler tidak berjalan pada:
 - Hari Minggu
-- Hari libur (yang didefinisikan di sistem)
 
 ### 6. **Manajemen Perangkat**
 
@@ -170,7 +169,6 @@ Sistem menjalankan task otomatis setiap hari:
 #### Konfigurasi Jadwal Otomatis
 - Waktu proses harian
 - Waktu laporan harian
-- Waktu jadwal guru
 - Waktu backup database
 - Waktu laporan siswa bermasalah
 
@@ -216,11 +214,7 @@ Sistem menjalankan task otomatis setiap hari:
   - Debugging device issues
   - Monitor aktivitas
 
-### 11. **Hari Libur**
 
-- Manajemen hari libur
-- Auto-skip proses pada hari libur
-- Tanggal dan keterangan
 
 ## 🏗️ Arsitektur Sistem
 
@@ -230,7 +224,7 @@ Sistem menjalankan task otomatis setiap hari:
 - **Database:** MySQL
 - **Queue:** Database Queue
 - **Hardware:** ESP8266 + RFID RC522 + Fingerprint Sensor
-- **Integration:** WhatsApp API (Custom Gateway)
+- **Integration:** WhatsApp Multi-Device API (Node.js Baileys)
 
 ### Struktur Database
 
@@ -244,10 +238,9 @@ Sistem menjalankan task otomatis setiap hari:
 - `settings` - Konfigurasi sistem
 - `devices` - Perangkat ESP8266
 - `message_queue` - Antrian pesan WhatsApp
-- `hari_libur` - Data hari libur
 - `jadwal` - Jam masuk/pulang
-- `jadwal_pelajaran` - Jadwal pelajaran
-- `mapel` - Mata pelajaran
+- `announcements` - Data pengumuman sekolah
+- `whatsapp_devices` - Data Multi-Device WhatsApp
 
 ### Flow Absensi
 
@@ -278,7 +271,7 @@ Sistem menjalankan task otomatis setiap hari:
 - MySQL/MariaDB
 - Node.js & NPM (untuk asset compilation)
 - ESP8266 dengan RFID RC522 dan/atau Fingerprint Sensor
-- WhatsApp Gateway API
+- Node.js (untuk WhatsApp Multi-Device API)
 
 ### Langkah Instalasi
 
@@ -393,13 +386,15 @@ Kode untuk ESP8266 tersedia di folder `esp8266_code/`.
 
 ## 🔧 Konfigurasi
 
-### WhatsApp Gateway
+### WhatsApp Multi-Device (Baileys)
 
-Edit `.env`:
+Jalankan service WhatsApp API (Node.js):
+```bash
+cd restapi-wa
+npm install
+npm start
 ```
-WHATSAPP_API_URL=http://your-whatsapp-gateway.com/api
-WHATSAPP_API_KEY=your-api-key
-```
+Konfigurasi device WhatsApp dilakukan melalui menu **Super Admin > WhatsApp Devices** di aplikasi web.
 
 ### Timezone
 
@@ -424,7 +419,6 @@ Edit `config/app.php`:
 2. **Guru:** Input data guru dan enroll RFID/Fingerprint
 3. **Siswa:** Input/Import data siswa dan enroll RFID/Fingerprint
 4. **Jadwal:** Atur jam masuk/pulang
-5. **Hari Libur:** Input tanggal libur
 
 ### 3. Monitoring Absensi
 
@@ -477,7 +471,7 @@ php artisan cache:clear
 
 ### Notifikasi WhatsApp Tidak Terkirim
 
-1. Cek WhatsApp Gateway API
+1. Cek service Node.js Baileys
 2. Cek queue worker: `php artisan queue:work`
 3. Cek tabel `message_queue`
 

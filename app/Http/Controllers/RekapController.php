@@ -40,10 +40,18 @@ class RekapController extends Controller
         if ($kelasId) {
             $siswaQuery->where('kelas_id', $kelasId);
         }
-        $allSiswa = $siswaQuery->get();
+        // Search functionality
+        if ($request->has('search') && !empty($request->search)) {
+            $search = $request->search;
+            $siswaQuery->where('nama', 'like', "%{$search}%");
+        }
+
+        $allSiswa = $siswaQuery->paginate(50)->withQueryString();
 
         // Fetch attendance in range
-        $attendances = Attendance::whereBetween('tanggal', [$startDate, $endDate])->get();
+        $attendances = Attendance::whereBetween('tanggal', [$startDate, $endDate])
+            ->whereIn('student_id', $allSiswa->pluck('id'))
+            ->get();
         // Group by student_id then date? Or just keep raw and map in view logic.
         // Better: Map[student_id] => [H=>count, I=>count...] for summary
 

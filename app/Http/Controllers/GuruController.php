@@ -8,7 +8,7 @@ use Illuminate\Validation\Rule;
 
 class GuruController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         $query = Guru::orderBy('nama');
 
@@ -17,7 +17,17 @@ class GuruController extends Controller
             $query->where('school_id', auth()->user()->school_id);
         }
 
-        $guru = $query->get();
+        // Search functionality
+        if ($request->has('search') && !empty($request->search)) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('nama', 'like', "%{$search}%")
+                  ->orWhere('nip', 'like', "%{$search}%")
+                  ->orWhere('no_wa', 'like', "%{$search}%");
+            });
+        }
+
+        $guru = $query->paginate(20)->withQueryString();
         // Fetch active devices for enrollment dropdowns
         $devices = \App\Models\Device::where('active', 1)->get();
         return view('guru.index', compact('guru', 'devices'));
@@ -26,6 +36,14 @@ class GuruController extends Controller
     public function store(Request $request)
     {
         $schoolId = auth()->user()->isSuperAdmin() ? null : auth()->user()->school_id;
+
+        // Check teacher quota
+        if ($schoolId) {
+            $school = \App\Models\School::find($schoolId);
+            if ($school && !$school->hasTeacherQuota()) {
+                return back()->with('error', 'Gagal: Kuota guru/staff untuk sekolah ini sudah penuh (' . $school->teacher_limit . ' guru). Hubungi Super Admin untuk upgrade kuota.')->withInput();
+            }
+        }
 
         $request->validate([
             'nama' => 'required|string|max:100',
@@ -314,10 +332,18 @@ class GuruController extends Controller
                     continue;
                 }
 
+                // Check quota before each insert
+                if ($schoolId) {
+                    $school = $school ?? \App\Models\School::find($schoolId);
+                    if ($school && !$school->hasTeacherQuota()) {
+                        return redirect()->route('guru.index')->with('error', "Import dihentikan: Kuota guru/staff penuh ({$school->teacher_limit} guru). Berhasil diimpor: {$countSuccess} guru.");
+                    }
+                }
+
                 Guru::create([
-                    'nama' => $nama,
-                    'nip' => $nip,
-                    'no_wa' => $normalizedWa,
+                    'nama'      => $nama,
+                    'nip'       => $nip,
+                    'no_wa'     => $normalizedWa,
                     'school_id' => $schoolId,
                 ]);
 

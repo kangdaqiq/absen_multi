@@ -15,7 +15,7 @@ use Illuminate\Validation\Rule;
 
 class SiswaController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         $query = Siswa::with(['kelas', 'user'])->orderBy('nama');
 
@@ -24,7 +24,17 @@ class SiswaController extends Controller
             $query->where('school_id', auth()->user()->school_id);
         }
 
-        $siswa = $query->get();
+        // Search functionality
+        if ($request->has('search') && !empty($request->search)) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('nama', 'like', "%{$search}%")
+                  ->orWhere('nis', 'like', "%{$search}%")
+                  ->orWhere('no_wa', 'like', "%{$search}%");
+            });
+        }
+
+        $siswa = $query->paginate(20)->withQueryString();
 
         // Also filter kelas by school
         $kelasQuery = Kelas::orderBy('nama_kelas');
@@ -171,6 +181,9 @@ class SiswaController extends Controller
             $firstRow = true;
             $schoolId = auth()->user()->isSuperAdmin() ? null : auth()->user()->school_id;
 
+            // Fetch school once for quota checking
+            $school = $schoolId ? \App\Models\School::find($schoolId) : null;
+
             // Scope Kelas Map by School
             $kelasMapQuery = Kelas::query();
             if ($schoolId) {
@@ -246,23 +259,9 @@ class SiswaController extends Controller
                     }
 
                     // Check Quota Limit before creating
-                    if ($schoolId) {
-                        // We need the school object.
-                        // Optimization: fetch school once outside loop?
-                        // But wait, $schoolId comes from auth()->user().
-                        // Let's assume non-super admin importing.
-                        $currentUser = auth()->user();
-                        if (!$currentUser->isSuperAdmin() && $currentUser->school && !$currentUser->school->hasStudentQuota()) {
-                            $countSkip++;
-                            // Maybe log error or just stop?
-                            // If we stop, we break loop. If we skip, we skip this row.
-                            // Ideally we should stop if quota full.
-                            // But for batch, maybe just skip and report?
-                            // Let's skip and maybe add 'Quota Penuh' to error log if possible?
-                            // Or throw invalid?
-                            \Log::warning("Import Skipped: Quota exceeded for school " . $schoolId);
-                            continue;
-                        }
+                    if ($school && !$school->hasStudentQuota()) {
+                        return redirect()->route('siswa.index')
+                            ->with('error', "Import dihentikan: Kuota siswa penuh ({$school->student_limit} siswa). Berhasil diimpor: {$countSuccess} siswa.");
                     }
 
                     $siswa = Siswa::create([

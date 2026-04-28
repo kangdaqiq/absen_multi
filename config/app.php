@@ -123,4 +123,21 @@ return [
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Deployment Mode & License
+    |--------------------------------------------------------------------------
+    |
+    | APP_MODE: "hosted" (default, multi-tenant on your server) or
+    |           "self_hosted" (client's own server — requires license key).
+    |
+    | LICENSE_KEY: provided by KangDaQiQ to the self-hosted client.
+    | LICENSE_SERVER_URL: URL of the license validation server.
+    |
+    */
+
+    'mode'               => env('APP_MODE', 'hosted'),
+    'license_key'        => env('LICENSE_KEY', ''),
+    'license_server_url' => env('LICENSE_SERVER_URL', ''),
+
 ];

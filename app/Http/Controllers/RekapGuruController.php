@@ -34,20 +34,34 @@ class RekapGuruController extends Controller
             $query->where('school_id', auth()->user()->school_id);
         }
 
-        $absensi = $query->get();
+        // Statistics based on the full query
+        $stats = [
+            'total' => clone $query,
+            'hadir' => clone $query,
+            'tidak_hadir' => clone $query,
+        ];
+
+        $stats = [
+            'total' => $stats['total']->count(),
+            'hadir' => $stats['hadir']->where('status', 'Hadir')->count(),
+            'tidak_hadir' => $stats['tidak_hadir']->where('status', '!=', 'Hadir')->count(),
+        ];
+
+        // Search functionality for guru name
+        if ($request->has('search') && !empty($request->search)) {
+            $search = $request->search;
+            $query->whereHas('guru', function($q) use ($search) {
+                $q->where('nama', 'like', "%{$search}%");
+            });
+        }
+
+        $absensi = $query->paginate(50)->withQueryString();
 
         $gurusQuery = Guru::orderBy('nama');
         if (auth()->user() && !auth()->user()->isSuperAdmin()) {
             $gurusQuery->where('school_id', auth()->user()->school_id);
         }
         $gurus = $gurusQuery->get();
-
-        // Statistics
-        $stats = [
-            'total' => $absensi->count(),
-            'hadir' => $absensi->where('status', 'Hadir')->count(),
-            'tidak_hadir' => $absensi->where('status', '!=', 'Hadir')->count(), // Assuming anything not 'Hadir' is absent/late/etc
-        ];
 
         return view('rekap-guru.index', compact('absensi', 'gurus', 'startDate', 'endDate', 'guruId', 'stats'));
     }

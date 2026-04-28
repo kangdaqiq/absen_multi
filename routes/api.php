@@ -11,3 +11,7 @@ Route::get('/user', function (Request $request) {
 Route::any('/rfid', [RfidController::class, 'handle']);
 Route::any('/fingerprint', [App\Http\Controllers\Api\FingerprintController::class, 'handle']);
 Route::any('/fingerprint/check-enroll', [App\Http\Controllers\Api\FingerprintController::class, 'checkEnrollRequest']);
+
+// License validation (public — for self-hosted clients)
+Route::post('/license/validate', [App\Http\Controllers\Api\LicenseValidateController::class, 'validate']);
+

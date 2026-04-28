@@ -16,6 +16,7 @@ use App\Models\Siswa;
 use App\Models\Attendance;
 use App\Models\TeacherCheckoutSession;
 use App\Models\MessageQueue;
+use App\Models\GateCard;
 
 class RfidController extends Controller
 {
@@ -38,6 +39,42 @@ class RfidController extends Controller
 
     // ... (handle method omitted) ...
 
+    private function handleGateScan($uid, $gateCard, $apiKey, $device)
+    {
+        try {
+            DB::beginTransaction();
+            $now = now();
+            
+            $gateName = $gateCard->guru_id ? ($gateCard->guru->nama ?? $gateCard->name) : $gateCard->name;
+
+            // Clean expired sessions
+            TeacherCheckoutSession::where('expires_at', '<', $now)->delete();
+
+            // Create/Extend Session using GateCard
+            TeacherCheckoutSession::create([
+                'teacher_id' => $gateCard->guru_id, // Link to Guru if exists
+                'teacher_name' => $gateName,
+                'uid_rfid' => $uid,
+                'status' => 'open',
+                'expires_at' => $now->copy()->addMinutes(30),
+                'created_at' => $now
+            ]);
+
+            DB::commit();
+
+            $this->logRequest($apiKey, 'gate_access', $uid, true, 'Sesi Kepulangan Dibuka: ' . $gateName);
+            return $this->response(true, 'success', "Gerbang Dibuka (30 Menit).", 'ok', [
+                'type' => 'gate_opened',
+                'nama' => $gateName
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error("Gate card scan error: " . $e->getMessage());
+            return $this->response(false, 'gagal', 'Gagal memproses kartu gerbang', 'error');
+        }
+    }
+
     private function handleTeacherScan($uid, $teacher, $apiKey, $device)
     {
         try {
@@ -45,31 +82,13 @@ class RfidController extends Controller
             $now = now();
             $today = $now->format('Y-m-d');
 
-            // 1. GATE CONTROL (Always open gate for teacher)
-            // Clean expired sessions
-            TeacherCheckoutSession::where('expires_at', '<', $now)->delete();
-
-            // Create/Extend Session
-            TeacherCheckoutSession::updateOrCreate(
-                ['teacher_id' => $teacher->id, 'status' => 'open'],
-                [
-                    'teacher_name' => $teacher->nama,
-                    'uid_rfid' => $uid,
-                    'expires_at' => $now->copy()->addMinutes(15),
-                    'created_at' => $now
-                ]
-            );
-
-            // 2. ABSENSI HARIAN (Daily)
-            // Find existing daily record (jadwal_pelajaran_id IS NULL)
+            // 1. ABSENSI HARIAN (Daily)
             $absensi = \App\Models\AbsensiGuru::where('guru_id', $teacher->id)
                 ->where('tanggal', $today)
                 ->where('school_id', $device->school_id) // Scope
                 ->whereNull('jadwal_pelajaran_id')
                 ->lockForUpdate()
                 ->first();
-
-            $gateMessage = "Gerbang Dibuka (15 Menit).";
 
             if (!$absensi) {
                 // CASE: CHECK-IN
@@ -88,31 +107,77 @@ class RfidController extends Controller
 
                 // Send WA Check-in
                 try {
-                    // Assuming sendCheckIn supports Teacher? Or generic?
-                    // The existing sendCheckIn uses 'nama_kelas'. For Guru, maybe pass '-' or 'Guru'.
                     $this->wa->sendCheckIn($teacher->nama, $teacher->no_wa, $now->format('H:i'), 'Hadir', $device->school_id, '-', null, '-');
                 } catch (\Exception $e) {
                     Log::error("WA Guru Checkin Error: " . $e->getMessage());
                 }
 
                 $this->logRequest($apiKey, 'checkin_success', $uid, true, 'Guru Masuk: ' . $teacher->nama);
-                return $this->response(true, 'success', "Selamat Pagi, {$teacher->nama}. $gateMessage", 'ok', [
+                return $this->response(true, 'success', "Selamat Pagi, {$teacher->nama}.", 'ok', [
                     'type' => 'absen_masuk_guru',
                     'nama' => $teacher->nama,
                     'jam' => $now->format('H:i')
                 ]);
 
             } else {
-                // CASE: ALREADY CHECKED IN (No Checkout needed)
-                DB::commit(); // Release lock (no updates)
+                // CASE: ALREADY CHECKED IN (Check for Check-Out logic)
+                
+                // Check if Teacher Check-Out is enabled
+                $checkoutEnabled = \App\Models\Setting::where('school_id', $device->school_id)
+                    ->where('setting_key', 'enable_checkout_teacher')
+                    ->value('setting_value') ?? 'false';
 
-                // Still log access but as info
-                // We keep the gate open (handled in Step 1)
+                if ($checkoutEnabled === 'false') {
+                    DB::commit();
+                    $this->logRequest($apiKey, 'checkin_success', $uid, true, 'Sudah Absen Masuk: ' . $teacher->nama);
+                    return $this->response(true, 'success', "Sudah Absen Masuk.", 'ok', [
+                        'type' => 'absen_sudah_masuk_guru',
+                        'nama' => $teacher->nama
+                    ]);
+                }
 
-                $this->logRequest($apiKey, 'gate_access', $uid, true, 'Guru Akses Gerbang: ' . $teacher->nama);
-                return $this->response(true, 'success', "Sudah Absen Masuk. $gateMessage", 'ok', [
-                    'type' => 'absen_sudah_masuk_guru',
-                    'nama' => $teacher->nama
+                // Teacher Check-Out is ENABLED
+                // Require Gate Session to check out
+                $gateSession = TeacherCheckoutSession::where('expires_at', '>', $now)
+                    ->where('status', 'open')
+                    // It doesn't strictly need school_id if TeacherCheckoutSession doesn't have it, but gate cards are scoped implicitly
+                    // We assume any open gate session is valid. (Ideally add school_id to session, but keeping it simple)
+                    ->orderBy('created_at', 'desc')
+                    ->first();
+
+                if (!$gateSession) {
+                    DB::rollBack();
+                    return $this->response(false, 'gagal', 'Belum ada izin gerbang.', 'warning', ['type' => 'no_authorization', 'nama' => $teacher->nama]);
+                }
+
+                // Process Pulang
+                $masuk = Carbon::parse($absensi->jam_masuk);
+                $totalSeconds = $masuk->diffInSeconds($now, false);
+                if ($totalSeconds < 0) {
+                    $totalSeconds = abs($totalSeconds);
+                }
+
+                $absensi->update([
+                    'jam_pulang' => $now->toTimeString(),
+                    'updated_at' => now(),
+                ]);
+                DB::commit();
+
+                // Send WA Check-Out
+                $hours = floor($totalSeconds / 3600);
+                $mins = floor(($totalSeconds % 3600) / 60);
+                
+                try {
+                    $this->wa->sendCheckOut($teacher->nama, $teacher->no_wa, $now->format('H:i'), $hours, $mins, $gateSession->teacher_name, $device->school_id, $masuk->format('H:i'));
+                } catch (\Exception $e) {
+                    Log::error("WA Guru Checkout Error: " . $e->getMessage());
+                }
+
+                $this->logRequest($apiKey, 'checkout_success', $uid, true, 'Guru Pulang: ' . $teacher->nama);
+                return $this->response(true, 'success', "Absen pulang berhasil.", 'ok', [
+                    'type' => 'absen_pulang_guru',
+                    'nama' => $teacher->nama,
+                    'authorized_by' => $gateSession->teacher_name
                 ]);
             }
 
@@ -151,6 +216,16 @@ class RfidController extends Controller
         }
 
         // 4. Mode Detection
+
+        // Check Gate Card - SCOPED
+        $gateCard = GateCard::with('guru')
+            ->whereRaw('UPPER(uid_rfid) = ?', [$uid])
+            ->where('school_id', $device->school_id)
+            ->first();
+        if ($gateCard) {
+            return $this->handleGateScan($uid, $gateCard, $apiKey, $device);
+        }
+
         // Check Teacher - SCOPED
         $teacher = $this->checkTeacherCard($uid, $device->school_id);
         if ($teacher) {
@@ -243,7 +318,12 @@ class RfidController extends Controller
             ->where('updated_at', '>=', now()->subHour())
             ->exists();
 
-        return $siswa || $guru;
+        $gate = GateCard::where('enroll_status', 'requested')
+            ->where('school_id', $schoolId)
+            ->where('updated_at', '>=', now()->subHour())
+            ->exists();
+
+        return $siswa || $guru || $gate;
     }
 
 
@@ -329,6 +409,29 @@ class RfidController extends Controller
                 return $this->response(true, 'success', 'Enroll Guru berhasil', 'ok', [
                     'type' => 'enroll_rfid',
                     'nama' => $guru->nama,
+                    'uid' => $uid
+                ]);
+            }
+
+            // 3. Check Gate Card Request (Scoped to School)
+            $gate = GateCard::where('enroll_status', 'requested')
+                ->where('school_id', $device->school_id)
+                ->where('updated_at', '>=', now()->subHour())
+                ->orderBy('id', 'desc')
+                ->lockForUpdate()
+                ->first();
+
+            if ($gate) {
+                $gate->update([
+                    'uid_rfid' => $uid,
+                    'enroll_status' => 'done'
+                ]);
+                DB::commit();
+
+                $this->logRequest($apiKey, 'enroll_success', $uid, true, 'Enroll Kartu Gerbang berhasil: ' . $gate->name);
+                return $this->response(true, 'success', 'Enroll Kartu Gerbang berhasil', 'ok', [
+                    'type' => 'enroll_rfid',
+                    'nama' => $gate->name,
                     'uid' => $uid
                 ]);
             }

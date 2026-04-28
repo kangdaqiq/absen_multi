@@ -38,3 +38,9 @@ Schedule::command('absen:check-abnormal')->everyMinute()->withoutOverlapping()
 
 // Daily Full SQL Database Backup (Runs at 02:00 AM)
 Schedule::command('db:backup')->dailyAt('02:00')->withoutOverlapping();
+
+// Auto-delete old attendance history per school quota (Runs at 01:00 AM)
+Schedule::command('absen:auto-delete-history')->dailyAt('01:00')->withoutOverlapping();
+
+// Refresh license validation cache (Runs at 00:30 AM) — only in self_hosted mode
+Schedule::command('license:validate')->dailyAt('00:30')->withoutOverlapping();

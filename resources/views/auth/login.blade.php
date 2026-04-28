@@ -1,281 +1,185 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="h-full">
 <head>
     <meta charset="utf-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <title>Login - Sistem Absensi</title>
-    <link href="{{ asset('vendor/fontawesome-free/css/all.min.css') }}" rel="stylesheet" type="text/css">
-    <link href="{{ asset('css/sb-admin-2.min.css') }}" rel="stylesheet">
-    <style>
-        body {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            position: relative;
-            overflow: hidden;
-        }
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>Login — Sistem Absensi</title>
 
-        /* Animated background circles */
-        body::before,
-        body::after {
-            content: '';
-            position: absolute;
-            border-radius: 50%;
-            background: rgba(255, 255, 255, 0.1);
-            animation: float 20s infinite ease-in-out;
-        }
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    <link href="{{ asset('vendor/fontawesome-free/css/all.min.css') }}" rel="stylesheet">
 
-        body::before {
-            width: 400px;
-            height: 400px;
-            top: -200px;
-            left: -200px;
-            animation-delay: 0s;
-        }
-
-        body::after {
-            width: 300px;
-            height: 300px;
-            bottom: -150px;
-            right: -150px;
-            animation-delay: 5s;
-        }
-
-        @keyframes float {
-            0%, 100% { transform: translate(0, 0) scale(1); }
-            33% { transform: translate(30px, -50px) scale(1.1); }
-            66% { transform: translate(-20px, 20px) scale(0.9); }
-        }
-
-        .login-container {
-            position: relative;
-            z-index: 1;
-        }
-
-        .login-card {
-            border-radius: 20px;
-            backdrop-filter: blur(10px);
-            background: rgba(255, 255, 255, 0.95);
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            overflow: hidden;
-            animation: slideUp 0.6s ease-out;
-        }
-
-        @keyframes slideUp {
-            from {
-                opacity: 0;
-                transform: translateY(30px);
+    {{-- Prevent dark mode flash --}}
+    <script>
+        (function() {
+            const t = localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+            if (t === 'dark') {
+                document.documentElement.classList.add('dark');
+                document.body && document.body.classList.add('dark', 'bg-gray-900');
             }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        .login-header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            padding: 40px 30px;
-            text-align: center;
-            color: white;
-        }
-
-        .login-icon {
-            width: 120px;
-            height: 120px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto 20px;
-        }
-
-        .login-icon img {
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-        }
-
-        .login-header h1 {
-            font-size: 28px;
-            font-weight: 700;
-            margin-bottom: 8px;
-            color: white;
-        }
-
-        .login-header p {
-            font-size: 14px;
-            opacity: 0.9;
-            margin: 0;
-        }
-
-        .login-body {
-            padding: 40px 35px;
-        }
-
-        .form-control-user {
-            border-radius: 50px;
-            padding: 15px 25px;
-            border: 2px solid #e3e6f0;
-            font-size: 14px;
-            transition: all 0.3s ease;
-        }
-
-        .form-control-user:focus {
-            border-color: #667eea;
-            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.15);
-            transform: translateY(-2px);
-        }
-
-        .btn-login {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border: none;
-            border-radius: 50px;
-            padding: 15px;
-            font-size: 16px;
-            font-weight: 600;
-            color: white;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
-        }
-
-        .btn-login:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
-            background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
-        }
-
-        .btn-login:active {
-            transform: translateY(0);
-        }
-
-        .alert {
-            border-radius: 15px;
-            border: none;
-            animation: shake 0.5s;
-        }
-
-        @keyframes shake {
-            0%, 100% { transform: translateX(0); }
-            25% { transform: translateX(-10px); }
-            75% { transform: translateX(10px); }
-        }
-
-        .input-group-icon {
-            position: relative;
-        }
-
-        .input-group-icon i {
-            position: absolute;
-            left: 20px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: #a0a0a0;
-            z-index: 10;
-        }
-
-        .input-group-icon .form-control-user {
-            padding-left: 50px;
-        }
-
-        .footer-text {
-            text-align: center;
-            margin-top: 20px;
-            color: #6c757d;
-            font-size: 13px;
-        }
-
-        /* Responsive */
-        @media (max-width: 576px) {
-            .login-header {
-                padding: 30px 20px;
-            }
-            
-            .login-body {
-                padding: 30px 25px;
-            }
-
-            .login-icon {
-                width: 60px;
-                height: 60px;
-            }
-
-            .login-icon i {
-                font-size: 30px;
-            }
-
-            .login-header h1 {
-                font-size: 24px;
-            }
-        }
-    </style>
+        })();
+    </script>
 </head>
-<body>
-    <div class="container login-container">
-        <div class="row justify-content-center">
-            <div class="col-xl-5 col-lg-6 col-md-8 col-sm-10">
-                <div class="card login-card border-0">
-                    <div class="login-header">
-                        <div class="login-icon">
-                            @php
-                                $globalSettingLogo = \App\Models\Setting::where('school_id', 0)->where('setting_key', 'logo_filename')->value('setting_value');
-                                $globalLogo = $globalSettingLogo ?: 'logo.png';
-                                $isStorage = \Illuminate\Support\Str::startsWith($globalLogo, 'schools/');
-                                $logoUrl = $isStorage ? asset('storage/' . $globalLogo) : asset('img/' . $globalLogo);
-                            @endphp
-                            <img src="{{ $logoUrl }}" alt="Logo Global">
-                        </div>
-                        <h1>Selamat Datang</h1>
-                        <p>Silakan login untuk mengakses sistem absensi</p>
-                    </div>
 
-                    <div class="login-body">
-                        @if ($errors->any())
-                            <div class="alert alert-danger">
-                                <i class="fas fa-exclamation-circle mr-2"></i>
-                                <strong>Login Gagal!</strong>
-                                <ul class="mb-0 mt-2">
-                                    @foreach ($errors->all() as $error)
-                                        <li>{{ $error }}</li>
-                                    @endforeach
-                                </ul>
-                            </div>
-                        @endif
+<body class="min-h-screen bg-gray-50 dark:bg-gray-900 font-outfit" x-data="{ showPass: false }">
 
-                        <form method="POST" action="{{ route('login') }}">
-                            @csrf
-                            <div class="form-group">
-                                <div class="input-group-icon">
-                                    <i class="fas fa-user"></i>
-                                    <input type="text" class="form-control form-control-user"
-                                        id="email" name="email" 
-                                        placeholder="Email, Username, atau NIS..." 
-                                        value="{{ old('email') }}" required autofocus>
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <div class="input-group-icon">
-                                    <i class="fas fa-lock"></i>
-                                    <input type="password" name="password" class="form-control form-control-user"
-                                        placeholder="Password" required>
-                                </div>
-                            </div>
-                            <button type="submit" class="btn btn-login btn-block mt-4">
-                                <i class="fas fa-sign-in-alt mr-2"></i> Login
-                            </button>
-                        </form>
+    {{-- ─── LAYOUT: split screen ─── --}}
+    <div class="min-h-screen lg:grid lg:grid-cols-2">
 
-                        <div class="footer-text">
-                            <i class="fas fa-shield-alt"></i> Sistem Keamanan Terjamin
-                        </div>
-                    </div>
+        {{-- ── LEFT PANEL — Branding ── --}}
+        <div class="hidden lg:flex flex-col justify-between bg-brand-600 dark:bg-gray-dark p-12 relative overflow-hidden">
+            {{-- Decorative blobs --}}
+            <div class="absolute -top-24 -left-24 w-96 h-96 rounded-full bg-white/10 blur-3xl"></div>
+            <div class="absolute -bottom-24 -right-24 w-80 h-80 rounded-full bg-white/10 blur-3xl"></div>
+            <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full bg-white/5 blur-3xl"></div>
+
+            {{-- Logo --}}
+            <div class="relative z-10">
+                @php
+                    $globalSettingLogo = \App\Models\Setting::where('school_id', 0)->where('setting_key', 'logo_filename')->value('setting_value');
+                    $globalLogo = $globalSettingLogo ?: 'logo.png';
+                    $isStorage = \Illuminate\Support\Str::startsWith($globalLogo, 'schools/');
+                    $logoUrl = $isStorage ? asset('storage/' . $globalLogo) : asset('img/' . $globalLogo);
+                @endphp
+                <div class="flex items-center gap-3">
+                    <img src="{{ $logoUrl }}" alt="Logo" class="h-10 w-10 rounded-xl object-contain bg-white/20 p-1">
+                    <span class="text-xl font-bold text-white">Sistem Absensi</span>
+                </div>
+            </div>
+
+            {{-- Center content --}}
+            <div class="relative z-10 text-center">
+                <div class="mb-8 inline-flex h-24 w-24 items-center justify-center rounded-3xl bg-white/20 backdrop-blur-sm">
+                    <i class="fas fa-fingerprint text-5xl text-white"></i>
+                </div>
+                <h2 class="mb-4 text-4xl font-bold text-white leading-tight">
+                    Pantau Kehadiran<br>dengan Mudah
+                </h2>
+                <p class="text-lg text-white/70 max-w-sm mx-auto">
+                    Sistem absensi digital berbasis RFID & fingerprint untuk mencatat kehadiran secara otomatis dan real-time.
+                </p>
+            </div>
+
+            {{-- Stats --}}
+            <div class="relative z-10 grid grid-cols-3 gap-4">
+                <div class="rounded-2xl bg-white/10 backdrop-blur-sm p-4 text-center">
+                    <p class="text-2xl font-bold text-white">RFID</p>
+                    <p class="text-xs text-white/60 mt-1">Kartu Gerbang</p>
+                </div>
+                <div class="rounded-2xl bg-white/10 backdrop-blur-sm p-4 text-center">
+                    <p class="text-2xl font-bold text-white">Real</p>
+                    <p class="text-xs text-white/60 mt-1">-Time Monitor</p>
+                </div>
+                <div class="rounded-2xl bg-white/10 backdrop-blur-sm p-4 text-center">
+                    <p class="text-2xl font-bold text-white">Auto</p>
+                    <p class="text-xs text-white/60 mt-1">Notifikasi WA</p>
                 </div>
             </div>
         </div>
+
+        {{-- ── RIGHT PANEL — Login Form ── --}}
+        <div class="flex flex-col items-center justify-center px-6 py-12 sm:px-12">
+
+            {{-- Mobile logo --}}
+            <div class="mb-8 lg:hidden flex flex-col items-center gap-3">
+                <img src="{{ $logoUrl ?? asset('img/logo.png') }}" alt="Logo" class="h-16 w-16 rounded-2xl object-contain">
+                <span class="text-xl font-bold text-gray-800 dark:text-white">Sistem Absensi</span>
+            </div>
+
+            <div class="w-full max-w-md">
+                {{-- Heading --}}
+                <div class="mb-8">
+                    <h1 class="text-3xl font-bold text-gray-800 dark:text-white/90">Selamat Datang 👋</h1>
+                    <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">Masukkan kredensial Anda untuk mengakses dashboard</p>
+                </div>
+
+                {{-- Error alert --}}
+                @if ($errors->any())
+                    <div class="mb-6 flex items-start gap-3 rounded-xl border border-error-200 bg-error-50 px-4 py-3 dark:border-error-500/20 dark:bg-error-500/10">
+                        <div class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-error-500 text-white">
+                            <i class="fas fa-times text-xs"></i>
+                        </div>
+                        <div>
+                            <p class="font-medium text-error-700 dark:text-error-400">Login gagal</p>
+                            @foreach ($errors->all() as $error)
+                                <p class="mt-0.5 text-sm text-error-600 dark:text-error-400">{{ $error }}</p>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
+
+                {{-- Form --}}
+                <form method="POST" action="{{ route('login') }}" class="space-y-5">
+                    @csrf
+
+                    {{-- Email / Username --}}
+                    <div>
+                        <label for="email" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                            Email / Username
+                        </label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-gray-400">
+                                <i class="fas fa-user text-sm"></i>
+                            </span>
+                            <input
+                                type="text"
+                                id="email"
+                                name="email"
+                                value="{{ old('email') }}"
+                                placeholder="email@sekolah.com atau username"
+                                required
+                                autofocus
+                                class="w-full rounded-xl border border-gray-200 bg-white py-3 pl-11 pr-4 text-sm text-gray-800 placeholder-gray-400 outline-none transition focus:border-brand-500 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-900 dark:text-white dark:placeholder-gray-600 dark:focus:border-brand-500 @error('email') border-error-300 focus:border-error-500 dark:border-error-500/50 @enderror"
+                            >
+                        </div>
+                    </div>
+
+                    {{-- Password --}}
+                    <div>
+                        <label for="password" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                            Password
+                        </label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-gray-400">
+                                <i class="fas fa-lock text-sm"></i>
+                            </span>
+                            <input
+                                :type="showPass ? 'text' : 'password'"
+                                id="password"
+                                name="password"
+                                placeholder="Masukkan password"
+                                required
+                                class="w-full rounded-xl border border-gray-200 bg-white py-3 pl-11 pr-12 text-sm text-gray-800 placeholder-gray-400 outline-none transition focus:border-brand-500 focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-900 dark:text-white dark:placeholder-gray-600 dark:focus:border-brand-500"
+                            >
+                            <button
+                                type="button"
+                                @click="showPass = !showPass"
+                                class="absolute inset-y-0 right-0 flex items-center pr-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition"
+                                tabindex="-1"
+                            >
+                                <i :class="showPass ? 'fas fa-eye-slash' : 'fas fa-eye'" class="text-sm"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    {{-- Submit --}}
+                    <button
+                        type="submit"
+                        class="flex w-full items-center justify-center gap-2 rounded-xl bg-brand-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-brand-600 focus:outline-none focus:ring-3 focus:ring-brand-500/30 active:scale-[0.98]"
+                    >
+                        <i class="fas fa-sign-in-alt"></i>
+                        Masuk ke Dashboard
+                    </button>
+                </form>
+
+                {{-- Footer --}}
+                <p class="mt-8 text-center text-xs text-gray-400 dark:text-gray-600">
+                    <i class="fas fa-shield-alt mr-1 text-brand-400"></i>
+                    Koneksi aman & terenkripsi &mdash; Sistem Absensi v2.0
+                </p>
+            </div>
+        </div>
     </div>
-    <script src="{{ asset('vendor/jquery/jquery.min.js') }}"></script>
-    <script src="{{ asset('vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
-    <script src="{{ asset('vendor/jquery-easing/jquery.easing.min.js') }}"></script>
-    <script src="{{ asset('js/sb-admin-2.min.js') }}"></script>
+
 </body>
 </html>

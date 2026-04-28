@@ -8,7 +8,7 @@ use Illuminate\Validation\Rule;
 
 class KelasController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         $kelasQuery = Kelas::with('waliKelas')->orderBy('nama_kelas');
         $gurusQuery = \App\Models\Guru::orderBy('nama');
@@ -19,7 +19,13 @@ class KelasController extends Controller
             $gurusQuery->where('school_id', auth()->user()->school_id);
         }
 
-        $kelas = $kelasQuery->get();
+        // Search functionality
+        if ($request->has('search') && !empty($request->search)) {
+            $search = $request->search;
+            $kelasQuery->where('nama_kelas', 'like', "%{$search}%");
+        }
+
+        $kelas = $kelasQuery->paginate(20)->withQueryString();
         $gurus = $gurusQuery->get();
         return view('kelas.index', compact('kelas', 'gurus'));
     }

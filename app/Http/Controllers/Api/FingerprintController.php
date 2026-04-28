@@ -37,6 +37,7 @@ use App\Models\Siswa;
 use App\Models\SiswaFingerprint;
 use App\Models\Attendance;
 use App\Models\TeacherCheckoutSession;
+use App\Models\GateCard;
 
 class FingerprintController extends Controller
 {
@@ -134,7 +135,22 @@ return $this->response(true, 'enroll_mode', 'Enroll Mode Active (Siswa)', 'ok', 
 ]);
 }
 
-return $this->response(false, 'standby', 'No Enrollment');
+        // Check Gate Card Enroll Request SCOPED
+        $gate = GateCard::where('enroll_status', 'requested')
+            ->where('school_id', $device->school_id)
+            ->where('updated_at', '>=', now()->subMinutes(15))
+            ->orderBy('updated_at', 'desc')
+            ->first();
+
+        if ($gate) {
+            return $this->response(true, 'enroll_mode', 'Enroll Mode Active (Gerbang)', 'ok', [
+                'enroll_id' => $gate->id,
+                'nama' => $gate->name,
+                'type' => 'gate_card'
+            ]);
+        }
+
+        return $this->response(false, 'standby', 'No Enrollment');
 }
 
 private function finalizeEnrollment($fingerId, $device)
@@ -187,8 +203,27 @@ DB::commit();
 return $this->response(true, 'success', 'Enroll Berhasil (Siswa): ' . $siswa->nama, 'success');
 }
 
-// Neither found
-DB::rollBack();
+        // Check Gate Card SCOPED
+        $gate = GateCard::where('enroll_status', 'requested')
+            ->where('school_id', $device->school_id)
+            ->where('updated_at', '>=', now()->subMinutes(15))
+            ->orderBy('updated_at', 'desc')
+            ->lockForUpdate()
+            ->first();
+
+        if ($gate) {
+            // Note: gate_cards doesn't have id_finger specifically, we reuse uid_rfid field for simplicity or just save it.
+            $gate->update([
+                'enroll_status' => 'done',
+                'uid_rfid' => $fingerId,
+            ]);
+
+            DB::commit();
+            return $this->response(true, 'success', 'Enroll Berhasil (Gerbang): ' . $gate->name, 'success');
+        }
+
+        // Neither found
+        DB::rollBack();
 return $this->response(false, 'gagal', 'Enroll Timeout / No Request');
 
 } catch (\Exception $e) {
@@ -198,33 +233,67 @@ return $this->response(false, 'error', 'Enroll Gagal');
 }
 }
 
-private function handleScan($fingerId, $device)
-{
-// Check Guru first
-// Note: GuruFingerprint links to Device -> School is implicit, but better to check
-$guruFingerprint = GuruFingerprint::where('device_id', $device->id)
-->where('finger_id', $fingerId)
-->with('guru')
-->first();
+    private function handleScan($fingerId, $device)
+    {
+        // Check Gate Card first
+        $gateCard = GateCard::with('guru')
+            ->where('school_id', $device->school_id)
+            ->where('uid_rfid', $fingerId)
+            ->first();
 
-if ($guruFingerprint && $guruFingerprint->guru) {
-$guru = $guruFingerprint->guru;
-
-try {
+        if ($gateCard) {
+            try {
                 DB::beginTransaction();
+                $now = now();
                 
-                // ALWAYS Create Teacher Checkout Session
-                TeacherCheckoutSession::updateOrCreate(
-                    ['teacher_id' => $guru->id, 'status' => 'open'],
-                    [
-                        'school_id' => $this->currentSchoolId,
-                        'teacher_name' => $guru->nama,
-                        'uid_rfid' => $guru->uid_rfid ?? 'FINGERPRINT',
-                        'expires_at' => now()->addMinutes(30),
-                        'created_at' => now()
-                    ]
-                );
+                $gateName = $gateCard->guru_id ? ($gateCard->guru->nama ?? $gateCard->name) : $gateCard->name;
+                
+                TeacherCheckoutSession::where('expires_at', '<', $now)->delete();
 
+                TeacherCheckoutSession::create([
+                    'teacher_id' => $gateCard->guru_id,
+                    'teacher_name' => $gateName,
+                    'uid_rfid' => $fingerId,
+                    'status' => 'open',
+                    'expires_at' => now()->addMinutes(30),
+                    'created_at' => now()
+                ]);
+
+                DB::commit();
+                
+                ApiLog::create([
+                    'school_id' => $this->currentSchoolId,
+                    'api_key' => $this->currentApiKey,
+                    'action' => 'gate_access',
+                    'uid' => $fingerId,
+                    'success' => true,
+                    'message' => 'Sesi Kepulangan Dibuka: ' . $gateName,
+                    'created_at' => now()
+                ]);
+
+                return $this->response(true, 'success', "Gerbang Dibuka (30 Menit).", 'ok', [
+                    'type' => 'gate_opened',
+                    'nama' => $gateName
+                ]);
+            } catch (\Exception $e) {
+                DB::rollBack();
+                Log::error("Gate finger scan error: " . $e->getMessage());
+                return $this->response(false, 'error', 'System Error');
+            }
+        }
+
+        // Check Guru
+        // Note: GuruFingerprint links to Device -> School is implicit, but better to check
+        $guruFingerprint = GuruFingerprint::where('device_id', $device->id)
+            ->where('finger_id', $fingerId)
+            ->with('guru')
+            ->first();
+
+        if ($guruFingerprint && $guruFingerprint->guru) {
+            $guru = $guruFingerprint->guru;
+
+            try {
+                DB::beginTransaction();
                 $now = now();
                 $today = $now->format('Y-m-d');
 
@@ -235,8 +304,6 @@ try {
                     ->whereNull('jadwal_pelajaran_id')
                     ->lockForUpdate()
                     ->first();
-
-                $gateMessage = "Gerbang Dibuka (30 Menit).";
 
                 if (!$absensi) {
                     // CASE: CHECK-IN
@@ -270,38 +337,88 @@ try {
                         'created_at' => now()
                     ]);
 
-                    return $this->response(true, 'success', "Selamat Pagi, {$guru->nama}. $gateMessage", 'ok', [
+                    return $this->response(true, 'success', "Selamat Pagi, {$guru->nama}.", 'ok', [
                         'type' => 'absen_masuk_guru',
                         'nama' => $guru->nama,
                         'jam' => $now->format('H:i')
                     ]);
 
                 } else {
-                    // CASE: ALREADY CHECKED IN (No Checkout needed)
+                    // CASE: ALREADY CHECKED IN
+                    $checkoutEnabled = \App\Models\Setting::where('school_id', $device->school_id)
+                        ->where('setting_key', 'enable_checkout_teacher')
+                        ->value('setting_value') ?? 'false';
+
+                    if ($checkoutEnabled === 'false') {
+                        DB::commit();
+                        ApiLog::create([
+                            'school_id' => $this->currentSchoolId,
+                            'api_key' => $this->currentApiKey,
+                            'action' => 'checkin_success',
+                            'uid' => $fingerId,
+                            'success' => true,
+                            'message' => 'Sudah Absen Masuk: ' . $guru->nama,
+                            'created_at' => now()
+                        ]);
+                        return $this->response(true, 'success', "Sudah Absen Masuk.", 'ok', [
+                            'type' => 'absen_sudah_masuk_guru',
+                            'nama' => $guru->nama
+                        ]);
+                    }
+
+                    // Check for active gate session
+                    $gateSession = TeacherCheckoutSession::where('expires_at', '>', $now)
+                        ->where('status', 'open')
+                        ->orderBy('created_at', 'desc')
+                        ->first();
+
+                    if (!$gateSession) {
+                        DB::rollBack();
+                        return $this->response(false, 'gagal', 'Belum ada izin gerbang.', 'warning', ['type' => 'no_authorization', 'nama' => $guru->nama]);
+                    }
+
+                    // Process Pulang
+                    $masuk = \Carbon\Carbon::parse($absensi->jam_masuk);
+                    $totalSeconds = $now->diffInSeconds($masuk);
+                    
+                    $absensi->update([
+                        'jam_pulang' => $now->toTimeString(),
+                        'updated_at' => now(),
+                    ]);
                     DB::commit();
+
+                    $hours = floor($totalSeconds / 3600);
+                    $mins = floor(($totalSeconds % 3600) / 60);
+
+                    try {
+                        $this->wa->sendCheckOut($guru->nama, $guru->no_wa, $now->format('H:i'), $hours, $mins, $gateSession->teacher_name, $device->school_id, $masuk->format('H:i'));
+                    } catch (\Exception $e) {
+                        Log::error("WA Guru Checkout Error: " . $e->getMessage());
+                    }
 
                     ApiLog::create([
                         'school_id' => $this->currentSchoolId,
                         'api_key' => $this->currentApiKey,
-                        'action' => 'gate_access',
+                        'action' => 'checkout_success',
                         'uid' => $fingerId,
                         'success' => true,
-                        'message' => 'Guru Akses Gerbang: ' . $guru->nama,
+                        'message' => 'Guru Pulang: ' . $guru->nama,
                         'created_at' => now()
                     ]);
 
-                    return $this->response(true, 'success', "Sudah Absen Masuk. $gateMessage", 'ok', [
-                        'type' => 'absen_sudah_masuk_guru',
-                        'nama' => $guru->nama
+                    return $this->response(true, 'success', "Absen pulang berhasil.", 'ok', [
+                        'type' => 'absen_pulang_guru',
+                        'nama' => $guru->nama,
+                        'authorized_by' => $gateSession->teacher_name
                     ]);
                 }
 
-} catch (\Exception $e) {
-    DB::rollBack();
-    Log::error("Teacher finger scan error: " . $e->getMessage());
-    return $this->response(false, 'error', 'System Error');
-}
-}
+            } catch (\Exception $e) {
+                DB::rollBack();
+                Log::error("Teacher finger scan error: " . $e->getMessage());
+                return $this->response(false, 'error', 'System Error');
+            }
+        }
 
 // Check Siswa
 $siswaFingerprint = SiswaFingerprint::where('device_id', $device->id)

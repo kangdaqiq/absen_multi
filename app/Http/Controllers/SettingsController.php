@@ -71,6 +71,7 @@ class SettingsController extends Controller
         // Handle checkboxes (they don't send data when unchecked)
         $checkboxSettings = [
             'enable_checkout_attendance',
+            'enable_checkout_teacher',
             'absence_notification_enabled'
         ];
 

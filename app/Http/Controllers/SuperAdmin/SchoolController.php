@@ -36,13 +36,19 @@ class SchoolController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
+            'type' => 'nullable|in:school,office',
             'address' => 'nullable|string',
             'phone' => 'nullable|string|max:20',
             'operator_phone' => 'nullable|string|max:20',
             'email' => 'nullable|email|max:255',
             'logo' => 'nullable|image|max:10240',
-            'student_limit' => 'nullable|integer|min:0',
+            'student_limit'        => 'nullable|integer|min:0',
+            'teacher_limit'        => 'nullable|integer|min:0',
+            'history_quota_months' => 'nullable|integer|in:3,6,9,12,24,36',
         ]);
+        
+        $validated['type'] = $request->type ?: 'school';
+
 
         // Auto-generate code
         do {
@@ -57,9 +63,11 @@ class SchoolController extends Controller
         }
 
         // Handle checkboxes
-        $validated['is_active'] = $request->has('is_active');
-        $validated['wa_enabled'] = $request->has('wa_enabled');
-        $validated['student_limit'] = $request->student_limit;
+        $validated['is_active']           = $request->has('is_active');
+        $validated['wa_enabled']           = $request->has('wa_enabled');
+        $validated['student_limit']        = $request->student_limit ?: null;
+        $validated['teacher_limit']        = $request->teacher_limit ?: null;
+        $validated['history_quota_months'] = $request->history_quota_months ?: null;
 
         $school = School::create($validated);
 
@@ -120,13 +128,19 @@ class SchoolController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
+            'type' => 'nullable|in:school,office',
             'address' => 'nullable|string',
             'phone' => 'nullable|string|max:20',
             'operator_phone' => 'nullable|string|max:20',
             'email' => 'nullable|email|max:255',
             'logo' => 'nullable|image|max:10240',
-            'student_limit' => 'nullable|integer|min:0',
+            'student_limit'        => 'nullable|integer|min:0',
+            'teacher_limit'        => 'nullable|integer|min:0',
+            'history_quota_months' => 'nullable|integer|in:3,6,9,12,24,36',
         ]);
+        
+        $validated['type'] = $request->type ?: 'school';
+
 
         // Handle logo upload
         if ($request->hasFile('logo')) {
@@ -146,10 +160,11 @@ class SchoolController extends Controller
         }
 
         // Handle checkboxes
-        // Handle checkboxes
-        $validated['is_active'] = $request->has('is_active');
-        $validated['wa_enabled'] = $request->has('wa_enabled');
-        $validated['student_limit'] = $request->student_limit;
+        $validated['is_active']           = $request->has('is_active');
+        $validated['wa_enabled']           = $request->has('wa_enabled');
+        $validated['student_limit']        = $request->student_limit ?: null;
+        $validated['teacher_limit']        = $request->teacher_limit ?: null;
+        $validated['history_quota_months'] = $request->history_quota_months ?: null;
 
         $school->update($validated);
 

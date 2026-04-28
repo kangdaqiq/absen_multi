@@ -29,10 +29,18 @@ class AttendanceController extends Controller
         if ($kelasId) {
             $siswaQuery->where('kelas_id', $kelasId);
         }
-        $allSiswa = $siswaQuery->get();
+        // Search functionality
+        if ($request->has('search') && !empty($request->search)) {
+            $search = $request->search;
+            $siswaQuery->where('nama', 'like', "%{$search}%");
+        }
+
+        $allSiswa = $siswaQuery->paginate(50)->withQueryString();
 
         // Fetch attendance for the date
-        $attendance = Attendance::where('tanggal', $tanggal)->get()->keyBy('student_id');
+        $attendance = Attendance::where('tanggal', $tanggal)
+            ->whereIn('student_id', $allSiswa->pluck('id'))
+            ->get()->keyBy('student_id');
 
         // Prepare data for view
         $data = [];
@@ -59,7 +67,7 @@ class AttendanceController extends Controller
 
         $allKelas = $kelasQuery->get();
 
-        return view('absensi.index', compact('data', 'tanggal', 'allKelas', 'kelasId'));
+        return view('absensi.index', compact('data', 'allSiswa', 'tanggal', 'allKelas', 'kelasId'));
     }
 
     // Manual Update (e.g., Izin, Sakit)

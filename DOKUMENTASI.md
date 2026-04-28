@@ -1,511 +1,384 @@
-# Sistem Absensi Sekolah
+# Sistem Absensi Sekolah — Dokumentasi Teknis
 
 ## 📋 Deskripsi Project
 
-Sistem Absensi Sekolah adalah aplikasi berbasis web yang dibangun menggunakan Laravel untuk mengelola absensi siswa dan guru secara otomatis menggunakan teknologi RFID dan Fingerprint. Sistem ini terintegrasi dengan WhatsApp untuk notifikasi real-time dan dilengkapi dengan berbagai fitur pelaporan dan monitoring.
+Sistem Absensi Sekolah adalah aplikasi berbasis web Laravel untuk mengelola absensi siswa dan guru secara otomatis menggunakan RFID dan Fingerprint. Sistem ini mendukung arsitektur **multi-tenant** (banyak sekolah dalam satu instalasi), terintegrasi dengan WhatsApp via **GOWA (Go WhatsApp)**, dan dapat di-deploy secara self-hosted menggunakan Docker dengan proteksi sistem lisensi online.
 
-## 🎯 Fitur Utama
-
-### 1. **Manajemen Data Master**
-- **Data Siswa**
-  - CRUD (Create, Read, Update, Delete) data siswa
-  - Import/Export data siswa via CSV/Excel
-  - Generate akun login otomatis untuk siswa
-  - Enroll RFID Card dan Fingerprint
-  - Manajemen nomor WhatsApp orang tua
-
-- **Data Guru**
-  - CRUD data guru
-  - Import/Export data guru via CSV/Excel
-  - Enroll RFID Card dan Fingerprint
-  - Manajemen nomor WhatsApp pribadi
-
-- **Data Kelas**
-  - Manajemen kelas dengan wali kelas
-  - Toggle status absensi aktif/non-aktif per kelas
-  - Toggle status laporan aktif/non-aktif per kelas
-  - Integrasi grup WhatsApp per kelas
-
-- **Jadwal Absensi**
-  - Jadwal jam masuk dan pulang
-
-- **Pengumuman & Informasi**
-  - Manajemen pengumuman sekolah
-  - Tampilan pengumuman interaktif di dashboard
-
-### 2. **Sistem Absensi**
-
-#### Absensi Siswa
-- **Metode Absensi:**
-  - RFID Card (Tap kartu)
-  - Fingerprint (Sidik jari)
-  
-- **Jenis Status:**
-  - ✅ **H (Hadir)** - Siswa hadir tepat waktu
-  - ⏰ **T (Terlambat)** - Siswa hadir terlambat
-  - ❌ **A (Alpha)** - Siswa tidak hadir tanpa keterangan
-  - 🏃 **B (Bolos)** - Siswa absen masuk tapi tidak absen pulang
-  - 📝 **I (Izin)** - Siswa izin (input manual)
-  - 🤒 **S (Sakit)** - Siswa sakit (input manual)
-
-- **Fitur:**
-  - Auto-detect terlambat berdasarkan toleransi
-  - Auto-mark Alpha untuk siswa yang tidak hadir
-  - Auto-mark Bolos untuk siswa yang tidak absen pulang
-  - Perhitungan durasi kehadiran otomatis
-  - Edit dan hapus data absensi manual
-
-#### Absensi Guru
-- **Metode Absensi:**
-  - RFID Card
-  - Fingerprint
-  
-- **Fitur:**
-  - Absensi masuk dan pulang
-  - Kontrol gerbang otomatis (buka/tutup)
-  - Auto-close gerbang setelah 15 menit
-  - Rekap kehadiran guru
-
-### 3. **Sistem Pelaporan**
-
-#### Rekap Absensi Siswa
-- Filter berdasarkan:
-  - Tanggal (range)
-  - Kelas
-  - Status kehadiran
-- Export ke:
-  - Excel/CSV
-  - PDF (dengan kop surat sekolah)
-- Detail per siswa dengan statistik lengkap
-
-#### Rekap Absensi Guru
-- Filter berdasarkan tanggal
-- Export Excel dan PDF
-- Statistik kehadiran per guru
-
-#### Laporan Siswa Bermasalah
-- **Deteksi Otomatis:**
-  - Threshold ketidakhadiran (default: 3 hari)
-  - Periode pengecekan (max: 180 hari / 1 semester)
-  - Filter: Hanya siswa yang **tidak hadir hari ini** DAN melebihi threshold
-  
-- **Fitur:**
-  - Laporan harian otomatis (default jam 16:00)
-  - Waktu laporan dapat dikustomisasi
-  - Export ke CSV
-  - Detail breakdown Alpha dan Bolos per siswa
-
-### 4. **Notifikasi WhatsApp**
-
-#### Notifikasi Real-time
-- **Untuk Orang Tua:**
-  - Notifikasi saat siswa tap masuk
-  - Notifikasi saat siswa tap pulang
-  - Informasi status (Hadir/Terlambat)
-  - Durasi kehadiran
-  - Lokasi tap (jika tersedia)
-
-- **Untuk Guru:**
-  - Laporan kehadiran kelas harian
-  - Laporan siswa bermasalah
-
-#### Laporan Terjadwal
-- **Laporan Harian Final** (setelah proses auto-bolos)
-  - Daftar siswa Alpha
-  - Daftar siswa Bolos
-  - Daftar siswa Izin/Sakit
-  - Dikirim ke grup kelas dan grup guru
-
-- **Laporan Siswa Bermasalah** (harian, customizable)
-  - Siswa dengan akumulasi ketidakhadiran tinggi
-  - Hanya yang tidak hadir hari ini
-  - Dikirim ke grup kelas dan wali kelas
-
-#### Broadcast Manual
-- Kirim pesan ke:
-  - Semua siswa
-  - Siswa per kelas (pilih multiple)
-  - Custom message
-
-### 5. **Otomatisasi (Scheduler)**
-
-Sistem menjalankan task otomatis setiap hari:
-
-| Waktu | Task | Deskripsi |
-|-------|------|-----------|
-| 08:15 | Laporan Pagi | Kirim rekap kehadiran ke grup |
-| 13:30 | Proses Harian | Mark Alpha/Bolos otomatis |
-| 16:00* | Cek Abnormal | Laporan siswa bermasalah |
-| 23:59 | Backup DB | Backup database otomatis |
-
-*Waktu dapat dikustomisasi via Settings
-
-**Catatan:** Scheduler tidak berjalan pada:
-- Hari Minggu
-
-### 6. **Manajemen Perangkat**
-
-- **Device Management:**
-  - Registrasi perangkat ESP8266
-  - Monitor status online/offline
-  - Konfigurasi per device
-  - API Key management
-
-- **Enroll RFID & Fingerprint:**
-  - Request enroll dari web
-  - Proses enroll di device
-  - Auto-sync ke database
-  - Cancel enroll
-  - Delete UID/Fingerprint
-
-### 7. **Pengaturan Sistem**
-
-#### Konfigurasi Umum
-- Nama sekolah (dinamis)
-- Logo sekolah (upload)
-- Alamat sekolah (untuk kop surat)
-- Toleransi checkout guru (menit)
-
-#### Konfigurasi Jadwal Otomatis
-- Waktu proses harian
-- Waktu laporan harian
-- Waktu backup database
-- Waktu laporan siswa bermasalah
-
-#### Konfigurasi Notifikasi
-- Target grup WhatsApp untuk laporan
-- Toggle aktif/non-aktif notifikasi
-- Threshold ketidakhadiran
-- Periode pengecekan (1-180 hari)
-
-### 8. **Manajemen User & Keamanan**
-
-- **Role-based Access Control:**
-  - **Admin:** Full access
-  - **Teacher:** View & limited edit
-  - **Student:** View dashboard pribadi
-
-- **User Management:**
-  - CRUD users
-  - Bulk delete
-  - Password management
-
-### 9. **Backup & Restore**
-
-- **Backup Database:**
-  - Manual backup
-  - Auto backup harian (23:59)
-  - Download file backup (.sql)
-  - Delete backup lama
-
-- **Restore:**
-  - Upload file backup
-  - Restore database
-
-### 10. **Logging & Monitoring**
-
-- **WhatsApp Logs:**
-  - History pesan terkirim
-  - Status pengiriman
-  - Filter dan search
-
-- **API Logs:**
-  - Log request dari ESP8266
-  - Debugging device issues
-  - Monitor aktivitas
-
-
+---
 
 ## 🏗️ Arsitektur Sistem
 
 ### Tech Stack
-- **Backend:** Laravel 11.x
-- **Frontend:** Blade Templates, Bootstrap 4 (SB Admin 2)
-- **Database:** MySQL
-- **Queue:** Database Queue
-- **Hardware:** ESP8266 + RFID RC522 + Fingerprint Sensor
-- **Integration:** WhatsApp Multi-Device API (Node.js Baileys)
 
-### Struktur Database
+| Layer | Teknologi |
+|-------|-----------|
+| Backend | Laravel 11.x |
+| Frontend | Blade, Bootstrap 4 (SB Admin 2), jQuery |
+| Database | MySQL 8.0 |
+| Queue | Database Queue (Laravel) |
+| Hardware | ESP8266/ESP32 + RFID RC522 + Fingerprint Sensor |
+| WhatsApp | **GOWA** (aldinokemal/go-whatsapp-web-multidevice) — Go binary, ~20MB RAM |
+| Deployment Hosted | PHP-FPM + Nginx + Supervisor (manual) |
+| Deployment Client | Docker (app + mysql + gowa dalam docker-compose) |
 
-**Tabel Utama:**
-- `users` - Data user login
-- `siswa` - Data siswa
-- `guru` - Data guru
-- `kelas` - Data kelas
-- `attendance` - Data absensi siswa
-- `absensi_guru` - Data absensi guru
-- `settings` - Konfigurasi sistem
-- `devices` - Perangkat ESP8266
-- `message_queue` - Antrian pesan WhatsApp
-- `jadwal` - Jam masuk/pulang
-- `announcements` - Data pengumuman sekolah
-- `whatsapp_devices` - Data Multi-Device WhatsApp
+### Mode Deployment
+
+| | **Hosted** | **Self-Hosted** |
+|---|---|---|
+| Dikelola oleh | Developer (kamu) | Client di server sendiri |
+| `APP_MODE` | `hosted` | `self_hosted` |
+| Install | Manual (PHP, Nginx, Composer) | `docker compose up -d` |
+| Super Admin | ✅ Aktif | ❌ Diblokir (404) |
+| License check | ❌ Tidak perlu | ✅ Ping harian ke server developer |
+| Source code | Di server langsung | Tersembunyi dalam Docker image |
+| Update | `git pull` + `migrate` | `docker compose pull` |
+
+---
+
+## 🎯 Fitur Detail
+
+### 1. Manajemen Data Master
+
+- **Siswa** — CRUD, import/export Excel, enroll RFID & Fingerprint, WA siswa & ortu
+- **Guru** — CRUD, import/export Excel, enroll RFID & Fingerprint, WA pribadi
+- **Kelas** — Manajemen kelas, wali kelas, toggle absensi & laporan, grup WA
+- **Jadwal** — Jam masuk/pulang per hari per sekolah
+- **Pengumuman** — Manajemen & tampilan interaktif di dashboard
+
+### 2. Sistem Absensi
+
+#### Status Siswa
+| Kode | Status | Keterangan |
+|------|--------|-----------|
+| H | Hadir | Tepat waktu |
+| T | Terlambat | Melewati batas toleransi |
+| A | Alpha | Tidak hadir (auto) |
+| B | Bolos | Masuk tapi tidak pulang (auto) |
+| I | Izin | Input manual |
+| S | Sakit | Input manual |
+
+#### Mode Absensi
+- **2x Scan (Aktif):** masuk + pulang dengan otorisasi guru (buka gerbang 15 menit)
+- **1x Scan (Nonaktif):** hanya masuk, tidak ada proses checkout
+
+### 3. Kuota Siswa & Guru
+
+Super Admin dapat membatasi jumlah siswa dan guru per sekolah:
+
+| Field | Keterangan |
+|-------|-----------|
+| `student_limit` | Maks siswa. null/0 = unlimited |
+| `teacher_limit` | Maks guru/staff. null/0 = unlimited |
+
+**Titik pengecekan:**
+- Tambah manual (form) → cek sebelum insert
+- Import Excel → cek per baris, stop + pesan error saat penuh
+
+**Pesan error:**
+```
+Gagal: Kuota siswa/guru sudah penuh (500 siswa). Hubungi Super Admin.
+Import dihentikan: Kuota penuh. Berhasil diimpor: 43 data.
+```
+
+### 4. Auto Delete History Absen
+
+- Field `history_quota_months` di tabel `schools`
+- Pilihan: `3`, `6`, `9`, `12`, `24`, `36` bulan, atau null (tidak terbatas)
+- Command: `absen:auto-delete-history` — dijalankan tiap malam 01:00
+- `--dry-run` untuk preview tanpa hapus
+- Menghapus `attendance` (siswa) dan `absensi_guru` yang melewati cutoff date
+
+### 5. Notifikasi WhatsApp (GOWA)
+
+GOWA (Go WhatsApp) dijalankan sebagai:
+- **Hosted:** binary `/usr/local/bin/gowa rest --port=3000`
+- **Self-Hosted:** Docker service `whatsapp` dalam `docker-compose.yml`
+
+Endpoint yang dipakai Laravel: `POST http://[host]:3000/send/message`
+
+Basic Auth dari `.env`: `WA_API_USER` dan `WA_API_PASS`
+
+### 6. Multi-Tenant
+
+| Role | Akses |
+|------|-------|
+| `super_admin` | Semua sekolah, Super Admin panel, kelola lisensi |
+| `admin` | Hanya sekolahnya sendiri |
+| `teacher` | View + limited edit |
+
+Setiap data di-scope per `school_id`. Super Admin tidak terpengaruh scope.
+
+### 7. Sistem Lisensi (Self-Hosted)
+
+#### Komponen
+
+| Komponen | Lokasi | Fungsi |
+|----------|--------|--------|
+| `LicenseService` | `app/Services/LicenseService.php` | Logika validasi, cache, grace period |
+| `CheckLicense` | `app/Http/Middleware/CheckLicense.php` | Global web middleware |
+| `SelfHostedGuard` | `app/Http/Middleware/SelfHostedGuard.php` | Blokir `/super-admin/*` |
+| `ValidateLicenseCommand` | `app/Console/Commands/` | `php artisan license:validate` |
+| `LicenseController` | `app/Http/Controllers/SuperAdmin/` | CRUD lisensi di panel |
+| `LicenseValidateController` | `app/Http/Controllers/Api/` | Public API endpoint |
+| `License` model | `app/Models/License.php` | Model tabel licenses |
+| Tabel `licenses` | Database | Menyimpan semua license key |
+
+#### Alur Validasi
+
+```
+Request web masuk
+    ↓ CheckLicense middleware (global)
+    ├── APP_MODE = hosted? → skip, lanjut
+    ├── Route api/*, login, license.*? → bypass
+    └── Self-hosted:
+        ├── Baca cache (storage/app/license_cache.json)
+        │   ├── Cache fresh < 24 jam → gunakan cache
+        │   └── Cache expired → ping server
+        │         ├── Server respond → update cache
+        │         └── Unreachable:
+        │               ├── Grace < 3 hari → lanjut (warn)
+        │               └── Grace > 3 hari → redirect /license/invalid
+        ├── valid=true → lanjut ke app
+        ├── expired=true → redirect /license/expired
+        └── valid=false → redirect /license/invalid
+```
+
+#### Cache File
+
+`storage/app/license_cache.json`:
+```json
+{
+  "cached_at": "2026-04-26T01:30:00+07:00",
+  "grace_started_at": null,
+  "result": {
+    "valid": true,
+    "expired": false,
+    "client_name": "SMA Negeri 1 Jakarta",
+    "expired_at": "2026-12-31",
+    "max_schools": 1,
+    "max_students": 500,
+    "message": "Lisensi aktif.",
+    "grace_remaining_days": 0
+  }
+}
+```
+
+#### API Endpoint (Public)
+
+```
+POST /api/license/validate
+Body: { "license_key": "XXXXXX-XXXXXX-XXXXXX-XXXXXX", "hostname": "client-server" }
+
+Response OK:
+{
+  "valid": true,
+  "client_name": "SMA Negeri 1 Jakarta",
+  "max_schools": 1,
+  "max_students": 500,
+  "expired_at": "2026-12-31",
+  "message": "Lisensi aktif."
+}
+```
+
+#### Tabel `licenses`
+
+| Kolom | Tipe | Keterangan |
+|-------|------|-----------|
+| `license_key` | VARCHAR(32) | Key unik (format XXXXXX-XXXXXX-XXXXXX-XXXXXX) |
+| `client_name` | VARCHAR(255) | Nama client/sekolah |
+| `max_schools` | SMALLINT | 0 = unlimited |
+| `max_students` | SMALLINT | 0 = unlimited |
+| `expired_at` | DATE | null = selamanya |
+| `is_active` | BOOLEAN | Toggle aktif/nonaktif |
+| `allowed_hostname` | VARCHAR(255) | Lock per hostname. null = semua hostname |
+| `last_ping_at` | TIMESTAMP | Terakhir client validasi |
+| `notes` | TEXT | Catatan internal |
+
+### 8. Docker (Self-Hosted)
+
+#### Services dalam `docker-compose.yml`
+
+| Service | Image | RAM | Keterangan |
+|---------|-------|-----|-----------|
+| `app` | ghcr.io/kangdaqiq/absen-multi | ~350MB | PHP-FPM + Nginx + Scheduler + Queue |
+| `mysql` | mysql:8.0 | ~180MB | Database (tuned 128M buffer) |
+| `whatsapp` | aldinokemal2104/go-whatsapp-web-multidevice | ~20MB | GOWA WhatsApp API |
+
+**Total RAM: ~550MB** — cocok untuk hardware 2GB RAM.
+
+#### Volumes
+
+| Volume | Isi |
+|--------|-----|
+| `mysql_data` | Data MySQL |
+| `app_storage` | File upload, backup, license cache |
+| `app_logs` | Laravel logs |
+| `wa_data` | Session WhatsApp (jangan dihapus!) |
+
+#### Entrypoint Flow
+
+```
+docker compose up
+    ↓ Container start
+    ↓ 1. Tunggu MySQL ready (healthcheck)
+    ↓ 2. php artisan migrate --force
+    ↓ 3. php artisan config:cache + route:cache + view:cache
+    ↓ 4. php artisan license:validate (jika self_hosted)
+    ↓ 5. supervisord start:
+         ├── nginx
+         ├── php-fpm
+         ├── laravel-scheduler (loop 60 detik)
+         └── laravel-queue (queue:work)
+```
+
+#### Build & Push Image
+
+```powershell
+# Build (jalankan npm run build dulu!)
+npm run build
+docker build -t ghcr.io/kangdaqiq/absen-multi:latest `
+             -t ghcr.io/kangdaqiq/absen-multi:v2.3.0 .
+
+# Push
+docker push ghcr.io/kangdaqiq/absen-multi:latest
+docker push ghcr.io/kangdaqiq/absen-multi:v2.3.0
+```
+
+---
+
+## 📅 Jadwal Otomatis
+
+| Waktu | Command | Keterangan |
+|-------|---------|-----------|
+| Setiap menit | `absen:process-daily` | Auto Alpha/Bolos per jadwal sekolah |
+| Setiap menit | `absen:daily-report` | Laporan harian WA |
+| Setiap menit | `wa:process` | Proses antrian WA |
+| Setiap menit | `absen:check-abnormal` | Cek siswa bermasalah |
+| 00:30 | `license:validate` | Refresh cache lisensi (self-hosted) |
+| 01:00 | `absen:auto-delete-history` | Hapus history melewati kuota |
+| 02:00 | `db:backup` | Backup database SQL |
+
+---
+
+## 📊 Struktur Database
+
+### Tabel Utama
+
+| Tabel | Keterangan |
+|-------|-----------|
+| `schools` | Sekolah (`student_limit`, `teacher_limit`, `history_quota_months`) |
+| `users` | User login semua role |
+| `siswa` | Data siswa per `school_id` |
+| `guru` | Data guru per `school_id` |
+| `kelas` | Data kelas per `school_id` |
+| `attendance` | Absensi siswa |
+| `absensi_guru` | Absensi guru |
+| `settings` | Konfigurasi per sekolah (key-value) |
+| `devices` | Perangkat ESP8266/ESP32 |
+| `message_queues` | Antrian notifikasi WA |
+| `jadwal` | Jam masuk/pulang per hari |
+| `announcements` | Pengumuman per sekolah |
+| `licenses` | License key untuk client self-hosted |
 
 ### Flow Absensi
 
 ```
-1. Siswa/Guru tap RFID/Fingerprint di device
-2. ESP8266 kirim data ke API Laravel
-3. Laravel validasi dan simpan ke database
-4. Laravel queue notifikasi WhatsApp
-5. Background job kirim notifikasi
-6. Orang tua/Guru terima notifikasi
+Siswa/Guru tap RFID/Fingerprint
+    ↓ ESP8266 POST ke /api/rfid atau /api/fingerprint
+    ↓ Laravel validate → simpan attendance
+    ↓ Queue notifikasi WA
+    ↓ Queue worker kirim via GOWA
+    ↓ Orang tua/Guru terima notifikasi
 ```
-
-### Flow Scheduler
-
-```
-1. Cron job trigger Laravel Scheduler (setiap menit)
-2. Scheduler cek waktu dan task
-3. Jalankan command sesuai jadwal
-4. Command proses data dan queue notifikasi
-5. Background job kirim notifikasi
-```
-
-## 🚀 Instalasi
-
-### Requirements
-- PHP >= 8.1
-- Composer
-- MySQL/MariaDB
-- Node.js & NPM (untuk asset compilation)
-- ESP8266 dengan RFID RC522 dan/atau Fingerprint Sensor
-- Node.js (untuk WhatsApp Multi-Device API)
-
-### Langkah Instalasi
-
-1. **Clone Repository**
-   ```bash
-   git clone <repository-url>
-   cd absen
-   ```
-
-2. **Install Dependencies**
-   ```bash
-   composer install
-   npm install
-   ```
-
-3. **Setup Environment**
-   ```bash
-   cp .env.example .env
-   php artisan key:generate
-   ```
-
-4. **Konfigurasi Database**
-   Edit file `.env`:
-   ```
-   DB_CONNECTION=mysql
-   DB_HOST=127.0.0.1
-   DB_PORT=3306
-   DB_DATABASE=absensi
-   DB_USERNAME=root
-   DB_PASSWORD=
-   ```
-
-5. **Migrasi Database**
-   ```bash
-   php artisan migrate
-   php artisan db:seed
-   ```
-
-6. **Setup Storage**
-   ```bash
-   php artisan storage:link
-   ```
-
-7. **Compile Assets**
-   ```bash
-   npm run build
-   ```
-
-8. **Setup Scheduler (Cron)**
-   Tambahkan ke crontab:
-   ```
-   * * * * * cd /path-to-project && php artisan schedule:run >> /dev/null 2>&1
-   ```
-
-9. **Jalankan Queue Worker**
-   ```bash
-   php artisan queue:work --daemon
-   ```
-
-10. **Akses Aplikasi**
-    ```
-    http://localhost/absen/public
-    ```
-
-### Default Login
-- **Username:** admin
-- **Password:** password
-
-## 📱 Integrasi ESP8266
-
-### API Endpoints untuk Device
-
-**Base URL:** `http://your-domain.com/api`
-
-#### 1. Check-in (Tap Masuk)
-```
-POST /checkin
-Content-Type: application/json
-
-{
-  "device_id": "ESP001",
-  "uid": "A1B2C3D4",
-  "timestamp": "2024-01-08 07:30:00"
-}
-```
-
-#### 2. Check-out (Tap Pulang)
-```
-POST /checkout
-Content-Type: application/json
-
-{
-  "device_id": "ESP001",
-  "uid": "A1B2C3D4",
-  "timestamp": "2024-01-08 14:30:00"
-}
-```
-
-#### 3. Enroll Status Check
-```
-GET /enroll-status?device_id=ESP001
-```
-
-#### 4. Fingerprint Enroll Check
-```
-GET /finger-enroll-status?device_id=ESP001
-```
-
-### Kode ESP8266
-
-Kode untuk ESP8266 tersedia di folder `esp8266_code/`.
-
-## 🔧 Konfigurasi
-
-### WhatsApp Multi-Device (Baileys)
-
-Jalankan service WhatsApp API (Node.js):
-```bash
-cd restapi-wa
-npm install
-npm start
-```
-Konfigurasi device WhatsApp dilakukan melalui menu **Super Admin > WhatsApp Devices** di aplikasi web.
-
-### Timezone
-
-Edit `config/app.php`:
-```php
-'timezone' => 'Asia/Jakarta',
-```
-
-## 📊 Penggunaan
-
-### 1. Setup Awal
-
-1. Login sebagai admin
-2. Buka **Konfigurasi > Pengaturan Umum**
-3. Isi data sekolah (nama, logo, alamat)
-4. Atur jadwal otomatis
-5. Konfigurasi notifikasi WhatsApp
-
-### 2. Input Data Master
-
-1. **Kelas:** Buat kelas dan assign wali kelas
-2. **Guru:** Input data guru dan enroll RFID/Fingerprint
-3. **Siswa:** Input/Import data siswa dan enroll RFID/Fingerprint
-4. **Jadwal:** Atur jam masuk/pulang
-
-### 3. Monitoring Absensi
-
-1. **Dashboard:** Lihat statistik real-time
-2. **Absensi Siswa:** Monitor kehadiran harian
-3. **Rekap:** Generate laporan periode tertentu
-4. **Laporan Bermasalah:** Monitor siswa dengan ketidakhadiran tinggi
-
-### 4. Notifikasi
-
-Sistem akan otomatis mengirim notifikasi sesuai konfigurasi.
-
-## 🛠️ Maintenance
-
-### Backup Database
-
-**Manual:**
-```bash
-php artisan db:backup
-```
-
-**Otomatis:**
-Sudah terjadwal setiap hari jam 23:59
-
-### Clear Cache
-
-```bash
-php artisan cache:clear
-php artisan config:clear
-php artisan route:clear
-php artisan view:clear
-```
-
-### Update Sistem
-
-```bash
-git pull origin main
-composer install
-php artisan migrate
-php artisan cache:clear
-```
-
-## 🐛 Troubleshooting
-
-### Scheduler Tidak Jalan
-
-1. Pastikan cron job sudah disetup
-2. Cek log: `storage/logs/laravel.log`
-3. Test manual: `php artisan schedule:run`
-
-### Notifikasi WhatsApp Tidak Terkirim
-
-1. Cek service Node.js Baileys
-2. Cek queue worker: `php artisan queue:work`
-3. Cek tabel `message_queue`
-
-### Device ESP8266 Tidak Terhubung
-
-1. Cek koneksi WiFi ESP8266
-2. Cek API URL di kode ESP8266
-3. Cek log API: Menu **Sistem > Log API**
-
-## 📝 Changelog
-
-### Version 2.0 (2026-01-08)
-- ✅ Implementasi Dynamic School Name & Logo
-- ✅ Refactor Weekly ke Daily Abnormal Attendance Check
-- ✅ Tambah filter "Absent Today" untuk laporan
-- ✅ Extend periode check hingga 180 hari (1 semester)
-- ✅ Customizable report time via Settings
-- ✅ Update UI labels dan dokumentasi
-
-### Version 1.0
-- ✅ Sistem absensi RFID & Fingerprint
-- ✅ Notifikasi WhatsApp real-time
-- ✅ Scheduler otomatis
-- ✅ Rekap dan export laporan
-- ✅ Multi-role access control
-
-## 👨‍💻 Developer
-
-**Developed with ❤️ by KangDaQiQ**
-
-## 📄 License
-
-Proprietary - All Rights Reserved
 
 ---
 
-**© 2024-2026 SMK Assuniyah Tumijajar**
+## 🚀 Panduan Instalasi Lengkap
+
+### A. Hosted (Server Developer)
+
+```bash
+# 1. Clone
+git clone <repo> /var/www/absen && cd /var/www/absen
+
+# 2. Install
+composer install --no-dev --optimize-autoloader
+npm install && npm run build
+
+# 3. Env
+cp .env.example .env && php artisan key:generate
+# Edit .env: APP_MODE=hosted, DB_*, WA_*
+
+# 4. Database
+php artisan migrate && php artisan storage:link && php artisan optimize
+
+# 5. Nginx + Scheduler crontab + Supervisor (queue + gowa)
+# (lihat README.md untuk detail)
+```
+
+### B. Self-Hosted Client (Docker)
+
+```bash
+# Client terima: docker-compose.yml + .env + INSTALL.txt
+
+# Edit .env
+nano .env    # isi DB_PASSWORD, DB_ROOT_PASSWORD, APP_URL
+
+# Jalankan
+docker compose up -d
+
+# Setup WA (sekali)
+# Buka http://IP-server:3001 → scan QR
+```
+
+---
+
+## 🐛 Troubleshooting
+
+| Masalah | Solusi |
+|---------|--------|
+| App self-hosted tidak bisa diakses | `docker compose logs app` |
+| Lisensi invalid | `php artisan license:validate --force` |
+| WA tidak terkirim | Cek queue worker, cek `message_queues` status='failed' |
+| Import gagal tanpa pesan | Cek storage writable, cek log Laravel |
+| Class not found | `composer dump-autoload && php artisan optimize:clear` |
+| Scheduler tidak jalan | Cek crontab / cek Supervisor status |
+
+---
+
+## 📝 Changelog
+
+### v2.3.0 (2026-04-26)
+- 🆕 **Kelola Lisensi di Super Admin** — tidak perlu project license server terpisah
+- 🆕 **API `/api/license/validate`** — built-in di app utama
+- 🆕 **Lock lisensi per hostname**, regenerate key, monitor `last_ping_at`
+- 🆕 **Teacher/Staff Quota** (`teacher_limit` di tabel schools)
+- 🆕 **Import siswa/guru**: stop + pesan error jelas saat kuota penuh
+- 🆕 **Auto Delete History Absen** — kuota retensi per sekolah
+- 🔄 **GOWA (Go WhatsApp)** — ganti Node.js Baileys, hemat ~150MB RAM
+- 🐳 Docker: GOWA service, MySQL memory tuning, `.dockerignore`
+- 🔐 `APP_MODE` config: `hosted` (default) / `self_hosted`
+- 🔐 `CheckLicense` + `SelfHostedGuard` middleware
+- 🔐 Grace period 3 hari, cache 24 jam di file JSON
+
+### v2.2.0 (2026-04-24)
+- ✨ Pengumuman sekolah
+- ✨ `operator_phone` per sekolah
+- 🔧 Drop tabel `hari_libur`
+
+### v2.1.0 (2026-01-11)
+- ✨ Multi-tenant architecture
+- ✨ Super Admin panel
+- ✨ WhatsApp Multi-Device per sekolah
+
+### v2.0.0 (2026-01-10)
+- ✨ Toggle absen pulang (1x/2x scan)
+- ✨ Kustomisasi waktu laporan via Settings
+
+### v1.0.0 (2025-12-01)
+- 🎉 Rilis awal: RFID + Fingerprint + WhatsApp + Dashboard
+
+---
+
+**Developed with ❤️ by KangDaQiQ**
+© 2024-2026 — Proprietary, All Rights Reserved

@@ -3,290 +3,251 @@
 @section('title', 'Dashboard')
 
 @section('content')
-    <div class="d-sm-flex align-items-center justify-content-between mb-4">
-        <h1 class="h3 mb-0 text-gray-800">Dashboard</h1>
+<div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+  <h2 class="text-title-md2 font-semibold text-gray-800 dark:text-white/90">
+    Dashboard
+  </h2>
+</div>
+
+<!-- Metrics Cards -->
+<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-6 xl:grid-cols-4 2xl:gap-7.5">
+    <!-- Siswa Card -->
+    <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-sm dark:border-gray-800 dark:bg-gray-dark md:p-6">
+      <div class="flex items-center justify-center w-12 h-12 bg-brand-50 rounded-xl dark:bg-brand-500/15 text-brand-500">
+        <i class="fas fa-users fa-lg"></i>
+      </div>
+      <div class="flex items-end justify-between mt-5">
+        <div>
+          <span class="text-sm text-gray-500 dark:text-gray-400">Total Siswa</span>
+          <h4 class="mt-2 font-bold text-gray-800 text-title-sm dark:text-white/90">{{ $countSiswa }}</h4>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Guru Card -->
+    <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-sm dark:border-gray-800 dark:bg-gray-dark md:p-6">
+      <div class="flex items-center justify-center w-12 h-12 bg-success-50 rounded-xl dark:bg-success-500/15 text-success-500">
+        <i class="fas fa-chalkboard-teacher fa-lg"></i>
+      </div>
+      <div class="flex items-end justify-between mt-5">
+        <div>
+          <span class="text-sm text-gray-500 dark:text-gray-400">Total Guru</span>
+          <h4 class="mt-2 font-bold text-gray-800 text-title-sm dark:text-white/90">{{ $countGuru }}</h4>
+        </div>
+      </div>
     </div>
 
-    <div class="row">
-
-        <!-- Siswa Card -->
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card border-left-primary shadow h-100 py-2">
-                <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Total Siswa</div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ $countSiswa }}</div>
-                        </div>
-                        <div class="col-auto">
-                            <i class="fas fa-users fa-2x text-gray-300"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
+    <!-- Hadir Card -->
+    <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-sm dark:border-gray-800 dark:bg-gray-dark md:p-6">
+      <div class="flex items-center justify-center w-12 h-12 bg-info-50 rounded-xl dark:bg-info-500/15 text-info-500">
+        <i class="fas fa-user-check fa-lg"></i>
+      </div>
+      <div class="flex items-end justify-between mt-5">
+        <div>
+          <span class="text-sm text-gray-500 dark:text-gray-400">Hadir Hari Ini</span>
+          <h4 class="mt-2 font-bold text-gray-800 text-title-sm dark:text-white/90">{{ $countHadir }}</h4>
         </div>
-
-        <!-- Guru Card -->
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card border-left-success shadow h-100 py-2">
-                <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Total Guru</div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ $countGuru }}</div>
-                        </div>
-                        <div class="col-auto">
-                            <i class="fas fa-chalkboard-teacher fa-2x text-gray-300"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Hadir Card -->
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card border-left-info shadow h-100 py-2">
-                <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">Hadir Hari Ini</div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ $countHadir }}</div>
-                        </div>
-                        <div class="col-auto">
-                            <i class="fas fa-user-check fa-2x text-gray-300"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Telat Card -->
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card border-left-warning shadow h-100 py-2">
-                <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Terlambat Hari Ini</div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ $countTelat }}</div>
-                        </div>
-                        <div class="col-auto">
-                            <i class="fas fa-user-clock fa-2x text-gray-300"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+      </div>
     </div>
 
-    <!-- Chart Row -->
-    <div class="row">
-        <div class="col-xl-12 col-lg-12">
-            <div class="card shadow mb-4">
-                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
-                    <h6 class="m-0 font-weight-bold text-primary">Grafik Kehadiran 7 Hari Terakhir</h6>
+    <!-- Telat Card -->
+    <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-sm dark:border-gray-800 dark:bg-gray-dark md:p-6">
+      <div class="flex items-center justify-center w-12 h-12 bg-warning-50 rounded-xl dark:bg-warning-500/15 text-warning-500">
+        <i class="fas fa-user-clock fa-lg"></i>
+      </div>
+      <div class="flex items-end justify-between mt-5">
+        <div>
+          <span class="text-sm text-gray-500 dark:text-gray-400">Terlambat Hari Ini</span>
+          <h4 class="mt-2 font-bold text-gray-800 text-title-sm dark:text-white/90">{{ $countTelat }}</h4>
+        </div>
+      </div>
+    </div>
+</div>
+
+<!-- Main Content Grid -->
+<div class="mt-4 grid grid-cols-12 gap-4 md:mt-6 md:gap-6 2xl:mt-7.5 2xl:gap-7.5">
+
+    <!-- Chart -->
+    <div class="col-span-12 xl:col-span-12">
+        <div class="rounded-2xl border border-gray-200 bg-white px-5 pt-7.5 pb-5 shadow-theme-sm dark:border-gray-800 dark:bg-gray-dark sm:px-7.5">
+            <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
+                <div>
+                    <h4 class="text-xl font-bold text-gray-800 dark:text-white/90">Grafik Kehadiran 7 Hari Terakhir</h4>
                 </div>
-                <div class="card-body">
-                    <div class="chart-area" style="height: 320px;">
-                        <canvas id="attendanceChart"></canvas>
-                    </div>
-                </div>
+            </div>
+            <div class="relative w-full h-[320px]">
+                <canvas id="attendanceChart"></canvas>
             </div>
         </div>
     </div>
 
-    <div class="row">
-        <!-- Recent Activity -->
-        <div class="col-lg-6 mb-4">
-            <div class="card shadow mb-4">
-                <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-primary">Aktivitas Absensi Terakhir Hari Ini</h6>
+    <!-- Recent Activity -->
+    <div class="col-span-12">
+        <div class="rounded-2xl border border-gray-200 bg-white px-5 pt-6 pb-2.5 shadow-theme-sm dark:border-gray-800 dark:bg-gray-dark sm:px-7.5 xl:pb-1">
+            <h4 class="mb-6 text-xl font-bold text-gray-800 dark:text-white/90">Aktivitas Absensi Terakhir Hari Ini</h4>
+            @if($recentLogs->count() > 0)
+                <div class="max-w-full overflow-x-auto">
+                    <table class="w-full table-auto">
+                        <thead>
+                            <tr class="bg-gray-50 text-left dark:bg-gray-800/50">
+                                <th class="min-w-[150px] px-4 py-4 font-medium text-gray-800 dark:text-white/90 xl:pl-5">Nama</th>
+                                <th class="min-w-[120px] px-4 py-4 font-medium text-gray-800 dark:text-white/90">Kelas</th>
+                                <th class="min-w-[120px] px-4 py-4 font-medium text-gray-800 dark:text-white/90">Jam Masuk</th>
+                                <th class="px-4 py-4 font-medium text-gray-800 dark:text-white/90">Ket</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($recentLogs as $log)
+                                <tr>
+                                    <td class="border-b border-gray-100 px-4 py-5 dark:border-gray-800 xl:pl-5">
+                                        <p class="text-gray-800 dark:text-white/90 font-medium">{{ $log->student->nama ?? '-' }}</p>
+                                    </td>
+                                    <td class="border-b border-gray-100 px-4 py-5 dark:border-gray-800">
+                                        <p class="text-gray-500 dark:text-gray-400">{{ $log->student->kelas->nama_kelas ?? '-' }}</p>
+                                    </td>
+                                    <td class="border-b border-gray-100 px-4 py-5 dark:border-gray-800">
+                                        <p class="text-gray-500 dark:text-gray-400">{{ $log->jam_masuk }}</p>
+                                    </td>
+                                    <td class="border-b border-gray-100 px-4 py-5 dark:border-gray-800">
+                                        @if($log->jam_pulang)
+                                            <p class="inline-flex rounded-full bg-success-50 px-3 py-1 text-xs font-medium text-success-600 dark:bg-success-500/15 dark:text-success-500">Pulang</p>
+                                        @elseif($log->keterangan)
+                                            <p class="inline-flex rounded-full bg-warning-50 px-3 py-1 text-xs font-medium text-warning-600 dark:bg-warning-500/15 dark:text-warning-500">Telat</p>
+                                        @else
+                                            <p class="inline-flex rounded-full bg-info-50 px-3 py-1 text-xs font-medium text-info-600 dark:bg-info-500/15 dark:text-info-500">Masuk</p>
+                                        @endif
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
                 </div>
-                <div class="card-body">
-                    @if($recentLogs->count() > 0)
-                        <div class="table-responsive">
-                            <table class="table table-bordered" width="100%" cellspacing="0">
-                                <thead>
-                                    <tr>
-                                        <th>Nama</th>
-                                        <th>Kelas</th>
-                                        <th>Jam Masuk</th>
-                                        <th>Ket</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach($recentLogs as $log)
-                                        <tr>
-                                            <td>{{ $log->student->nama ?? '-' }}</td>
-                                            <td>{{ $log->student->kelas->nama_kelas ?? '-' }}</td>
-                                            <td>{{ $log->jam_masuk }}</td>
-                                            <td>
-                                                @if($log->jam_pulang)
-                                                    <span class="badge badge-success">Pulang</span>
-                                                @elseif($log->keterangan)
-                                                    <span class="badge badge-warning">Telat</span>
-                                                @else
-                                                    <span class="badge badge-info">Masuk</span>
-                                                @endif
-                                            </td>
-                                        </tr>
-                                    @endforeach
-                                </tbody>
-                            </table>
-                        </div>
-                    @else
-                        <p class="text-center">Belum ada aktivitas hari ini.</p>
-                    @endif
-                </div>
-            </div>
-        </div>
-
-        <!-- Quick Links / Info -->
-        <div class="col-lg-6 mb-4">
-            <div class="card shadow mb-4">
-                <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-primary">Informasi & Pengumuman</h6>
-                </div>
-                <div class="card-body">
-                    <p>Selamat datang di Sistem Absensi RFID v2.0 .</p>
-                    
-                    @if(isset($announcements) && $announcements->count() > 0)
-                        <div class="mt-4">
-                            <h6 class="font-weight-bold">Pengumuman Terbaru:</h6>
-                            <div class="accordion" id="accordionAnnouncements">
-                                @foreach($announcements as $index => $announcement)
-                                    <div class="card mb-2">
-                                        <div class="card-header p-2" id="heading{{ $index }}">
-                                            <h2 class="mb-0">
-                                                <button class="btn btn-link btn-block text-left text-dark font-weight-bold" type="button" data-toggle="collapse" data-target="#collapse{{ $index }}" aria-expanded="{{ $index == 0 ? 'true' : 'false' }}" aria-controls="collapse{{ $index }}">
-                                                    <i class="fas fa-bullhorn text-warning mr-2"></i> {{ $announcement->title }}
-                                                    <small class="float-right text-muted">{{ $announcement->created_at->diffForHumans() }}</small>
-                                                </button>
-                                            </h2>
-                                        </div>
-                                        <div id="collapse{{ $index }}" class="collapse {{ $index == 0 ? 'show' : '' }}" aria-labelledby="heading{{ $index }}" data-parent="#accordionAnnouncements">
-                                            <div class="card-body bg-light">
-                                                {!! nl2br(e($announcement->content)) !!}
-                                            </div>
-                                        </div>
-                                    </div>
-                                @endforeach
-                            </div>
-                        </div>
-                    @endif
-                    
-                    <hr>
-                    <div class="mt-3">
-                        <a href="{{ route('siswa.index') }}" class="btn btn-primary btn-icon-split btn-sm mb-2">
-                            <span class="icon text-white-50"><i class="fas fa-users"></i></span>
-                            <span class="text">Kelola Siswa</span>
-                        </a>
-                        <a href="{{ route('guru.index') }}" class="btn btn-success btn-icon-split btn-sm mb-2">
-                            <span class="icon text-white-50"><i class="fas fa-chalkboard-teacher"></i></span>
-                            <span class="text">Kelola Guru</span>
-                        </a>
-                        <a href="{{ route('absensi.index') }}" class="btn btn-info btn-icon-split btn-sm mb-2">
-                            <span class="icon text-white-50"><i class="fas fa-clipboard-list"></i></span>
-                            <span class="text">Laporan Absensi</span>
-                        </a>
-                    </div>
-                </div>
-            </div>
+            @else
+                <p class="pb-6 text-center text-gray-500 dark:text-gray-400">Belum ada aktivitas hari ini.</p>
+            @endif
         </div>
     </div>
+
+
+</div>
 @endsection
 
 @push('scripts')
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="{{ asset('vendor/chart.js/Chart.min.js') }}"></script>
     <script>
         var ctx = document.getElementById('attendanceChart').getContext('2d');
+        
+        // Define colors based on theme
+        const isDark = document.documentElement.classList.contains('dark');
+        const textColor = isDark ? '#9CA3AF' : '#6B7280';
+        const gridColor = isDark ? '#1F2937' : '#F3F4F6';
+
         var attendanceChart = new Chart(ctx, {
-            type: 'bar', // or 'line'
+            type: 'bar',
             data: {
                 labels: @json($dates),
                 datasets: [
                     {
                         label: 'Hadir (H)',
                         data: @json($chartData['H']),
-                        backgroundColor: 'rgba(28, 200, 138, 0.5)',
-                        borderColor: 'rgba(28, 200, 138, 1)',
-                        borderWidth: 1
+                        backgroundColor: 'rgba(28, 200, 138, 0.8)',
+                        borderRadius: 4
                     },
                     {
                         label: 'Izin (I)',
                         data: @json($chartData['I']),
-                        backgroundColor: 'rgba(54, 185, 204, 0.5)',
-                        borderColor: 'rgba(54, 185, 204, 1)',
-                        borderWidth: 1
+                        backgroundColor: 'rgba(54, 185, 204, 0.8)',
+                        borderRadius: 4
                     },
                     {
                         label: 'Sakit (S)',
                         data: @json($chartData['S']),
-                        backgroundColor: 'rgba(133, 135, 150, 0.5)',
-                        borderColor: 'rgba(133, 135, 150, 1)',
-                        borderWidth: 1
+                        backgroundColor: 'rgba(133, 135, 150, 0.8)',
+                        borderRadius: 4
                     },
                     {
                         label: 'Alpha (A)',
                         data: @json($chartData['A']),
-                        backgroundColor: 'rgba(231, 74, 59, 0.5)',
-                        borderColor: 'rgba(231, 74, 59, 1)',
-                        borderWidth: 1
+                        backgroundColor: 'rgba(231, 74, 59, 0.8)',
+                        borderRadius: 4
                     }
                 ]
             },
             options: {
                 maintainAspectRatio: false,
-                layout: {
-                    padding: {
-                        left: 10,
-                        right: 25,
-                        top: 25,
-                        bottom: 0
+                responsive: true,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'bottom',
+                        labels: {
+                            color: textColor,
+                            padding: 20,
+                            usePointStyle: true,
+                            pointStyle: 'circle'
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: isDark ? '#1F2937' : '#FFFFFF',
+                        titleColor: isDark ? '#FFFFFF' : '#1F2937',
+                        bodyColor: textColor,
+                        borderColor: gridColor,
+                        borderWidth: 1,
+                        padding: 12,
+                        boxPadding: 6,
+                        usePointStyle: true
                     }
                 },
                 scales: {
                     x: {
                         grid: {
                             display: false,
-                            drawBorder: false
                         },
                         ticks: {
+                            color: textColor,
                             maxTicksLimit: 7
                         }
                     },
                     y: {
+                        grid: {
+                            color: gridColor,
+                            drawBorder: false,
+                        },
                         ticks: {
+                            color: textColor,
                             beginAtZero: true,
                             maxTicksLimit: 5,
                             padding: 10,
-                        },
-                        grid: {
-                            color: "rgb(234, 236, 244)",
-                            zeroLineColor: "rgb(234, 236, 244)",
-                            drawBorder: false,
-                            borderDash: [2],
-                            zeroLineBorderDash: [2]
                         }
                     },
-                },
-                legend: {
-                    display: true,
-                    position: 'bottom'
-                },
-                tooltips: {
-                    backgroundColor: "rgb(255,255,255)",
-                    bodyFontColor: "#858796",
-                    titleMarginBottom: 10,
-                    titleFontColor: '#6e707e',
-                    titleFontSize: 14,
-                    borderColor: '#dddfeb',
-                    borderWidth: 1,
-                    xPadding: 15,
-                    yPadding: 15,
-                    displayColors: false,
-                    caretPadding: 10,
-                },
+                }
             }
+        });
+        
+        // Listen for theme changes to update chart colors
+        document.addEventListener('alpine:init', () => {
+            const observer = new MutationObserver((mutations) => {
+                mutations.forEach((mutation) => {
+                    if (mutation.attributeName === 'class') {
+                        const isDark = document.documentElement.classList.contains('dark');
+                        const textColor = isDark ? '#9CA3AF' : '#6B7280';
+                        const gridColor = isDark ? '#1F2937' : '#F3F4F6';
+                        
+                        attendanceChart.options.plugins.legend.labels.color = textColor;
+                        attendanceChart.options.plugins.tooltip.backgroundColor = isDark ? '#1F2937' : '#FFFFFF';
+                        attendanceChart.options.plugins.tooltip.titleColor = isDark ? '#FFFFFF' : '#1F2937';
+                        attendanceChart.options.plugins.tooltip.bodyColor = textColor;
+                        attendanceChart.options.plugins.tooltip.borderColor = gridColor;
+                        attendanceChart.options.scales.x.ticks.color = textColor;
+                        attendanceChart.options.scales.y.ticks.color = textColor;
+                        attendanceChart.options.scales.y.grid.color = gridColor;
+                        
+                        attendanceChart.update();
+                    }
+                });
+            });
+            
+            observer.observe(document.documentElement, { attributes: true });
         });
     </script>
 @endpush

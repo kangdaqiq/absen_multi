@@ -1,398 +1,168 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="h-full">
 
 <head>
     <meta charset="utf-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <meta name="description" content="Sistem Absensi">
-    <meta name="author" content="">
-    <meta name="author" content="">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
 
-    <title>@yield('title', 'Sistem Absensi')</title>
+    <title>{{ $title ?? 'Dashboard' }} | TailAdmin - Laravel Tailwind CSS Admin Dashboard Template</title>
 
-    <!-- Custom fonts for this template-->
+    <!-- Scripts -->
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
+
+    <!-- Font Awesome -->
     <link href="{{ asset('vendor/fontawesome-free/css/all.min.css') }}" rel="stylesheet" type="text/css">
-    <link
-        href="https://fonts.googleapis.com/css?family=Nunito:200,200i,300,300i,400,400i,600,600i,700,700i,800,800i,900,900i"
-        rel="stylesheet">
 
-    <!-- Custom styles for this template-->
-    <link href="{{ asset('css/sb-admin-2.min.css') }}" rel="stylesheet">
-    <!-- DataTables -->
-    <link href="{{ asset('vendor/datatables/dataTables.bootstrap4.min.css') }}" rel="stylesheet">
+    <!-- Alpine.js -->
+    {{-- <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script> --}}
 
-    @stack('styles')
-</head>
-
-<body id="page-top">
-
-    <!-- Page Wrapper -->
-    <div id="wrapper">
-
-        <!-- Sidebar -->
-        <ul class="navbar-nav bg-gradient-primary sidebar sidebar-dark accordion" id="accordionSidebar">
-
-            <!-- Sidebar - Brand -->
-            <a class="sidebar-brand d-flex flex-column align-items-center justify-content-center py-4 mb-2"
-                href="{{ route('dashboard') }}" style="height: auto;">
-                <div class="sidebar-brand-icon mb-2">
-                    @php
-                        $isStorage = \Illuminate\Support\Str::startsWith($school_logo, 'schools/');
-                        $logoUrl = $isStorage ? asset('storage/' . $school_logo) : asset('img/' . $school_logo);
-                    @endphp
-                    <img src="{{ $logoUrl }}" alt="Logo" style="width: 80px; height: 80px; object-fit: contain;">
-                </div>
-                <div class="sidebar-brand-text mx-3 small font-weight-bold"
-                    style="line-height: 1.2; text-align: center;">{{ $school_name }}</div>
-            </a>
-
-            <hr class="sidebar-divider my-0">
-
-            <!-- Dashboard -->
-            <li
-                class="nav-item {{ request()->routeIs('dashboard') || request()->routeIs('super-admin.dashboard') ? 'active' : '' }}">
-                <a class="nav-link"
-                    href="{{ auth()->user()->role === 'super_admin' ? route('super-admin.dashboard') : route('dashboard') }}">
-                    <i class="fas fa-fw fa-tachometer-alt"></i>
-                    <span>Dashboard</span>
-                </a>
-            </li>
-
-            <hr class="sidebar-divider">
-
-            <div class="sidebar-heading">Menu</div>
-
-            <!-- Super Admin Menu -->
-            @if(auth()->user()->role === 'super_admin')
-                <li class="nav-item {{ request()->routeIs('super-admin.schools.*') ? 'active' : '' }}">
-                    <a class="nav-link" href="{{ route('super-admin.schools.index') }}">
-                        <i class="fas fa-school"></i>
-                        <span>Data Sekolah</span>
-                    </a>
-                </li>
-                <li class="nav-item {{ request()->routeIs('super-admin.whatsapp-devices.*') ? 'active' : '' }}">
-                    <a class="nav-link" href="{{ route('super-admin.whatsapp-devices.index') }}">
-                        <i class="fab fa-whatsapp text-success"></i>
-                        <span>Status WA Device</span>
-                    </a>
-                </li>
-                <li class="nav-item {{ request()->routeIs('super-admin.announcements.*') ? 'active' : '' }}">
-                    <a class="nav-link" href="{{ route('super-admin.announcements.index') }}">
-                        <i class="fas fa-bullhorn"></i>
-                        <span>Pengumuman</span>
-                    </a>
-                </li>
-            @endif
-
-            <!-- Data Siswa -->
-            @if(in_array(auth()->user()->role, ['admin', 'teacher']))
-                <li class="nav-item {{ request()->routeIs('siswa.*') ? 'active' : '' }}">
-                    <a class="nav-link" href="{{ route('siswa.index') }}">
-                        <i class="fas fa-users"></i>
-                        <span>Data Siswa</span>
-                    </a>
-                </li>
-
-                <!-- Data Guru -->
-                <li class="nav-item {{ request()->routeIs('guru.*') ? 'active' : '' }}">
-                    <a class="nav-link" href="{{ route('guru.index') }}">
-                        <i class="fas fa-user-tie"></i>
-                        <span>Data Guru</span>
-                    </a>
-                </li>
-
-                <!-- Broadcast WA -->
-                @if(auth()->user()->school && auth()->user()->school->wa_enabled)
-                    <li class="nav-item {{ request()->routeIs('broadcast.*') ? 'active' : '' }}">
-                        <a class="nav-link" href="{{ route('broadcast.index') }}">
-                            <i class="fab fa-whatsapp"></i>
-                            <span>Broadcast WA</span>
-                        </a>
-                    </li>
-                @endif
-            @endif
-
-
-
-            <!-- Absensi Collapse -->
-            @if(in_array(auth()->user()->role, ['admin', 'teacher']))
-                @php
-                    $isAbsensiActive = request()->routeIs('absensi.*') ||
-                        request()->routeIs('absensi-guru.*') ||
-                        request()->routeIs('rekap.*') ||
-                        request()->routeIs('rekap-guru.*');
-                @endphp
-                <li class="nav-item {{ $isAbsensiActive ? 'active' : '' }}">
-                    <a class="nav-link {{ $isAbsensiActive ? '' : 'collapsed' }}" href="#" data-toggle="collapse"
-                        data-target="#collapseAbsensi" aria-expanded="true" aria-controls="collapseAbsensi">
-                        <i class="fas fa-calendar-check"></i>
-                        <span>Absensi</span>
-                    </a>
-                    <div id="collapseAbsensi" class="collapse {{ $isAbsensiActive ? 'show' : '' }}"
-                        aria-labelledby="headingAbsensi" data-parent="#accordionSidebar">
-                        <div class="bg-white py-2 collapse-inner rounded">
-                            <a class="collapse-item {{ request()->routeIs('absensi.*') ? 'active' : '' }}"
-                                href="{{ route('absensi.index') }}">Absensi Siswa</a>
-                            <a class="collapse-item {{ request()->routeIs('absensi-guru.*') ? 'active' : '' }}"
-                                href="{{ route('absensi-guru.index') }}">Absensi Guru</a>
-                            <a class="collapse-item {{ request()->routeIs('rekap.index') ? 'active' : '' }}"
-                                href="{{ route('rekap.index') }}">Rekap Siswa</a>
-                            <a class="collapse-item {{ request()->routeIs('rekap-guru.*') ? 'active' : '' }}"
-                                href="{{ route('rekap-guru.index') }}">Rekap Guru</a>
-                        </div>
-                    </div>
-                </li>
-            @endif
-
-
-            <!-- Master Data Collapse -->
-            @if(auth()->user()->role === 'admin')
-                @php
-                    $isMasterActive = request()->routeIs('kelas.*');
-                @endphp
-                <li class="nav-item {{ $isMasterActive ? 'active' : '' }}">
-                    <a class="nav-link {{ $isMasterActive ? '' : 'collapsed' }}" href="#" data-toggle="collapse"
-                        data-target="#collapseMaster" aria-expanded="true" aria-controls="collapseMaster">
-                        <i class="fas fa-database"></i>
-                        <span>Master Data</span>
-                    </a>
-                    <div id="collapseMaster" class="collapse {{ $isMasterActive ? 'show' : '' }}"
-                        aria-labelledby="headingMaster" data-parent="#accordionSidebar">
-                        <div class="bg-white py-2 collapse-inner rounded">
-                            <a class="collapse-item {{ request()->routeIs('kelas.*') ? 'active' : '' }}"
-                                href="{{ route('kelas.index') }}">Kelas</a>
-                        </div>
-                    </div>
-                </li>
-            @endif
-
-            <!-- Konfigurasi Collapse -->
-            @if(auth()->user()->role === 'admin')
-                @php
-                    $isKonfigurasiActive = request()->routeIs('jadwal.*') ||
-                        request()->routeIs('devices.*') ||
-                        request()->routeIs('settings.*') ||
-                        request()->routeIs('whatsapp.device.*');
-                @endphp
-                <li class="nav-item {{ $isKonfigurasiActive ? 'active' : '' }}">
-                    <a class="nav-link {{ $isKonfigurasiActive ? '' : 'collapsed' }}" href="#" data-toggle="collapse"
-                        data-target="#collapseKonfigurasi" aria-expanded="true" aria-controls="collapseKonfigurasi">
-                        <i class="fas fa-cogs"></i>
-                        <span>Konfigurasi</span>
-                    </a>
-                    <div id="collapseKonfigurasi" class="collapse {{ $isKonfigurasiActive ? 'show' : '' }}"
-                        aria-labelledby="headingKonfigurasi" data-parent="#accordionSidebar">
-                        <div class="bg-white py-2 collapse-inner rounded">
-                            <a class="collapse-item {{ request()->routeIs('jadwal.*') ? 'active' : '' }}"
-                                href="{{ route('jadwal.index') }}">Jam Masuk/Pulang</a>
-
-                            <a class="collapse-item {{ request()->routeIs('devices.*') ? 'active' : '' }}"
-                                href="{{ route('devices.index') }}">Device</a>
-                            <a class="collapse-item {{ request()->routeIs('settings.*') ? 'active' : '' }}"
-                                href="{{ route('settings.index') }}">Pengaturan Umum</a>
-                            @if(auth()->user()->school && auth()->user()->school->wa_enabled)
-                                <a class="collapse-item {{ request()->routeIs('whatsapp.device.*') ? 'active' : '' }}"
-                                    href="{{ route('whatsapp.device.index') }}">WhatsApp Device</a>
-                            @endif
-                        </div>
-                    </div>
-                </li>
-            @endif
-
-            <!-- Sistem Collapse -->
-            @php
-                    $isSistemActive = request()->routeIs('users.*') ||
-                        request()->routeIs('backup.*') ||
-                        request()->routeIs('backups.*') ||
-                        request()->routeIs('whatsapp-logs.*') ||
-                        request()->routeIs('api-logs.*');
-                @endphp
-                @if(in_array(auth()->user()->role, ['admin', 'super_admin']))
-                    <li class="nav-item {{ $isSistemActive ? 'active' : '' }}">
-                        <a class="nav-link {{ $isSistemActive ? '' : 'collapsed' }}" href="#" data-toggle="collapse"
-                            data-target="#collapseSistem" aria-expanded="true" aria-controls="collapseSistem">
-                            <i class="fas fa-server"></i>
-                            <span>Sistem</span>
-                        </a>
-                        <div id="collapseSistem" class="collapse {{ $isSistemActive ? 'show' : '' }}"
-                            aria-labelledby="headingSistem" data-parent="#accordionSidebar">
-                            <div class="bg-white py-2 collapse-inner rounded">
-                                <a class="collapse-item {{ request()->routeIs('users.*') ? 'active' : '' }}"
-                                    href="{{ route('users.index') }}">Manajemen Admin</a>
-
-                                <a class="collapse-item {{ request()->routeIs('backup.index') ? 'active' : '' }}"
-                                    href="{{ route('backup.index') }}">Backup & Restore</a>
-
-                                @if(auth()->user()->role === 'super_admin')
-                                    <a class="collapse-item {{ request()->routeIs('backups.*') ? 'active' : '' }}"
-                                        href="{{ route('backups.index') }}">Backup Sistem (SQL)</a>
-                                @endif
-
-                                <a class="collapse-item {{ request()->routeIs('whatsapp-logs.*') ? 'active' : '' }}"
-                                    href="{{ route('whatsapp-logs.index') }}">Log WhatsApp</a>
-                                <a class="collapse-item {{ request()->routeIs('api-logs.*') ? 'active' : '' }}"
-                                    href="{{ route('api-logs.index') }}">Log API</a>
-                            </div>
-                        </div>
-                    </li>
-                @endif
-
-
-
-            <hr class="sidebar-divider d-none d-md-block">
-
-            <!-- Logo at Bottom Removed -->
-
-            <div class="text-center d-none d-md-inline">
-                <button class="rounded-circle border-0" id="sidebarToggle"></button>
-            </div>
-
-        </ul>
-        <!-- End of Sidebar -->
-
-        <!-- Content Wrapper -->
-        <div id="content-wrapper" class="d-flex flex-column">
-
-            <!-- Main Content -->
-            <div id="content">
-
-                <!-- Topbar -->
-                <nav class="navbar navbar-expand navbar-light bg-white topbar mb-4 shadow">
-
-                    <button id="sidebarToggleTop" class="btn btn-link d-md-none rounded-circle mr-3">
-                        <i class="fa fa-bars"></i>
-                    </button>
-
-                    <h5 class="font-weight-bold mb-0 ml-3">Sistem Absensi {{ $school_name }}</h5>
-
-                    <ul class="navbar-nav ml-auto">
-
-                        <li class="nav-item dropdown no-arrow">
-                            <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button"
-                                data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                                <span class="mr-2 d-none d-lg-inline text-gray-600 small">
-                                    {{ auth()->user()->full_name }} ({{ ucfirst(auth()->user()->role) }})
-                                </span>
-                                <img class="img-profile rounded-circle"
-                                    src="https://ui-avatars.com/api/?name={{ urlencode(auth()->user()->full_name) }}">
-                            </a>
-                            <!-- Dropdown - User Information -->
-                            <div class="dropdown-menu dropdown-menu-right shadow animated--grow-in"
-                                aria-labelledby="userDropdown">
-                                <a class="dropdown-item" href="{{ route('profile.edit') }}">
-                                    <i class="fas fa-user fa-sm fa-fw mr-2 text-gray-400"></i>
-                                    Profile
-                                </a>
-                                <div class="dropdown-divider"></div>
-                                <a class="dropdown-item" href="#" data-toggle="modal" data-target="#logoutModal">
-                                    <i class="fas fa-sign-out-alt fa-sm fa-fw mr-2 text-gray-400"></i>
-                                    Logout
-                                </a>
-                            </div>
-                        </li>
-
-                    </ul>
-
-                </nav>
-                <!-- End of Topbar -->
-
-                <!-- Begin Page Content -->
-                <div class="container-fluid">
-
-                    @if(session('success'))
-                        <div class="alert alert-success alert-dismissible fade show" role="alert">
-                            {{ session('success') }}
-                            <button type="button" class="close" data-dismiss="alert">&times;</button>
-                        </div>
-                    @endif
-
-                    @if(session('error'))
-                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                            {{ session('error') }}
-                            <button type="button" class="close" data-dismiss="alert">&times;</button>
-                        </div>
-                    @endif
-
-                    @yield('content')
-
-                </div>
-                <!-- /.container-fluid -->
-
-            </div>
-            <!-- End of Main Content -->
-
-            <!-- Footer -->
-            <footer class="sticky-footer bg-white">
-                <div class="container my-auto">
-                    <div class="copyright text-center my-auto">
-                        <span>&copy; {{ date('Y') }} {{ $school_name }} - developed with ❤️ by KangDaQiQ</span>
-                    </div>
-                </div>
-            </footer>
-            <!-- End of Footer -->
-
-        </div>
-        <!-- End of Content Wrapper -->
-
-    </div>
-    <!-- End of Page Wrapper -->
-
-    <!-- Scroll to Top Button-->
-    <a class="scroll-to-top rounded" href="#page-top">
-        <i class="fas fa-angle-up"></i>
-    </a>
-
-    <!-- Logout Modal-->
-    <div class="modal fade" id="logoutModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalLabel"
-        aria-hidden="true">
-        <div class="modal-dialog" role="document">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="exampleModalLabel">Yakin ingin keluar?</h5>
-                    <button class="close" type="button" data-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">×</span>
-                    </button>
-                </div>
-                <div class="modal-body">Yakin ingin keluar?</div>
-                <div class="modal-footer">
-                    <button class="btn btn-secondary" type="button" data-dismiss="modal">Cancel</button>
-                    <form action="{{ route('logout') }}" method="POST">
-                        @csrf
-                        <button type="submit" class="btn btn-primary">Logout</button>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Bootstrap core JavaScript-->
-    <script src="{{ asset('vendor/jquery/jquery.min.js') }}"></script>
-    <script src="{{ asset('vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
-
-    <!-- Core plugin JavaScript-->
-    <script src="{{ asset('vendor/jquery-easing/jquery.easing.min.js') }}"></script>
-
-    <!-- Custom scripts for all pages-->
-    <script src="{{ asset('js/sb-admin-2.min.js') }}"></script>
-
-    <!-- Page level plugins -->
-    <script src="{{ asset('vendor/datatables/jquery.dataTables.min.js') }}"></script>
-    <script src="{{ asset('vendor/datatables/dataTables.bootstrap4.min.js') }}"></script>
-
+    <!-- Theme Store -->
     <script>
-        $(document).ready(function () {
-            // Auto-close alerts after 3 seconds, excluding those with 'alert-static' class
-            window.setTimeout(function () {
-                $(".alert:not(.alert-static)").fadeTo(500, 0).slideUp(500, function () {
-                    $(this).remove();
-                });
-            }, 3000);
+        document.addEventListener('alpine:init', () => {
+            Alpine.store('theme', {
+                init() {
+                    const savedTheme = localStorage.getItem('theme');
+                    const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' :
+                        'light';
+                    this.theme = savedTheme || systemTheme;
+                    this.updateTheme();
+                },
+                theme: 'light',
+                toggle() {
+                    this.theme = this.theme === 'light' ? 'dark' : 'light';
+                    localStorage.setItem('theme', this.theme);
+                    this.updateTheme();
+                },
+                updateTheme() {
+                    const html = document.documentElement;
+                    const body = document.body;
+                    if (this.theme === 'dark') {
+                        html.classList.add('dark');
+                        body.classList.add('dark', 'bg-gray-900');
+                    } else {
+                        html.classList.remove('dark');
+                        body.classList.remove('dark', 'bg-gray-900');
+                    }
+                }
+            });
+
+            Alpine.store('sidebar', {
+                // Initialize based on screen size
+                isExpanded: window.innerWidth >= 1280, // true for desktop, false for mobile
+                isMobileOpen: false,
+                isHovered: false,
+
+                toggleExpanded() {
+                    this.isExpanded = !this.isExpanded;
+                    // When toggling desktop sidebar, ensure mobile menu is closed
+                    this.isMobileOpen = false;
+                },
+
+                toggleMobileOpen() {
+                    this.isMobileOpen = !this.isMobileOpen;
+                    // Don't modify isExpanded when toggling mobile menu
+                },
+
+                setMobileOpen(val) {
+                    this.isMobileOpen = val;
+                },
+
+                setHovered(val) {
+                    // Only allow hover effects on desktop when sidebar is collapsed
+                    if (window.innerWidth >= 1280 && !this.isExpanded) {
+                        this.isHovered = val;
+                    }
+                }
+            });
         });
     </script>
 
-    @stack('scripts')
+    <!-- Apply dark mode immediately to prevent flash -->
+    <script>
+        (function() {
+            const savedTheme = localStorage.getItem('theme');
+            const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            const theme = savedTheme || systemTheme;
+            if (theme === 'dark') {
+                document.documentElement.classList.add('dark');
+                document.body.classList.add('dark', 'bg-gray-900');
+            } else {
+                document.documentElement.classList.remove('dark');
+                document.body.classList.remove('dark', 'bg-gray-900');
+            }
+        })();
+    </script>
+    
+</head>
+
+<body
+    x-data="{ 'loaded': true}"
+    x-init="$store.sidebar.isExpanded = window.innerWidth >= 1280;
+    const checkMobile = () => {
+        if (window.innerWidth < 1280) {
+            $store.sidebar.setMobileOpen(false);
+            $store.sidebar.isExpanded = false;
+        } else {
+            $store.sidebar.isMobileOpen = false;
+            $store.sidebar.isExpanded = true;
+        }
+    };
+    window.addEventListener('resize', checkMobile);">
+
+    {{-- preloader --}}
+    <x-common.preloader/>
+    {{-- preloader end --}}
+
+    <div class="min-h-screen xl:flex">
+        @include('layouts.backdrop')
+        @include('layouts.sidebar')
+
+        <div class="flex-1 transition-all duration-300 ease-in-out"
+            :class="{
+                'xl:ml-[290px]': $store.sidebar.isExpanded || $store.sidebar.isHovered,
+                'xl:ml-[90px]': !$store.sidebar.isExpanded && !$store.sidebar.isHovered,
+                'ml-0': $store.sidebar.isMobileOpen
+            }">
+            <!-- app header start -->
+            @include('layouts.app-header')
+            <!-- app header end -->
+            <div class="p-4 mx-auto max-w-(--breakpoint-2xl) md:p-6">
+                @yield('content')
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Client-side Search Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const searchInputs = document.querySelectorAll('.client-search');
+            searchInputs.forEach(input => {
+                input.addEventListener('input', function() {
+                    const searchTerm = this.value.toLowerCase();
+                    const table = document.querySelector('table');
+                    if (!table) return;
+                    
+                    const rows = table.querySelectorAll('tbody tr');
+                    rows.forEach(row => {
+                        // Skip empty state rows
+                        if (row.querySelector('td[colspan]')) return;
+                        
+                        const text = row.textContent.toLowerCase();
+                        if (text.includes(searchTerm)) {
+                            row.style.display = '';
+                        } else {
+                            row.style.display = 'none';
+                        }
+                    });
+                });
+            });
+        });
+    </script>
 
 </body>
+
+@stack('scripts')
 
 </html>

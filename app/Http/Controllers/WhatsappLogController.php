@@ -7,7 +7,7 @@ use App\Models\MessageQueue;
 
 class WhatsappLogController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         $query = MessageQueue::orderBy('created_at', 'desc');
 
@@ -20,7 +20,13 @@ class WhatsappLogController extends Controller
             }
         }
 
-        $logs = $query->paginate(20);
+        if ($request->has('search') && !empty($request->search)) {
+            $search = $request->search;
+            $query->where('phone_number', 'like', "%{$search}%")
+                  ->orWhere('message', 'like', "%{$search}%");
+        }
+
+        $logs = $query->paginate(20)->withQueryString();
         return view('whatsapp.logs', compact('logs'));
     }
 }

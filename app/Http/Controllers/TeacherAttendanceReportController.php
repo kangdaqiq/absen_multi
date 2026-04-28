@@ -59,22 +59,32 @@ class TeacherAttendanceReportController extends Controller
             ];
         });
 
-        return view('teacher-attendance.index', compact('report', 'dateStr', 'dayName'));
+        // 6. Filter by Status (server-side)
+        $filterStatus = $request->input('status', '');
+        if ($filterStatus !== '') {
+            $report = $report->filter(fn($item) => $item['status'] === $filterStatus)->values();
+        }
+
+        return view('teacher-attendance.index', compact('report', 'dateStr', 'dayName', 'filterStatus'));
     }
 
     public function store(Request $request)
     {
         $request->validate([
             'guru_id' => 'required|exists:guru,id',
-            'jadwal_pelajaran_id' => 'required|exists:jadwal_pelajaran,id',
+            'jadwal_pelajaran_id' => 'nullable|exists:jadwal_pelajaran,id',
             'tanggal' => 'required|date',
-            'status' => 'required|in:Hadir,Tidak Hadir',
+            'status' => 'required',
+            'jam_masuk' => 'nullable|date_format:H:i',
+            'jam_pulang' => 'nullable|date_format:H:i',
+            'keterangan' => 'nullable|string|max:255',
         ]);
 
         $data = [
             'guru_id' => $request->guru_id,
             'jadwal_pelajaran_id' => $request->jadwal_pelajaran_id,
             'tanggal' => $request->tanggal,
+            'school_id' => auth()->user()->school_id ?? null,
         ];
 
         // Jika Hadir, set waktu_hadir sekarang (jika belum ada) atau tetap
@@ -83,18 +93,36 @@ class TeacherAttendanceReportController extends Controller
 
         $updateData = [
             'status' => $request->status,
+            'jam_masuk' => $request->jam_masuk,
+            'jam_pulang' => $request->jam_pulang,
+            'keterangan' => $request->keterangan,
         ];
-
-        if ($request->status == 'Hadir') {
-            // Opsional: set waktu hadir jika record baru
-            $updateData['waktu_hadir'] = Carbon::now();
-        } else {
-            $updateData['waktu_hadir'] = null; // Reset jika tidak hadir? Atau biarkan? 
-            // Better to nullify if not Present
-        }
 
         AbsensiGuru::updateOrCreate($data, $updateData);
 
         return redirect()->back()->with('success', 'Status absensi berhasil diperbarui.');
+    }
+
+    public function destroy(Request $request)
+    {
+        $request->validate([
+            'guru_id' => 'required',
+            'tanggal' => 'required|date',
+        ]);
+
+        $guruId = $request->guru_id;
+        $date = $request->tanggal;
+
+        $att = AbsensiGuru::where('guru_id', $guruId)
+            ->where('tanggal', $date)
+            ->whereNull('jadwal_pelajaran_id')
+            ->first();
+
+        if ($att) {
+            $att->delete();
+            return back()->with('success', 'Data absensi berhasil dihapus.');
+        }
+
+        return back()->with('error', 'Data absensi tidak ditemukan.');
     }
 }

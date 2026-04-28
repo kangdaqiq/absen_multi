@@ -10,13 +10,21 @@ use App\Http\Controllers\GuruController;
 use App\Http\Controllers\SiswaController;
 use App\Http\Controllers\DeviceController;
 
+// ── License Pages (no auth, no license check — must be first) ────────────
+Route::get('/license/invalid', fn () => view('license.invalid'))->name('license.invalid');
+Route::get('/license/expired', fn () => view('license.expired', [
+    'licenseExpiredAt' => cache()->get('license_expired_at'),
+]))->name('license.expired');
+
+
 Route::get('/login', [AuthController::class, 'showLoginForm'])->name('login');
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
 // Super Admin Routes
-Route::middleware(['auth'])->prefix('super-admin')->name('super-admin.')->group(function () {
+Route::middleware(['auth', 'self_hosted_guard'])->prefix('super-admin')->name('super-admin.')->group(function () {
     Route::middleware('role:super_admin')->group(function () {
+
         Route::get('/dashboard', [App\Http\Controllers\SuperAdmin\DashboardController::class, 'index'])->name('dashboard');
 
         // Schools Management
@@ -31,6 +39,10 @@ Route::middleware(['auth'])->prefix('super-admin')->name('super-admin.')->group(
         // Announcements
         Route::resource('announcements', App\Http\Controllers\SuperAdmin\AnnouncementController::class)->except(['show']);
 
+        // Licenses (Self-Hosted)
+        Route::patch('licenses/{license}/regenerate', [App\Http\Controllers\SuperAdmin\LicenseController::class, 'regenerate'])->name('licenses.regenerate');
+        Route::resource('licenses', App\Http\Controllers\SuperAdmin\LicenseController::class)->only(['index', 'store', 'update', 'destroy']);
+
         // WhatsApp Devices Overview
         Route::get('/whatsapp-devices', [App\Http\Controllers\SuperAdmin\WhatsappDevicesController::class, 'index'])->name('whatsapp-devices.index');
         Route::get('/whatsapp-devices/{schoolId}/status', [App\Http\Controllers\SuperAdmin\WhatsappDevicesController::class, 'status'])->name('whatsapp-devices.status');
@@ -43,6 +55,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/profile', [App\Http\Controllers\ProfileController::class, 'edit'])->name('profile.edit');
     Route::put('/profile', [App\Http\Controllers\ProfileController::class, 'update'])->name('profile.update');
+    Route::get('/support', [App\Http\Controllers\SupportController::class, 'index'])->name('support.index');
 
     // Admin & Teacher Routes
     Route::middleware('role:admin,teacher')->group(function () {
@@ -57,6 +70,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/absensi', [App\Http\Controllers\AttendanceController::class, 'index'])->name('absensi.index');
         Route::get('/absensi/guru', [App\Http\Controllers\TeacherAttendanceReportController::class, 'index'])->name('absensi-guru.index');
         Route::post('/absensi/guru/store', [App\Http\Controllers\TeacherAttendanceReportController::class, 'store'])->name('absensi-guru.store');
+        Route::delete('/absensi/guru/destroy', [App\Http\Controllers\TeacherAttendanceReportController::class, 'destroy'])->name('absensi-guru.destroy');
         Route::post('/absensi/update', [App\Http\Controllers\AttendanceController::class, 'update'])->name('absensi.update');
         Route::delete('/absensi/destroy', [App\Http\Controllers\AttendanceController::class, 'destroy'])->name('absensi.destroy');
 
@@ -115,6 +129,19 @@ Route::middleware('auth')->group(function () {
         Route::get('/backup', [App\Http\Controllers\SchoolBackupController::class, 'index'])->name('backup.index');
         Route::get('/backup/download', [App\Http\Controllers\SchoolBackupController::class, 'download'])->name('backup.download');
         Route::post('/backup/restore', [App\Http\Controllers\SchoolBackupController::class, 'restore'])->name('backup.restore');
+
+        // Schedule Broadcast
+        Route::get('broadcast/schedule', [App\Http\Controllers\BroadcastController::class, 'createSchedule'])->name('broadcast.schedule.create');
+        Route::post('broadcast/schedule', [App\Http\Controllers\BroadcastController::class, 'storeSchedule'])->name('broadcast.schedule.store');
+        Route::delete('broadcast/schedule/{id}', [App\Http\Controllers\BroadcastController::class, 'destroySchedule'])->name('broadcast.schedule.destroy');
+
+        // Gate Cards
+        Route::resource('gate-cards', App\Http\Controllers\GateCardController::class)->except(['show']);
+        Route::get('gate-cards/{gateCard}/request-enroll', [App\Http\Controllers\GateCardController::class, 'requestEnroll'])->name('gate-cards.request-enroll');
+        Route::post('/gate-cards/{id}/enroll', [App\Http\Controllers\GateCardController::class, 'enrollRequest']);
+        Route::post('/gate-cards/{id}/enroll-cancel', [App\Http\Controllers\GateCardController::class, 'cancelEnroll']);
+        Route::get('/gate-cards/{id}/enroll-check', [App\Http\Controllers\GateCardController::class, 'enrollCheck']);
+        Route::post('/gate-cards/{id}/delete-uid', [App\Http\Controllers\GateCardController::class, 'deleteUid']);
 
         // Backups
         Route::get('/backups', [App\Http\Controllers\BackupController::class, 'index'])->name('backups.index');

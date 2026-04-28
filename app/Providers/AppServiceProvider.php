@@ -20,7 +20,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        \Illuminate\Pagination\Paginator::useBootstrap();
+        \Illuminate\Pagination\Paginator::useTailwind();
         \Carbon\Carbon::setLocale('id');
 
         // Only force HTTPS on production domain

@@ -93,6 +93,20 @@ class WhatsappDeviceController extends Controller
                 ->withHeaders(['X-Device-Id' => $deviceId])
                 ->get("{$base}/app/login");
 
+            // Auto-create device if it was deleted / not found
+            if ($loginRes->status() === 404 && str_contains($loginRes->body(), 'DEVICE_NOT_FOUND')) {
+                // Try creating device_id
+                Http::timeout(10)
+                    ->withBasicAuth($user, $pass)
+                    ->post("{$base}/api/devices", ['device_id' => $deviceId]);
+                
+                // Retry login
+                $loginRes = Http::timeout(25)
+                    ->withBasicAuth($user, $pass)
+                    ->withHeaders(['X-Device-Id' => $deviceId])
+                    ->get("{$base}/app/login");
+            }
+
             if ($loginRes->successful()) {
                 $loginData  = $loginRes->json();
                 $qrLink     = $loginData['results']['qr_link']     ?? null;

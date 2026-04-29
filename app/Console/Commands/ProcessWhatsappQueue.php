@@ -22,14 +22,14 @@ class ProcessWhatsappQueue extends Command
 
         \Illuminate\Support\Facades\DB::transaction(function () use ($limit, &$messages) {
             $candidates = MessageQueue::query()
-                ->select('message_queue.*')
-                ->leftJoin('schools', 'message_queue.school_id', '=', 'schools.id')
-                ->where('message_queue.status', 'pending')
+                ->select('message_queues.*')
+                ->leftJoin('schools', 'message_queues.school_id', '=', 'schools.id')
+                ->where('message_queues.status', 'pending')
                 ->where(function ($q) {
-                    $q->whereNull('message_queue.school_id')
+                    $q->whereNull('message_queues.school_id')
                         ->orWhere('schools.wa_enabled', true);
                 })
-                ->orderBy('message_queue.created_at', 'asc')
+                ->orderBy('message_queues.created_at', 'asc')
                 ->limit($limit)
                 ->lockForUpdate()
                 ->get();

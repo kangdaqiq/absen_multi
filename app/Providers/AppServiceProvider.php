@@ -23,8 +23,11 @@ class AppServiceProvider extends ServiceProvider
         \Illuminate\Pagination\Paginator::useTailwind();
         \Carbon\Carbon::setLocale('id');
 
-        // Only force HTTPS on production domain
-        if (str_contains(request()->getHost(), 'smkassuniyah.sch.id')) {
+        // Force HTTPS if accessed via secure proxy, explicitly secure, or in production env
+        if (request()->header('x-forwarded-proto') === 'https' ||
+            request()->isSecure() ||
+            app()->environment('production') ||
+            env('FORCE_HTTPS', false)) {
             URL::forceScheme('https');
         }
 

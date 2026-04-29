@@ -1,29 +1,6 @@
-'school_id' => $device->school_id, // Ensure API logs also track school_id if possible, but WA service needs it.
-// Wait, this is ApiLog, not WA.
-// Checking where WA is called in FingerprintController...
-// It seems FingerprintController calls handleStudentAttendance, which calls WA?
-// Let's check handleStudentAttendance method in FingerprintController.
-// Actually, handleStudentAttendance logic is inside FingerprintController.php (lines 282-446)
-// But wait, the file I viewed for FingerprintController DOES NOT seem to have specific WA calls inside handleScan for
-TEACHER?
-// Line 223: $this->attendanceService->handleAttendance($guru);
-// This service might handle WA?
-// Let's check TeacherAttendanceService.
-// But for Student, it calls handleStudentAttendance (line 271).
-// Inside handleStudentAttendance (lines 282+):
-// It does NOT seem to call $this->wa->send... in the code I viewed earlier?
-// Let me re-verify FingerprintController content.
-// Ah, I see sendCheckOut call at line 461 in RfidController.
-// Does FingerprintController have it?
-// Yes, I should check the file content of FingerprintController again.
-// Viewing file 1434...
-// Line 510: $this->wa->sendCheckIn(...)
-// Line 461? No, logic is similar but maybe lines differ.
-// Let's check the code snippet I have for FingerprintController.
-
+<?php
 
 namespace App\Http\Controllers\Api;
-
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;

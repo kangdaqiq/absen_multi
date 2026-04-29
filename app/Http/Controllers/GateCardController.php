@@ -12,7 +12,8 @@ class GateCardController extends Controller
     {
         $schoolId = auth()->user()->school_id;
         $gateCards = GateCard::where('school_id', $schoolId)->get();
-        return view('gate-cards.index', compact('gateCards'));
+        $gurus = Guru::where('school_id', $schoolId)->orderBy('nama')->get();
+        return view('gate-cards.index', compact('gateCards', 'gurus'));
     }
 
     public function create()

@@ -15,8 +15,13 @@
             const t = localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
             if (t === 'dark') {
                 document.documentElement.classList.add('dark');
-                document.body && document.body.classList.add('dark', 'bg-gray-900');
             }
+            
+            document.addEventListener('DOMContentLoaded', () => {
+                if (t === 'dark') {
+                    document.body.classList.add('dark', 'bg-gray-900');
+                }
+            });
         })();
     </script>
 </head>

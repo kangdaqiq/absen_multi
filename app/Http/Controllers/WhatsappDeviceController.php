@@ -95,11 +95,24 @@ class WhatsappDeviceController extends Controller
 
             // Auto-create device if it was deleted / not found
             if ($loginRes->status() === 404 && str_contains($loginRes->body(), 'DEVICE_NOT_FOUND')) {
-                // Try creating device_id
-                Http::timeout(10)
+                // Try creating device_id. Send all possible variations to ensure compatibility
+                $createRes = Http::timeout(10)
                     ->withBasicAuth($user, $pass)
-                    ->post("{$base}/api/devices", ['device_id' => $deviceId]);
+                    ->post("{$base}/api/devices", [
+                        'device_id' => $deviceId,
+                        'device'    => $deviceId,
+                        'id'        => $deviceId,
+                        'name'      => $deviceId
+                    ]);
                 
+                if (!$createRes->successful()) {
+                    return response()->json([
+                        'status'  => 'error',
+                        'message' => 'Gagal membuat device otomatis. WA API error (HTTP ' . $createRes->status() . ')',
+                        'debug'   => $createRes->body(),
+                    ], 500);
+                }
+
                 // Retry login
                 $loginRes = Http::timeout(25)
                     ->withBasicAuth($user, $pass)

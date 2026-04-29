@@ -173,6 +173,7 @@ Route::middleware('auth')->group(function () {
             Route::get('/whatsapp-device/status', [App\Http\Controllers\WhatsappDeviceController::class, 'status'])->name('whatsapp.device.status');
             Route::get('/whatsapp-device/check', [App\Http\Controllers\WhatsappDeviceController::class, 'check'])->name('whatsapp.device.check');
             Route::post('/whatsapp-device/logout', [App\Http\Controllers\WhatsappDeviceController::class, 'logout'])->name('whatsapp.device.logout');
+            Route::post('/whatsapp-device/test', [App\Http\Controllers\WhatsappDeviceController::class, 'testMessage'])->name('whatsapp.device.test');
             Route::get('/whatsapp-device/qr-proxy', [App\Http\Controllers\WhatsappDeviceController::class, 'qrProxy'])->name('whatsapp.device.qr-proxy');
         });
     });

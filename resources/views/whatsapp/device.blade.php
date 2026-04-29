@@ -48,6 +48,24 @@
                         <h4 class="mb-2 text-2xl font-bold text-success-600 dark:text-success-500">WhatsApp Terhubung!</h4>
                         <p class="mb-8 text-gray-500 dark:text-gray-400 max-w-md mx-auto">Nomor WhatsApp sekolah ini sudah
                             aktif dan siap digunakan untuk mengirim notifikasi absensi.</p>
+
+                        <!-- Form Test WA -->
+                        <div class="mb-8 max-w-md mx-auto p-5 bg-gray-50 border border-gray-100 dark:border-gray-700 dark:bg-gray-800 rounded-xl text-left">
+                            <h5 class="mb-4 text-base font-semibold text-gray-800 dark:text-white"><i class="fas fa-paper-plane text-brand-500 mr-2"></i>Uji Coba Pengiriman</h5>
+                            <div class="flex flex-col gap-4">
+                                <div>
+                                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Nomor Tujuan</label>
+                                    <input type="text" id="testWaNumber" placeholder="Contoh: 081234567890" class="w-full rounded border border-stroke bg-white py-2 px-3 text-sm outline-none transition focus:border-brand-500 active:border-brand-500 dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-brand-500">
+                                </div>
+                                <div>
+                                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Isi Pesan</label>
+                                    <textarea id="testWaMessage" rows="2" placeholder="Halo, ini pesan percobaan dari sistem absensi..." class="w-full rounded border border-stroke bg-white py-2 px-3 text-sm outline-none transition focus:border-brand-500 active:border-brand-500 dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-brand-500"></textarea>
+                                </div>
+                                <button id="btnTestWa" onclick="testWaMessage()" class="inline-flex justify-center items-center gap-2 rounded bg-brand-500 py-2 px-4 text-sm font-medium text-white hover:bg-opacity-90 transition">
+                                    <i class="fas fa-paper-plane"></i> Kirim Pesan Tes
+                                </button>
+                            </div>
+                        </div>
                         <button id="btnLogout" onclick="doLogout()"
                             class="inline-flex items-center justify-center gap-2 rounded-lg bg-error-500 px-6 py-2.5 text-center font-medium text-white hover:bg-error-600 transition">
                             <i class="fas fa-sign-out-alt"></i> Putuskan Koneksi (Logout)
@@ -292,6 +310,47 @@
                     btn.classList.remove('opacity-50', 'cursor-not-allowed');
                     btn.innerHTML = '<i class="fas fa-sign-out-alt mr-1"></i> Putuskan Koneksi (Logout)';
                 });
+        }
+
+        function testWaMessage() {
+            const phone = document.getElementById('testWaNumber').value.trim();
+            const message = document.getElementById('testWaMessage').value.trim();
+
+            if (!phone || !message) {
+                alert('Silakan isi nomor tujuan dan isi pesan.');
+                return;
+            }
+
+            const btn = document.getElementById('btnTestWa');
+            const originalHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.classList.add('opacity-50', 'cursor-not-allowed');
+            btn.innerHTML = '<div class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-solid border-white border-r-transparent align-[-0.125em] mr-2"></div> Memproses...';
+
+            fetch('{{ route("whatsapp.device.test") }}', {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ phone: phone, message: message })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    alert(data.message);
+                    document.getElementById('testWaMessage').value = '';
+                } else {
+                    alert('Gagal: ' + (data.message ?? 'Unknown error'));
+                }
+            })
+            .catch(() => alert('Terjadi kesalahan saat menghubungi server.'))
+            .finally(() => {
+                btn.disabled = false;
+                btn.classList.remove('opacity-50', 'cursor-not-allowed');
+                btn.innerHTML = originalHtml;
+            });
         }
 
         // Init on page load

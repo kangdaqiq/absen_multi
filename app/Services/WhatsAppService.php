@@ -129,6 +129,12 @@ class WhatsAppService
         }
     }
 
+    public function sendTestMessage($phone, $message, $schoolId = null)
+    {
+        if (!$phone || empty(trim($message))) return;
+        $this->queueMessage($phone, $message, $schoolId);
+    }
+
     private function queueMessage($phone, $message, $schoolId = null)
     {
         $originalPhone = $phone;

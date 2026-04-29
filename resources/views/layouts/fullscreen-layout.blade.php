@@ -7,6 +7,7 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
     <title>{{ $title ?? 'Dashboard' }} | Sistem Absensi by Jagat Tech</title>
+    <link rel="icon" type="image/x-icon" href="{{ asset('images/logo/logo-icon.ico') }}">
 
     <!-- Scripts -->
     @vite(['resources/css/app.css', 'resources/js/app.js'])

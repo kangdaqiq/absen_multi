@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Login — Sistem Absensi</title>
+    <link rel="icon" type="image/x-icon" href="{{ asset('images/logo/logo-icon.ico') }}">
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <link href="{{ asset('vendor/fontawesome-free/css/all.min.css') }}" rel="stylesheet">

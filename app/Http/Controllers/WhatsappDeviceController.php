@@ -192,4 +192,19 @@ class WhatsappDeviceController extends Controller
             return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }
+
+    public function testMessage(Request $request, \App\Services\WhatsAppService $wa)
+    {
+        $request->validate([
+            'phone' => 'required|string',
+            'message' => 'required|string',
+        ]);
+
+        try {
+            $wa->sendTestMessage($request->phone, $request->message, Auth::user()->school_id);
+            return response()->json(['success' => true, 'message' => 'Pesan percobaan dimasukkan ke antrean.']);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
 }

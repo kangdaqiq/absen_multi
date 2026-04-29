@@ -55,7 +55,7 @@ return new class extends Migration {
         // Add school_id to settings table
         if (Schema::hasTable('settings')) {
             Schema::table('settings', function (Blueprint $table) {
-                $table->foreignId('school_id')->nullable()->after('id')->constrained('schools')->onDelete('cascade');
+                $table->foreignId('school_id')->nullable()->after('setting_key')->constrained('schools')->onDelete('cascade');
             });
         }
     }

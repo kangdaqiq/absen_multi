@@ -7,10 +7,14 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration {
     public function up(): void
     {
-        Schema::table('settings', function (Blueprint $table) {
-            // Drop the foreign key constraint
-            $table->dropForeign(['school_id']);
-        });
+        try {
+            Schema::table('settings', function (Blueprint $table) {
+                // Drop the foreign key constraint
+                $table->dropForeign(['school_id']);
+            });
+        } catch (\Exception $e) {
+            // Ignore if it's already dropped
+        }
     }
 
     public function down(): void

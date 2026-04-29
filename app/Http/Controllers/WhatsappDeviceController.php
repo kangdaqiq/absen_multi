@@ -95,21 +95,34 @@ class WhatsappDeviceController extends Controller
 
             // Auto-create device if it was deleted / not found
             if ($loginRes->status() === 404 && str_contains($loginRes->body(), 'DEVICE_NOT_FOUND')) {
-                // Try creating device_id. Send all possible variations to ensure compatibility
-                $createRes = Http::timeout(10)
-                    ->withBasicAuth($user, $pass)
-                    ->post("{$base}/api/devices", [
-                        'device_id' => $deviceId,
-                        'device'    => $deviceId,
-                        'id'        => $deviceId,
-                        'name'      => $deviceId
-                    ]);
+                // Auto-discovery endpoints for device creation (some APIs use different paths)
+                $createSuccess = false;
+                $debugLogs = '';
+                $endpointsToTry = ["/devices", "/api/devices", "/app/devices", "/sessions/add", "/sessions"];
                 
-                if (!$createRes->successful()) {
+                foreach ($endpointsToTry as $ep) {
+                    $createRes = Http::timeout(5)
+                        ->withBasicAuth($user, $pass)
+                        ->post("{$base}{$ep}", [
+                            'device_id' => $deviceId,
+                            'device'    => $deviceId,
+                            'id'        => $deviceId,
+                            'name'      => $deviceId,
+                            'sessionId' => $deviceId
+                        ]);
+                    
+                    if ($createRes->successful() && !str_contains($createRes->body(), 'Cannot POST')) {
+                        $createSuccess = true;
+                        break;
+                    }
+                    $debugLogs .= "POST {$ep}: " . $createRes->body() . "\n";
+                }
+                
+                if (!$createSuccess) {
                     return response()->json([
                         'status'  => 'error',
-                        'message' => 'Gagal membuat device otomatis. WA API error (HTTP ' . $createRes->status() . ')',
-                        'debug'   => $createRes->body(),
+                        'message' => 'Gagal membuat device otomatis. Endpoint tidak ditemukan.',
+                        'debug'   => $debugLogs,
                     ], 500);
                 }
 

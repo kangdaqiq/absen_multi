@@ -24,9 +24,10 @@
                     <th class="py-4 px-4 font-medium text-black dark:text-white" width="10%">Action</th>
                     <th class="py-4 px-4 font-medium text-black dark:text-white" width="10%">UID</th>
                     <th class="py-4 px-4 font-medium text-black dark:text-white text-center" width="10%">Status</th>
-                    <th class="py-4 px-4 font-medium text-black dark:text-white" width="35%">Pesan</th>
+                    <th class="py-4 px-4 font-medium text-black dark:text-white" width="30%">Pesan</th>
                     <th class="py-4 px-4 font-medium text-black dark:text-white" width="10%">API Key</th>
                     <th class="py-4 px-4 font-medium text-black dark:text-white" width="10%">IP</th>
+                    <th class="py-4 px-4 font-medium text-black dark:text-white text-center" width="10%">Aksi</th>
                 </tr>
             </thead>
             <tbody>
@@ -57,6 +58,11 @@
                     <td class="border-b border-[#eee] py-5 px-4 dark:border-strokedark align-top">
                         <p class="text-gray-500 dark:text-gray-400 text-sm font-mono">{{ $log->ip_address }}</p>
                     </td>
+                    <td class="border-b border-[#eee] py-5 px-4 dark:border-strokedark text-center align-top">
+                        <button onclick="retryRequest(this, '{{ $log->uid }}', '{{ $log->api_key }}', '{{ \Carbon\Carbon::parse($log->created_at)->format('Y-m-d H:i:s') }}')" class="inline-flex items-center rounded bg-brand-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-opacity-90 transition">
+                            <i class="fas fa-redo mr-1"></i> Ulang
+                        </button>
+                    </td>
                 </tr>
                 @empty
                 <tr>
@@ -76,3 +82,40 @@
     @endif
 </div>
 @endsection
+
+@push('scripts')
+<script>
+function retryRequest(btn, uid, apiKey, scannedAt) {
+    if (!confirm('Yakin ingin mengulang request ini? Waktu absen akan diproses sesuai jam log: ' + scannedAt)) return;
+    
+    let originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    btn.disabled = true;
+    btn.classList.add('opacity-50', 'cursor-not-allowed');
+
+    fetch('{{ url('/api/rfid') }}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        },
+        body: JSON.stringify({ 
+            uid: uid, 
+            api_key: apiKey,
+            scanned_at: scannedAt
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        alert(data.message || 'Request berhasil dikirim ulang');
+        window.location.reload();
+    })
+    .catch(err => {
+        alert('Terjadi kesalahan saat menghubungi API.');
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+        btn.classList.remove('opacity-50', 'cursor-not-allowed');
+    });
+}
+</script>
+@endpush

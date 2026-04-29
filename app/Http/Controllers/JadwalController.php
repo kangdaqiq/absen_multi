@@ -36,7 +36,9 @@ class JadwalController extends Controller
             'index_hari' => 'required|integer|min:1|max:7',
             'jam_masuk' => 'required',
             'jam_pulang' => 'required',
-            'toleransi' => 'required|integer',
+            'awal_absen_masuk' => 'required',
+            'akhir_absen_masuk' => 'required',
+            'akhir_absen_pulang' => 'required',
         ]);
 
         $data = $request->all();
@@ -73,7 +75,9 @@ class JadwalController extends Controller
         $request->validate([
             'jam_masuk' => 'required',
             'jam_pulang' => 'required',
-            'toleransi' => 'required|integer',
+            'awal_absen_masuk' => 'required',
+            'akhir_absen_masuk' => 'required',
+            'akhir_absen_pulang' => 'required',
         ]);
 
         $jadwal = Jadwal::findOrFail($id);
@@ -112,7 +116,9 @@ class JadwalController extends Controller
                     'hari' => $dayName,
                     'jam_masuk' => $data['jam_masuk'],
                     'jam_pulang' => $data['jam_pulang'],
-                    'toleransi' => $data['toleransi'] ?? 15,
+                    'awal_absen_masuk' => $data['awal_absen_masuk'] ?? '06:00',
+                    'akhir_absen_masuk' => $data['akhir_absen_masuk'] ?? '09:00',
+                    'akhir_absen_pulang' => $data['akhir_absen_pulang'] ?? '17:00',
                     'is_active' => $isActive
                 ]
             );

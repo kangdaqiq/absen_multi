@@ -48,11 +48,13 @@
                 <table class="w-full table-auto">
                     <thead>
                         <tr class="bg-gray-2 text-left dark:bg-meta-4">
-                            <th class="py-4 px-4 font-medium text-black dark:text-white xl:pl-11" style="width: 15%">Hari</th>
-                            <th class="py-4 px-4 font-medium text-black dark:text-white" style="width: 25%">Jam Masuk</th>
-                            <th class="py-4 px-4 font-medium text-black dark:text-white" style="width: 25%">Jam Pulang</th>
-                            <th class="py-4 px-4 font-medium text-black dark:text-white" style="width: 20%">Toleransi (Menit)</th>
-                            <th class="py-4 px-4 font-medium text-black dark:text-white text-center" style="width: 15%">Aktif?</th>
+                            <th class="py-4 px-4 font-medium text-black dark:text-white" style="width: 15%">Hari</th>
+                            <th class="py-4 px-4 font-medium text-black dark:text-white" style="width: 15%">Awal Masuk</th>
+                            <th class="py-4 px-4 font-medium text-black dark:text-white" style="width: 20%">Jam Masuk (Telat)</th>
+                            <th class="py-4 px-4 font-medium text-black dark:text-white" style="width: 15%">Akhir Masuk</th>
+                            <th class="py-4 px-4 font-medium text-black dark:text-white" style="width: 15%">Jam Pulang</th>
+                            <th class="py-4 px-4 font-medium text-black dark:text-white" style="width: 15%">Akhir Pulang</th>
+                            <th class="py-4 px-4 font-medium text-black dark:text-white text-center" style="width: 10%">Aktif?</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -66,23 +68,33 @@
                                 $current = $existingJadwal->get($index);
                             @endphp
                             <tr>
-                                <td class="border-b border-[#eee] py-5 px-4 pl-9 dark:border-strokedark xl:pl-11">
+                                <td class="border-b border-[#eee] py-5 px-4 pl-9 dark:border-strokedark">
                                     <p class="text-black dark:text-white font-medium">{{ $dayName }}</p>
                                 </td>
                                 <td class="border-b border-[#eee] py-5 px-4 dark:border-strokedark">
+                                    <input type="time" name="schedules[{{ $index }}][awal_absen_masuk]" 
+                                        class="w-full rounded border border-stroke bg-transparent py-2.5 px-3 outline-none transition focus:border-brand-500 active:border-brand-500 dark:border-form-strokedark dark:bg-form-input dark:focus:border-brand-500 text-black dark:text-white text-sm" 
+                                        value="{{ $current && $current->awal_absen_masuk ? substr($current->awal_absen_masuk, 0, 5) : '06:00' }}">
+                                </td>
+                                <td class="border-b border-[#eee] py-5 px-4 dark:border-strokedark">
                                     <input type="time" name="schedules[{{ $index }}][jam_masuk]" 
-                                        class="w-full rounded border border-stroke bg-transparent py-2.5 px-4 outline-none transition focus:border-brand-500 active:border-brand-500 dark:border-form-strokedark dark:bg-form-input dark:focus:border-brand-500 text-black dark:text-white" 
+                                        class="w-full rounded border border-stroke bg-transparent py-2.5 px-3 outline-none transition focus:border-brand-500 active:border-brand-500 dark:border-form-strokedark dark:bg-form-input dark:focus:border-brand-500 text-black dark:text-white text-sm" 
                                         value="{{ $current ? substr($current->jam_masuk, 0, 5) : '07:00' }}">
                                 </td>
                                 <td class="border-b border-[#eee] py-5 px-4 dark:border-strokedark">
+                                    <input type="time" name="schedules[{{ $index }}][akhir_absen_masuk]" 
+                                        class="w-full rounded border border-stroke bg-transparent py-2.5 px-3 outline-none transition focus:border-brand-500 active:border-brand-500 dark:border-form-strokedark dark:bg-form-input dark:focus:border-brand-500 text-black dark:text-white text-sm" 
+                                        value="{{ $current && $current->akhir_absen_masuk ? substr($current->akhir_absen_masuk, 0, 5) : '09:00' }}">
+                                </td>
+                                <td class="border-b border-[#eee] py-5 px-4 dark:border-strokedark">
                                     <input type="time" name="schedules[{{ $index }}][jam_pulang]" 
-                                        class="w-full rounded border border-stroke bg-transparent py-2.5 px-4 outline-none transition focus:border-brand-500 active:border-brand-500 dark:border-form-strokedark dark:bg-form-input dark:focus:border-brand-500 text-black dark:text-white" 
+                                        class="w-full rounded border border-stroke bg-transparent py-2.5 px-3 outline-none transition focus:border-brand-500 active:border-brand-500 dark:border-form-strokedark dark:bg-form-input dark:focus:border-brand-500 text-black dark:text-white text-sm" 
                                         value="{{ $current ? substr($current->jam_pulang, 0, 5) : '15:00' }}">
                                 </td>
                                 <td class="border-b border-[#eee] py-5 px-4 dark:border-strokedark">
-                                    <input type="number" name="schedules[{{ $index }}][toleransi]" 
-                                        class="w-full rounded border border-stroke bg-transparent py-2.5 px-4 outline-none transition focus:border-brand-500 active:border-brand-500 dark:border-form-strokedark dark:bg-form-input dark:focus:border-brand-500 text-black dark:text-white" 
-                                        value="{{ $current ? $current->toleransi : 15 }}" min="0">
+                                    <input type="time" name="schedules[{{ $index }}][akhir_absen_pulang]" 
+                                        class="w-full rounded border border-stroke bg-transparent py-2.5 px-3 outline-none transition focus:border-brand-500 active:border-brand-500 dark:border-form-strokedark dark:bg-form-input dark:focus:border-brand-500 text-black dark:text-white text-sm" 
+                                        value="{{ $current && $current->akhir_absen_pulang ? substr($current->akhir_absen_pulang, 0, 5) : '17:00' }}">
                                 </td>
                                 <td class="border-b border-[#eee] py-5 px-4 dark:border-strokedark text-center">
                                     <!-- Toggle Switch -->

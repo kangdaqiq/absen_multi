@@ -452,6 +452,7 @@ void showSuccessDisplay(const char *nama, const char *type) {
   else if (t=="sudah_lengkap")                          { lcd.print("ABSEN LENGKAP"); beepShort(); }
   else if (t=="enroll_rfid")                            { lcd.print("ENROLL SUKSES"); beepTriple(); }
   else if (t=="gate_opened")                            { lcd.print("PULANG DIBUKA"); beepTriple(); }
+  else if (t=="gate_closed")                            { lcd.print("PULANG DITUTUP"); beepTriple(); }
   else                                                  { lcd.print("SUKSES");        beepOK(); }
   lcd.setCursor(0,1);
   String n = String(nama); if (n.length()>16) n = n.substring(0,13)+"...";

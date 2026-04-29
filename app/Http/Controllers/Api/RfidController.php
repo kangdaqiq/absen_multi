@@ -51,7 +51,24 @@ class RfidController extends Controller
             TeacherCheckoutSession::where('expires_at', '<', $now)->delete();
 
 
-            // Create/Extend Session using GateCard
+            // Cek apakah gerbang sedang terbuka oleh kartu ini
+            $activeSession = TeacherCheckoutSession::where('uid_rfid', $uid)
+                ->where('expires_at', '>=', $now)
+                ->first();
+
+            if ($activeSession) {
+                // Jika sedang terbuka, TUTUP gerbang
+                $activeSession->delete();
+                DB::commit();
+
+                $this->logRequest($apiKey, 'gate_closed', $uid, true, 'Sesi Kepulangan Ditutup: ' . $gateName);
+                return $this->response(true, 'success', "Gerbang Ditutup.", 'ok', [
+                    'type' => 'gate_closed',
+                    'nama' => $gateName
+                ]);
+            }
+
+            // Jika belum terbuka, BUKA gerbang
             TeacherCheckoutSession::create([
                 'teacher_id' => $gateCard->guru_id, // Link to Guru if exists
                 'teacher_name' => $gateName,
@@ -499,11 +516,11 @@ class RfidController extends Controller
             }
             $jamMasuk = Carbon::parse($now->format('Y-m-d') . ' ' . $jadwal->jam_masuk);
             $jamPulang = Carbon::parse($now->format('Y-m-d') . ' ' . $jadwal->jam_pulang);
-            $toleransi = $jadwal->toleransi;
-
-            $batasTelat = $jamMasuk->copy()->addMinutes($toleransi);
-            $awalAbsenMasuk = $jamMasuk->copy()->subHour();
-            $akhirAbsenMasuk = $jamMasuk->copy()->addHours(2);
+            
+            $awalAbsenMasuk = Carbon::parse($now->format('Y-m-d') . ' ' . $jadwal->awal_absen_masuk);
+            $akhirAbsenMasuk = Carbon::parse($now->format('Y-m-d') . ' ' . $jadwal->akhir_absen_masuk);
+            $akhirAbsenPulang = Carbon::parse($now->format('Y-m-d') . ' ' . $jadwal->akhir_absen_pulang);
+            $batasTelat = $jamMasuk; // Toleransi dihapus, telat dihitung langsung setelah jam_masuk
 
             DB::beginTransaction();
 
@@ -548,15 +565,24 @@ class RfidController extends Controller
                     ->orderBy('teacher_checkout_sessions.created_at', 'desc')
                     ->first();
 
-                // If still in check-in window and no teacher session, warn
-                if (!$teacherSession && $now->between($awalAbsenMasuk, $akhirAbsenMasuk)) {
-                    DB::rollBack();
-                    return $this->response(true, 'success', 'Sudah Absen Masuk', 'ok', ['type' => 'sudah_absen_masuk', 'nama' => $siswa->nama]);
+                $isAutoCheckoutTime = $now->between($jamPulang, $akhirAbsenPulang);
+
+                // Jika sudah melewati batas akhir absen pulang dan tidak ada sesi guru, tolak
+                if ($now->gt($akhirAbsenPulang) && !$teacherSession) {
+                     DB::rollBack();
+                     return $this->response(false, 'gagal', 'Pulang Ditutup', 'warning', ['type' => 'checkout_closed', 'nama' => $siswa->nama]);
                 }
 
-                if (!$teacherSession) {
+                // Jika belum masuk waktu pulang otomatis dan tidak ada izin guru, tolak
+                if (!$isAutoCheckoutTime && !$teacherSession) {
+                    // Beri pesan berbeda jika masih di jam masuk (mencegah spam absen 2x)
+                    if ($now->between($awalAbsenMasuk, $akhirAbsenMasuk)) {
+                        DB::rollBack();
+                        return $this->response(true, 'success', 'Sudah Absen Masuk', 'ok', ['type' => 'sudah_absen_masuk', 'nama' => $siswa->nama]);
+                    }
+
                     DB::rollBack();
-                    return $this->response(false, 'gagal', 'Belum ada izin guru.', 'warning', ['type' => 'no_authorization', 'nama' => $siswa->nama]);
+                    return $this->response(false, 'gagal', 'Belum waktu pulang', 'warning', ['type' => 'no_authorization', 'nama' => $siswa->nama]);
                 }
 
                 // Pulang
@@ -580,13 +606,14 @@ class RfidController extends Controller
                 // WA
                 $hours = floor($totalSeconds / 3600);
                 $mins = floor(($totalSeconds % 3600) / 60);
-                $this->wa->sendCheckOut($siswa->nama, $siswa->no_wa, $now->format('H:i'), $hours, $mins, $teacherSession->teacher_name, $device->school_id, $masuk->format('H:i'), $siswa->wa_ortu);
+                $authorizedBy = $teacherSession ? $teacherSession->teacher_name : 'Sistem Otomatis';
+                $this->wa->sendCheckOut($siswa->nama, $siswa->no_wa, $now->format('H:i'), $hours, $mins, $authorizedBy, $device->school_id, $masuk->format('H:i'), $siswa->wa_ortu);
 
                 $this->logRequest($apiKey, 'checkout_success', $uid, true, 'Pulang: ' . $siswa->nama);
                 return $this->response(true, 'success', 'Absen pulang berhasil', 'ok', [
                     'type' => 'absen_pulang',
                     'nama' => $siswa->nama,
-                    'authorized_by' => $teacherSession->teacher_name
+                    'authorized_by' => $authorizedBy
                 ]);
             }
 
@@ -605,8 +632,7 @@ class RfidController extends Controller
                 $keterangan = null;
 
                 if ($now->gt($batasTelat)) {
-                    // Calculate late duration from the tolerance deadline (batasTelat)
-                    // This ensures accurate late time calculation
+                    // Calculate late duration from jam_masuk
                     $diff = $now->timestamp - $batasTelat->timestamp;
                     $jam = floor($diff / 3600);
                     $menit = floor(($diff % 3600) / 60);

@@ -44,21 +44,21 @@
       </div>
       <div class="flex items-end justify-between mt-5">
         <div>
-          <span class="text-sm text-gray-500 dark:text-gray-400">Hadir Hari Ini</span>
+          <span class="text-sm text-gray-500 dark:text-gray-400">Siswa Hadir</span>
           <h4 class="mt-2 font-bold text-gray-800 text-title-sm dark:text-white/90">{{ $countHadir }}</h4>
         </div>
       </div>
     </div>
 
-    <!-- Telat Card -->
+    <!-- Tidak Hadir Card -->
     <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-sm dark:border-gray-800 dark:bg-gray-dark md:p-6">
-      <div class="flex items-center justify-center w-12 h-12 bg-warning-50 rounded-xl dark:bg-warning-500/15 text-warning-500">
-        <i class="fas fa-user-clock fa-lg"></i>
+      <div class="flex items-center justify-center w-12 h-12 bg-error-50 rounded-xl dark:bg-error-500/15 text-error-500">
+        <i class="fas fa-user-times fa-lg"></i>
       </div>
       <div class="flex items-end justify-between mt-5">
         <div>
-          <span class="text-sm text-gray-500 dark:text-gray-400">Terlambat Hari Ini</span>
-          <h4 class="mt-2 font-bold text-gray-800 text-title-sm dark:text-white/90">{{ $countTelat }}</h4>
+          <span class="text-sm text-gray-500 dark:text-gray-400">Siswa Tidak Hadir</span>
+          <h4 class="mt-2 font-bold text-gray-800 text-title-sm dark:text-white/90">{{ $countTidakHadir }}</h4>
         </div>
       </div>
     </div>

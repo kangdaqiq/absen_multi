@@ -61,13 +61,7 @@ class DashboardController extends Controller
             })
             ->count();
 
-        $countTelat = Attendance::whereDate('tanggal', $today)
-            ->where('status', 'H')
-            ->where('keterangan', 'like', 'Telat%')
-            ->when(!$isSuperAdmin, function ($q) use ($schoolId) {
-                $q->whereHas('student', fn($sub) => $sub->where('school_id', $schoolId));
-            })
-            ->count();
+        $countTidakHadir = max(0, $countSiswa - $countHadir);
 
         // 3. Recent Activity (Last 5) SCOPED
         $recentLogs = Attendance::with('student.kelas')
@@ -127,7 +121,7 @@ class DashboardController extends Controller
             'countGuru',
             'countKelas',
             'countHadir',
-            'countTelat',
+            'countTidakHadir',
             'recentLogs',
             'dates',
             'chartData',

@@ -39,16 +39,17 @@ class RfidController extends Controller
 
     // ... (handle method omitted) ...
 
-    private function handleGateScan($uid, $gateCard, $apiKey, $device)
+    private function handleGateScan($uid, $gateCard, $apiKey, $device, $now = null)
     {
         try {
             DB::beginTransaction();
-            $now = now();
-            
+            $now = $now ?? now();
+
             $gateName = $gateCard->guru_id ? ($gateCard->guru->nama ?? $gateCard->name) : $gateCard->name;
 
             // Clean expired sessions
             TeacherCheckoutSession::where('expires_at', '<', $now)->delete();
+
 
             // Create/Extend Session using GateCard
             TeacherCheckoutSession::create([
@@ -75,11 +76,11 @@ class RfidController extends Controller
         }
     }
 
-    private function handleTeacherScan($uid, $teacher, $apiKey, $device)
+    private function handleTeacherScan($uid, $teacher, $apiKey, $device, $now = null)
     {
         try {
             DB::beginTransaction();
-            $now = now();
+            $now = $now ?? now();
             $today = $now->format('Y-m-d');
 
             // 1. ABSENSI HARIAN (Daily)
@@ -210,12 +211,30 @@ class RfidController extends Controller
 
         $uid = $this->validateUID($uid);
 
-        // 3. Cooldown
+        // 3. Parse scanned_at (offline sync dari device)
+        // Jika device mengirim scanned_at, gunakan sebagai waktu absen
+        // Dibatasi maks 7 hari ke belakang untuk keamanan
+        $now = now();
+        $scannedAt = trim($request->input('scanned_at', ''));
+        if ($scannedAt !== '') {
+            try {
+                $parsed = Carbon::parse($scannedAt);
+                $maxBack = now()->subDays(7);
+                if ($parsed->lte(now()) && $parsed->gte($maxBack)) {
+                    $now = $parsed;
+                    Log::info("[OFFLINE SYNC] uid={$uid} scanned_at={$scannedAt}");
+                }
+            } catch (\Exception $e) {
+                // scanned_at tidak valid, pakai now()
+            }
+        }
+
+        // 4. Cooldown
         if ($res = $this->checkScanCooldown($uid)) {
             return $res;
         }
 
-        // 4. Mode Detection
+        // 5. Mode Detection
 
         // Check Gate Card - SCOPED
         $gateCard = GateCard::with('guru')
@@ -223,13 +242,13 @@ class RfidController extends Controller
             ->where('school_id', $device->school_id)
             ->first();
         if ($gateCard) {
-            return $this->handleGateScan($uid, $gateCard, $apiKey, $device);
+            return $this->handleGateScan($uid, $gateCard, $apiKey, $device, $now);
         }
 
         // Check Teacher - SCOPED
         $teacher = $this->checkTeacherCard($uid, $device->school_id);
         if ($teacher) {
-            return $this->handleTeacherScan($uid, $teacher, $apiKey, $device);
+            return $this->handleTeacherScan($uid, $teacher, $apiKey, $device, $now);
         }
 
         // Check Enrollment - SCOPED
@@ -238,7 +257,7 @@ class RfidController extends Controller
         }
 
         // Default: Scan Absensi - SCOPED
-        return $this->handleScan($uid, $apiKey, $device);
+        return $this->handleScan($uid, $apiKey, $device, $now);
     }
 
     // ... Helper Methods ...
@@ -447,7 +466,7 @@ class RfidController extends Controller
         }
     }
 
-    private function handleScan($uid, $apiKey, $device)
+    private function handleScan($uid, $apiKey, $device, $now = null)
     {
         try {
             // Find Student SCOPED to Device's School
@@ -466,8 +485,9 @@ class RfidController extends Controller
                 return $this->response(false, 'gagal', 'Absensi dimatikan untuk kelas ini.', 'error', ['type' => 'class_disabled']);
             }
 
-            // Jadwal SCOPED to School
-            $indexHari = date('N'); // 1 (Mon) - 7 (Sun)
+            $now = $now ?? now();
+            $today = $now->format('Y-m-d');
+            $indexHari = (int) $now->format('N'); // 1 (Mon) - 7 (Sun)
 
             $jadwal = Jadwal::where('index_hari', $indexHari)
                 ->where('is_active', 1)
@@ -477,8 +497,6 @@ class RfidController extends Controller
             if (!$jadwal) {
                 return $this->response(false, 'gagal', 'Jadwal Libur/Kosong', 'warning', ['type' => 'schedule_empty']);
             }
-
-            $now = now();
             $jamMasuk = Carbon::parse($now->format('Y-m-d') . ' ' . $jadwal->jam_masuk);
             $jamPulang = Carbon::parse($now->format('Y-m-d') . ' ' . $jadwal->jam_pulang);
             $toleransi = $jadwal->toleransi;

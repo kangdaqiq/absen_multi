@@ -1,3 +1,15 @@
+/*
+ * ============================================================
+ *  Absensi Fingerprint ESP8266 - Jagat Tech
+ *  Backend: Laravel Multi-School Absensi System
+ *
+ *  API Endpoints yang digunakan:
+ *    POST /api/fingerprint              → scan / ping / konfirmasi enroll
+ *    GET  /api/fingerprint/check-enroll → polling cek request enroll pending
+ *    GET  /delete-finger?id=X           → hapus slot di sensor (lokal, dari dashboard)
+ * ============================================================
+ */
+
 #include <ESP8266WiFi.h>
 #include <ESP8266HTTPClient.h>
 #include <WiFiClient.h>
@@ -7,96 +19,116 @@
 #include <Adafruit_Fingerprint.h>
 
 // ==========================================
-// CONFIGURATION
+// KONFIGURASI — Sesuaikan sebelum upload
 // ==========================================
-const char* ssid = "Tarbiyyah Assunniyyah";
-const char* password = "AnfiaCollection";
+const char* ssid     = "NamaWiFi";
+const char* password = "PasswordWiFi";
 
-// API Configuration
-// PENTING: Sesuaikan api_host dengan cara Anda menjalankan server Laravel
-// Opsi 1: Jika pakai "php artisan serve --host 0.0.0.0"
-// const char* api_host = "http://192.168.1.X:8000"; 
-// Opsi 2: Jika pakai XAMPP (tanpa virtual host)
-// const char* api_host = "http://192.168.1.X/absen/public";
+// URL server Laravel (tanpa trailing slash)
+// Contoh XAMPP: "http://192.168.1.10/absen/public"
+// Contoh artisan serve: "http://192.168.1.10:8000"
+const char* api_host = "http://192.168.1.10/absen/public";
 
-// Ganti 192.168.1.X dengan IP Laptop Anda (cek pakai ipconfig)
-const char* api_host = "http://192.168.1.227/absen/public"; // Sesuai URL yang bisa diakses user
-String api_key = "xlSoXObt6EPXrsiBYOkllYZ83QeV2lp0M63qHiVYLT0mnHwBXgpskzNdNGNh"; // Samakan dengan api_keys di database
+// API Key dari halaman Manajemen Device di dashboard admin
+const char* api_key  = "isi-api-key-dari-dashboard";
 
-// Pin Configuration
-// Fingerprint sensor: Green (TX) to D2 (RX), White (RX) to D3 (TX)
-SoftwareSerial mySerial(4, 0); 
+// ==========================================
+// PIN KONFIGURASI
+// Sensor TX (hijau) → D1 = GPIO5 (RX ESP)
+// Sensor RX (putih) → D2 = GPIO4 (TX ESP)
+// ==========================================
+SoftwareSerial mySerial(5, 4); // RX=GPIO5, TX=GPIO4
 Adafruit_Fingerprint finger = Adafruit_Fingerprint(&mySerial);
 
-// Globals
-
+// ==========================================
+// GLOBALS
+// ==========================================
 ESP8266WebServer server(80);
-bool pendingEnroll = false;
-int pendingEnrollId = 0;
 
+// Polling enroll ke backend setiap 3 detik
+const unsigned long ENROLL_POLL_INTERVAL = 3000;
+unsigned long lastEnrollCheck = 0;
+
+// State enroll dari hasil polling
+bool   pendingEnroll     = false;
+int    pendingEnrollId   = 0;
+String pendingEnrollType = ""; // "guru", "siswa", "gate_card"
+
+// ==========================================
+// SETUP
+// ==========================================
 void setup() {
   Serial.begin(115200);
   delay(100);
-  
-  Serial.println("\n\n=== Absensi Fingerprint ESP8266 ===");
+  Serial.println("\n\n=== Absensi Fingerprint ESP8266 - Jagat Tech ===");
 
-  // 1. Setup Fingerprint
+  // 1. Init Sensor Fingerprint
   finger.begin(57600);
-  delay(5);
+  delay(50);
   if (finger.verifyPassword()) {
-    Serial.println("Found fingerprint sensor!");
+    Serial.println("[OK] Fingerprint sensor ditemukan.");
   } else {
-    Serial.println("Did not find fingerprint sensor :(");
+    Serial.println("[ERROR] Fingerprint sensor TIDAK ditemukan! Cek kabel.");
     while (1) { delay(1); }
   }
 
-  // 2. Setup WiFi
+  // 2. Koneksi WiFi
   WiFi.begin(ssid, password);
-  Serial.print("Connecting to WiFi");
-  while (WiFi.status() != WL_CONNECTED) {
+  Serial.print("Menghubungkan ke WiFi");
+  int retry = 0;
+  while (WiFi.status() != WL_CONNECTED && retry < 40) {
     delay(500);
     Serial.print(".");
+    retry++;
   }
-  Serial.println("");
-  Serial.print("Connected! IP: ");
-  Serial.println(WiFi.localIP());
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("\n[OK] WiFi terhubung. IP: " + WiFi.localIP().toString());
+  } else {
+    Serial.println("\n[WARN] WiFi gagal. Mode offline.");
+  }
 
-  // 3. Setup Web Server for Push Notification
-  server.on("/enroll-finger", handlePushEnroll);
+  // 3. Web Server Lokal (untuk hapus sidik jari dari dashboard)
   server.on("/delete-finger", handleDeleteFinger);
   server.begin();
-  Serial.println("Web server started");
+  Serial.println("[OK] Web server lokal aktif (port 80).");
 
-  // 4. Send Ping to Register IP
+  // 4. Ping ke backend (registrasi IP device)
   sendPing();
 }
 
+// ==========================================
+// LOOP
+// ==========================================
 void loop() {
-  // Check for Enrollment Request Periodically
-  server.handleClient(); // Handle incoming push requests
-  
-  if (pendingEnroll) {
-      pendingEnroll = false;
-      handleEnrollment(pendingEnrollId, "Teacher (Push)");
+  // Handle request lokal (delete-finger dari dashboard)
+  server.handleClient();
+
+  // Polling ke backend: cek apakah ada request enroll pending
+  if (millis() - lastEnrollCheck >= ENROLL_POLL_INTERVAL) {
+    lastEnrollCheck = millis();
+    checkEnrollRequest();
   }
 
+  // Proses enroll jika ada dari hasil polling
+  if (pendingEnroll) {
+    pendingEnroll = false;
+    handleEnrollment(pendingEnrollId, pendingEnrollType);
+  }
 
-
-  // Check for Scan
+  // Scan sidik jari untuk absensi
   int fingerId = getFingerprintID();
   if (fingerId != -1) {
-    Serial.print("Found ID #"); Serial.println(fingerId);
+    Serial.print("[SCAN] Terdeteksi ID #"); Serial.println(fingerId);
     sendScanRequest(fingerId);
-    delay(2000); // Prevent multiple scans
+    delay(2000); // Jeda agar tidak scan ganda
   }
-  
+
   delay(50);
 }
 
 // ==========================================
-// FINGERPRINT LOGIC
+// FINGERPRINT: Ambil & Cocokkan
 // ==========================================
-
 int getFingerprintID() {
   uint8_t p = finger.getImage();
   if (p != FINGERPRINT_OK) return -1;
@@ -107,236 +139,300 @@ int getFingerprintID() {
   p = finger.fingerFastSearch();
   if (p != FINGERPRINT_OK) return -1;
 
-  // Found a match!
   return finger.fingerID;
 }
 
 // ==========================================
-// API LOGIC
+// POLLING: Cek Enroll Request ke Backend
+// GET /api/fingerprint/check-enroll?api_key=xxx
+// Response: { ok, status:"enroll_mode", enroll_id, type }
 // ==========================================
+void checkEnrollRequest() {
+  if (WiFi.status() != WL_CONNECTED) return;
 
+  WiFiClient client;
+  HTTPClient http;
 
+  String url = String(api_host) + "/api/fingerprint/check-enroll?api_key=" + String(api_key);
+  http.begin(client, url);
+  http.setTimeout(3000);
 
-void handlePushEnroll() {
-  if (server.hasArg("id")) {
-    String idStr = server.arg("id");
-    pendingEnrollId = idStr.toInt();
-    pendingEnroll = true;
-    server.send(200, "application/json", "{\"status\":\"ok\", \"message\":\"Enrollment started\"}");
-    Serial.println("Push Enroll Request Received for ID: " + idStr);
-  } else {
-    server.send(400, "application/json", "{\"status\":\"error\", \"message\":\"Missing id\"}");
+  int httpCode = http.GET();
+  if (httpCode == 200) {
+    String payload = http.getString();
+    StaticJsonDocument<256> doc;
+    if (!deserializeJson(doc, payload)) {
+      String status = doc["status"].as<String>();
+      if (status == "enroll_mode") {
+        pendingEnrollId   = doc["enroll_id"].as<int>();
+        pendingEnrollType = doc["type"].as<String>(); // guru / siswa / gate_card
+        pendingEnroll     = true;
+        Serial.println("[ENROLL] Request dari backend: " + pendingEnrollType + " ID=" + String(pendingEnrollId));
+      }
+    }
   }
+  http.end();
 }
 
-void handleEnrollment(int id, String name) {
-  Serial.println("Place finger to enroll...");
-  
-  // --- Check for Duplicate First ---
-  Serial.println("Checking for duplicate...");
-  int p = -1;
+// ==========================================
+// ENROLL: Proses Pendaftaran Sidik Jari
+// ==========================================
+void handleEnrollment(int id, String type) {
+  Serial.println("\n[ENROLL] Mulai untuk " + type + " ID=" + String(id));
+  Serial.println(">> Tempelkan jari...");
+
+  uint8_t p = -1;
+
+  // --- Cek Duplikat ---
   while (p != FINGERPRINT_OK) {
-      p = finger.getImage();
-      if (p == FINGERPRINT_NOFINGER) delay(100);
-      else if (p != FINGERPRINT_OK) delay(100);
+    p = finger.getImage();
+    if (p == FINGERPRINT_NOFINGER) delay(100);
+    else if (p != FINGERPRINT_OK)  delay(100);
   }
-  
+
   p = finger.image2Tz();
   if (p == FINGERPRINT_OK) {
-      p = finger.fingerFastSearch();
-      if (p == FINGERPRINT_OK) {
-          Serial.println("Fingerprint already exists!");
-          Serial.print("Found ID #"); Serial.println(finger.fingerID);
-          
-          // REVISION: Use this existing ID instead of erroring
-          sendEnrollSuccess(finger.fingerID);
-          
-          delay(2000);
-          return; // Stop enrollment (we reused existing ID)
-      }
+    p = finger.fingerFastSearch();
+    if (p == FINGERPRINT_OK) {
+      Serial.println("[ENROLL] Duplikat! Reuse slot #" + String(finger.fingerID));
+      sendEnrollSuccess(finger.fingerID);
+      delay(2000);
+      return;
+    }
   }
-  
-  Serial.println("No duplicate found. Proceeding...");
-  Serial.println("Remove finger");
+
+  Serial.println(">> Tidak ada duplikat. Angkat jari...");
   delay(1000);
+
   p = 0;
   while (p != FINGERPRINT_NOFINGER) {
     p = finger.getImage();
     delay(10);
   }
-  // ---------------------------------
-  
-  Serial.println("Place finger again for Image 1...");
-  
-  // Step 1: Get First Image
-  while (p != FINGERPRINT_OK) {
-    p = finger.getImage();
-    if (p == FINGERPRINT_NOFINGER) Serial.print(".");
-    else if (p == FINGERPRINT_PACKETRECIEVEERR) Serial.println("Communication error");
-    else if (p == FINGERPRINT_IMAGEFAIL) Serial.println("Imaging error");
-    delay(100);
-  }
-  Serial.println("Image taken");
-  
-  p = finger.image2Tz(1);
-  if (p != FINGERPRINT_OK) {
-    Serial.println("Image2Tz 1 failed");
-    return;
-  }
-  
-  Serial.println("Remove finger");
-  delay(2000);
-  p = 0;
-  while (p != FINGERPRINT_NOFINGER) {
-    p = finger.getImage();
-    delay(100);
-  }
-  
-  Serial.println("Place same finger again");
+
+  // --- Gambar 1 ---
+  Serial.println(">> Tempelkan jari lagi (Gambar 1)...");
   p = -1;
   while (p != FINGERPRINT_OK) {
     p = finger.getImage();
     if (p == FINGERPRINT_NOFINGER) Serial.print(".");
     delay(100);
   }
-  Serial.println("Image 2 taken");
+  Serial.println("\n[OK] Gambar 1 diambil.");
+
+  p = finger.image2Tz(1);
+  if (p != FINGERPRINT_OK) {
+    Serial.println("[ERROR] image2Tz(1) gagal.");
+    sendEnrollError(id, "Image 1 gagal");
+    return;
+  }
+
+  // --- Angkat jari ---
+  Serial.println(">> Angkat jari...");
+  delay(2000);
+  p = 0;
+  while (p != FINGERPRINT_NOFINGER) {
+    p = finger.getImage();
+    delay(100);
+  }
+
+  // --- Gambar 2 ---
+  Serial.println(">> Tempelkan jari yang sama lagi (Gambar 2)...");
+  p = -1;
+  while (p != FINGERPRINT_OK) {
+    p = finger.getImage();
+    if (p == FINGERPRINT_NOFINGER) Serial.print(".");
+    delay(100);
+  }
+  Serial.println("\n[OK] Gambar 2 diambil.");
 
   p = finger.image2Tz(2);
   if (p != FINGERPRINT_OK) {
-    Serial.println("Image2Tz 2 failed");
+    Serial.println("[ERROR] image2Tz(2) gagal.");
+    sendEnrollError(id, "Image 2 gagal");
     return;
   }
 
-  // Create Model
+  // --- Buat Model ---
   p = finger.createModel();
-  if (p == FINGERPRINT_OK) {
-    Serial.println("Prints matched!");
-  } else {
-    Serial.println("Communication error or did not match");
+  if (p != FINGERPRINT_OK) {
+    Serial.println("[ERROR] Sidik jari tidak cocok. Coba ulangi.");
+    sendEnrollError(id, "Sidik jari tidak cocok");
     return;
   }
 
-  // Store Model
+  // --- Simpan ke Sensor ---
   p = finger.storeModel(id);
   if (p == FINGERPRINT_OK) {
-    Serial.println("Stored!");
+    Serial.println("[OK] Tersimpan di slot #" + String(id));
     sendEnrollSuccess(id);
   } else {
-    Serial.println("Error storing model");
+    Serial.println("[ERROR] Gagal simpan ke sensor.");
+    sendEnrollError(id, "Gagal menyimpan ke sensor");
   }
 }
 
+// ==========================================
+// API: Konfirmasi Enroll Berhasil
+// POST /api/fingerprint
+// Body: { api_key, finger_id, enroll_success: true }
+// ==========================================
 void sendEnrollSuccess(int id) {
   if (WiFi.status() != WL_CONNECTED) return;
-  
+
   WiFiClient client;
   HTTPClient http;
-  
+
   String url = String(api_host) + "/api/fingerprint";
   http.begin(client, url);
   http.addHeader("Content-Type", "application/json");
-  
+
   StaticJsonDocument<200> doc;
-  doc["api_key"] = api_key;
-  doc["finger_id"] = id;
+  doc["api_key"]        = api_key;
+  doc["finger_id"]      = id;
   doc["enroll_success"] = true;
-  String requestBody;
-  serializeJson(doc, requestBody);
-  
-  int httpCode = http.POST(requestBody);
-  Serial.print("Enroll Success Sent: "); Serial.println(httpCode);
-  http.end();
-}
 
-void sendScanRequest(int id) {
-  if (WiFi.status() != WL_CONNECTED) return;
-  
-  WiFiClient client;
-  HTTPClient http;
-  
-  String url = String(api_host) + "/api/fingerprint";
-  http.begin(client, url);
-  http.addHeader("Content-Type", "application/json");
-  
-  StaticJsonDocument<200> doc;
-  doc["api_key"] = api_key;
-  doc["finger_id"] = id;
-  String requestBody;
-  serializeJson(doc, requestBody);
-  
-  int httpCode = http.POST(requestBody);
+  String body;
+  serializeJson(doc, body);
+
+  int httpCode = http.POST(body);
   if (httpCode > 0) {
-    String payload = http.getString();
-    Serial.println("Scan Response: " + payload);
-    // You can parse payload to show message on LCD if available
+    Serial.println("[ENROLL] Konfirmasi OK. HTTP=" + String(httpCode) + " " + http.getString());
   } else {
-    Serial.print("Scan Request Error: "); Serial.println(httpCode);
+    Serial.println("[ENROLL] Gagal kirim konfirmasi: " + http.errorToString(httpCode));
   }
   http.end();
 }
 
-void sendPing() {
-  if (WiFi.status() != WL_CONNECTED) return;
-  
-  WiFiClient client;
-  HTTPClient http;
-  
-  String url = String(api_host) + "/api/fingerprint";
-  http.begin(client, url);
-  http.addHeader("Content-Type", "application/json");
-  
-  StaticJsonDocument<200> doc;
-  doc["api_key"] = api_key;
-  doc["ping"] = true;
-  String requestBody;
-  serializeJson(doc, requestBody);
-  
-  int httpCode = http.POST(requestBody);
-  Serial.print("Ping Sent: "); Serial.println(httpCode);
-  if (httpCode > 0) {
-      Serial.println(http.getString());
-  }
-  http.end();
-}
-
+// ==========================================
+// API: Laporan Error Enroll
+// POST /api/fingerprint
+// Body: { api_key, finger_id, enroll_error: true, message }
+// ==========================================
 void sendEnrollError(int id, String reason) {
   if (WiFi.status() != WL_CONNECTED) return;
-  
+
   WiFiClient client;
   HTTPClient http;
-  
+
   String url = String(api_host) + "/api/fingerprint";
   http.begin(client, url);
   http.addHeader("Content-Type", "application/json");
-  
-  StaticJsonDocument<200> doc;
-  doc["api_key"] = api_key;
-  doc["finger_id"] = id;
+
+  StaticJsonDocument<256> doc;
+  doc["api_key"]      = api_key;
+  doc["finger_id"]    = id;
   doc["enroll_error"] = true;
-  doc["message"] = reason;
-  String requestBody;
-  serializeJson(doc, requestBody);
-  
-  int httpCode = http.POST(requestBody);
-  Serial.print("Enroll Error Sent: "); Serial.println(httpCode);
+  doc["message"]      = reason;
+
+  String body;
+  serializeJson(doc, body);
+
+  int httpCode = http.POST(body);
+  Serial.println("[ENROLL] Error dikirim. HTTP=" + String(httpCode));
   http.end();
 }
 
-void handleDeleteFinger() {
-  if (server.hasArg("id")) {
-    int idToDelete = server.arg("id").toInt();
-    
-    // Delete from Fingerprint Sensor
-    int p = finger.deleteModel(idToDelete);
-    
-    if (p == FINGERPRINT_OK) {
-        server.send(200, "application/json", "{\"status\":\"ok\", \"message\":\"Deleted ID " + String(idToDelete) + "\"}");
-        Serial.println("Deleted ID " + String(idToDelete));
-    } else {
-        server.send(500, "application/json", "{\"status\":\"error\", \"message\":\"Failed to delete\"}");
-        Serial.print("Failed to delete ID "); Serial.println(idToDelete);
+// ==========================================
+// API: Scan Absensi
+// POST /api/fingerprint
+// Body: { api_key, finger_id }
+// Response: { ok, status, message, sound, type, nama }
+// ==========================================
+void sendScanRequest(int id) {
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("[SCAN] Offline, scan dilewati.");
+    return;
+  }
+
+  WiFiClient client;
+  HTTPClient http;
+
+  String url = String(api_host) + "/api/fingerprint";
+  http.begin(client, url);
+  http.addHeader("Content-Type", "application/json");
+  http.setTimeout(5000);
+
+  StaticJsonDocument<200> doc;
+  doc["api_key"]   = api_key;
+  doc["finger_id"] = id;
+
+  String body;
+  serializeJson(doc, body);
+
+  int httpCode = http.POST(body);
+  if (httpCode > 0) {
+    String payload = http.getString();
+    Serial.println("[SCAN] HTTP=" + String(httpCode) + " " + payload);
+
+    // Parse respons (untuk feedback LED/buzzer/LCD jika ada)
+    StaticJsonDocument<256> resp;
+    if (!deserializeJson(resp, payload)) {
+      bool ok       = resp["ok"].as<bool>();
+      String type   = resp["type"].as<String>();
+      String nama   = resp["nama"].as<String>();
+      String sound  = resp["sound"].as<String>(); // "ok", "warning", "gagal"
+      Serial.println("[INFO] ok=" + String(ok) + " type=" + type + " nama=" + nama + " sound=" + sound);
+      // TODO: tambahkan kontrol buzzer/LED berdasarkan 'sound'
     }
   } else {
-    server.send(400, "application/json", "{\"status\":\"error\", \"message\":\"Missing id\"}");
+    Serial.println("[SCAN] Error: " + http.errorToString(httpCode));
+  }
+  http.end();
+}
+
+// ==========================================
+// API: Ping / Boot Notification
+// POST /api/fingerprint
+// Body: { api_key, ping: true }
+// ==========================================
+void sendPing() {
+  if (WiFi.status() != WL_CONNECTED) return;
+
+  WiFiClient client;
+  HTTPClient http;
+
+  String url = String(api_host) + "/api/fingerprint";
+  http.begin(client, url);
+  http.addHeader("Content-Type", "application/json");
+
+  StaticJsonDocument<128> doc;
+  doc["api_key"] = api_key;
+  doc["ping"]    = true;
+
+  String body;
+  serializeJson(doc, body);
+
+  int httpCode = http.POST(body);
+  if (httpCode > 0) {
+    Serial.println("[PING] OK. HTTP=" + String(httpCode) + " " + http.getString());
+  } else {
+    Serial.println("[PING] Gagal: " + http.errorToString(httpCode));
+  }
+  http.end();
+}
+
+// ==========================================
+// LOCAL SERVER: Hapus Sidik Jari dari Sensor
+// GET /delete-finger?id=X
+// Dipanggil oleh dashboard Laravel saat admin delete enrollment
+// ==========================================
+void handleDeleteFinger() {
+  if (!server.hasArg("id")) {
+    server.send(400, "application/json", "{\"status\":\"error\",\"message\":\"Missing id\"}");
+    return;
+  }
+
+  int idToDelete = server.arg("id").toInt();
+  uint8_t p = finger.deleteModel(idToDelete);
+
+  if (p == FINGERPRINT_OK) {
+    Serial.println("[DELETE] Slot #" + String(idToDelete) + " berhasil dihapus.");
+    server.send(200, "application/json",
+      "{\"status\":\"ok\",\"message\":\"Deleted ID " + String(idToDelete) + "\"}");
+  } else {
+    Serial.println("[DELETE] Gagal hapus slot #" + String(idToDelete) + ".");
+    server.send(500, "application/json",
+      "{\"status\":\"error\",\"message\":\"Failed to delete ID " + String(idToDelete) + "\"}");
   }
 }

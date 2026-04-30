@@ -90,10 +90,9 @@
 
             <div class="w-full max-w-md">
                 {{-- Heading --}}
-                <div class="mb-8">
-                    <h1 class="text-3xl font-bold text-gray-800 dark:text-white/90">Selamat Datang 👋</h1>
-                    <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">Masukkan kredensial Anda untuk mengakses
-                        dashboard</p>
+                <div class="mb-6 sm:mb-8 text-center sm:text-left">
+                    <h1 class="text-2xl sm:text-3xl font-bold text-gray-800 dark:text-white/90">Selamat Datang 👋</h1>
+                    <p class="mt-1.5 sm:mt-2 text-sm text-gray-500 dark:text-gray-400">Masukkan kredensial Anda untuk mengakses dashboard</p>
                 </div>
 
                 {{-- Error alert --}}

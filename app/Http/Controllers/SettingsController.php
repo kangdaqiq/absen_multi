@@ -66,7 +66,7 @@ class SettingsController extends Controller
         }
 
         // Handle License Key for self_hosted mode
-        if (config('app.mode') === 'self_hosted' && auth()->user()->isSuperAdmin() && $request->has('license_key')) {
+        if (config('app.mode') === 'self_hosted' && (auth()->user()->isSuperAdmin() || auth()->user()->isAdmin()) && $request->has('license_key')) {
             $key = trim($request->input('license_key'));
             $path = base_path('.env');
             if (file_exists($path)) {

@@ -28,7 +28,7 @@
                         class="border-b-2 py-4 px-2 text-sm font-medium transition-colors">
                         Otomatisasi & Notifikasi
                     </button>
-                    @if(config('app.mode') === 'self_hosted' && auth()->user()->isSuperAdmin())
+                    @if(config('app.mode') === 'self_hosted' && (auth()->user()->isSuperAdmin() || auth()->user()->isAdmin()))
                     <button @click.prevent="activeTab = 'license'"
                         :class="activeTab === 'license' ? 'border-brand-500 text-brand-500' : 'border-transparent text-gray-500 hover:text-gray-800 dark:hover:text-white'"
                         class="border-b-2 py-4 px-2 text-sm font-medium transition-colors">
@@ -181,7 +181,7 @@
                 </div>
 
                 <!-- Tab Lisensi Aplikasi -->
-                @if(config('app.mode') === 'self_hosted' && auth()->user()->isSuperAdmin())
+                @if(config('app.mode') === 'self_hosted' && (auth()->user()->isSuperAdmin() || auth()->user()->isAdmin()))
                 <div x-show="activeTab === 'license'" style="display: none;"
                     x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0"
                     x-transition:enter-end="opacity-100" class="space-y-6">

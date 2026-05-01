@@ -25,9 +25,11 @@ class ProcessWhatsappQueue extends Command
                 ->select('message_queues.*')
                 ->leftJoin('schools', 'message_queues.school_id', '=', 'schools.id')
                 ->where('message_queues.status', 'pending')
-                ->where(function ($q) {
-                    $q->whereNull('message_queues.school_id')
-                        ->orWhere('schools.wa_enabled', true);
+                ->when(config('app.mode', 'hosted') !== 'self_hosted', function ($query) {
+                    $query->where(function ($q) {
+                        $q->whereNull('message_queues.school_id')
+                          ->orWhere('schools.wa_enabled', true);
+                    });
                 })
                 ->orderBy('message_queues.created_at', 'asc')
                 ->limit($limit)

@@ -29,18 +29,22 @@
 </div>
 
 <div class="rounded-2xl border border-gray-200 bg-white shadow-theme-sm dark:border-gray-800 dark:bg-gray-dark">
-    {{-- Banner kuota bot (jika bot aktif untuk sekolah ini) --}}
-    @if($showBotCol)
-    <div class="px-5 py-3 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between flex-wrap gap-2 bg-brand-50/30 dark:bg-brand-500/5">
-        <p class="text-sm text-gray-700 dark:text-gray-300 flex items-center gap-2">
-            <i class="fas fa-robot text-brand-500"></i>
-            <strong>Bot WhatsApp:</strong> Aktif &mdash;
-            <span id="bot-quota-display" class="font-medium {{ ($botLimit > 0 && $botCount >= $botLimit) ? 'text-danger' : 'text-success' }}">
-                {{ $botCount }} / {{ $botLimit > 0 ? $botLimit : '∞' }} guru diizinkan
-            </span>
-        </p>
-        <span class="text-xs text-gray-500 dark:text-gray-400">Toggle kolom Bot WA untuk izinkan/cabut akses per guru</span>
-    </div>
+    {{-- Alert Success / Error --}}
+    @if(session('success'))
+        <div class="m-5 flex items-start gap-3 rounded-xl border border-success-200 bg-success-50 px-4 py-3 dark:border-success-500/20 dark:bg-success-500/10">
+            <div class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-success-500 text-white">
+                <i class="fas fa-check text-xs"></i>
+            </div>
+            <p class="text-sm font-medium text-success-800 dark:text-success-400">{{ session('success') }}</p>
+        </div>
+    @endif
+    @if(session('error'))
+        <div class="m-5 flex items-start gap-3 rounded-xl border border-error-200 bg-error-50 px-4 py-3 dark:border-error-500/20 dark:bg-error-500/10">
+            <div class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-error-500 text-white">
+                <i class="fas fa-exclamation text-xs"></i>
+            </div>
+            <p class="text-sm font-medium text-error-800 dark:text-error-400">{!! session('error') !!}</p>
+        </div>
     @endif
     <!-- Header & Search -->
     <div class="flex flex-col sm:flex-row justify-between items-center px-5 py-4 border-b border-gray-200 dark:border-gray-800 gap-4">
@@ -601,7 +605,6 @@
     <script>
     (function() {
         const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
-        const quotaDisplay = document.getElementById('bot-quota-display');
 
         document.querySelectorAll('.guru-bot-toggle').forEach(function(checkbox) {
             checkbox.addEventListener('change', function() {
@@ -644,12 +647,7 @@
                             badge.textContent = 'Tidak';
                             badge.className = 'text-xs mt-0.5 text-gray-400 dark:text-gray-500';
                         }
-
-                        // Update quota display
-                        if (quotaDisplay) {
-                            quotaDisplay.textContent = data.bot_count + ' / ' + data.bot_limit + ' guru diizinkan';
-                        }
-
+                        
                         showBotToast(data.message, active ? 'success' : 'warning');
                     } else {
                         cb.checked = !cb.checked; // rollback

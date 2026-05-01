@@ -18,6 +18,23 @@
 </div>
 
 <div class="rounded-2xl border border-gray-200 bg-white shadow-theme-sm dark:border-gray-800 dark:bg-gray-dark">
+    {{-- Alert Success / Error --}}
+    @if(session('success'))
+        <div class="m-5 flex items-start gap-3 rounded-xl border border-success-200 bg-success-50 px-4 py-3 dark:border-success-500/20 dark:bg-success-500/10">
+            <div class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-success-500 text-white">
+                <i class="fas fa-check text-xs"></i>
+            </div>
+            <p class="text-sm font-medium text-success-800 dark:text-success-400">{{ session('success') }}</p>
+        </div>
+    @endif
+    @if(session('error'))
+        <div class="m-5 flex items-start gap-3 rounded-xl border border-error-200 bg-error-50 px-4 py-3 dark:border-error-500/20 dark:bg-error-500/10">
+            <div class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-error-500 text-white">
+                <i class="fas fa-exclamation text-xs"></i>
+            </div>
+            <p class="text-sm font-medium text-error-800 dark:text-error-400">{!! session('error') !!}</p>
+        </div>
+    @endif
     <!-- Header & Search -->
     <div class="flex flex-col sm:flex-row justify-between items-center px-5 py-4 border-b border-gray-200 dark:border-gray-800 gap-4">
         <h4 class="font-semibold text-gray-800 dark:text-white/90">Tabel Data Siswa</h4>

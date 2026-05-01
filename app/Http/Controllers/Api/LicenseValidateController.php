@@ -26,11 +26,15 @@ class LicenseValidateController extends Controller
         }
 
         $license = License::where('license_key', $key)->first();
+        $allKeys = \Illuminate\Support\Facades\DB::table('licenses')->pluck('license_key');
 
         if (!$license) {
             return response()->json([
                 'valid'   => false,
                 'message' => 'Lisensi tidak ditemukan.',
+                'debug_input' => $request->all(),
+                'debug_key' => $key,
+                'debug_all_keys' => $allKeys
             ], 404);
         }
 

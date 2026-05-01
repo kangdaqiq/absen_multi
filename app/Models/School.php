@@ -37,6 +37,30 @@ class School extends Model
     ];
 
     /**
+     * Get wa_enabled attribute.
+     * Always returns true in self_hosted mode.
+     */
+    public function getWaEnabledAttribute($value): bool
+    {
+        if (config('app.mode', 'hosted') === 'self_hosted') {
+            return true;
+        }
+        return (bool) $value;
+    }
+
+    /**
+     * Get bot_enabled attribute.
+     * Always returns true in self_hosted mode.
+     */
+    public function getBotEnabledAttribute($value): bool
+    {
+        if (config('app.mode', 'hosted') === 'self_hosted') {
+            return true;
+        }
+        return (bool) $value;
+    }
+
+    /**
      * Get all users for this school
      */
     public function users()

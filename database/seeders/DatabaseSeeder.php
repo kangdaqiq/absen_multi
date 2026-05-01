@@ -25,7 +25,15 @@ class DatabaseSeeder extends Seeder
                 'phone' => '0812345678',
                 'email' => 'default@school.com',
                 'is_active' => true,
+                'wa_enabled' => true,
+                'bot_enabled' => true,
             ]
+        );
+
+        // Ensure WA notification is enabled by default
+        \App\Models\Setting::firstOrCreate(
+            ['setting_key' => 'absence_notification_enabled'],
+            ['setting_value' => 'true']
         );
 
         // Create Admin User

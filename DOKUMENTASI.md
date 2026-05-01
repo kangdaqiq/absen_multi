@@ -313,7 +313,7 @@ cp .env.example .env && php artisan key:generate
 # PENTING: Untuk fresh install, import absen_sell.sql terlebih dahulu ke database kosong
 # Anda bisa menggunakan phpMyAdmin, atau MySQL CLI jika tersedia
 # Setelah absen_sell.sql berhasil diimport, jalankan:
-php artisan migrate && php artisan storage:link && php artisan optimize
+php artisan migrate && php artisan db:seed --class=SuperAdminSeeder && php artisan storage:link && php artisan optimize
 
 # 5. Nginx + Scheduler crontab + Supervisor (queue + gowa)
 # (lihat README.md untuk detail)

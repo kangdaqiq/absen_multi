@@ -82,11 +82,14 @@
         <h1>Akses Ditangguhkan</h1>
         <p>Aplikasi ini memerlukan lisensi yang valid untuk beroperasi. Lisensi yang terdaftar tidak dapat diverifikasi oleh server.</p>
 
-        @if(config('app.license_key'))
-            <div class="license-key">
-                🔑 {{ substr(config('app.license_key'), 0, 8) }}•••••••••••••••••
+        <form action="{{ route('license.update-key') }}" method="POST" style="margin-bottom: 24px;">
+            @csrf
+            <div style="position: relative;">
+                <input type="text" name="license_key" placeholder="Masukkan License Key..." value="{{ config('app.license_key') }}" style="width: 100%; padding: 12px 16px; border-radius: 8px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2); color: white; font-family: monospace; outline: none; transition: border 0.3s;" onfocus="this.style.borderColor='#6366f1';" onblur="this.style.borderColor='rgba(255,255,255,0.2)';">
+                <button type="submit" style="position: absolute; right: 8px; top: 8px; padding: 6px 16px; background: #6366f1; border: none; border-radius: 6px; color: white; font-weight: bold; cursor: pointer; transition: background 0.3s;" onmouseover="this.style.background='#4f46e5';" onmouseout="this.style.background='#6366f1';">Simpan</button>
             </div>
-        @endif
+            <p style="font-size: 0.8rem; margin-top: 8px; color: rgba(255,255,255,0.5); text-align: left;">Masukkan lisensi baru Anda di sini dan tekan Simpan.</p>
+        </form>
 
         <div class="contact-box">
             <p class="label">Hubungi Provider</p>

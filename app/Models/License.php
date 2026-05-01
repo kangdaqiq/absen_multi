@@ -12,6 +12,8 @@ class License extends Model
         'client_name',
         'max_schools',
         'max_students',
+        'max_teachers',
+        'max_bot_users',
         'expired_at',
         'is_active',
         'allowed_hostname',
@@ -25,6 +27,8 @@ class License extends Model
         'last_ping_at' => 'datetime',
         'max_schools'  => 'integer',
         'max_students' => 'integer',
+        'max_teachers' => 'integer',
+        'max_bot_users' => 'integer',
     ];
 
     /**

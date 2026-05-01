@@ -35,6 +35,8 @@ class ValidateLicenseCommand extends Command
             $this->line("   Berlaku s/d: {$result['expired_at']}");
             $this->line("   Max Sekolah: " . ($result['max_schools'] === 0 ? 'Unlimited' : $result['max_schools']));
             $this->line("   Max Siswa  : " . ($result['max_students'] === 0 ? 'Unlimited' : $result['max_students']));
+            $this->line("   Max Guru   : " . (($result['max_teachers'] ?? 0) === 0 ? 'Unlimited' : $result['max_teachers']));
+            $this->line("   Max Bot    : " . (($result['max_bot_users'] ?? 0) === 0 ? 'Unlimited' : $result['max_bot_users']));
         } elseif ($result['expired']) {
             $this->error('⛔ Lisensi EXPIRED: ' . $result['message']);
             return 1;

@@ -44,6 +44,7 @@ class SchoolController extends Controller
             'logo' => 'nullable|image|max:10240',
             'student_limit'        => 'nullable|integer|min:0',
             'teacher_limit'        => 'nullable|integer|min:0',
+            'bot_user_limit'       => 'nullable|integer|min:0',
             'history_quota_months' => 'nullable|integer|in:3,6,9,12,24,36',
         ]);
         
@@ -65,6 +66,8 @@ class SchoolController extends Controller
         // Handle checkboxes
         $validated['is_active']           = $request->has('is_active');
         $validated['wa_enabled']           = $request->has('wa_enabled');
+        $validated['bot_enabled']          = true; // Default aktif saat buat sekolah baru
+        $validated['bot_user_limit']       = $request->bot_user_limit ?: 0;
         $validated['student_limit']        = $request->student_limit ?: null;
         $validated['teacher_limit']        = $request->teacher_limit ?: null;
         $validated['history_quota_months'] = $request->history_quota_months ?: null;
@@ -136,6 +139,7 @@ class SchoolController extends Controller
             'logo' => 'nullable|image|max:10240',
             'student_limit'        => 'nullable|integer|min:0',
             'teacher_limit'        => 'nullable|integer|min:0',
+            'bot_user_limit'       => 'nullable|integer|min:0',
             'history_quota_months' => 'nullable|integer|in:3,6,9,12,24,36',
         ]);
         
@@ -162,6 +166,8 @@ class SchoolController extends Controller
         // Handle checkboxes
         $validated['is_active']           = $request->has('is_active');
         $validated['wa_enabled']           = $request->has('wa_enabled');
+        // bot_enabled TIDAK diubah dari form edit biasa — dikontrol lewat toggleBot() khusus superadmin
+        $validated['bot_user_limit']       = $request->bot_user_limit ?: 0;
         $validated['student_limit']        = $request->student_limit ?: null;
         $validated['teacher_limit']        = $request->teacher_limit ?: null;
         $validated['history_quota_months'] = $request->history_quota_months ?: null;
@@ -256,6 +262,23 @@ class SchoolController extends Controller
                 ->route('super-admin.schools.index')
                 ->with('error', 'Gagal menghapus sekolah: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Toggle bot_enabled for a school (AJAX, superadmin only)
+     */
+    public function toggleBot(School $school)
+    {
+        $school->bot_enabled = !$school->bot_enabled;
+        $school->save();
+
+        $status = $school->bot_enabled ? 'aktif' : 'nonaktif';
+
+        return response()->json([
+            'success'     => true,
+            'bot_enabled' => $school->bot_enabled,
+            'message'     => "Bot WhatsApp untuk {$school->name} berhasil di{$status}kan.",
+        ]);
     }
 
     private function syncWaDevice(School $school)

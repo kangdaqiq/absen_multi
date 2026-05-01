@@ -111,6 +111,8 @@ class LicenseService
                     'expired_at'       => $expiredAt->format('d M Y'),
                     'max_schools'      => $data['max_schools'] ?? 1,
                     'max_students'     => $data['max_students'] ?? 0,
+                    'max_teachers'     => $data['max_teachers'] ?? 0,
+                    'max_bot_users'    => $data['max_bot_users'] ?? 0,
                     'message'          => 'Lisensi telah expired pada ' . $expiredAt->format('d M Y') . '. Hubungi provider untuk perpanjangan.',
                     'grace_remaining_days' => 0,
                 ];
@@ -123,6 +125,8 @@ class LicenseService
                 'expired_at'       => $expiredAt?->format('d M Y') ?? 'Selamanya',
                 'max_schools'      => $data['max_schools'] ?? 1,
                 'max_students'     => $data['max_students'] ?? 0,
+                'max_teachers'     => $data['max_teachers'] ?? 0,
+                'max_bot_users'    => $data['max_bot_users'] ?? 0,
                 'message'          => 'Lisensi aktif.',
                 'grace_remaining_days' => 0,
             ];
@@ -141,6 +145,8 @@ class LicenseService
             'expired_at'       => 'Selamanya',
             'max_schools'      => 0,   // 0 = unlimited
             'max_students'     => 0,   // 0 = unlimited
+            'max_teachers'     => 0,   // 0 = unlimited
+            'max_bot_users'    => 0,   // 0 = unlimited
             'message'          => $message,
             'grace_remaining_days' => 0,
         ];
@@ -160,6 +166,8 @@ class LicenseService
             'expired_at'       => null,
             'max_schools'      => 0,
             'max_students'     => 0,
+            'max_teachers'     => 0,
+            'max_bot_users'    => 0,
             'message'          => $message,
             'grace_remaining_days' => 0,
         ];
@@ -200,5 +208,45 @@ class LicenseService
         if (file_exists($path)) {
             unlink($path);
         }
+    }
+
+    /**
+     * Check if global teacher quota is available (for self_hosted mode)
+     */
+    public function hasGlobalTeacherQuota(): bool
+    {
+        if (config('app.mode', 'hosted') !== 'self_hosted') {
+            return true; // only enforced in self_hosted
+        }
+
+        $license = $this->validate();
+        $limit = $license['max_teachers'] ?? 0;
+
+        if ($limit === 0) {
+            return true; // unlimited
+        }
+
+        $currentCount = \App\Models\Guru::count();
+        return $currentCount < $limit;
+    }
+
+    /**
+     * Check if global bot user quota is available (for self_hosted mode)
+     */
+    public function hasGlobalBotQuota(): bool
+    {
+        if (config('app.mode', 'hosted') !== 'self_hosted') {
+            return true; // only enforced in self_hosted
+        }
+
+        $license = $this->validate();
+        $limit = $license['max_bot_users'] ?? 0;
+
+        if ($limit === 0) {
+            return true; // unlimited
+        }
+
+        $currentCount = \App\Models\Guru::where('bot_access', true)->count();
+        return $currentCount < $limit;
     }
 }

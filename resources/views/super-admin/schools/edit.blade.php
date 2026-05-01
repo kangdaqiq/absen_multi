@@ -141,6 +141,26 @@
                         </div>
                     </div>
 
+                    {{-- Kuota Bot WA — superadmin only --}}
+                    <div class="mb-4.5">
+                        <label class="mb-2.5 block text-black dark:text-white">
+                            <i class="fas fa-robot text-brand-500 mr-1"></i>
+                            Kuota Guru Pengguna Bot WA
+                            @php
+                                $currentBotCount = $school->botAccessCount();
+                                $botLimit = $school->bot_user_limit ?? 0;
+                            @endphp
+                            <span class="ml-2 inline-flex rounded-full {{ $botLimit > 0 ? 'bg-brand-500/10 text-brand-500' : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-300' }} px-2 py-0.5 text-xs font-medium">
+                                {{ $currentBotCount }} / {{ $botLimit > 0 ? $botLimit : '∞' }} aktif
+                            </span>
+                        </label>
+                        <input type="number" name="bot_user_limit" value="{{ old('bot_user_limit', $school->bot_user_limit ?? 0) }}" min="0" class="w-full rounded border border-stroke bg-transparent py-3 px-5 outline-none transition focus:border-brand-500 active:border-brand-500 dark:border-form-strokedark dark:bg-form-input dark:focus:border-brand-500 @error('bot_user_limit') border-danger @enderror" />
+                        <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">Maksimal guru yang bisa menggunakan bot WA interaktif. Biarkan 0 untuk Unlimited. Admin sekolah bisa memilih guru mana yang mendapat akses (hingga batas ini).</p>
+                        @error('bot_user_limit')
+                            <p class="mt-1 text-xs text-danger">{{ $message }}</p>
+                        @enderror
+                    </div>
+
                     <div class="mb-5.5">
                         <label class="mb-2.5 block text-black dark:text-white">
                             <i class="fas fa-history text-warning mr-1"></i> Kuota Retensi History Absen
@@ -190,6 +210,44 @@
                             </div>
                             <span class="text-sm font-medium text-black dark:text-white">Aktifkan Notifikasi WhatsApp</span>
                         </label>
+
+                        {{-- Toggle Bot WA — hanya superadmin, admin sekolah tidak bisa melihat/mengubah ini --}}
+                        <div class="rounded-md border border-stroke dark:border-strokedark p-4 bg-gray-2/40 dark:bg-meta-4/40">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm font-semibold text-black dark:text-white flex items-center gap-2">
+                                        <i class="fas fa-robot text-brand-500"></i>
+                                        Bot WhatsApp Interaktif
+                                    </p>
+                                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                        Aktifkan/nonaktifkan bot respons otomatis (guru &amp; siswa). Notifikasi tetap jalan meski bot dimatikan.
+                                    </p>
+                                </div>
+                                <label class="inline-flex items-center cursor-pointer ml-4" id="bot-toggle-label">
+                                    <input
+                                        type="checkbox"
+                                        class="sr-only"
+                                        id="bot-toggle-checkbox"
+                                        data-url="{{ route('super-admin.schools.toggle-bot', $school) }}"
+                                        {{ $school->bot_enabled ? 'checked' : '' }}
+                                    />
+                                    <div id="bot-toggle-track" class="relative w-12 h-6 rounded-full transition-colors duration-300 {{ $school->bot_enabled ? 'bg-brand-500' : 'bg-gray-300 dark:bg-meta-4' }}">
+                                        <div id="bot-toggle-thumb" class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-300" style="{{ $school->bot_enabled ? 'transform: translateX(24px);' : '' }}"></div>
+                                    </div>
+                                </label>
+                            </div>
+                            <div id="bot-status-badge" class="mt-2">
+                                @if($school->bot_enabled)
+                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-success-500/10 px-3 py-1 text-xs font-medium text-success-500">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-success-500 inline-block"></span> Bot Aktif
+                                    </span>
+                                @else
+                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-error-500/10 px-3 py-1 text-xs font-medium text-error-500">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-error-500 inline-block"></span> Bot Nonaktif
+                                    </span>
+                                @endif
+                            </div>
+                        </div>
                     </div>
 
                     <div class="flex justify-end gap-4.5 border-t border-stroke pt-5 dark:border-strokedark">
@@ -264,4 +322,81 @@
         border-color: #3C50E0;
     }
 </style>
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const checkbox = document.getElementById('bot-toggle-checkbox');
+    if (!checkbox) return;
+
+    const track      = document.getElementById('bot-toggle-track');
+    const thumb      = document.getElementById('bot-toggle-thumb');
+    const badge      = document.getElementById('bot-status-badge');
+    const csrfToken  = document.querySelector('meta[name="csrf-token"]').content;
+
+    checkbox.addEventListener('change', function () {
+        const url = this.getAttribute('data-url');
+        this.disabled = true;
+
+        fetch(url, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrfToken,
+                'Accept': 'application/json',
+            },
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                const active = data.bot_enabled;
+
+                if (active) {
+                    track.classList.remove('bg-gray-300', 'dark:bg-meta-4');
+                    track.classList.add('bg-brand-500');
+                    thumb.style.transform = 'translateX(24px)';
+                    badge.innerHTML = `
+                        <span class="inline-flex items-center gap-1.5 rounded-full bg-success-500/10 px-3 py-1 text-xs font-medium text-success-500">
+                            <span class="w-1.5 h-1.5 rounded-full bg-success-500 inline-block"></span> Bot Aktif
+                        </span>`;
+                } else {
+                    track.classList.remove('bg-brand-500');
+                    track.classList.add('bg-gray-300', 'dark:bg-meta-4');
+                    thumb.style.transform = 'translateX(0)';
+                    badge.innerHTML = `
+                        <span class="inline-flex items-center gap-1.5 rounded-full bg-error-500/10 px-3 py-1 text-xs font-medium text-error-500">
+                            <span class="w-1.5 h-1.5 rounded-full bg-error-500 inline-block"></span> Bot Nonaktif
+                        </span>`;
+                }
+
+                showToast(data.message, active ? 'success' : 'warning');
+            } else {
+                this.checked = !this.checked;
+                showToast('Gagal mengubah status bot.', 'error');
+            }
+        })
+        .catch(() => {
+            this.checked = !this.checked;
+            showToast('Terjadi kesalahan jaringan.', 'error');
+        })
+        .finally(() => { this.disabled = false; });
+    });
+
+    function showToast(message, type) {
+        const colors = { success: '#10B981', warning: '#F59E0B', error: '#EF4444' };
+        const toast = document.createElement('div');
+        toast.textContent = message;
+        toast.style.cssText = `
+            position:fixed;bottom:24px;right:24px;z-index:9999;
+            background:${colors[type]};color:#fff;padding:12px 20px;
+            border-radius:8px;font-size:13px;font-weight:500;
+            box-shadow:0 4px 12px rgba(0,0,0,.18);opacity:0;
+            transition:opacity .3s ease;max-width:360px;line-height:1.4;`;
+        document.body.appendChild(toast);
+        requestAnimationFrame(() => toast.style.opacity = '1');
+        setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 3500);
+    }
+});
+</script>
+@endpush
 @endsection

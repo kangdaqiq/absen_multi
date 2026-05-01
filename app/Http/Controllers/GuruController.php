@@ -45,6 +45,12 @@ class GuruController extends Controller
             }
         }
 
+        // Check global license quota for self_hosted
+        $licenseService = app(\App\Services\LicenseService::class);
+        if (!$licenseService->hasGlobalTeacherQuota()) {
+            return back()->with('error', 'Gagal: Kuota global Guru/Karyawan dari Lisensi Anda telah penuh. Silakan upgrade lisensi Anda.')->withInput();
+        }
+
         $request->validate([
             'nama' => 'required|string|max:100',
             'nip' => 'nullable|string|max:50',
@@ -118,7 +124,56 @@ class GuruController extends Controller
         return redirect()->route('guru.index')->with('success', 'Guru berhasil dihapus.');
     }
 
+    /**
+     * Toggle bot_access for a teacher (AJAX).
+     * Admin sekolah bisa toggle, dibatasi oleh bot_user_limit dari superadmin.
+     */
+    public function toggleBotAccess(Request $request, $id)
+    {
+        $guru = Guru::findOrFail($id);
+
+        // Pastikan admin hanya bisa atur guru sekolahnya sendiri
+        $user = auth()->user();
+        if (!$user->isSuperAdmin() && $guru->school_id !== $user->school_id) {
+            return response()->json(['success' => false, 'message' => 'Akses ditolak.'], 403);
+        }
+
+        $school = \App\Models\School::find($guru->school_id);
+
+        // Jika akan diaktifkan, cek kuota bot
+        // Jika akan diaktifkan, cek kuota bot
+        if (!$guru->bot_access) {
+            if ($school && !$school->hasBotQuota()) {
+                $limit = $school->bot_user_limit;
+                return response()->json(['success' => false, 'message' => "Kuota Bot WhatsApp sekolah penuh (Maks: $limit guru)."], 422);
+            }
+
+            // Check global license bot quota for self_hosted
+            $licenseService = app(\App\Services\LicenseService::class);
+            if (!$licenseService->hasGlobalBotQuota()) {
+                return response()->json(['success' => false, 'message' => "Kuota global Bot WhatsApp dari Lisensi Anda penuh. Hubungi provider."], 422);
+            }
+        }
+
+        $guru->bot_access = !$guru->bot_access;
+        $guru->save();
+
+        $botCount = $school ? $school->botAccessCount() : '-';
+        $botLimit = ($school && $school->bot_user_limit > 0) ? $school->bot_user_limit : '∞';
+
+        return response()->json([
+            'success'    => true,
+            'bot_access' => $guru->bot_access,
+            'bot_count'  => $botCount,
+            'bot_limit'  => $botLimit,
+            'message'    => $guru->bot_access
+                ? "{$guru->nama} sekarang bisa menggunakan bot WhatsApp. ({$botCount}/{$botLimit})"
+                : "{$guru->nama} tidak lagi bisa menggunakan bot WhatsApp. ({$botCount}/{$botLimit})",
+        ]);
+    }
+
     // Enrollment Methods
+
     public function enrollRequest($id)
     {
         // Cancel others (Siswa & Guru) to ensure Single Active Request - SCOPED

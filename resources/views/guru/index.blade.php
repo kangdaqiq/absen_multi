@@ -4,6 +4,11 @@
     $school = auth()->user()->school ?? null;
     $labelKaryawan = $school?->employeeLabel() ?? 'Guru';
     $labelNIP = $school?->nipLabel() ?? 'NIP';
+    // Info kuota bot (hanya untuk non-superadmin)
+    $botEnabled  = $school?->bot_enabled ?? false;
+    $botLimit    = $school?->bot_user_limit ?? 0;
+    $botCount    = $school?->botAccessCount() ?? 0;
+    $showBotCol  = $school && $botEnabled && $school->wa_enabled;
 @endphp
 
 @section('title', 'Data ' . $labelKaryawan)
@@ -24,6 +29,19 @@
 </div>
 
 <div class="rounded-2xl border border-gray-200 bg-white shadow-theme-sm dark:border-gray-800 dark:bg-gray-dark">
+    {{-- Banner kuota bot (jika bot aktif untuk sekolah ini) --}}
+    @if($showBotCol)
+    <div class="px-5 py-3 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between flex-wrap gap-2 bg-brand-50/30 dark:bg-brand-500/5">
+        <p class="text-sm text-gray-700 dark:text-gray-300 flex items-center gap-2">
+            <i class="fas fa-robot text-brand-500"></i>
+            <strong>Bot WhatsApp:</strong> Aktif &mdash;
+            <span id="bot-quota-display" class="font-medium {{ ($botLimit > 0 && $botCount >= $botLimit) ? 'text-danger' : 'text-success' }}">
+                {{ $botCount }} / {{ $botLimit > 0 ? $botLimit : '∞' }} guru diizinkan
+            </span>
+        </p>
+        <span class="text-xs text-gray-500 dark:text-gray-400">Toggle kolom Bot WA untuk izinkan/cabut akses per guru</span>
+    </div>
+    @endif
     <!-- Header & Search -->
     <div class="flex flex-col sm:flex-row justify-between items-center px-5 py-4 border-b border-gray-200 dark:border-gray-800 gap-4">
         <h4 class="font-semibold text-gray-800 dark:text-white/90">Tabel Data {{ $labelKaryawan }}</h4>
@@ -47,6 +65,9 @@
                     <th class="px-4 py-4">No WhatsApp</th>
                     <th class="px-4 py-4 text-center">UID RFID</th>
                     <th class="px-4 py-4 text-center">ID Finger</th>
+                    @if($showBotCol)
+                    <th class="px-4 py-4 text-center">Bot WA</th>
+                    @endif
                     <th class="px-4 py-4 text-center">Aksi</th>
                 </tr>
             </thead>
@@ -79,6 +100,33 @@
                                 <span class="text-gray-400">-</span>
                             @endif
                         </td>
+                        {{-- Kolom Bot WA — hanya tampil jika bot aktif --}}
+                        @if($showBotCol)
+                        <td class="border-b border-gray-100 px-4 py-4 dark:border-gray-800 text-center">
+                            @if($g->no_wa)
+                                <label class="inline-flex flex-col items-center cursor-pointer group">
+                                    <input
+                                        type="checkbox"
+                                        class="sr-only guru-bot-toggle"
+                                        data-id="{{ $g->id }}"
+                                        data-nama="{{ $g->nama }}"
+                                        data-url="{{ route('guru.toggle-bot-access', $g->id) }}"
+                                        {{ $g->bot_access ? 'checked' : '' }}
+                                    />
+                                    <div class="bot-track relative w-10 h-5 rounded-full transition-colors duration-300 {{ $g->bot_access ? 'bg-brand-500' : 'bg-gray-300 dark:bg-gray-600' }}">
+                                        <div class="bot-thumb absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-all duration-300" style="{{ $g->bot_access ? 'transform: translateX(20px);' : '' }}"></div>
+                                    </div>
+                                    <span class="text-xs mt-0.5 {{ $g->bot_access ? 'text-brand-500' : 'text-gray-400 dark:text-gray-500' }}">
+                                        {{ $g->bot_access ? 'Ya' : 'Tidak' }}
+                                    </span>
+                                </label>
+                            @else
+                                <span class="text-xs text-gray-400 italic" title="Perlu nomor WA dulu">
+                                    <i class="fas fa-phone-slash"></i>
+                                </span>
+                            @endif
+                        </td>
+                        @endif
                         <td class="border-b border-gray-100 px-4 py-4 dark:border-gray-800">
                             <div class="flex items-center justify-center gap-2" x-data="{}">
                                 <!-- Enroll RFID -->
@@ -113,7 +161,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="7" class="border-b border-gray-100 px-4 py-8 dark:border-gray-800 text-center text-gray-500 dark:text-gray-400">
+                        <td colspan="{{ $showBotCol ? 8 : 7 }}" class="border-b border-gray-100 px-4 py-8 dark:border-gray-800 text-center text-gray-500 dark:text-gray-400">
                             Tidak ada data {{ strtolower($labelKaryawan) }} ditemukan.
                         </td>
                     </tr>
@@ -547,4 +595,90 @@
             });
         });
     </script>
+
+    @if($showBotCol)
+    {{-- Script AJAX toggle bot_access --}}
+    <script>
+    (function() {
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').content;
+        const quotaDisplay = document.getElementById('bot-quota-display');
+
+        document.querySelectorAll('.guru-bot-toggle').forEach(function(checkbox) {
+            checkbox.addEventListener('change', function() {
+                const url    = this.getAttribute('data-url');
+                const nama   = this.getAttribute('data-nama');
+                const label  = this.closest('label');
+                const track  = label.querySelector('.bot-track');
+                const thumb  = track.querySelector('div');
+                const badge  = label.querySelector('span');
+                const cb     = this;
+
+                cb.disabled = true;
+
+                fetch(url, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                        'Accept': 'application/json',
+                    }
+                })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        const active = data.bot_access;
+
+                        // Update toggle visual
+                        if (active) {
+                            track.classList.replace('bg-gray-300', 'bg-brand-500');
+                            track.classList.replace('dark:bg-gray-600', 'bg-brand-500');
+                            track.className = 'bot-track relative w-10 h-5 rounded-full transition-colors duration-300 bg-brand-500';
+                            thumb.className = 'bot-thumb absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-all duration-300';
+                            thumb.style.transform = 'translateX(20px)';
+                            badge.textContent = 'Ya';
+                            badge.className = 'text-xs mt-0.5 text-brand-500';
+                        } else {
+                            track.className = 'bot-track relative w-10 h-5 rounded-full transition-colors duration-300 bg-gray-300 dark:bg-gray-600';
+                            thumb.className = 'bot-thumb absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-all duration-300';
+                            thumb.style.transform = 'translateX(0)';
+                            badge.textContent = 'Tidak';
+                            badge.className = 'text-xs mt-0.5 text-gray-400 dark:text-gray-500';
+                        }
+
+                        // Update quota display
+                        if (quotaDisplay) {
+                            quotaDisplay.textContent = data.bot_count + ' / ' + data.bot_limit + ' guru diizinkan';
+                        }
+
+                        showBotToast(data.message, active ? 'success' : 'warning');
+                    } else {
+                        cb.checked = !cb.checked; // rollback
+                        showBotToast(data.message || 'Gagal mengubah akses bot.', 'error');
+                    }
+                })
+                .catch(() => {
+                    cb.checked = !cb.checked;
+                    showBotToast('Terjadi kesalahan jaringan.', 'error');
+                })
+                .finally(() => { cb.disabled = false; });
+            });
+        });
+
+        function showBotToast(message, type) {
+            const colors = { success: '#3C50E0', warning: '#F59E0B', error: '#EF4444' };
+            const toast = document.createElement('div');
+            toast.textContent = message;
+            toast.style.cssText = `
+                position:fixed;bottom:24px;right:24px;z-index:9999;
+                background:${colors[type]};color:#fff;padding:12px 20px;
+                border-radius:8px;font-size:13px;font-weight:500;
+                box-shadow:0 4px 12px rgba(0,0,0,.18);opacity:0;
+                transition:opacity .3s ease;max-width:380px;line-height:1.4;`;
+            document.body.appendChild(toast);
+            requestAnimationFrame(() => toast.style.opacity = '1');
+            setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 3500);
+        }
+    })();
+    </script>
+    @endif
 @endpush

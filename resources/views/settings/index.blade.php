@@ -28,6 +28,13 @@
                         class="border-b-2 py-4 px-2 text-sm font-medium transition-colors">
                         Otomatisasi & Notifikasi
                     </button>
+                    @if(config('app.mode') === 'self_hosted' && auth()->user()->isSuperAdmin())
+                    <button @click.prevent="activeTab = 'license'"
+                        :class="activeTab === 'license' ? 'border-brand-500 text-brand-500' : 'border-transparent text-gray-500 hover:text-gray-800 dark:hover:text-white'"
+                        class="border-b-2 py-4 px-2 text-sm font-medium transition-colors">
+                        Lisensi Aplikasi
+                    </button>
+                    @endif
                 </nav>
             </div>
 
@@ -172,6 +179,75 @@
                     </div>
 
                 </div>
+
+                <!-- Tab Lisensi Aplikasi -->
+                @if(config('app.mode') === 'self_hosted' && auth()->user()->isSuperAdmin())
+                <div x-show="activeTab === 'license'" style="display: none;"
+                    x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0"
+                    x-transition:enter-end="opacity-100" class="space-y-6">
+
+                    <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90 border-b border-gray-200 dark:border-gray-800 pb-2">
+                        <i class="fas fa-key text-brand-500 mr-2"></i> Konfigurasi Lisensi
+                    </h3>
+
+                    <div class="mb-6 rounded-lg border-l-4 border-warning bg-warning/10 p-4">
+                        <div class="flex items-start">
+                            <i class="fas fa-exclamation-triangle text-warning mt-1 mr-3"></i>
+                            <div>
+                                <h4 class="font-medium text-warning">Peringatan</h4>
+                                <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                                    Aplikasi berjalan dalam mode <span class="font-semibold">Self Hosted</span>. Harap masukkan <strong>License Key</strong> yang valid agar fitur-fitur utama dapat berfungsi. Lisensi divalidasi ke server pusat.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="space-y-6">
+                            <div>
+                                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">License Key</label>
+                                <input type="text" name="license_key"
+                                    value="{{ config('app.license_key') }}"
+                                    placeholder="XXXX-XXXX-XXXX-XXXX"
+                                    class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white font-mono tracking-wider">
+                                <p class="mt-1 text-xs text-gray-500">Masukkan kode lisensi yang diberikan oleh Provider Anda.</p>
+                            </div>
+                            
+                            @php
+                                $licenseService = app(\App\Services\LicenseService::class);
+                                $licenseStatus = $licenseService->validate();
+                            @endphp
+                            
+                            <div class="rounded-lg border border-gray-200 p-4 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
+                                <h4 class="mb-3 text-sm font-semibold text-gray-800 dark:text-white/90">Status Lisensi Saat Ini</h4>
+                                
+                                @if($licenseStatus && $licenseStatus['valid'])
+                                    <div class="flex items-center gap-2 mb-2">
+                                        <span class="inline-flex rounded-full bg-success/10 px-3 py-1 text-xs font-medium text-success">
+                                            <i class="fas fa-check-circle mr-1"></i> Aktif
+                                        </span>
+                                    </div>
+                                    <ul class="text-sm text-gray-600 dark:text-gray-400 space-y-1">
+                                        <li><strong>Klien:</strong> {{ $licenseStatus['client_name'] ?? '-' }}</li>
+                                        <li><strong>Berlaku s/d:</strong> {{ $licenseStatus['expired_at'] ?? 'Selamanya' }}</li>
+                                        <li><strong>Max Sekolah:</strong> {{ ($licenseStatus['max_schools'] ?? 0) === 0 ? 'Unlimited' : $licenseStatus['max_schools'] }}</li>
+                                        <li><strong>Max Siswa:</strong> {{ ($licenseStatus['max_students'] ?? 0) === 0 ? 'Unlimited' : $licenseStatus['max_students'] }}</li>
+                                        <li><strong>Max Guru:</strong> {{ ($licenseStatus['max_teachers'] ?? 0) === 0 ? 'Unlimited' : $licenseStatus['max_teachers'] }}</li>
+                                        <li><strong>Max Bot User:</strong> {{ ($licenseStatus['max_bot_users'] ?? 0) === 0 ? 'Unlimited' : $licenseStatus['max_bot_users'] }}</li>
+                                    </ul>
+                                @else
+                                    <div class="flex items-center gap-2 mb-2">
+                                        <span class="inline-flex rounded-full bg-danger/10 px-3 py-1 text-xs font-medium text-danger">
+                                            <i class="fas fa-times-circle mr-1"></i> Tidak Valid / Expired
+                                        </span>
+                                    </div>
+                                    <p class="text-sm text-danger mt-1">{{ $licenseStatus['message'] ?? 'Lisensi gagal diverifikasi. Pastikan License Key benar.' }}</p>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                @endif
 
                 <div class="mt-8 border-t border-gray-200 pt-6 dark:border-gray-800">
                     <button type="submit"

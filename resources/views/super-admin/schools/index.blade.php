@@ -22,20 +22,21 @@
     <div class="max-w-full overflow-x-auto">
         <table class="w-full table-auto">
             <thead>
-                <tr class="bg-gray-2 text-left dark:bg-meta-4">
-                    <th class="py-4 px-4 font-medium text-black dark:text-white xl:pl-11">Nama Sekolah</th>
-                    <th class="py-4 px-4 font-medium text-black dark:text-white">Kode</th>
-                    <th class="py-4 px-4 font-medium text-black dark:text-white">Kontak</th>
-                    <th class="py-4 px-4 font-medium text-black dark:text-white text-center">Siswa</th>
-                    <th class="py-4 px-4 font-medium text-black dark:text-white text-center">Karyawan/Guru</th>
-                    <th class="py-4 px-4 font-medium text-black dark:text-white text-center">Admin</th>
-                    <th class="py-4 px-4 font-medium text-black dark:text-white">Status</th>
-                    <th class="py-4 px-4 font-medium text-black dark:text-white">Aksi</th>
+                <tr class="bg-gray-50 text-left dark:bg-gray-800/50 text-gray-800 dark:text-white/90 font-medium text-sm">
+                    <th class="py-4 px-4 xl:pl-11 border-b border-stroke dark:border-strokedark">Nama Sekolah</th>
+                    <th class="py-4 px-4 border-b border-stroke dark:border-strokedark">Kode</th>
+                    <th class="py-4 px-4 border-b border-stroke dark:border-strokedark">Kontak</th>
+                    <th class="py-4 px-4 text-center border-b border-stroke dark:border-strokedark">Siswa</th>
+                    <th class="py-4 px-4 text-center border-b border-stroke dark:border-strokedark">Karyawan/Guru</th>
+                    <th class="py-4 px-4 text-center border-b border-stroke dark:border-strokedark">Admin</th>
+                    <th class="py-4 px-4 border-b border-stroke dark:border-strokedark">Status</th>
+                    <th class="py-4 px-4 text-center border-b border-stroke dark:border-strokedark">Bot WA</th>
+                    <th class="py-4 px-4 border-b border-stroke dark:border-strokedark">Aksi</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody class="text-sm">
                 @forelse($schools as $school)
-                    <tr>
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                         <td class="border-b border-[#eee] py-5 px-4 pl-9 dark:border-strokedark xl:pl-11 align-top">
                             <p class="text-black dark:text-white font-medium">{{ $school->name }}</p>
                             @if($school->address)
@@ -78,23 +79,48 @@
                         </td>
                         <td class="border-b border-[#eee] py-5 px-4 dark:border-strokedark align-top">
                             @if($school->is_active)
-                                <span class="inline-flex rounded-full bg-success/10 px-3 py-1 text-xs font-medium text-success">Aktif</span>
+                                <span class="inline-flex rounded-full bg-success-500/10 px-3 py-1 text-xs font-medium text-success-500">Aktif</span>
                             @else
-                                <span class="inline-flex rounded-full bg-danger/10 px-3 py-1 text-xs font-medium text-danger">Nonaktif</span>
+                                <span class="inline-flex rounded-full bg-error-500/10 px-3 py-1 text-xs font-medium text-error-500">Nonaktif</span>
+                            @endif
+                        </td>
+                        {{-- Toggle Bot WA --}}
+                        <td class="border-b border-[#eee] py-5 px-4 dark:border-strokedark align-top text-center">
+                            @if($school->wa_enabled)
+                                <label class="inline-flex items-center cursor-pointer" title="{{ $school->bot_enabled ? 'Klik untuk nonaktifkan bot' : 'Klik untuk aktifkan bot' }}">
+                                    <input
+                                        type="checkbox"
+                                        class="sr-only bot-toggle"
+                                        data-school-id="{{ $school->id }}"
+                                        data-school-name="{{ $school->name }}"
+                                        data-url="{{ route('super-admin.schools.toggle-bot', $school) }}"
+                                        {{ $school->bot_enabled ? 'checked' : '' }}
+                                    />
+                                    <div class="bot-toggle-track relative w-11 h-6 rounded-full transition-colors duration-300 {{ $school->bot_enabled ? 'bg-brand-500' : 'bg-gray-300 dark:bg-meta-4' }}">
+                                        <div class="bot-toggle-thumb absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-300" style="{{ $school->bot_enabled ? 'transform: translateX(20px);' : '' }}"></div>
+                                    </div>
+                                </label>
+                                <p class="text-xs mt-1 {{ $school->bot_enabled ? 'text-brand-500' : 'text-gray-400 dark:text-gray-500' }}">
+                                    {{ $school->bot_enabled ? 'Aktif' : 'Mati' }}
+                                </p>
+                            @else
+                                <span class="text-xs text-gray-400 dark:text-gray-500 italic" title="WA tidak diaktifkan untuk sekolah ini">
+                                    <i class="fas fa-ban"></i> N/A
+                                </span>
                             @endif
                         </td>
                         <td class="border-b border-[#eee] py-5 px-4 dark:border-strokedark align-top">
                             <div class="flex items-center space-x-3">
-                                <a href="{{ route('super-admin.schools.edit', $school) }}" class="hover:text-warning" title="Edit">
+                                <a href="{{ route('super-admin.schools.edit', $school) }}" class="text-warning-500 hover:text-warning-700 hover:bg-warning-50 p-2 rounded-lg transition" title="Edit">
                                     <i class="fas fa-edit"></i>
                                 </a>
-                                <a href="{{ route('super-admin.schools.admins.index', $school) }}" class="hover:text-info" title="Kelola Admin">
+                                <a href="{{ route('super-admin.schools.admins.index', $school) }}" class="text-info-500 hover:text-info-700 hover:bg-info-50 p-2 rounded-lg transition" title="Kelola Admin">
                                     <i class="fas fa-users-cog"></i>
                                 </a>
-                                <a href="{{ route('super-admin.schools.devices.index', $school) }}" class="hover:text-meta-6" title="Kelola Device">
+                                <a href="{{ route('super-admin.schools.devices.index', $school) }}" class="text-theme-purple-500 hover:text-theme-purple-700 hover:bg-theme-purple-500/10 p-2 rounded-lg transition" title="Kelola Device">
                                     <i class="fas fa-microchip"></i>
                                 </a>
-                                <button type="button" class="hover:text-danger btnDelete" data-id="{{ $school->id }}" title="Hapus">
+                                <button type="button" class="text-error-500 hover:text-error-700 hover:bg-error-50 p-2 rounded-lg transition btnDelete" data-id="{{ $school->id }}" title="Hapus">
                                     <i class="fas fa-trash"></i>
                                 </button>
                                 <form id="delete-form-{{ $school->id }}" action="{{ route('super-admin.schools.destroy', $school) }}" method="POST" class="hidden">
@@ -106,7 +132,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="8" class="border-b border-[#eee] py-5 px-4 dark:border-strokedark text-center text-gray-500">
+                        <td class="border-b border-[#eee] py-5 px-4 dark:border-strokedark text-center">
                             Belum ada sekolah
                         </td>
                     </tr>
@@ -126,6 +152,7 @@
 @push('scripts')
     <script>
         document.addEventListener('DOMContentLoaded', function() {
+            // ── Delete School ──────────────────────────────────────────────
             document.querySelectorAll('.btnDelete').forEach(btn => {
                 btn.addEventListener('click', function() {
                     const id = this.getAttribute('data-id');
@@ -134,6 +161,93 @@
                     }
                 });
             });
+
+            // ── Toggle Bot WA (AJAX) ───────────────────────────────────────
+            document.querySelectorAll('.bot-toggle').forEach(checkbox => {
+                checkbox.addEventListener('change', function() {
+                    const url          = this.getAttribute('data-url');
+                    const schoolName   = this.getAttribute('data-school-name');
+                    const isChecked    = this.checked;
+                    const label        = this.closest('label');
+                    const track        = label.querySelector('.bot-toggle-track');
+                    const thumb        = label.querySelector('.bot-toggle-thumb');
+                    const statusText   = label.closest('td').querySelector('p');
+                    const csrfToken    = document.querySelector('meta[name="csrf-token"]').content;
+
+                    // Disable toggle selama proses
+                    this.disabled = true;
+
+                    fetch(url, {
+                        method: 'PATCH',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': csrfToken,
+                            'Accept': 'application/json',
+                        },
+                    })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.success) {
+                            const active = data.bot_enabled;
+
+                            // Update visual
+                            if (active) {
+                                track.classList.remove('bg-gray-300', 'dark:bg-meta-4');
+                                track.classList.add('bg-brand-500');
+                                thumb.style.transform = 'translateX(20px)';
+                                statusText.textContent = 'Aktif';
+                                statusText.className = 'text-xs mt-1 text-brand-500';
+                            } else {
+                                track.classList.remove('bg-brand-500');
+                                track.classList.add('bg-gray-300', 'dark:bg-meta-4');
+                                thumb.style.transform = 'translateX(0)';
+                                statusText.textContent = 'Mati';
+                                statusText.className = 'text-xs mt-1 text-gray-400 dark:text-gray-500';
+                            }
+
+                            // Toast notifikasi singkat
+                            showToast(data.message, active ? 'success' : 'warning');
+                        } else {
+                            // Rollback jika gagal
+                            this.checked = !isChecked;
+                            showToast('Gagal mengubah status bot.', 'error');
+                        }
+                    })
+                    .catch(() => {
+                        this.checked = !isChecked;
+                        showToast('Terjadi kesalahan jaringan.', 'error');
+                    })
+                    .finally(() => {
+                        this.disabled = false;
+                    });
+                });
+            });
+
+            // ── Toast helper ───────────────────────────────────────────────
+            function showToast(message, type) {
+                const colors = {
+                    success: '#10B981',
+                    warning: '#F59E0B',
+                    error:   '#EF4444',
+                };
+                const toast = document.createElement('div');
+                toast.textContent = message;
+                toast.style.cssText = `
+                    position: fixed; bottom: 24px; right: 24px; z-index: 9999;
+                    background: ${colors[type] || colors.success};
+                    color: #fff; padding: 12px 20px; border-radius: 8px;
+                    font-size: 13px; font-weight: 500;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.18);
+                    opacity: 0; transition: opacity 0.3s ease;
+                    max-width: 360px; line-height: 1.4;
+                `;
+                document.body.appendChild(toast);
+                requestAnimationFrame(() => toast.style.opacity = '1');
+                setTimeout(() => {
+                    toast.style.opacity = '0';
+                    setTimeout(() => toast.remove(), 300);
+                }, 3000);
+            }
         });
     </script>
 @endpush

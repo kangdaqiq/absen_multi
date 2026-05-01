@@ -17,6 +17,8 @@ class School extends Model
         'logo',
         'is_active',
         'wa_enabled',
+        'bot_enabled',
+        'bot_user_limit',
         'student_limit',
         'teacher_limit',
         'history_quota_months',
@@ -26,6 +28,8 @@ class School extends Model
     protected $casts = [
         'is_active'            => 'boolean',
         'wa_enabled'           => 'boolean',
+        'bot_enabled'          => 'boolean',
+        'bot_user_limit'       => 'integer',
         'student_limit'        => 'integer',
         'teacher_limit'        => 'integer',
         'history_quota_months' => 'integer',
@@ -94,6 +98,26 @@ class School extends Model
             return true;
         }
         return $this->guru()->count() < $this->teacher_limit;
+    }
+
+    /**
+     * Check if school's bot user quota is available.
+     * Returns true if unlimited (0) or bot_access_count < bot_user_limit.
+     */
+    public function hasBotQuota(): bool
+    {
+        if (empty($this->bot_user_limit) || $this->bot_user_limit <= 0) {
+            return true;
+        }
+        return $this->guru()->where('bot_access', true)->count() < $this->bot_user_limit;
+    }
+
+    /**
+     * Count how many teachers currently have bot access.
+     */
+    public function botAccessCount(): int
+    {
+        return $this->guru()->where('bot_access', true)->count();
     }
 
     // ── Type helpers ───────────────────────────────────────────────────────

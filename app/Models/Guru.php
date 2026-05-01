@@ -10,7 +10,11 @@ class Guru extends Model
     public $timestamps = true;
     // timestamps enabled by default
     // const UPDATED_AT = null;  // Column does not exist in DB
-    protected $fillable = ['nama', 'nip', 'no_wa', 'id_finger', 'uid_rfid', 'enroll_status', 'enroll_finger_status', 'created_at', 'updated_at', 'school_id'];
+    protected $fillable = ['nama', 'nip', 'no_wa', 'bot_access', 'id_finger', 'uid_rfid', 'enroll_status', 'enroll_finger_status', 'created_at', 'updated_at', 'school_id'];
+
+    protected $casts = [
+        'bot_access' => 'boolean',
+    ];
 
     public function fingerprints()
     {

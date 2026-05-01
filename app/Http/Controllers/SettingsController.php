@@ -60,13 +60,29 @@ class SettingsController extends Controller
                 ['setting_value' => $path]
             );
 
-            // Also update the School table for consistency (Only for actual schools)
             if ($schoolId && $schoolId > 0) {
                 \App\Models\School::where('id', $schoolId)->update(['logo' => $path]);
             }
         }
 
-        $data = $request->except('_token', '_method', 'logo');
+        // Handle License Key for self_hosted mode
+        if (config('app.mode') === 'self_hosted' && auth()->user()->isSuperAdmin() && $request->has('license_key')) {
+            $key = trim($request->input('license_key'));
+            $path = base_path('.env');
+            if (file_exists($path)) {
+                $env = file_get_contents($path);
+                if (str_contains($env, 'LICENSE_KEY=')) {
+                    $env = preg_replace('/^LICENSE_KEY=.*$/m', 'LICENSE_KEY=' . $key, $env);
+                } else {
+                    $env .= "\nLICENSE_KEY=" . $key . "\n";
+                }
+                file_put_contents($path, $env);
+            }
+            \Illuminate\Support\Facades\Artisan::call('config:clear');
+            app(\App\Services\LicenseService::class)->clearCache();
+        }
+
+        $data = $request->except('_token', '_method', 'logo', 'license_key');
 
         // Handle checkboxes (they don't send data when unchecked)
         $checkboxSettings = [

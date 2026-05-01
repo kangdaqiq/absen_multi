@@ -29,12 +29,14 @@ Route::middleware(['auth', 'self_hosted_guard'])->prefix('super-admin')->name('s
 
         // Schools Management
         Route::resource('schools', App\Http\Controllers\SuperAdmin\SchoolController::class);
+        Route::patch('schools/{school}/toggle-bot', [App\Http\Controllers\SuperAdmin\SchoolController::class, 'toggleBot'])->name('schools.toggle-bot');
 
         // School Admins Management (nested resource)
         Route::resource('schools.admins', App\Http\Controllers\SuperAdmin\SchoolAdminController::class);
         
         // School Devices Management (nested resource)
         Route::resource('schools.devices', App\Http\Controllers\SuperAdmin\SchoolDeviceController::class)->except(['create', 'show', 'edit']);
+
 
         // Announcements
         Route::resource('announcements', App\Http\Controllers\SuperAdmin\AnnouncementController::class)->except(['show']);
@@ -64,6 +66,7 @@ Route::middleware('auth')->group(function () {
         Route::post('kelas/{id}/toggle-report', [KelasController::class, 'toggleReport'])->name('kelas.toggle-report');
         Route::resource('kelas', KelasController::class)->except(['create', 'show', 'edit']);
         Route::resource('guru', GuruController::class)->except(['create', 'show', 'edit']);
+        Route::patch('guru/{id}/toggle-bot-access', [GuruController::class, 'toggleBotAccess'])->name('guru.toggle-bot-access');
         Route::resource('siswa', SiswaController::class)->except(['create', 'show', 'edit']);
 
         // Absensi

@@ -68,6 +68,19 @@
                         </div>
                     </div>
 
+                    <div class="mb-4.5 flex flex-col gap-5 sm:flex-row">
+                        <div class="w-full sm:w-1/2">
+                            <label class="mb-2.5 block text-black dark:text-white">Max Guru/Karyawan</label>
+                            <input type="number" name="max_teachers" value="{{ old('max_teachers', 0) }}" min="0" class="w-full rounded border border-stroke bg-transparent py-3 px-5 outline-none transition focus:border-brand-500 active:border-brand-500 dark:border-form-strokedark dark:bg-form-input dark:focus:border-brand-500" />
+                            <p class="mt-1.5 text-xs text-gray-500">0 = unlimited</p>
+                        </div>
+                        <div class="w-full sm:w-1/2">
+                            <label class="mb-2.5 block text-black dark:text-white">Max User Bot WA</label>
+                            <input type="number" name="max_bot_users" value="{{ old('max_bot_users', 0) }}" min="0" class="w-full rounded border border-stroke bg-transparent py-3 px-5 outline-none transition focus:border-brand-500 active:border-brand-500 dark:border-form-strokedark dark:bg-form-input dark:focus:border-brand-500" />
+                            <p class="mt-1.5 text-xs text-gray-500">0 = unlimited</p>
+                        </div>
+                    </div>
+
                     <div class="mb-4.5">
                         <label class="mb-2.5 block text-black dark:text-white">Expired At</label>
                         <input type="date" name="expired_at" value="{{ old('expired_at') }}" class="w-full rounded border border-stroke bg-transparent py-3 px-5 outline-none transition focus:border-brand-500 active:border-brand-500 dark:border-form-strokedark dark:bg-form-input dark:focus:border-brand-500 @error('expired_at') border-danger @enderror" />
@@ -128,6 +141,7 @@
                             <th class="py-4 px-4 font-medium text-black dark:text-white xl:pl-6">Client</th>
                             <th class="py-4 px-4 font-medium text-black dark:text-white">License Key</th>
                             <th class="py-4 px-4 font-medium text-black dark:text-white text-center">Sekolah</th>
+                            <th class="py-4 px-4 font-medium text-black dark:text-white text-center">Kuota Limit</th>
                             <th class="py-4 px-4 font-medium text-black dark:text-white">Expired</th>
                             <th class="py-4 px-4 font-medium text-black dark:text-white">Status</th>
                             <th class="py-4 px-4 font-medium text-black dark:text-white text-center">Aksi</th>
@@ -152,6 +166,11 @@
                                 </td>
                                 <td class="border-b border-[#eee] py-5 px-4 dark:border-strokedark text-center align-top">
                                     <p class="text-black dark:text-white">{{ $license->max_schools === 0 ? '∞' : $license->max_schools }}</p>
+                                </td>
+                                <td class="border-b border-[#eee] py-5 px-4 dark:border-strokedark text-center align-top text-xs space-y-1">
+                                    <p class="text-gray-600 dark:text-gray-400">Siswa: <span class="font-medium text-black dark:text-white">{{ $license->max_students === 0 ? '∞' : $license->max_students }}</span></p>
+                                    <p class="text-gray-600 dark:text-gray-400">Guru: <span class="font-medium text-black dark:text-white">{{ $license->max_teachers === 0 ? '∞' : $license->max_teachers }}</span></p>
+                                    <p class="text-gray-600 dark:text-gray-400">Bot: <span class="font-medium text-black dark:text-white">{{ $license->max_bot_users === 0 ? '∞' : $license->max_bot_users }}</span></p>
                                 </td>
                                 <td class="border-b border-[#eee] py-5 px-4 dark:border-strokedark align-top text-sm">
                                     @if($license->expired_at)
@@ -201,7 +220,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="6" class="border-b border-[#eee] py-8 px-4 dark:border-strokedark text-center text-gray-500">
+                                <td colspan="7" class="border-b border-[#eee] py-8 px-4 dark:border-strokedark text-center text-gray-500">
                                     <div class="flex flex-col items-center">
                                         <i class="fas fa-key text-4xl mb-3 text-gray-400"></i>
                                         <span>Belum ada lisensi. Buat lisensi pertama di form sebelah.</span>
@@ -243,6 +262,17 @@
                         <div class="w-full sm:w-1/2">
                             <label class="mb-2.5 block text-black dark:text-white">Max Siswa</label>
                             <input type="number" name="max_students" x-model="editData.max_students" min="0" class="w-full rounded border border-stroke bg-transparent py-3 px-5 outline-none transition focus:border-brand-500 active:border-brand-500 dark:border-form-strokedark dark:bg-form-input dark:focus:border-brand-500" />
+                        </div>
+                    </div>
+
+                    <div class="mb-4.5 flex flex-col gap-5 sm:flex-row">
+                        <div class="w-full sm:w-1/2">
+                            <label class="mb-2.5 block text-black dark:text-white">Max Guru</label>
+                            <input type="number" name="max_teachers" x-model="editData.max_teachers" min="0" class="w-full rounded border border-stroke bg-transparent py-3 px-5 outline-none transition focus:border-brand-500 active:border-brand-500 dark:border-form-strokedark dark:bg-form-input dark:focus:border-brand-500" />
+                        </div>
+                        <div class="w-full sm:w-1/2">
+                            <label class="mb-2.5 block text-black dark:text-white">Max Bot User</label>
+                            <input type="number" name="max_bot_users" x-model="editData.max_bot_users" min="0" class="w-full rounded border border-stroke bg-transparent py-3 px-5 outline-none transition focus:border-brand-500 active:border-brand-500 dark:border-form-strokedark dark:bg-form-input dark:focus:border-brand-500" />
                         </div>
                     </div>
 
@@ -324,6 +354,8 @@ function licenseManager() {
             client_name: '',
             max_schools: 0,
             max_students: 0,
+            max_teachers: 0,
+            max_bot_users: 0,
             expired_at: '',
             allowed_hostname: '',
             notes: '',
@@ -335,6 +367,8 @@ function licenseManager() {
                 client_name: license.client_name,
                 max_schools: license.max_schools,
                 max_students: license.max_students,
+                max_teachers: license.max_teachers,
+                max_bot_users: license.max_bot_users,
                 expired_at: license.expired_at ? license.expired_at.substring(0, 10) : '',
                 allowed_hostname: license.allowed_hostname ?? '',
                 notes: license.notes ?? '',

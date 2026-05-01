@@ -5,7 +5,7 @@
 @section('content')
 <div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
     <h2 class="text-title-md2 font-semibold text-gray-800 dark:text-white/90">
-        <i class="fab fa-whatsapp text-success mr-2"></i> Status WhatsApp Device
+        <i class="fab fa-whatsapp text-success-500 mr-2"></i> Status WhatsApp Device
     </h2>
     <button onclick="refreshAll()" class="inline-flex items-center justify-center gap-2.5 rounded-md bg-brand-500 px-10 py-3 text-center font-medium text-white hover:bg-opacity-90 lg:px-8 xl:px-10 transition">
         <i class="fas fa-sync-alt"></i> Refresh Semua
@@ -87,9 +87,9 @@
         const el = document.querySelector(`.wa-status[data-school-id="${schoolId}"]`);
         if (!el) return;
         if (connected) {
-            el.innerHTML = `<span class="inline-flex rounded-full bg-success/10 px-3 py-1 text-xs font-medium text-success"><i class="fab fa-whatsapp mr-1 mt-0.5"></i> Terhubung</span>`;
+            el.innerHTML = `<span class="inline-flex rounded-full bg-success-500/10 px-3 py-1 text-xs font-medium text-success-500"><i class="fab fa-whatsapp mr-1 mt-0.5"></i> Terhubung</span>`;
         } else {
-            el.innerHTML = `<span class="inline-flex rounded-full bg-danger/10 px-3 py-1 text-xs font-medium text-danger"><i class="fas fa-times-circle mr-1 mt-0.5"></i> Tidak Terhubung</span>`;
+            el.innerHTML = `<span class="inline-flex rounded-full bg-error-500/10 px-3 py-1 text-xs font-medium text-error-500"><i class="fas fa-times-circle mr-1 mt-0.5"></i> Tidak Terhubung</span>`;
         }
     }
 

@@ -1,6 +1,6 @@
 services:
   app:
-    image: ghcr.io/kangdaqiq/absen-multi:latest
+    image: ghcr.io/kangdaqiq/jagattech_absen:latest
     container_name: absen_app
     restart: unless-stopped
     ports:

@@ -58,6 +58,24 @@ services:
       - wa_data:/app/storages   # session WA tersimpan permanen
     # Tidak perlu expose ke internet, app mengakses via internal network: http://whatsapp:3000
 
+  # ── Bot WhatsApp (Node.js) ──────────────────────────────────────────────
+  bot:
+    build:
+      context: ../bot_multi
+      dockerfile: Dockerfile
+    container_name: absen_bot
+    restart: unless-stopped
+    # Mount .env if you want dynamic configuration without rebuilding
+    env_file:
+      - ../bot_multi/.env
+    depends_on:
+      mysql:
+        condition: service_healthy
+      whatsapp:
+        condition: service_started
+    # Jika menggunakan network internal, pastikan bot mengarah ke host mysql & whatsapp yang benar
+    # di dalam .env bot_multi: DB_HOST=mysql, WA_API_URL=http://whatsapp:3000
+
 volumes:
   mysql_data:
   app_storage:

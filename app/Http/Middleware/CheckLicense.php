@@ -29,11 +29,11 @@ class CheckLicense
 
         $status = $this->licenseService->validate();
 
-        if ($status['expired']) {
+        if (!empty($status['expired'])) {
             return redirect()->route('license.expired');
         }
 
-        if (!$status['valid']) {
+        if (empty($status['valid'])) {
             return redirect()->route('license.invalid');
         }
 

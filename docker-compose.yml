@@ -1,6 +1,6 @@
 services:
   app:
-    image: ghcr.io/kangdaqiq/absen-multi:latest
+    image: ghcr.io/kangdaqiq/jagattech_absen:latest
     container_name: absen_app
     restart: unless-stopped
     ports:
@@ -60,14 +60,12 @@ services:
 
   # ── Bot WhatsApp (Node.js) ──────────────────────────────────────────────
   bot:
-    build:
-      context: ../bot_wa
-      dockerfile: Dockerfile
+    image: ghcr.io/kangdaqiq/bot_absen:latest
     container_name: absen_bot
     restart: unless-stopped
-    # Mount .env if you want dynamic configuration without rebuilding
+    # File konfigurasi terpisah khusus bot (.env.bot)
     env_file:
-      - ../bot_wa/.env
+      - .env.bot
     depends_on:
       mysql:
         condition: service_healthy

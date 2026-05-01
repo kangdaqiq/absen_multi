@@ -16,6 +16,7 @@ RUN apk add --no-cache \
     libzip-dev \
     oniguruma-dev \
     icu-dev \
+    libxml2-dev \
     mysql-client
 
 # ── PHP Extensions ────────────────────────────────────────────────────────
@@ -23,9 +24,6 @@ RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
  && docker-php-ext-install \
     pdo_mysql \
     mbstring \
-    tokenizer \
-    xml \
-    ctype \
     bcmath \
     gd \
     zip \

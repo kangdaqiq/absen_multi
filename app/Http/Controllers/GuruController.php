@@ -158,8 +158,14 @@ class GuruController extends Controller
         $guru->bot_access = !$guru->bot_access;
         $guru->save();
 
-        $botCount = $school ? $school->botAccessCount() : '-';
-        $botLimit = ($school && $school->bot_user_limit > 0) ? $school->bot_user_limit : '∞';
+        if (config('app.mode', 'hosted') === 'self_hosted') {
+            $botCount = \App\Models\Guru::where('bot_access', true)->count();
+            $licenseLimit = app(\App\Services\LicenseService::class)->validate()['max_bot_users'] ?? 0;
+            $botLimit = $licenseLimit > 0 ? $licenseLimit : '∞';
+        } else {
+            $botCount = $school ? $school->botAccessCount() : '-';
+            $botLimit = ($school && $school->bot_user_limit > 0) ? $school->bot_user_limit : '∞';
+        }
 
         return response()->json([
             'success'    => true,

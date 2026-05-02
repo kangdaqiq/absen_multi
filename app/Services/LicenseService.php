@@ -34,8 +34,19 @@ class LicenseService
      */
     public function validate(): array
     {
-        // In hosted mode, license always valid
-        if (config('app.mode', 'hosted') !== 'self_hosted') {
+        // [SECURITY] Deteksi mode dari integrity file, bukan APP_MODE dari .env
+        // Mencegah bypass dengan mengubah APP_MODE=hosted
+        $isClientRelease = file_exists(storage_path('app/license_integrity.json'));
+
+        if (!$isClientRelease) {
+            // Tidak ada integrity file = dev/hosted server → skip license check
+            if (config('app.mode', 'hosted') !== 'self_hosted') {
+                return $this->ok('Hosted mode — no license required.');
+            }
+        }
+
+        // Jika bukan client release dan APP_MODE juga bukan self_hosted = hosted server
+        if (!$isClientRelease && config('app.mode', 'hosted') !== 'self_hosted') {
             return $this->ok('Hosted mode — no license required.');
         }
 
@@ -247,10 +258,15 @@ class LicenseService
     {
         $hashFile = storage_path('app/license_integrity.json');
 
-        // Jika file hash tidak ada, skip check (mode development)
-        // Di release client, file ini WAJIB ada
         if (!file_exists($hashFile)) {
-            return true;
+            // Integrity file tidak ada:
+            // - Jika APP_MODE=self_hosted → fail (client mungkin hapus file sebagai bypass)
+            // - Jika APP_MODE=hosted → skip (mode developer, file memang tidak ada)
+            if (config('app.mode') === 'self_hosted') {
+                Log::warning('[LicenseService] Integrity file tidak ditemukan dalam mode self_hosted.');
+                return false;
+            }
+            return true; // Dev/hosted mode, tidak perlu integrity check
         }
 
         $expected = json_decode(file_get_contents($hashFile), true);

@@ -13,6 +13,22 @@ class LicenseService
     private const CACHE_HOURS      = 24;
 
     /**
+     * Files yang dijaga integritasnya.
+     * Jika file-file ini dimodifikasi, license dianggap invalid.
+     * Update hash ini setiap kali ada perubahan legitimate pada file tersebut
+     * dengan menjalankan: php artisan license:rehash
+     */
+    private const INTEGRITY_FILES = [
+        'app/Http/Middleware/CheckLicense.php',
+        'app/Http/Middleware/SelfHostedGuard.php',
+        'app/Services/LicenseService.php',
+    ];
+
+    // Secret salt untuk HMAC signature cache
+    // Ubah nilai ini di setiap release baru
+    private const CACHE_SALT = 'absen-kangdaqiq-2026-s3cr3t';
+
+    /**
      * Validate license. Returns array:
      * [valid, expired, client_name, expired_at, max_schools, max_students, message, grace_remaining_days]
      */
@@ -21,6 +37,12 @@ class LicenseService
         // In hosted mode, license always valid
         if (config('app.mode', 'hosted') !== 'self_hosted') {
             return $this->ok('Hosted mode — no license required.');
+        }
+
+        // [SECURITY] Integrity check — pastikan file license tidak dimodifikasi
+        if (!$this->integrityCheck()) {
+            Log::error('[LicenseService] Integrity check gagal — file license telah dimodifikasi.');
+            return $this->failResult('Integritas sistem tidak valid. Hubungi provider.');
         }
 
         $licenseKey = config('app.license_key');
@@ -185,8 +207,21 @@ class LicenseService
         $path = $this->cachePath();
         if (!file_exists($path)) return null;
 
-        $data = json_decode(file_get_contents($path), true);
-        return is_array($data) ? $data : null;
+        $raw  = file_get_contents($path);
+        $data = json_decode($raw, true);
+        if (!is_array($data)) return null;
+
+        // [SECURITY] Verifikasi HMAC signature — cegah manipulasi cache manual
+        $signature = $data['_sig'] ?? null;
+        unset($data['_sig']);
+        $expected = hash_hmac('sha256', json_encode($data), self::CACHE_SALT . gethostname());
+        if (!hash_equals($expected, (string) $signature)) {
+            Log::warning('[LicenseService] Cache signature tidak valid — cache dihapus.');
+            @unlink($path);
+            return null;
+        }
+
+        return $data;
     }
 
     private function writeCache(array $result, ?Carbon $graceStarted): void
@@ -196,7 +231,42 @@ class LicenseService
             'grace_started_at' => $graceStarted?->toIso8601String(),
             'result'           => $result,
         ];
+
+        // [SECURITY] Tambahkan HMAC signature untuk anti-tamper
+        $data['_sig'] = hash_hmac('sha256', json_encode($data), self::CACHE_SALT . gethostname());
         file_put_contents($this->cachePath(), json_encode($data, JSON_PRETTY_PRINT));
+    }
+
+    // ── Integrity Check ────────────────────────────────────────────────────
+
+    /**
+     * Verifikasi file-file kritis tidak dimodifikasi.
+     * Hash disimpan di storage/app/license_integrity.json (dibuat saat build release).
+     */
+    private function integrityCheck(): bool
+    {
+        $hashFile = storage_path('app/license_integrity.json');
+
+        // Jika file hash tidak ada, skip check (mode development)
+        // Di release client, file ini WAJIB ada
+        if (!file_exists($hashFile)) {
+            return true;
+        }
+
+        $expected = json_decode(file_get_contents($hashFile), true);
+        if (!is_array($expected)) return false;
+
+        foreach (self::INTEGRITY_FILES as $relPath) {
+            $absPath = base_path($relPath);
+            if (!file_exists($absPath)) return false;
+
+            $actualHash = hash_file('sha256', $absPath);
+            if (($expected[$relPath] ?? '') !== $actualHash) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**

@@ -2,7 +2,7 @@
 
 ## 📋 Deskripsi Project
 
-Sistem Absensi Sekolah adalah aplikasi berbasis web Laravel untuk mengelola absensi siswa dan guru secara otomatis menggunakan RFID dan Fingerprint. Sistem ini mendukung arsitektur **multi-tenant** (banyak sekolah dalam satu instalasi), terintegrasi dengan WhatsApp via **GOWA (Go WhatsApp)**, dan dapat di-deploy secara self-hosted menggunakan Docker dengan proteksi sistem lisensi online.
+Sistem Absensi Sekolah adalah aplikasi berbasis web Laravel untuk mengelola absensi siswa dan guru secara otomatis menggunakan RFID dan Fingerprint. Sistem ini mendukung arsitektur **multi-tenant** (banyak sekolah dalam satu instalasi), terintegrasi dengan WhatsApp via **GOWA (Go WhatsApp)**, dan dapat di-deploy secara hosted maupun self-hosted (manual) dengan proteksi sistem lisensi online.
 
 ---
 
@@ -18,8 +18,8 @@ Sistem Absensi Sekolah adalah aplikasi berbasis web Laravel untuk mengelola abse
 | Queue | Database Queue (Laravel) |
 | Hardware | ESP8266/ESP32 + RFID RC522 + Fingerprint Sensor |
 | WhatsApp | **GOWA** (aldinokemal/go-whatsapp-web-multidevice) — Go binary, ~20MB RAM |
-| Deployment Hosted | PHP-FPM + Nginx + Supervisor (manual) |
-| Deployment Client | Docker (app + mysql + gowa dalam docker-compose) |
+| Web Server | Nginx atau Apache + PHP-FPM |
+| Process Manager | Supervisor (queue worker + scheduler) |
 
 ### Mode Deployment
 
@@ -27,11 +27,11 @@ Sistem Absensi Sekolah adalah aplikasi berbasis web Laravel untuk mengelola abse
 |---|---|---|
 | Dikelola oleh | Developer (kamu) | Client di server sendiri |
 | `APP_MODE` | `hosted` | `self_hosted` |
-| Install | Manual (PHP, Nginx, Composer) | `docker compose up -d` |
+| Install | Manual (PHP, Nginx/Apache, Composer) | Manual (PHP, Apache/Nginx, Composer) |
 | Super Admin | ✅ Aktif | ❌ Diblokir (404) |
 | License check | ❌ Tidak perlu | ✅ Ping harian ke server developer |
-| Source code | Di server langsung | Tersembunyi dalam Docker image |
-| Update | `git pull` + `migrate` | `docker compose pull` |
+| Source code | Full source code | Full source code (diterima dari provider) |
+| Update | `git pull` + `migrate` | Scp/rsync dari provider + `migrate` |
 
 ---
 
@@ -194,54 +194,23 @@ Response OK:
 | `last_ping_at` | TIMESTAMP | Terakhir client validasi |
 | `notes` | TEXT | Catatan internal |
 
-### 8. Docker (Self-Hosted)
+### 8. Persyaratan Server
 
-#### Services dalam `docker-compose.yml`
+#### Minimum Spesifikasi
 
-| Service | Image | RAM | Keterangan |
-|---------|-------|-----|-----------|
-| `app` | ghcr.io/kangdaqiq/absen-multi | ~350MB | PHP-FPM + Nginx + Scheduler + Queue |
-| `mysql` | mysql:8.0 | ~180MB | Database (tuned 128M buffer) |
-| `whatsapp` | aldinokemal2104/go-whatsapp-web-multidevice | ~20MB | GOWA WhatsApp API |
+| Kebutuhan | Minimum | Rekomendasi |
+|-----------|---------|-------------|
+| OS | Ubuntu 20.04 | Ubuntu 22.04 LTS |
+| RAM | 1 GB | 2 GB |
+| Storage | 10 GB | 20 GB |
+| PHP | 8.2+ | 8.3 |
+| MySQL | 8.0 | 8.0 |
+| Web Server | Nginx atau Apache | Nginx |
 
-**Total RAM: ~550MB** — cocok untuk hardware 2GB RAM.
-
-#### Volumes
-
-| Volume | Isi |
-|--------|-----|
-| `mysql_data` | Data MySQL |
-| `app_storage` | File upload, backup, license cache |
-| `app_logs` | Laravel logs |
-| `wa_data` | Session WhatsApp (jangan dihapus!) |
-
-#### Entrypoint Flow
+#### PHP Extensions yang Dibutuhkan
 
 ```
-docker compose up
-    ↓ Container start
-    ↓ 1. Tunggu MySQL ready (healthcheck)
-    ↓ 2. php artisan migrate --force
-    ↓ 3. php artisan config:cache + route:cache + view:cache
-    ↓ 4. php artisan license:validate (jika self_hosted)
-    ↓ 5. supervisord start:
-         ├── nginx
-         ├── php-fpm
-         ├── laravel-scheduler (loop 60 detik)
-         └── laravel-queue (queue:work)
-```
-
-#### Build & Push Image
-
-```powershell
-# Build (jalankan npm run build dulu!)
-npm run build
-docker build -t ghcr.io/kangdaqiq/absen-multi:latest `
-             -t ghcr.io/kangdaqiq/absen-multi:v2.3.0 .
-
-# Push
-docker push ghcr.io/kangdaqiq/absen-multi:latest
-docker push ghcr.io/kangdaqiq/absen-multi:v2.3.0
+pdo_mysql, mbstring, bcmath, gd, zip, opcache, intl, pcntl, xml, curl
 ```
 
 ---
@@ -295,43 +264,235 @@ Siswa/Guru tap RFID/Fingerprint
 
 ## 🚀 Panduan Instalasi Lengkap
 
-### A. Hosted (Server Developer)
+### A. Hosted — Server Developer (Ubuntu/Debian)
 
 ```bash
-# 1. Clone
-git clone <repo> /var/www/absen && cd /var/www/absen
+# ── 1. Install dependensi sistem ──────────────────────────────────────────
+sudo apt update && sudo apt upgrade -y
+sudo apt install -y nginx mysql-server supervisor curl git unzip
 
-# 2. Install
+# PHP 8.3
+sudo apt install -y software-properties-common
+sudo add-apt-repository ppa:ondrej/php -y
+sudo apt update
+sudo apt install -y php8.3-fpm php8.3-mysql php8.3-mbstring php8.3-bcmath \
+  php8.3-gd php8.3-zip php8.3-intl php8.3-xml php8.3-curl php8.3-pcntl php8.3-opcache
+
+# Composer
+curl -sS https://getcomposer.org/installer | php
+sudo mv composer.phar /usr/local/bin/composer
+
+# Node.js (untuk build assets)
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt install -y nodejs
+
+# ── 2. Setup MySQL ────────────────────────────────────────────────────────
+sudo mysql -e "CREATE DATABASE absen_sell CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+sudo mysql -e "CREATE USER 'absen_user'@'localhost' IDENTIFIED BY 'passwordKuat';"
+sudo mysql -e "GRANT ALL PRIVILEGES ON absen_sell.* TO 'absen_user'@'localhost';"
+sudo mysql -e "FLUSH PRIVILEGES;"
+
+# ── 3. Clone & install app ────────────────────────────────────────────────
+git clone <repo> /var/www/absen && cd /var/www/absen
 composer install --no-dev --optimize-autoloader
 npm install && npm run build
 
-# 3. Env
-cp .env.example .env && php artisan key:generate
-# Edit .env: APP_MODE=hosted, DB_*, WA_*
+# ── 4. Konfigurasi .env ───────────────────────────────────────────────────
+cp .env.example .env
+nano .env
+# Isi: APP_MODE=hosted, APP_URL, DB_HOST=127.0.0.1, DB_DATABASE, DB_USERNAME, DB_PASSWORD, WA_*
+php artisan key:generate
 
-# 4. Database
-# PENTING: Untuk fresh install, import absen_sell.sql terlebih dahulu ke database kosong
-# Anda bisa menggunakan phpMyAdmin, atau MySQL CLI jika tersedia
-# Setelah absen_sell.sql berhasil diimport, jalankan:
-php artisan migrate && php artisan db:seed --class=SuperAdminSeeder && php artisan storage:link && php artisan optimize
+# ── 5. Database migration ─────────────────────────────────────────────────
+php artisan migrate --force
+php artisan db:seed --class=SuperAdminSeeder
+php artisan storage:link
+php artisan optimize
 
-# 5. Nginx + Scheduler crontab + Supervisor (queue + gowa)
-# (lihat README.md untuk detail)
+# ── 6. Permissions ───────────────────────────────────────────────────────
+sudo chown -R www-data:www-data /var/www/absen/storage /var/www/absen/bootstrap/cache
+sudo chmod -R 775 /var/www/absen/storage /var/www/absen/bootstrap/cache
+
+# ── 7. Nginx vhost ────────────────────────────────────────────────────────
+# Buat file: /etc/nginx/sites-available/absen
+# (lihat konfigurasi Nginx di bawah)
+sudo ln -s /etc/nginx/sites-available/absen /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+
+# ── 8. Crontab (Laravel Scheduler) ───────────────────────────────────────
+# Tambahkan ke crontab (sudo crontab -e -u www-data):
+# * * * * * cd /var/www/absen && php artisan schedule:run >> /dev/null 2>&1
+
+# ── 9. Supervisor (Queue Worker) ─────────────────────────────────────────
+# Buat file: /etc/supervisor/conf.d/absen-queue.conf
+# (lihat konfigurasi Supervisor di bawah)
+sudo supervisorctl reread && sudo supervisorctl update
+
+# ── 10. GOWA (WhatsApp API) ───────────────────────────────────────────────
+# Download binary dari: https://github.com/aldinokemal/go-whatsapp-web-multidevice/releases
+wget https://github.com/aldinokemal/go-whatsapp-web-multidevice/releases/latest/download/gowa-linux-amd64
+chmod +x gowa-linux-amd64 && sudo mv gowa-linux-amd64 /usr/local/bin/gowa
+# Jalankan via Supervisor atau systemd
+gowa rest --port=3000 --basic-auth=admin:changeme
 ```
 
-### B. Self-Hosted Client (Docker)
+#### Konfigurasi Nginx (`/etc/nginx/sites-available/absen`)
+
+```nginx
+server {
+    listen 80;
+    server_name yourdomain.com;  # ganti dengan domain/IP
+    root /var/www/absen/public;
+    index index.php;
+
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    location ~ \.php$ {
+        fastcgi_pass unix:/var/run/php/php8.3-fpm.sock;
+        fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
+        include fastcgi_params;
+    }
+
+    location ~ /\.(?!well-known).* {
+        deny all;
+    }
+}
+```
+
+#### Konfigurasi Supervisor (`/etc/supervisor/conf.d/absen-queue.conf`)
+
+```ini
+[program:absen-queue]
+process_name=%(program_name)s_%(process_num)02d
+command=php /var/www/absen/artisan queue:work --sleep=3 --tries=3 --max-time=3600
+autostart=true
+autorestart=true
+user=www-data
+numprocs=1
+redirect_stderr=true
+stdout_logfile=/var/www/absen/storage/logs/queue.log
+```
+
+---
+
+### B. Self-Hosted Client (Ubuntu/Debian)
+
+> Client menerima source code dari provider via ZIP/SCP, lalu install sendiri di server.
 
 ```bash
-# Client terima: docker-compose.yml + .env + INSTALL.txt
+# ── 1. Install dependensi sistem ──────────────────────────────────────────
+sudo apt update && sudo apt upgrade -y
+sudo apt install -y apache2 mysql-server supervisor curl unzip
 
-# Edit .env
-nano .env    # isi DB_PASSWORD, DB_ROOT_PASSWORD, APP_URL
+# PHP 8.3
+sudo apt install -y software-properties-common
+sudo add-apt-repository ppa:ondrej/php -y
+sudo apt update
+sudo apt install -y php8.3 php8.3-mysql php8.3-mbstring php8.3-bcmath \
+  php8.3-gd php8.3-zip php8.3-intl php8.3-xml php8.3-curl php8.3-pcntl \
+  php8.3-opcache libapache2-mod-php8.3
 
-# Jalankan
-docker compose up -d
+# Composer
+curl -sS https://getcomposer.org/installer | php
+sudo mv composer.phar /usr/local/bin/composer
 
-# Setup WA (sekali)
-# Buka http://IP-server:3001 → scan QR
+# Enable Apache mod_rewrite
+sudo a2enmod rewrite
+sudo systemctl restart apache2
+
+# ── 2. Setup MySQL ────────────────────────────────────────────────────────
+sudo mysql -e "CREATE DATABASE absen_sell CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+sudo mysql -e "CREATE USER 'absen_user'@'localhost' IDENTIFIED BY 'passwordKuat';"
+sudo mysql -e "GRANT ALL PRIVILEGES ON absen_sell.* TO 'absen_user'@'localhost';"
+sudo mysql -e "FLUSH PRIVILEGES;"
+
+# ── 3. Extract & install app ──────────────────────────────────────────────
+sudo mkdir -p /var/www/absen
+sudo unzip absensi.zip -d /var/www/absen
+cd /var/www/absen
+composer install --no-dev --optimize-autoloader
+
+# ── 4. Konfigurasi .env ───────────────────────────────────────────────────
+cp .env.example .env
+nano .env
+# Wajib diisi:
+#   APP_MODE=self_hosted
+#   APP_URL=http://IP-SERVER
+#   DB_HOST=127.0.0.1
+#   DB_DATABASE=absen_sell
+#   DB_USERNAME=absen_user
+#   DB_PASSWORD=passwordKuat
+#   LICENSE_KEY=XXXX-XXXX-XXXX-XXXX   ← dari provider
+#   LICENSE_SERVER_URL=https://absen.kangdaqiq.com
+#   WA_API_BASE_URL=http://localhost:3000
+#   WA_API_USER=admin
+#   WA_API_PASS=changeme
+php artisan key:generate
+
+# ── 5. Database migration ─────────────────────────────────────────────────
+php artisan migrate --force
+php artisan storage:link
+php artisan optimize
+
+# ── 6. Permissions ───────────────────────────────────────────────────────
+sudo chown -R www-data:www-data /var/www/absen/storage /var/www/absen/bootstrap/cache
+sudo chmod -R 775 /var/www/absen/storage /var/www/absen/bootstrap/cache
+
+# ── 7. Apache vhost ───────────────────────────────────────────────────────
+# Buat file /etc/apache2/sites-available/absen.conf (lihat di bawah)
+sudo a2ensite absen.conf
+sudo systemctl reload apache2
+
+# ── 8. Crontab (Scheduler) ───────────────────────────────────────────────
+(sudo crontab -u www-data -l 2>/dev/null; echo "* * * * * cd /var/www/absen && php artisan schedule:run >> /dev/null 2>&1") | sudo crontab -u www-data -
+
+# ── 9. Supervisor (Queue Worker) ─────────────────────────────────────────
+sudo nano /etc/supervisor/conf.d/absen-queue.conf
+# (isi sama seperti config di atas, sesuaikan path)
+sudo supervisorctl reread && sudo supervisorctl update
+
+# ── 10. GOWA (WhatsApp API) ───────────────────────────────────────────────
+wget https://github.com/aldinokemal/go-whatsapp-web-multidevice/releases/latest/download/gowa-linux-amd64
+chmod +x gowa-linux-amd64 && sudo mv gowa-linux-amd64 /usr/local/bin/gowa
+# Jalankan:
+gowa rest --port=3000 --basic-auth=admin:changeme
+# Buka browser: http://IP-SERVER:3000 → scan QR WhatsApp
+```
+
+#### Konfigurasi Apache (`/etc/apache2/sites-available/absen.conf`)
+
+```apache
+<VirtualHost *:80>
+    ServerName yourdomain.com
+    DocumentRoot /var/www/absen/public
+
+    <Directory /var/www/absen/public>
+        AllowOverride All
+        Require all granted
+    </Directory>
+
+    ErrorLog ${APACHE_LOG_DIR}/absen_error.log
+    CustomLog ${APACHE_LOG_DIR}/absen_access.log combined
+</VirtualHost>
+```
+
+#### Update Aplikasi (Client)
+
+```bash
+cd /var/www/absen
+
+# Terima file baru dari provider (ZIP)
+sudo unzip -o absensi-update.zip -d /var/www/absen
+
+# Update dependencies & migrate
+composer install --no-dev --optimize-autoloader
+php artisan migrate --force
+php artisan optimize
+
+# Restart queue
+sudo supervisorctl restart absen-queue:*
 ```
 
 ---

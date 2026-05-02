@@ -25,3 +25,8 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Build output — jangan di-commit
+/release-client/
+/release-client.zip
+/dist/

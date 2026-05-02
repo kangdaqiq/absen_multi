@@ -72,7 +72,7 @@ class SiswaController extends Controller
                 'regex:/^(08|628)[0-9]{8,13}$/',
                 Rule::unique('siswa')->where(fn($q) => $q->where('school_id', $schoolId))
             ],
-            'wa_ortu' => 'nullable|string|max:20|regex:/^(08|628)[0-9]{8,13}$/',
+            'wa_ortu' => ['nullable', 'string', 'max:20', 'regex:/^(08|628)[0-9]{8,13}$/'],
             'user_id' => 'nullable|exists:users,id',
         ]);
 
@@ -135,7 +135,7 @@ class SiswaController extends Controller
                 'regex:/^(08|628)[0-9]{8,13}$/',
                 Rule::unique('siswa')->ignore($siswa->id)->where(fn($q) => $q->where('school_id', $schoolId))
             ],
-            'wa_ortu' => 'nullable|string|max:20|regex:/^(08|628)[0-9]{8,13}$/',
+            'wa_ortu' => ['nullable', 'string', 'max:20', 'regex:/^(08|628)[0-9]{8,13}$/'],
             'uid_rfid' => 'nullable|string|max:50',
             'user_id' => 'nullable|exists:users,id',
         ]);

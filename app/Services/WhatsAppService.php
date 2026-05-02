@@ -50,15 +50,15 @@ class WhatsAppService
         // Send to student if phone exists
         if ($phone) {
             if ($isLate) {
-                // Extract late minutes from keterangan if possible
-                preg_match('/(\d+)\s*menit/', $keterangan ?? '', $matches);
-                $lateMinutes = $matches[1] ?? 0;
+                // Parse durasi dari keterangan: "Telat 1 jam 30 menit" atau "Telat 30 menit"
+                [$lateHours, $lateMinutes] = $this->parseLateDuration($keterangan);
 
                 $msg = WhatsAppMessageTemplates::checkInLate(
                     nama: $name,
                     jamMasuk: $time,
                     kelas: $kelas,
-                    lateMinutes: (int) $lateMinutes
+                    lateHours: $lateHours,
+                    lateMinutes: $lateMinutes
                 );
             } else {
                 $msg = WhatsAppMessageTemplates::checkIn(
@@ -73,16 +73,15 @@ class WhatsAppService
 
         // Send to parent if phone number exists
         if ($phoneOrtu) {
-            // Use same template for parent
             if ($isLate) {
-                preg_match('/(\d+)\s*menit/', $keterangan ?? '', $matches);
-                $lateMinutes = $matches[1] ?? 0;
+                [$lateHours, $lateMinutes] = $this->parseLateDuration($keterangan);
 
                 $msgOrtu = WhatsAppMessageTemplates::checkInLate(
                     nama: $name,
                     jamMasuk: $time,
                     kelas: $kelas,
-                    lateMinutes: (int) $lateMinutes
+                    lateHours: $lateHours,
+                    lateMinutes: $lateMinutes
                 );
             } else {
                 $msgOrtu = WhatsAppMessageTemplates::checkIn(
@@ -94,6 +93,31 @@ class WhatsAppService
             }
             $this->queueMessage($phoneOrtu, $msgOrtu, $schoolId);
         }
+    }
+
+    /**
+     * Parse durasi keterlambatan dari string keterangan.
+     * Contoh: "Telat 1 jam 30 menit" -> [1, 30]
+     *         "Telat 30 menit"        -> [0, 30]
+     *
+     * @return array [hours, minutes]
+     */
+    private function parseLateDuration(?string $keterangan): array
+    {
+        if (empty($keterangan)) return [0, 0];
+
+        $hours   = 0;
+        $minutes = 0;
+
+        if (preg_match('/(\d+)\s*jam/', $keterangan, $m)) {
+            $hours = (int) $m[1];
+        }
+
+        if (preg_match('/(\d+)\s*menit/', $keterangan, $m)) {
+            $minutes = (int) $m[1];
+        }
+
+        return [$hours, $minutes];
     }
 
     public function sendCheckOut($name, $phone, $time, $hours, $mins, $authorizer, $schoolId, $jamMasuk = '-', $phoneOrtu = null)

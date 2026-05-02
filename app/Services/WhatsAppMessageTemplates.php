@@ -48,13 +48,23 @@ class WhatsAppMessageTemplates
         string $nama,
         string $jamMasuk,
         string $kelas,
-        int $lateMinutes
+        int $lateHours = 0,
+        int $lateMinutes = 0
     ): string {
+        // Format durasi: "1 jam 30 menit", "30 menit", atau "1 jam"
+        if ($lateHours > 0 && $lateMinutes > 0) {
+            $lateDuration = "{$lateHours} jam {$lateMinutes} menit";
+        } elseif ($lateHours > 0) {
+            $lateDuration = "{$lateHours} jam";
+        } else {
+            $lateDuration = "{$lateMinutes} menit";
+        }
+
         return "⚠️ *Notifikasi Terlambat*\n\n" .
             "Assalamualaikum, *{$nama}*,\n\n" .
             "📅 Tanggal: " . now()->format('d/m/Y') . "\n" .
             "🕐 Jam Masuk: {$jamMasuk}\n" .
-            "⏰ Keterlambatan: {$lateMinutes} menit\n" .
+            "⏰ Keterlambatan: {$lateDuration}\n" .
             "📊 Status: Terlambat\n" .
             "🏫 Kelas: {$kelas}\n\n" .
             "Mohon lebih disiplin waktu kedepannya.\n\n" .

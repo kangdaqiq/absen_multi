@@ -279,6 +279,9 @@ Lisensi dikelola dari **Super Admin → Kelola Lisensi** di app hosted kamu.
 
 API validasi: `POST https://absen.kangdaqiq.com/api/license/validate`
 
+> **[SECURITY v2.4.0]** Deteksi mode self-hosted kini berbasis `license_integrity.json`,
+> bukan `APP_MODE`. Client tidak bisa bypass dengan mengubah variabel di `.env`.
+
 | Kondisi | Perilaku App Client |
 |---------|-------------------|
 | Lisensi valid | Berjalan normal ✅ |
@@ -286,6 +289,15 @@ API validasi: `POST https://absen.kangdaqiq.com/api/license/validate`
 | Grace period habis | App ditangguhkan ❌ |
 | Lisensi expired | Halaman expired ❌ |
 | Lisensi dinonaktifkan | Halaman invalid ❌ |
+
+### Kuota yang bisa dikonfigurasi per lisensi
+
+| Field | Keterangan |
+|-------|------------|
+| `max_schools` | Maks sekolah (0 = unlimited) |
+| `max_students` | Maks siswa (0 = unlimited) |
+| `max_teachers` | Maks guru/karyawan (0 = unlimited) |
+| `max_bot_users` | Maks user yang bisa pakai bot WA (0 = unlimited) |
 
 ```bash
 # Command manual di server client
@@ -333,6 +345,12 @@ php artisan optimize:clear
 ---
 
 ## 📝 Changelog
+
+### v2.4.0 (2026-05-01)
+- 🔐 **[SECURITY] CheckLicense berbasis integrity file** — tidak bisa di-bypass via `APP_MODE`
+- 🆕 **`max_teachers` & `max_bot_users`** di tabel `licenses` — kuota guru dan user bot per lisensi
+- 🆕 API `/api/license/validate` menyertakan `max_teachers` dan `max_bot_users` dalam response
+- 🔐 Log warning otomatis jika ada percobaan bypass (integrity file ada tapi `APP_MODE` diubah)
 
 ### v2.3.0 (2026-04-26)
 - 🆕 **Sistem Lisensi terintegrasi** di Super Admin panel (tidak perlu project terpisah)

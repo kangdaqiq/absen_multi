@@ -125,12 +125,20 @@ Setiap data di-scope per `school_id`. Super Admin tidak terpengaruh scope.
 
 #### Alur Validasi
 
+> **[SECURITY v2.4.0]** Deteksi mode kini berbasis **integrity file**, bukan `APP_MODE`.
+> Client tidak bisa bypass dengan mengubah `APP_MODE=hosted` di `.env`-nya sendiri.
+
 ```
 Request web masuk
     ↓ CheckLicense middleware (global)
-    ├── APP_MODE = hosted? → skip, lanjut
+    ├── Cek: storage/app/license_integrity.json ada?
+    │   ├── TIDAK ADA → environment developer (hosted server)
+    │   │   └── Fallback: APP_MODE != self_hosted → skip, lanjut
+    │   └── ADA → client release (self-hosted)
+    │       └── [SECURITY] Jika APP_MODE diubah ke 'hosted' → LOG WARNING,
+    │                      tetap enforce license check
     ├── Route api/*, login, license.*? → bypass
-    └── Self-hosted:
+    └── Self-hosted (integrity file terdeteksi):
         ├── Baca cache (storage/app/license_cache.json)
         │   ├── Cache fresh < 24 jam → gunakan cache
         │   └── Cache expired → ping server
@@ -143,12 +151,25 @@ Request web masuk
         └── valid=false → redirect /license/invalid
 ```
 
+#### File Integrity
+
+`storage/app/license_integrity.json` — dibuat otomatis oleh `build_release.php` saat
+build paket client. **Tidak boleh diedit manual.** Keberadaan file ini adalah penanda
+bahwa instalasi adalah self-hosted client.
+
+```json
+{
+  "build_at": "2026-05-01T10:00:00+07:00",
+  "checksum": "sha256-hash-..."
+}
+```
+
 #### Cache File
 
 `storage/app/license_cache.json`:
 ```json
 {
-  "cached_at": "2026-04-26T01:30:00+07:00",
+  "cached_at": "2026-05-01T10:00:00+07:00",
   "grace_started_at": null,
   "result": {
     "valid": true,
@@ -157,6 +178,8 @@ Request web masuk
     "expired_at": "2026-12-31",
     "max_schools": 1,
     "max_students": 500,
+    "max_teachers": 10,
+    "max_bot_users": 5,
     "message": "Lisensi aktif.",
     "grace_remaining_days": 0
   }
@@ -175,6 +198,8 @@ Response OK:
   "client_name": "SMA Negeri 1 Jakarta",
   "max_schools": 1,
   "max_students": 500,
+  "max_teachers": 10,
+  "max_bot_users": 5,
   "expired_at": "2026-12-31",
   "message": "Lisensi aktif."
 }
@@ -188,6 +213,8 @@ Response OK:
 | `client_name` | VARCHAR(255) | Nama client/sekolah |
 | `max_schools` | SMALLINT | 0 = unlimited |
 | `max_students` | SMALLINT | 0 = unlimited |
+| `max_teachers` | SMALLINT | 0 = unlimited (kolom baru v2.4.0) |
+| `max_bot_users` | SMALLINT | 0 = unlimited — maks user yang boleh pakai bot WA (kolom baru v2.4.0) |
 | `expired_at` | DATE | null = selamanya |
 | `is_active` | BOOLEAN | Toggle aktif/nonaktif |
 | `allowed_hostname` | VARCHAR(255) | Lock per hostname. null = semua hostname |
@@ -511,6 +538,13 @@ sudo supervisorctl restart absen-queue:*
 ---
 
 ## 📝 Changelog
+
+### v2.4.0 (2026-05-01)
+- 🔐 **[SECURITY] CheckLicense berbasis integrity file** — deteksi mode self-hosted tidak lagi bergantung `APP_MODE`, mencegah bypass client
+- 🆕 **`max_teachers`** di tabel `licenses` — batasi kuota guru per lisensi (terpisah dari `teacher_limit` di `schools`)
+- 🆕 **`max_bot_users`** di tabel `licenses` — batasi jumlah user yang boleh menggunakan bot WhatsApp
+- 🆕 API response `/api/license/validate` kini menyertakan `max_teachers` dan `max_bot_users`
+- 🔐 Log warning otomatis jika terdeteksi bypass attempt (`license_integrity.json` ada tapi `APP_MODE` diubah)
 
 ### v2.3.0 (2026-04-26)
 - 🆕 **Kelola Lisensi di Super Admin** — tidak perlu project license server terpisah

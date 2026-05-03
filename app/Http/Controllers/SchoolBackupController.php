@@ -199,38 +199,33 @@ class SchoolBackupController extends Controller
             // Safe bet: Don't delete SELF.
 
             // STEP 2: RESTORE & MAP IDs
-            $mapUsers = [];
-            $mapKelas = [];
-            $mapGuru = [];
-            $mapSiswa = [];
-            $mapJadwal = [];
-            $mapMapel = [];
+            $mapUsers  = [];
+            $mapKelas  = [];
+            $mapGuru   = [];
+            $mapSiswa  = [];
+            $mapMapel  = [];
 
             // 1. Settings
             foreach ($data['settings'] as $item) {
-                // Force current school_id
                 $item['school_id'] = $schoolId;
                 unset($item['id']);
                 Setting::create($item);
             }
 
-            // 2. Users (Admin/Staff) - Skip Students/Teachers users for now, handle them with link
+            // 2. Users (Admin/Staff) — skip student (dibuat ulang bersama Siswa) & self
             foreach ($data['users'] as $item) {
-                if ($item['role'] == 'student')
-                    continue; // Will be re-created/linked by Siswa logic? Or manually restored?
-                // Let's restore Admins.
-                if ($item['id'] == $user->id)
-                    continue; // Skip self
+                if (in_array($item['role'], ['student'])) continue;
+                if ($item['id'] == $user->id) continue;
 
                 $oldId = $item['id'];
                 unset($item['id']);
                 $item['school_id'] = $schoolId;
 
-                // Check username/email collision
-                $exists = User::where('username', $item['username'])->orWhere('email', $item['email'])->exists();
-                if ($exists) {
-                    $item['username'] = $item['username'] . '_restored_' . rand(100, 999);
-                    $item['email'] = $item['username'] . '@restored.com';
+                // Anti-collision username/email
+                if (User::where('username', $item['username'])->orWhere('email', $item['email'])->exists()) {
+                    $suffix = substr(uniqid(), -6);
+                    $item['username'] = $item['username'] . '_r' . $suffix;
+                    $item['email']    = $item['username'] . '@restored.local';
                 }
 
                 $newUser = User::create($item);
@@ -252,126 +247,93 @@ class SchoolBackupController extends Controller
                 unset($item['id']);
                 $item['school_id'] = $schoolId;
 
-                // Map User ID if exists
-                if (isset($item['user_id']) && isset($mapUsers[$item['user_id']])) {
-                    $item['user_id'] = $mapUsers[$item['user_id']];
-                } else {
-                    $item['user_id'] = null; // Unlink if user not found (e.g. self-admin)
-                }
+                // Map ke user baru; null-kan jika tidak ditemukan (misal: self-admin yang di-skip)
+                $item['user_id'] = $mapUsers[$item['user_id'] ?? null] ?? null;
 
                 $newGuru = Guru::create($item);
                 $mapGuru[$oldId] = $newGuru->id;
             }
 
-            // 5. Guru Fingerprints
-            if (isset($data['guru_fingerprints'])) {
-                foreach ($data['guru_fingerprints'] as $item) {
-                    unset($item['id']);
-                    if (isset($mapGuru[$item['guru_id']])) {
-                        $item['guru_id'] = $mapGuru[$item['guru_id']];
-                        // Device ID? We haven't restored devices yet.
-                        // Order matters! Devices should be before fingerprints if linked.
-                        // But fingerprints table usually link to device_id.
-                        // Let's restore devices first? No, list order on top had devices late.
-                        // Let's move Devices higher or handle map later.
-                        // Wait, logic: Restore Devices -> Map Device IDs.
-                    }
-                }
-            }
-
-            // Re-order: Handle Devices now
+            // 5. Devices — harus sebelum fingerprints agar device_id bisa di-remap
             $mapDevices = [];
             foreach ($data['devices'] ?? [] as $item) {
                 $oldId = $item['id'];
                 unset($item['id']);
                 $item['school_id'] = $schoolId;
-                // Unique API Key?
-                $exists = Device::where('api_key', $item['api_key'])->exists();
-                if ($exists) {
-                    $item['api_key'] = $item['api_key'] . '_restored';
+
+                // Pastikan api_key unik
+                if (Device::where('api_key', $item['api_key'])->exists()) {
+                    $item['api_key'] = $item['api_key'] . '_r' . substr(uniqid(), -5);
                 }
                 $newDevice = Device::create($item);
                 $mapDevices[$oldId] = $newDevice->id;
             }
 
-            // Now Guru Fingerprints again
+            // 6. Guru Fingerprints (FIX: hapus loop pertama yang mati; cukup satu loop setelah Devices)
             if (isset($data['guru_fingerprints'])) {
                 foreach ($data['guru_fingerprints'] as $item) {
                     unset($item['id']);
                     if (isset($mapGuru[$item['guru_id']]) && isset($mapDevices[$item['device_id']])) {
-                        $item['guru_id'] = $mapGuru[$item['guru_id']];
+                        $item['guru_id']   = $mapGuru[$item['guru_id']];
                         $item['device_id'] = $mapDevices[$item['device_id']];
                         GuruFingerprint::create($item);
                     }
                 }
             }
 
-            // 6. Siswa
+            // 7. Siswa
             foreach ($data['siswa'] as $item) {
                 $oldId = $item['id'];
                 unset($item['id']);
                 $item['school_id'] = $schoolId;
 
-                // Map Kelas
                 if (isset($item['kelas_id']) && isset($mapKelas[$item['kelas_id']])) {
                     $item['kelas_id'] = $mapKelas[$item['kelas_id']];
                 }
 
-                // Map User (Student User) - We skipped filtering student users early.
-                // Re-create user for student?
-                // The export contained ALL users.
-                // If restore created a User with role 'student', we mapped it in $mapUsers.
-                // But earlier I put `if ($item['role'] == 'student') continue;`
-                // So Student Users were NOT created in Users loop.
-                // We should probably recreate them here or handled above.
-                // Better: Create new user for student to ensure credential sync.
-                $username = $schoolId . $item['nis']; // New logic
-                
-                // Ensure unique email
-                $email = $username . '@siswa.smkassuniyah.sch.id';
-                $emailExists = User::where('email', $email)->exists();
-                if ($emailExists) {
-                    $email = $username . rand(10, 99) . '@siswa.smkassuniyah.sch.id';
-                }
+                // FIX: email anti-collision pakai uniqid() bukan rand() yang bisa duplicate
+                $username  = $schoolId . $item['nis'];
+                $baseEmail = $schoolId . '_' . $item['nis'] . '@siswa.local';
+                $email     = User::where('email', $baseEmail)->exists()
+                    ? $schoolId . '_' . $item['nis'] . '_' . substr(uniqid(), -5) . '@siswa.local'
+                    : $baseEmail;
 
-                $userSitswa = User::updateOrCreate(
+                $userSiswa = User::updateOrCreate(
                     ['username' => $username],
                     [
-                        'full_name' => $item['nama'],
-                        'email' => $email,
+                        'full_name'     => $item['nama'],
+                        'email'         => $email,
                         'password_hash' => \Illuminate\Support\Facades\Hash::make($item['nis']),
-                        'role' => 'student',
-                        'school_id' => $schoolId
+                        'role'          => 'student',
+                        'school_id'     => $schoolId,
                     ]
                 );
-                $item['user_id'] = $userSitswa->id;
+                $item['user_id'] = $userSiswa->id;
 
                 $newSiswa = Siswa::create($item);
                 $mapSiswa[$oldId] = $newSiswa->id;
             }
 
-            // 7. Siswa Fingerprints
+            // 8. Siswa Fingerprints
             if (isset($data['siswa_fingerprints'])) {
                 foreach ($data['siswa_fingerprints'] as $item) {
                     unset($item['id']);
                     if (isset($mapSiswa[$item['student_id']]) && isset($mapDevices[$item['device_id']])) {
                         $item['student_id'] = $mapSiswa[$item['student_id']];
-                        $item['device_id'] = $mapDevices[$item['device_id']];
+                        $item['device_id']  = $mapDevices[$item['device_id']];
                         SiswaFingerprint::create($item);
                     }
                 }
             }
 
-            // 8. Jadwal
+            // 9. Jadwal (jam masuk/pulang per hari — tidak ada FK yang mereferensikan ID-nya)
             foreach ($data['jadwal'] as $item) {
-                $oldId = $item['id'];
                 unset($item['id']);
                 $item['school_id'] = $schoolId;
-                $newJadwal = Jadwal::create($item);
-                $mapJadwal[$oldId] = $newJadwal->id;
+                Jadwal::create($item);
             }
 
-            // 8.5 Mapel
+            // 10. Mapel
             foreach ($data['mapel'] ?? [] as $item) {
                 $oldId = $item['id'];
                 unset($item['id']);
@@ -380,8 +342,10 @@ class SchoolBackupController extends Controller
                 $mapMapel[$oldId] = $newMapel->id;
             }
 
-            // 9. Jadwal Pelajaran
+            // 11. Jadwal Pelajaran — FIX: track ID mapping agar absensi_guru bisa remap
+            $mapJadwalPelajaran = [];
             foreach ($data['jadwal_pelajaran'] as $item) {
+                $oldId = $item['id'];
                 unset($item['id']);
                 $item['school_id'] = $schoolId;
                 if (isset($mapKelas[$item['kelas_id']]))
@@ -391,12 +355,11 @@ class SchoolBackupController extends Controller
                 if (isset($mapMapel[$item['mapel_id']]))
                     $item['mapel_id'] = $mapMapel[$item['mapel_id']];
 
-                JadwalPelajaran::create($item);
+                $newJP = JadwalPelajaran::create($item);
+                $mapJadwalPelajaran[$oldId] = $newJP->id;
             }
 
-            // 10. Hari Libur (Removed)
-
-            // 11. Attendance
+            // 12. Attendance
             foreach ($data['attendance'] as $item) {
                 unset($item['id']);
                 if (isset($mapSiswa[$item['student_id']])) {
@@ -405,15 +368,27 @@ class SchoolBackupController extends Controller
                 }
             }
 
-            // 12. Absensi Guru
+            // 13. Absensi Guru — FIX: remap jadwal_pelajaran_id ke ID baru agar tidak pointing ID lama
             foreach ($data['absensi_guru'] as $item) {
                 unset($item['id']);
                 $item['school_id'] = $schoolId;
-                if (isset($mapGuru[$item['guru_id']])) {
-                    $item['guru_id'] = $mapGuru[$item['guru_id']];
-                    // jadwal_pelajaran_id ??
-                    AbsensiGuru::create($item);
+                if (!isset($mapGuru[$item['guru_id']])) continue;
+                $item['guru_id'] = $mapGuru[$item['guru_id']];
+
+                // null-kan jika mapping tidak ditemukan (field nullable)
+                if (!empty($item['jadwal_pelajaran_id'])) {
+                    $item['jadwal_pelajaran_id'] = $mapJadwalPelajaran[$item['jadwal_pelajaran_id']] ?? null;
                 }
+
+                AbsensiGuru::create($item);
+            }
+
+            // 14. Teacher Checkout Sessions — FIX: sebelumnya tidak direstore sama sekali
+            foreach ($data['teacher_checkout_sessions'] ?? [] as $item) {
+                unset($item['id']);
+                if (!isset($mapGuru[$item['teacher_id']])) continue;
+                $item['teacher_id'] = $mapGuru[$item['teacher_id']];
+                TeacherCheckoutSession::create($item);
             }
 
             DB::commit();

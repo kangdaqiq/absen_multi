@@ -9,6 +9,44 @@
     </h2>
 </div>
 
+{{-- Flash Messages --}}
+@if(session('success'))
+<div id="alertSuccess" class="mb-5 flex w-full items-start gap-3 rounded-md border border-success/30 bg-success/10 px-5 py-4 shadow-sm">
+    <span class="mt-0.5 text-success"><i class="fas fa-check-circle text-xl"></i></span>
+    <div class="flex-1">
+        <h5 class="font-semibold text-success">Berhasil!</h5>
+        <p class="text-sm text-success/90">{{ session('success') }}</p>
+    </div>
+    <button onclick="document.getElementById('alertSuccess').remove()" class="ml-auto text-success/70 hover:text-success">&times;</button>
+</div>
+@endif
+
+@if(session('error'))
+<div id="alertError" class="mb-5 flex w-full items-start gap-3 rounded-md border border-danger/30 bg-danger/10 px-5 py-4 shadow-sm">
+    <span class="mt-0.5 text-danger"><i class="fas fa-exclamation-circle text-xl"></i></span>
+    <div class="flex-1">
+        <h5 class="font-semibold text-danger">Restore Gagal!</h5>
+        <p class="text-sm text-danger/90">{{ session('error') }}</p>
+    </div>
+    <button onclick="document.getElementById('alertError').remove()" class="ml-auto text-danger/70 hover:text-danger">&times;</button>
+</div>
+@endif
+
+@if($errors->any())
+<div id="alertValidation" class="mb-5 flex w-full items-start gap-3 rounded-md border border-danger/30 bg-danger/10 px-5 py-4 shadow-sm">
+    <span class="mt-0.5 text-danger"><i class="fas fa-exclamation-triangle text-xl"></i></span>
+    <div class="flex-1">
+        <h5 class="font-semibold text-danger">Validasi Gagal!</h5>
+        <ul class="mt-1 list-disc list-inside text-sm text-danger/90">
+            @foreach($errors->all() as $err)
+                <li>{{ $err }}</li>
+            @endforeach
+        </ul>
+    </div>
+    <button onclick="document.getElementById('alertValidation').remove()" class="ml-auto text-danger/70 hover:text-danger">&times;</button>
+</div>
+@endif
+
 <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
     <!-- Export / Backup -->
     <div class="rounded-sm border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark">
@@ -144,6 +182,16 @@
 </style>
 
 <script>
+    // Jika ada session error atau validation error, pastikan tombol restore tampil & progress disembunyikan
+    @if(session('error') || $errors->any())
+    document.addEventListener('DOMContentLoaded', function() {
+        var btn = document.getElementById('restoreBtn');
+        var prog = document.getElementById('progressContainer');
+        if (btn) btn.style.display = '';
+        if (prog) prog.style.display = 'none';
+    });
+    @endif
+
     document.getElementById('restoreForm').addEventListener('submit', function(e) {
         
         if (!confirm("APAKAH ANDA YAKIN?\n\nSemua data sekolah saat ini akan DIHAPUS dan digantikan dengan data backup.\nTindakan ini tidak dapat dibatalkan.")) {

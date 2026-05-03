@@ -11,12 +11,12 @@ class WhatsappDevicesController extends Controller
 {
     private function baseUrl(): string
     {
-        return rtrim(env('WA_API_BASE_URL', 'http://localhost:3000'), '/');
+        return rtrim(env('GOWA_API_BASE_URL', 'http://localhost:3000'), '/');
     }
 
     private function auth(): array
     {
-        return [env('WA_API_USER', 'admin'), env('WA_API_PASS', '')];
+        return [env('GOWA_API_USER', 'admin'), env('GOWA_API_PASS', 'jagattech')];
     }
 
     /**

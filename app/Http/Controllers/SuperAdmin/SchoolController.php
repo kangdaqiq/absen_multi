@@ -283,9 +283,9 @@ class SchoolController extends Controller
 
     private function syncWaDevice(School $school)
     {
-        $base = rtrim(env('WA_API_BASE_URL', 'http://localhost:3000'), '/');
-        $user = env('WA_API_USER', 'admin');
-        $pass = env('WA_API_PASS', '04112000');
+        $base = rtrim(env('GOWA_API_BASE_URL', 'http://localhost:3000'), '/');
+        $user = env('GOWA_API_USER', 'admin');
+        $pass = env('GOWA_API_PASS', 'jagattech');
         $deviceId = (string)$school->id;
 
         try {
@@ -308,9 +308,9 @@ class SchoolController extends Controller
 
     private function deleteWaDevice(School $school)
     {
-        $base = rtrim(env('WA_API_BASE_URL', 'http://localhost:3000'), '/');
-        $user = env('WA_API_USER', 'admin');
-        $pass = env('WA_API_PASS', '04112000');
+        $base = rtrim(env('GOWA_API_BASE_URL', 'http://localhost:3000'), '/');
+        $user = env('GOWA_API_USER', 'admin');
+        $pass = env('GOWA_API_PASS', 'jagattech');
         $deviceId = (string)$school->id;
 
         try {

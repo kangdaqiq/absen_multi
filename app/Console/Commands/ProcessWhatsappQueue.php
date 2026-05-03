@@ -73,10 +73,10 @@ class ProcessWhatsappQueue extends Command
 
     private function sendMessage($phone, $message, $schoolId = null)
     {
-        $baseUrl = rtrim(env('WA_API_BASE_URL', 'http://localhost:3000'), '/');
+        $baseUrl = rtrim(env('GOWA_API_BASE_URL', 'http://localhost:3000'), '/');
         $url     = $baseUrl . '/send/message';
-        $user    = env('WA_API_USER', 'admin');
-        $pass    = env('WA_API_PASS', '04112000');
+        $user    = env('GOWA_API_USER', 'admin');
+        $pass    = env('GOWA_API_PASS', 'jagattech');
 
         $headers = $schoolId ? ['X-Device-Id' => (string)$schoolId] : [];
 

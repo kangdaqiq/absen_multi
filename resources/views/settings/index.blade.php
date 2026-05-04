@@ -72,7 +72,20 @@
                                     placeholder="Contoh: Jakarta"
                                     class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
                             </div>
-                        </div>
+
+                            <div>
+                                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Nama Kepala Sekolah</label>
+                                <input type="text" name="nama_kepala_sekolah" value="{{ $settings['nama_kepala_sekolah'] ?? '' }}"
+                                    placeholder="Contoh: Drs. Ahmad Fauzi, M.Pd"
+                                    class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                            </div>
+
+                            <div>
+                                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Nama Waka Kesiswaan</label>
+                                <input type="text" name="nama_waka_kesiswaan" value="{{ $settings['nama_waka_kesiswaan'] ?? '' }}"
+                                    placeholder="Contoh: Siti Nurhaliza, S.Pd"
+                                    class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                            </div>
 
                         <div class="space-y-6">
                             <div>

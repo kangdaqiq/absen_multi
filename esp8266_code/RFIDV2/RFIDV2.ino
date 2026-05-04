@@ -11,48 +11,53 @@
 #include <ESP8266HTTPClient.h>
 #include <ESP8266WebServer.h>
 #include <ESP8266WiFi.h>
+#include <ESP8266httpUpdate.h>
 #include <ESP8266mDNS.h>
-#include <LittleFS.h>
 #include <LiquidCrystal_I2C.h>
+#include <LittleFS.h>
 #include <MFRC522.h>
 #include <RTClib.h>
 #include <SPI.h>
 #include <Ticker.h>
+#include <WiFiClientSecure.h>
 #include <Wire.h>
 
 // =====================================================
 // KONFIGURASI
 // =====================================================
-const char *AP_SSID       = "ABSEN-RFID";
-const char *AP_PASS       = "12345678";
-const char *OTA_HOSTNAME  = "ABSEN-RFID";
-const char *OTA_PASSWORD  = "04112000";
+const char *AP_SSID = "ABSEN-RFID";
+const char *AP_PASS = "12345678";
+const char *OTA_HOSTNAME = "ABSEN-RFID";
+const char *OTA_PASSWORD = "04112000";
+const char *CURRENT_VERSION = "4.0.1";
 
-#define EEPROM_SIZE              512
-#define CONFIG_MAGIC             0xA9
-#define SS_PIN                   16   // D0
-#define RST_PIN                  0    // D3
-#define BUZZER_PIN               2    // D4
-#define I2C_SDA                  4    // D2
-#define I2C_SCL                  5    // D1
-#define RESPONSE_DISPLAY_TIME    3000
-#define STANDBY_SCROLL_INTERVAL  500
-#define BACKLIGHT_TIMEOUT        10000
-#define CARD_COOLDOWN_TIME       2000
+#define EEPROM_SIZE 512
+#define CONFIG_MAGIC 0xA9
+#define SS_PIN 16    // D0
+#define RST_PIN 0    // D3
+#define BUZZER_PIN 2 // D4
+#define I2C_SDA 4    // D2
+#define I2C_SCL 5    // D1
+#define RESPONSE_DISPLAY_TIME 3000
+#define STANDBY_SCROLL_INTERVAL 500
+#define BACKLIGHT_TIMEOUT 10000
+#define CARD_COOLDOWN_TIME 2000
 #define WATCHDOG_TIMEOUT_SECONDS 30
-#define OFFLINE_QUEUE_FILE        "/queue.ndjson"
-#define OFFLINE_QUEUE_TMP         "/queue_tmp.ndjson"
-#define OFFLINE_QUEUE_MAX         2000 // Batas entri (file ~100KB di flash)
-#define OFFLINE_BATCH_TIMEOUT     (30UL * 60 * 1000)
+#define OFFLINE_QUEUE_FILE "/queue.ndjson"
+#define OFFLINE_QUEUE_TMP "/queue_tmp.ndjson"
+#define OFFLINE_QUEUE_MAX 2000 // Batas entri (file ~100KB di flash)
+#define OFFLINE_BATCH_TIMEOUT (30UL * 60 * 1000)
 
 // =====================================================
 // STRUCT
 // =====================================================
 struct WifiConfig {
-  char    ssid[32];
-  char    pass[32];
-  char    apiKey[65];
-  char    apiUrl[128];
+  char ssid[32];
+  char pass[32];
+  char apiKey[65];
+  char apiUrl[128];
+  char schoolName[32];
+  char otaUrl[128];
   uint8_t magic;
 };
 WifiConfig cfg;
@@ -60,55 +65,133 @@ WifiConfig cfg;
 // =====================================================
 // GLOBALS
 // =====================================================
-RTC_DS1307           rtc;
-bool                 rtcReady       = false;
-bool                 bootWifiOK     = false;
-bool                 otaInProgress  = false;
-bool                 backlightOn    = true;
-unsigned long        lastActivity   = 0;
-String               lastScannedUID      = "";
-unsigned long        lastScanTime        = 0;
-unsigned long        lastSyncAttempt     = 0;
-const unsigned long  SYNC_INTERVAL       = 30000;
-bool                 serverOnline        = false; // Status koneksi ke server
+RTC_DS1307 rtc;
+bool rtcReady = false;
+bool bootWifiOK = false;
+bool otaInProgress = false;
+bool backlightOn = true;
+unsigned long lastActivity = 0;
+String lastScannedUID = "";
+unsigned long lastScanTime = 0;
+unsigned long lastSyncAttempt = 0;
+const unsigned long SYNC_INTERVAL = 30000;
+bool serverOnline = false; // Status koneksi ke server
 // Offline batch tracking
-String               offlineBatchTime    = "";   // Timestamp batch aktif
-unsigned long        lastOfflineScanMs   = 0;    // Millis scan offline terakhir
+String offlineBatchTime = "";        // Timestamp batch aktif
+unsigned long lastOfflineScanMs = 0; // Millis scan offline terakhir
 
-Ticker               watchdogTicker;
-volatile bool        watchdogFlag   = false;
+Ticker watchdogTicker;
+volatile bool watchdogFlag = false;
+bool otaTriggered = false;
+String otaTriggerUrl = "";
 
-enum LcdState { LCD_BOOT, LCD_AP_MODE, LCD_STANDBY, LCD_PROCESSING,
-                LCD_SUCCESS, LCD_ERROR, LCD_OTA_UPDATE, LCD_OFFLINE_SAVED };
-LcdState      currentLcdState    = LCD_BOOT;
+enum LcdState {
+  LCD_BOOT,
+  LCD_AP_MODE,
+  LCD_STANDBY,
+  LCD_PROCESSING,
+  LCD_SUCCESS,
+  LCD_ERROR,
+  LCD_OTA_UPDATE,
+  LCD_OFFLINE_SAVED
+};
+LcdState currentLcdState = LCD_BOOT;
 unsigned long lcdStateChangeTime = 0;
-unsigned long lastStandbyUpdate  = 0;
-int           standbyScrollPos   = 0;
+unsigned long lastStandbyUpdate = 0;
+int standbyScrollPos = 0;
 
-ESP8266WebServer    server(80);
-LiquidCrystal_I2C   lcd(0x27, 16, 2);
-MFRC522             rfid(SS_PIN, RST_PIN);
+ESP8266WebServer server(80);
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+MFRC522 rfid(SS_PIN, RST_PIN);
 
 // Deklarasi fungsi di awal agar tidak error scope
 bool sendToServer(String uid, String scannedAt = "");
-
 
 // =====================================================
 // RTC
 // =====================================================
 String getRtcDatetime() {
-  if (!rtcReady) return "1970-01-01 00:00:00";
+  if (!rtcReady)
+    return "1970-01-01 00:00:00";
   DateTime now = rtc.now();
   char buf[20];
-  snprintf(buf, sizeof(buf), "%04d-%02d-%02d %02d:%02d:%02d",
-           now.year(), now.month(), now.day(),
-           now.hour(), now.minute(), now.second());
+  snprintf(buf, sizeof(buf), "%04d-%02d-%02d %02d:%02d:%02d", now.year(),
+           now.month(), now.day(), now.hour(), now.minute(), now.second());
   return String(buf);
+}
+static constexpr float ADC_VREF = 3.3f;
+static constexpr float VOLTAGE_DIVIDER = 2.0f;
+static constexpr float VOLTAGE_OFFSET =
+    0.253f; // kalibrasi: V_multimeter - V_serial
+static constexpr float BAT_EMA_ALPHA = 0.10f;
+static constexpr int BAT_STEP = 5;
+static constexpr unsigned long BAT_DEBUG_MS = 5000UL;
+
+struct BatPoint {
+  float voltage;
+  int pct;
+};
+
+static const BatPoint BAT_CURVE[] = {
+    {4.00f, 100}, {3.98f, 97}, {3.95f, 93}, {3.91f, 87}, {3.87f, 80},
+    {3.83f, 73},  {3.79f, 67}, {3.75f, 60}, {3.71f, 53}, {3.67f, 47},
+    {3.63f, 40},  {3.59f, 33}, {3.55f, 27}, {3.49f, 20}, {3.42f, 13},
+    {3.30f, 7},   {3.00f, 0},
+};
+static constexpr int BAT_CURVE_LEN = sizeof(BAT_CURVE) / sizeof(BAT_CURVE[0]);
+
+static int voltToPct(float v) {
+  if (v >= BAT_CURVE[0].voltage)
+    return 100;
+  if (v <= BAT_CURVE[BAT_CURVE_LEN - 1].voltage)
+    return 0;
+
+  for (int i = 0; i < BAT_CURVE_LEN - 1; i++) {
+    const BatPoint &hi = BAT_CURVE[i];
+    const BatPoint &lo = BAT_CURVE[i + 1];
+    if (v <= hi.voltage && v >= lo.voltage) {
+      float t = (v - lo.voltage) / (hi.voltage - lo.voltage);
+      return static_cast<int>(lo.pct + t * (hi.pct - lo.pct) + 0.5f);
+    }
+  }
+  return 0;
+}
+
+int getBatteryPercentage() {
+  static float smoothedRaw = -1.0f;
+
+  int raw = analogRead(A0);
+
+  if (smoothedRaw < 0.0f) {
+    smoothedRaw = static_cast<float>(raw);
+  } else {
+    smoothedRaw += BAT_EMA_ALPHA * (raw - smoothedRaw);
+  }
+
+  float vAdc = (smoothedRaw / 1023.0f) * ADC_VREF;
+  float vBattery = (vAdc * VOLTAGE_DIVIDER) + VOLTAGE_OFFSET;
+
+  int pct = voltToPct(vBattery);
+  pct = (pct / BAT_STEP) * BAT_STEP;
+
+  static unsigned long lastPrint = 0;
+  unsigned long now = millis();
+  if (now - lastPrint >= BAT_DEBUG_MS) {
+    lastPrint = now;
+    Serial.printf(
+        "[BATTERY] Raw: %d | V_adc: %.3fV | V_bat: %.3fV | Pct: %d%%\n", raw,
+        vAdc, vBattery, pct);
+  }
+
+  return pct;
 }
 
 bool initRTC() {
-  if (!rtc.begin()) { Serial.println("[RTC] Not found"); return false; }
-  
+  if (!rtc.begin()) {
+    Serial.println("[RTC] Not found");
+    return false;
+  }
+
   // DS1307 menggunakan isrunning(), bukan lostPower()
   if (!rtc.isrunning()) {
     Serial.println("[RTC] Not running, setting time...");
@@ -125,14 +208,17 @@ bool initRTC() {
 // Kapasitas: ~2000 entri (~100KB file), flash 1MB tidak jadi masalah
 // =====================================================
 int getQueueCount() {
-  if (!LittleFS.exists(OFFLINE_QUEUE_FILE)) return 0;
+  if (!LittleFS.exists(OFFLINE_QUEUE_FILE))
+    return 0;
   File f = LittleFS.open(OFFLINE_QUEUE_FILE, "r");
-  if (!f) return 0;
+  if (!f)
+    return 0;
   int count = 0;
   while (f.available()) {
     String line = f.readStringUntil('\n');
     line.trim();
-    if (line.length() > 0) count++;
+    if (line.length() > 0)
+      count++;
   }
   f.close();
   return count;
@@ -144,7 +230,8 @@ bool saveOfflineRecord(const String &uid) {
   unsigned long nowMs = millis();
 
   bool newBatch = (offlineBatchTime.length() == 0) ||
-                  (lastOfflineScanMs > 0 && nowMs - lastOfflineScanMs > OFFLINE_BATCH_TIMEOUT);
+                  (lastOfflineScanMs > 0 &&
+                   nowMs - lastOfflineScanMs > OFFLINE_BATCH_TIMEOUT);
   if (newBatch) {
     offlineBatchTime = getRtcDatetime();
     Serial.println("[QUEUE] Batch baru: " + offlineBatchTime);
@@ -162,7 +249,7 @@ bool saveOfflineRecord(const String &uid) {
   File r = LittleFS.open(OFFLINE_QUEUE_FILE, "r");
   if (r) {
     String searchUid = "\"uid\":\"" + uid + "\"";
-    String searchTs  = "\"ts\":\"" + offlineBatchTime + "\"";
+    String searchTs = "\"ts\":\"" + offlineBatchTime + "\"";
     while (r.available()) {
       String line = r.readStringUntil('\n');
       if (line.indexOf(searchUid) >= 0 && line.indexOf(searchTs) >= 0) {
@@ -180,10 +267,11 @@ bool saveOfflineRecord(const String &uid) {
 
   // Append 1 baris JSON ke file
   File f = LittleFS.open(OFFLINE_QUEUE_FILE, "a"); // mode append!
-  if (!f) return false;
+  if (!f)
+    return false;
   StaticJsonDocument<128> doc;
   doc["uid"] = uid;
-  doc["ts"]  = offlineBatchTime;
+  doc["ts"] = offlineBatchTime;
   serializeJson(doc, f);
   f.println(); // newline pemisah antar entri
   f.close();
@@ -193,19 +281,28 @@ bool saveOfflineRecord(const String &uid) {
 }
 
 void syncOfflineQueue() {
-  if (!LittleFS.exists(OFFLINE_QUEUE_FILE)) return;
-  if (WiFi.status() != WL_CONNECTED) return;
+  if (!LittleFS.exists(OFFLINE_QUEUE_FILE))
+    return;
+  if (WiFi.status() != WL_CONNECTED)
+    return;
 
   int total = getQueueCount();
-  if (total == 0) { LittleFS.remove(OFFLINE_QUEUE_FILE); return; }
+  if (total == 0) {
+    LittleFS.remove(OFFLINE_QUEUE_FILE);
+    return;
+  }
 
-  lcd.clear(); lcd.setCursor(0,0); lcd.print("SINKRONISASI");
-  lcd.setCursor(0,1); lcd.print("0/" + String(total));
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("SINKRONISASI");
+  lcd.setCursor(0, 1);
+  lcd.print("0/" + String(total));
   Serial.println("[SYNC] Start: " + String(total) + " entri");
 
   String apiUrl = String(cfg.apiUrl) + "/api/rfid";
   File src = LittleFS.open(OFFLINE_QUEUE_FILE, "r");
-  if (!src) return;
+  if (!src)
+    return;
 
   // File sementara untuk menyimpan entri yang gagal
   File tmp = LittleFS.open(OFFLINE_QUEUE_TMP, "w");
@@ -216,14 +313,17 @@ void syncOfflineQueue() {
     feedWatchdog();
     String line = src.readStringUntil('\n');
     line.trim();
-    if (line.length() == 0) continue;
+    if (line.length() == 0)
+      continue;
 
     StaticJsonDocument<128> entry;
-    if (deserializeJson(entry, line)) continue; // skip baris rusak
+    if (deserializeJson(entry, line))
+      continue; // skip baris rusak
 
     const char *uid = entry["uid"] | "";
-    const char *ts  = entry["ts"]  | "";
-    if (strlen(uid) == 0) continue;
+    const char *ts = entry["ts"] | "";
+    if (strlen(uid) == 0)
+      continue;
 
     idx++;
     WiFiClient client;
@@ -233,29 +333,35 @@ void syncOfflineQueue() {
     http.setTimeout(6000);
 
     StaticJsonDocument<200> req;
-    req["api_key"]    = cfg.apiKey;
-    req["uid"]        = uid;
-    if (strlen(ts) > 0) req["scanned_at"] = ts;
-    String body; serializeJson(req, body);
+    req["api_key"] = cfg.apiKey;
+    req["uid"] = uid;
+    if (strlen(ts) > 0)
+      req["scanned_at"] = ts;
+    String body;
+    serializeJson(req, body);
 
     int code = http.POST(body);
     if (code == 200) {
       synced++;
-      Serial.println("[SYNC] OK " + String(idx) + "/" + String(total) + ": " + String(uid));
+      Serial.println("[SYNC] OK " + String(idx) + "/" + String(total) + ": " +
+                     String(uid));
     } else {
       failed++;
       // Tulis ulang ke tmp file
-      if (tmp) { tmp.println(line); }
+      if (tmp) {
+        tmp.println(line);
+      }
       Serial.println("[SYNC] FAIL " + String(code) + ": " + String(uid));
     }
     http.end();
     delay(150);
-    lcd.setCursor(0,1);
+    lcd.setCursor(0, 1);
     lcd.print(String(idx) + "/" + String(total) + "      ");
   }
 
   src.close();
-  if (tmp) tmp.close();
+  if (tmp)
+    tmp.close();
 
   // Ganti file queue dengan yang tersisa (gagal)
   LittleFS.remove(OFFLINE_QUEUE_FILE);
@@ -263,20 +369,26 @@ void syncOfflineQueue() {
     LittleFS.rename(OFFLINE_QUEUE_TMP, OFFLINE_QUEUE_FILE);
   } else {
     LittleFS.remove(OFFLINE_QUEUE_TMP);
-    offlineBatchTime  = "";
+    offlineBatchTime = "";
     lastOfflineScanMs = 0;
   }
 
-  Serial.println("[SYNC] Done: " + String(synced) + " OK, " + String(failed) + " gagal");
-  lcd.clear(); lcd.setCursor(0,0); lcd.print("SYNC SELESAI");
-  lcd.setCursor(0,1); lcd.print(String(synced) + " OK " + String(failed) + " gagal");
+  Serial.println("[SYNC] Done: " + String(synced) + " OK, " + String(failed) +
+                 " gagal");
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("SYNC SELESAI");
+  lcd.setCursor(0, 1);
+  lcd.print(String(synced) + " OK " + String(failed) + " gagal");
   delay(2000);
   showStandbyDisplay();
 }
 
 bool pingServer() {
-  if (WiFi.status() != WL_CONNECTED) return false;
-  WiFiClient client; HTTPClient http;
+  if (WiFi.status() != WL_CONNECTED)
+    return false;
+  WiFiClient client;
+  HTTPClient http;
   String apiUrl = String(cfg.apiUrl) + "/api/rfid";
   http.begin(client, apiUrl);
   http.setTimeout(3000);
@@ -285,19 +397,27 @@ bool pingServer() {
   return (code > 0); // Jika HTTP code > 0 berarti server hidup
 }
 
-
 // =====================================================
 // WATCHDOG
 // =====================================================
 void IRAM_ATTR watchdogISR() { watchdogFlag = true; }
-void feedWatchdog()           { watchdogFlag = false; }
-void setupWatchdog() { watchdogTicker.attach(WATCHDOG_TIMEOUT_SECONDS, watchdogISR); }
+void feedWatchdog() { watchdogFlag = false; }
+void setupWatchdog() {
+  watchdogTicker.attach(WATCHDOG_TIMEOUT_SECONDS, watchdogISR);
+}
 void checkWatchdog() {
-  if (otaInProgress) { feedWatchdog(); return; }
+  if (otaInProgress) {
+    feedWatchdog();
+    return;
+  }
   if (watchdogFlag) {
-    lcd.clear(); lcd.setCursor(0,0); lcd.print("SYSTEM RESTART");
-    lcd.setCursor(0,1); lcd.print("Watchdog Trigger");
-    delay(3000); ESP.restart();
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("SYSTEM RESTART");
+    lcd.setCursor(0, 1);
+    lcd.print("Watchdog Trigger");
+    delay(3000);
+    ESP.restart();
   }
 }
 
@@ -305,22 +425,38 @@ void checkWatchdog() {
 // BUZZER
 // =====================================================
 void beepOK() {
-  digitalWrite(BUZZER_PIN, HIGH); delay(100); digitalWrite(BUZZER_PIN, LOW);
+  digitalWrite(BUZZER_PIN, HIGH);
+  delay(100);
+  digitalWrite(BUZZER_PIN, LOW);
   delay(60);
-  digitalWrite(BUZZER_PIN, HIGH); delay(100); digitalWrite(BUZZER_PIN, LOW);
+  digitalWrite(BUZZER_PIN, HIGH);
+  delay(100);
+  digitalWrite(BUZZER_PIN, LOW);
 }
-void beepShort()   { digitalWrite(BUZZER_PIN, HIGH); delay(120); digitalWrite(BUZZER_PIN, LOW); }
-void beepError()   { digitalWrite(BUZZER_PIN, HIGH); delay(600); digitalWrite(BUZZER_PIN, LOW); }
+void beepShort() {
+  digitalWrite(BUZZER_PIN, HIGH);
+  delay(120);
+  digitalWrite(BUZZER_PIN, LOW);
+}
+void beepError() {
+  digitalWrite(BUZZER_PIN, HIGH);
+  delay(600);
+  digitalWrite(BUZZER_PIN, LOW);
+}
 void beepTriple() {
-  for (int i=0; i<3; i++) {
-    digitalWrite(BUZZER_PIN, HIGH); delay(80);
-    digitalWrite(BUZZER_PIN, LOW);  delay(80);
+  for (int i = 0; i < 3; i++) {
+    digitalWrite(BUZZER_PIN, HIGH);
+    delay(80);
+    digitalWrite(BUZZER_PIN, LOW);
+    delay(80);
   }
 }
 void beepNetwork() {
-  for (int i=0; i<3; i++) {
-    digitalWrite(BUZZER_PIN, HIGH); delay(150);
-    digitalWrite(BUZZER_PIN, LOW);  delay(150);
+  for (int i = 0; i < 3; i++) {
+    digitalWrite(BUZZER_PIN, HIGH);
+    delay(150);
+    digitalWrite(BUZZER_PIN, LOW);
+    delay(150);
   }
 }
 
@@ -332,24 +468,144 @@ void setupOTA() {
   ArduinoOTA.setPassword(OTA_PASSWORD);
   ArduinoOTA.onStart([]() {
     otaInProgress = true;
-    lcd.clear(); lcd.setCursor(0,0); lcd.print("OTA UPDATE");
-    lcd.setCursor(0,1); lcd.print("Starting...");
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("OTA UPDATE");
+    lcd.setCursor(0, 1);
+    lcd.print("Starting...");
   });
   ArduinoOTA.onEnd([]() {
-    lcd.clear(); lcd.setCursor(0,0); lcd.print("OTA COMPLETE");
-    lcd.setCursor(0,1); lcd.print("Restarting...");
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("OTA COMPLETE");
+    lcd.setCursor(0, 1);
+    lcd.print("Restarting...");
     beepTriple();
   });
   ArduinoOTA.onProgress([](unsigned int p, unsigned int t) {
-    lcd.setCursor(0,1); lcd.print("Prog: "); lcd.print(p/(t/100)); lcd.print("%   ");
+    lcd.setCursor(0, 1);
+    lcd.print("Prog: ");
+    lcd.print(p / (t / 100));
+    lcd.print("%   ");
     feedWatchdog();
   });
   ArduinoOTA.onError([](ota_error_t e) {
     otaInProgress = false;
-    lcd.clear(); lcd.setCursor(0,0); lcd.print("OTA ERROR!");
-    beepError(); delay(3000);
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("OTA ERROR!");
+    beepError();
+    delay(3000);
   });
   ArduinoOTA.begin();
+}
+
+// =====================================================
+// ONLINE OTA UPDATE
+// =====================================================
+void handleOnlineUpdate(String url = "") {
+  if (WiFi.status() != WL_CONNECTED) {
+    server.send(500, "text/plain", "WiFi Tidak Terkoneksi");
+    return;
+  }
+
+  String updateUrl = (url.length() > 0) ? url : String(cfg.otaUrl);
+  updateUrl.trim();
+
+  if (updateUrl.length() == 0) {
+    server.send(500, "text/plain", "URL OTA Kosong");
+    return;
+  }
+
+  // Cache Buster
+  if (updateUrl.indexOf('?') >= 0)
+    updateUrl += "&t=";
+  else
+    updateUrl += "?t=";
+  updateUrl += String(millis());
+
+  Serial.println("[OTA] Target: " + updateUrl);
+
+  server.send(
+      200, "text/html",
+      "<h3>Memulai Update Online...</h3><p>Jangan matikan perangkat. Cek LCD "
+      "atau Serial "
+      "Monitor.</p><script>setTimeout(function(){window.location.href='/';}, "
+      "10000);</script>");
+
+  delay(1000);
+  server.stop(); // Stop server untuk bebaskan RAM
+
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("ONLINE UPDATE");
+  lcd.setCursor(0, 1);
+  lcd.print("Connecting...");
+
+  ESPhttpUpdate.onProgress([](int cur, int total) {
+    static int lastPct = -1;
+    if (total > 0) {
+      int pct = (cur * 100) / total;
+      if (pct != lastPct) {
+        lastPct = pct;
+        lcd.setCursor(0, 1);
+        lcd.print("Prog: ");
+        lcd.print(pct);
+        lcd.print("%   ");
+        Serial.printf("[OTA] Progress: %d%%\n", pct);
+      }
+    } else {
+      lcd.setCursor(0, 1);
+      lcd.print("Downloading...  ");
+    }
+    feedWatchdog();
+  });
+
+  ESPhttpUpdate.rebootOnUpdate(true);
+  ESPhttpUpdate.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+  Serial.println("[OTA] Starting download...");
+  Serial.printf("[OTA] Free heap: %d\n", ESP.getFreeHeap());
+  Serial.printf("[OTA] Free sketch space: %d\n", ESP.getFreeSketchSpace());
+
+  t_httpUpdate_return ret;
+  if (updateUrl.startsWith("https")) {
+    WiFiClientSecure sclient;
+    sclient.setInsecure();
+    // GitHub butuh buffer sedikit lebih besar, coba 1024
+    sclient.setBufferSizes(1024, 1024);
+    ret = ESPhttpUpdate.update(sclient, updateUrl);
+  } else {
+    WiFiClient client;
+    client.setTimeout(15000);
+    ret = ESPhttpUpdate.update(client, updateUrl);
+  }
+
+  switch (ret) {
+  case HTTP_UPDATE_FAILED:
+    Serial.printf("HTTP_UPDATE_FAILED Error (%d): %s\n",
+                  ESPhttpUpdate.getLastError(),
+                  ESPhttpUpdate.getLastErrorString().c_str());
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("UPDATE GAGAL");
+    lcd.setCursor(0, 1);
+    lcd.print("Err: " + String(ESPhttpUpdate.getLastError()));
+    delay(5000);
+    showStandbyDisplay();
+    break;
+  case HTTP_UPDATE_NO_UPDATES:
+    Serial.println("HTTP_UPDATE_NO_UPDATES");
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("TIDAK ADA UPDATE");
+    delay(3000);
+    showStandbyDisplay();
+    break;
+  case HTTP_UPDATE_OK:
+    Serial.println("HTTP_UPDATE_OK");
+    // Restart otomatis
+    break;
+  }
 }
 
 // =====================================================
@@ -357,14 +613,24 @@ void setupOTA() {
 // =====================================================
 bool checkCooldown(String uid) {
   unsigned long now = millis();
-  if (lastScannedUID != uid) { lastScannedUID = uid; lastScanTime = now; return true; }
-  if (now - lastScanTime < CARD_COOLDOWN_TIME) {
-    lcd.clear(); lcd.setCursor(0,0); lcd.print("TUNGGU");
-    lcd.setCursor(0,1);
-    lcd.print("Cooldown: " + String((CARD_COOLDOWN_TIME-(now-lastScanTime))/1000) + "s");
-    beepShort(); delay(1000); return false;
+  if (lastScannedUID != uid) {
+    lastScannedUID = uid;
+    lastScanTime = now;
+    return true;
   }
-  lastScanTime = now; return true;
+  if (now - lastScanTime < CARD_COOLDOWN_TIME) {
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("TUNGGU");
+    lcd.setCursor(0, 1);
+    lcd.print("Cooldown: " +
+              String((CARD_COOLDOWN_TIME - (now - lastScanTime)) / 1000) + "s");
+    beepShort();
+    delay(1000);
+    return false;
+  }
+  lastScanTime = now;
+  return true;
 }
 
 // =====================================================
@@ -372,103 +638,173 @@ bool checkCooldown(String uid) {
 // =====================================================
 void loadConfig() {
   EEPROM.get(0, cfg);
-  if (cfg.magic != CONFIG_MAGIC) memset(&cfg, 0, sizeof(cfg));
+  if (cfg.magic != CONFIG_MAGIC) {
+    memset(&cfg, 0, sizeof(cfg));
+    strncpy(cfg.schoolName, "RFID ABSENSI", sizeof(cfg.schoolName) - 1);
+    strncpy(cfg.otaUrl, "http://yourserver.com/ota/RFIDV2.bin",
+            sizeof(cfg.otaUrl) - 1);
+  }
 }
-void saveConfig() { cfg.magic = CONFIG_MAGIC; EEPROM.put(0, cfg); EEPROM.commit(); }
+
+void saveConfig() {
+  cfg.magic = CONFIG_MAGIC;
+  EEPROM.put(0, cfg);
+  EEPROM.commit();
+}
 
 // =====================================================
 // LCD
 // =====================================================
 void setLcdState(LcdState s) {
   if (currentLcdState != s) {
-    currentLcdState = s; lcdStateChangeTime = millis();
-    standbyScrollPos = 0; lastStandbyUpdate = 0;
+    currentLcdState = s;
+    lcdStateChangeTime = millis();
+    standbyScrollPos = 0;
+    lastStandbyUpdate = 0;
   }
 }
 void resetActivityTimer() {
   lastActivity = millis();
-  if (!backlightOn) { lcd.backlight(); backlightOn = true; }
+  if (!backlightOn) {
+    lcd.backlight();
+    backlightOn = true;
+  }
 }
 void checkBacklightTimeout() {
   if (!bootWifiOK || currentLcdState == LCD_PROCESSING ||
-      currentLcdState == LCD_SUCCESS  || currentLcdState == LCD_ERROR ||
-      currentLcdState == LCD_OTA_UPDATE) return;
-  if (backlightOn && millis()-lastActivity >= BACKLIGHT_TIMEOUT)
-    { lcd.noBacklight(); backlightOn = false; }
+      currentLcdState == LCD_SUCCESS || currentLcdState == LCD_ERROR ||
+      currentLcdState == LCD_OTA_UPDATE)
+    return;
+  if (backlightOn && millis() - lastActivity >= BACKLIGHT_TIMEOUT) {
+    lcd.noBacklight();
+    backlightOn = false;
+  }
 }
 void updateStandbyDisplay() {
-  if (millis()-lastStandbyUpdate < STANDBY_SCROLL_INTERVAL) return;
+  if (millis() - lastStandbyUpdate < STANDBY_SCROLL_INTERVAL)
+    return;
   lastStandbyUpdate = millis();
-  lcd.clear(); lcd.setCursor(0,0);
-  // Tampilkan jam dari RTC di baris 1
-  if (rtcReady) {
-    DateTime now = rtc.now();
-    char timeBuf[17];
-    snprintf(timeBuf, sizeof(timeBuf), "ABSENSI %02d:%02d:%02d", now.hour(), now.minute(), now.second());
-    lcd.print(timeBuf);
-  } else {
-    lcd.print("SISTEM ABSENSI");
-  }
-  lcd.setCursor(0,1);
-  String s = "Tempel Kartu Anda   ";
-  String d = ""; int len = s.length();
-  for (int i=0; i<16; i++) d += s[(standbyScrollPos+i)%len];
+
+  // Baris 1: ABSENSI + Battery
+  lcd.setCursor(0, 0);
+  int bat = getBatteryPercentage();
+  char buf[17];
+  snprintf(buf, sizeof(buf), "ABSENSI     %3d%%", bat);
+  lcd.print(buf);
+
+  // Baris 2: Running Text (School Name only)
+  lcd.setCursor(0, 1);
+  String school = String(cfg.schoolName);
+  if (school.length() == 0)
+    school = "RFID ABSENSI";
+  String s = school + "       "; // Padding spasi
+
+  String d = "";
+  int len = s.length();
+  for (int i = 0; i < 16; i++)
+    d += s[(standbyScrollPos + i) % len];
   lcd.print(d);
-  if (++standbyScrollPos >= len) standbyScrollPos = 0;
+  if (++standbyScrollPos >= len)
+    standbyScrollPos = 0;
 }
+
 void updateLcdDisplay() {
   checkBacklightTimeout();
-  if ((currentLcdState==LCD_SUCCESS || currentLcdState==LCD_ERROR ||
-       currentLcdState==LCD_OFFLINE_SAVED) &&
-      millis()-lcdStateChangeTime >= RESPONSE_DISPLAY_TIME)
+  if ((currentLcdState == LCD_SUCCESS || currentLcdState == LCD_ERROR ||
+       currentLcdState == LCD_OFFLINE_SAVED) &&
+      millis() - lcdStateChangeTime >= RESPONSE_DISPLAY_TIME)
     setLcdState(LCD_STANDBY);
-  if (currentLcdState == LCD_STANDBY) updateStandbyDisplay();
+  if (currentLcdState == LCD_STANDBY)
+    updateStandbyDisplay();
 }
 void showStandbyDisplay() {
-  setLcdState(LCD_STANDBY); resetActivityTimer();
-  lcd.clear(); lcd.setCursor(0,0); lcd.print("SISTEM ABSENSI");
-  lcd.setCursor(0,1); lcd.print("Tempel Kartu Anda");
+  setLcdState(LCD_STANDBY);
+  resetActivityTimer();
+  lcd.clear();
+  updateStandbyDisplay(); // Langsung render frame pertama
 }
 void showProcessingDisplay() {
-  setLcdState(LCD_PROCESSING); resetActivityTimer();
-  lcd.clear(); lcd.setCursor(0,0); lcd.print("MEMPROSES DATA");
-  lcd.setCursor(0,1); lcd.print("Tunggu sebentar");
+  setLcdState(LCD_PROCESSING);
+  resetActivityTimer();
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("MEMPROSES DATA");
+  lcd.setCursor(0, 1);
+  lcd.print("Tunggu sebentar");
 }
 void showOfflineSavedDisplay(const String &uid) {
-  setLcdState(LCD_OFFLINE_SAVED); resetActivityTimer();
-  lcd.clear(); lcd.setCursor(0,0); lcd.print("OFFLINE - SIMPAN");
-  lcd.setCursor(0,1);
-  String u = uid; if (u.length()>16) u = u.substring(0,16);
+  setLcdState(LCD_OFFLINE_SAVED);
+  resetActivityTimer();
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("OFFLINE - SIMPAN");
+  lcd.setCursor(0, 1);
+  String u = uid;
+  if (u.length() > 16)
+    u = u.substring(0, 16);
   lcd.print(u);
   beepOK();
 }
 void showSuccessDisplay(const char *nama, const char *type) {
-  setLcdState(LCD_SUCCESS); resetActivityTimer();
-  lcd.clear(); lcd.setCursor(0,0);
-  String t = String(type); t.toLowerCase();
-  if      (t=="absen_masuk"  || t=="absen_masuk_guru")  { lcd.print("ABSEN MASUK");   beepOK(); }
-  else if (t=="absen_pulang" || t=="absen_pulang_guru") { lcd.print("ABSEN PULANG");  beepOK(); }
-  else if (t=="sudah_absen_masuk")                      { lcd.print("SUDAH ABSEN");   beepShort(); }
-  else if (t=="sudah_lengkap")                          { lcd.print("ABSEN LENGKAP"); beepShort(); }
-  else if (t=="enroll_rfid")                            { lcd.print("ENROLL SUKSES"); beepTriple(); }
-  else if (t=="gate_opened")                            { lcd.print("PULANG DIBUKA"); beepTriple(); }
-  else if (t=="gate_closed")                            { lcd.print("PULANG DITUTUP"); beepTriple(); }
-  else                                                  { lcd.print("SUKSES");        beepOK(); }
-  lcd.setCursor(0,1);
-  String n = String(nama); if (n.length()>16) n = n.substring(0,13)+"...";
+  setLcdState(LCD_SUCCESS);
+  resetActivityTimer();
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  String t = String(type);
+  t.toLowerCase();
+  if (t == "absen_masuk" || t == "absen_masuk_guru") {
+    lcd.print("ABSEN MASUK");
+    beepOK();
+  } else if (t == "absen_pulang" || t == "absen_pulang_guru") {
+    lcd.print("ABSEN PULANG");
+    beepOK();
+  } else if (t == "sudah_absen_masuk") {
+    lcd.print("SUDAH ABSEN");
+    beepShort();
+  } else if (t == "sudah_lengkap") {
+    lcd.print("ABSEN LENGKAP");
+    beepShort();
+  } else if (t == "enroll_rfid") {
+    lcd.print("ENROLL SUKSES");
+    beepTriple();
+  } else if (t == "gate_opened") {
+    lcd.print("PULANG DIBUKA");
+    beepTriple();
+  } else if (t == "gate_closed") {
+    lcd.print("PULANG DITUTUP");
+    beepTriple();
+  } else {
+    lcd.print("SUKSES");
+    beepOK();
+  }
+  lcd.setCursor(0, 1);
+  String n = String(nama);
+  if (n.length() > 16)
+    n = n.substring(0, 13) + "...";
   lcd.print(n);
 }
-void showErrorDisplay(const char *message, const char *type="") {
-  setLcdState(LCD_ERROR); resetActivityTimer();
-  lcd.clear(); lcd.setCursor(0,0); lcd.print("ABSEN GAGAL!");
-  lcd.setCursor(0,1);
-  String m = String(message); if (m.length()>16) m = m.substring(0,13)+"...";
-  lcd.print(m); beepError();
+void showErrorDisplay(const char *message, const char *type = "") {
+  setLcdState(LCD_ERROR);
+  resetActivityTimer();
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("ABSEN GAGAL!");
+  lcd.setCursor(0, 1);
+  String m = String(message);
+  if (m.length() > 16)
+    m = m.substring(0, 13) + "...";
+  lcd.print(m);
+  beepError();
 }
 void showNetworkErrorDisplay(const char *errorType) {
-  setLcdState(LCD_ERROR); resetActivityTimer();
-  lcd.clear(); lcd.setCursor(0,0); lcd.print("ERROR JARINGAN");
-  lcd.setCursor(0,1); lcd.print(errorType); beepNetwork();
+  setLcdState(LCD_ERROR);
+  resetActivityTimer();
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("ERROR JARINGAN");
+  lcd.setCursor(0, 1);
+  lcd.print(errorType);
+  beepNetwork();
 }
 
 // =====================================================
@@ -477,48 +813,143 @@ void showNetworkErrorDisplay(const char *errorType) {
 void setupWebConfig() {
   server.on("/", []() {
     int qCount = getQueueCount();
-    String html = "<!DOCTYPE html><html><head>";
-    html += "<meta name='viewport' content='width=device-width,initial-scale=1'>";
-    html += "<title>Setup RFID</title>";
-    html += "<style>body{font-family:Arial;margin:20px;background:#f0f0f0;}";
-    html += "form{background:#fff;padding:20px;border-radius:8px;max-width:420px;}";
-    html += "input{width:100%;padding:8px;margin:5px 0 12px;box-sizing:border-box;}";
-    html += "button{background:#4CAF50;color:#fff;padding:10px;border:none;border-radius:4px;width:100%;cursor:pointer;}";
-    html += ".box{padding:10px;border-left:4px solid #2196F3;background:#e7f3fe;margin:10px 0;}";
-    html += ".warn{border-color:#f90;background:#fff3cd;}</style></head><body>";
-    html += "<h2>Setup Absen RFID</h2>";
-    html += "<div class='box'><b>Status:</b> ";
-    html += bootWifiOK ? "WiFi OK — IP: "+WiFi.localIP().toString() : "AP Mode — "+WiFi.softAPIP().toString();
-    html += "<br><b>RTC:</b> " + (rtcReady ? getRtcDatetime() : "Tidak Terdeteksi");
-    html += "<br><b>Queue Offline:</b> " + String(qCount) + " entri";
-    if (qCount > 0) html += "<br><a href='/sync'>🔄 Sync Sekarang</a>";
+    String html = "<!DOCTYPE html><html lang='id'><head><meta charset='UTF-8'>";
+    html +=
+        "<meta name='viewport' content='width=device-width,initial-scale=1'>";
+    html += "<title>RFIDv2 Config</title>";
+    html += "<link "
+            "href='https://fonts.googleapis.com/"
+            "css2?family=Inter:wght@400;600&display=swap' rel='stylesheet'>";
+    html += "<style>";
+    html += "body{font-family:'Inter',sans-serif;background:#f8fafc;color:#"
+            "1e293b;margin:0;padding:20px;display:flex;justify-content:center;"
+            "line-height:1.5}";
+    html +=
+        ".card{background:#fff;padding:32px;border-radius:20px;box-shadow:0 "
+        "20px 25px -5px rgba(0,0,0,0.1),0 10px 10px -5px "
+        "rgba(0,0,0,0.04);width:100%;max-width:400px;border:1px solid #e2e8f0}";
+    html += "h2{margin:0 0 "
+            "24px;font-size:24px;font-weight:600;color:#0f172a;text-align:"
+            "center;letter-spacing:-0.025em}";
+    html += ".status-box{background:#f1f5f9;border-radius:12px;padding:16px;"
+            "margin-bottom:24px;font-size:13px;border:1px solid #e2e8f0}";
+    html += ".status-item{display:flex;justify-content:space-between;margin-"
+            "bottom:6px}";
+    html += ".label{font-weight:600;color:#64748b;font-size:12px;margin-bottom:"
+            "6px;display:block;text-transform:uppercase;letter-spacing:0.05em}";
+    html += "input{width:100%;padding:12px;margin-bottom:18px;border:1px solid "
+            "#cbd5e1;border-radius:10px;box-sizing:border-box;font-size:14px;"
+            "transition:all 0.2s;background:#fff}";
+    html += "input:focus{outline:none;border-color:#6366f1;box-shadow:0 0 0 "
+            "4px rgba(99,102,241,0.1)}";
+    html +=
+        "button{width:100%;padding:14px;background:#6366f1;color:#fff;border:"
+        "none;border-radius:10px;font-weight:600;cursor:pointer;transition:all "
+        "0.2s;font-size:14px;box-shadow:0 4px 6px -1px rgba(99,102,241,0.2)}";
+    html += "button:hover{background:#4f46e5;transform:translateY(-1px);box-"
+            "shadow:0 10px 15px -3px rgba(99,102,241,0.3)}";
+    html += ".btn-ota{background:#f59e0b;margin-bottom:24px;box-shadow:0 4px "
+            "6px -1px rgba(245,158,11,0.2)}";
+    html += ".btn-ota:hover{background:#d97706;box-shadow:0 10px 15px -3px "
+            "rgba(245,158,11,0.3)}";
+    html += ".footer{text-align:center;font-size:12px;color:#94a3b8;margin-top:"
+            "24px}";
+    html += "a{color:#6366f1;text-decoration:none;font-weight:600}";
+    html += "</style></head><body>";
+    html += "<div class='card'><h2>Setup RFIDv2</h2>";
+
+    html += "<div class='status-box'>";
+    html += "<div class='status-item'><span>Status WiFi</span><strong>" +
+            String(bootWifiOK ? "Connected ✅" : "AP Mode 📡") +
+            "</strong></div>";
+    html +=
+        "<div class='status-item'><span>IP Address</span><strong>" +
+        (bootWifiOK ? WiFi.localIP().toString() : WiFi.softAPIP().toString()) +
+        "</strong></div>";
+    html += "<div class='status-item'><span>Versi Firmware</span><strong>" +
+            String(CURRENT_VERSION) + "</strong></div>";
+    html += "<div class='status-item'><span>Antrean Offline</span><strong>" +
+            String(qCount) + " entri</strong></div>";
+    if (qCount > 0)
+      html += "<div style='text-align:center;margin-top:8px'><a "
+              "href='/sync'>🔄 Sinkronisasi Sekarang</a></div>";
     html += "</div>";
-    if (bootWifiOK) html += "<div class='box warn'>OTA: <b>"+String(OTA_HOSTNAME)+"</b> | Pass: <b>"+String(OTA_PASSWORD)+"</b></div>";
+
     html += "<form method='POST' action='/save'>";
-    html += "SSID:<br><input name='ssid' value='"+String(cfg.ssid)+"' required><br>";
-    html += "Password:<br><input name='pass' type='password'><br>";
-    html += "API Key:<br><input name='apikey' value='"+String(cfg.apiKey)+"' required><br>";
-    html += "API URL (contoh: http://192.168.1.10/absen/public):<br>";
-    html += "<input name='apiurl' value='"+String(cfg.apiUrl)+"' required><br>";
-    html += "<button>Simpan &amp; Restart</button></form></body></html>";
+    html += "<span class='label'>SSID WiFi</span><input name='ssid' value='" +
+            String(cfg.ssid) + "' placeholder='Nama WiFi'>";
+    html += "<span class='label'>Password WiFi</span><input name='pass' "
+            "type='password' placeholder='Kosongkan jika tidak diubah'>";
+    html +=
+        "<span class='label'>Nama Sekolah</span><input name='school' value='" +
+        String(cfg.schoolName) + "'>";
+
+    html += "<span class='label'>OTA Update URL</span>";
+    html += "<input name='ota' id='ota_url' value='" + String(cfg.otaUrl) +
+            "' placeholder='http://server.com/firmware.bin'>";
+    html += "<button type='button' class='btn-ota' onclick='doUpdate()'>🚀 "
+            "Update Sekarang</button>";
+
+    html += "<span class='label'>API Key</span><input name='apikey' value='" +
+            String(cfg.apiKey) + "'>";
+    html += "<span class='label'>API Server URL</span><input name='apiurl' "
+            "value='" +
+            String(cfg.apiUrl) + "' placeholder='http://domain.com'>";
+
+    html += "<button type='submit'>💾 Simpan Konfigurasi</button></form>";
+    html += "<div class='footer'>RFIDv2 Smart Attendance System</div>";
+
+    html += "<script>";
+    html += "function doUpdate(){";
+    html += "  var u=document.getElementById('ota_url').value;";
+    html += "  if(!u){alert('URL Kosong!');return;}";
+    html += "  if(confirm('Mulai update online sekarang? Perangkat akan "
+            "mendownload dan "
+            "restart.')){window.location.href='/"
+            "ota-trigger?url='+encodeURIComponent(u);}";
+    html += "}";
+    html += "</script></div></body></html>";
     server.send(200, "text/html", html);
   });
 
   server.on("/save", []() {
-    strncpy(cfg.ssid,   server.arg("ssid").c_str(),   sizeof(cfg.ssid)-1);
+    strncpy(cfg.ssid, server.arg("ssid").c_str(), sizeof(cfg.ssid) - 1);
     if (server.arg("pass").length() > 0)
-      strncpy(cfg.pass, server.arg("pass").c_str(), sizeof(cfg.pass)-1);
-    strncpy(cfg.apiKey, server.arg("apikey").c_str(), sizeof(cfg.apiKey)-1);
-    String u = server.arg("apiurl"); u.trim();
-    strncpy(cfg.apiUrl, u.c_str(), sizeof(cfg.apiUrl)-1);
+      strncpy(cfg.pass, server.arg("pass").c_str(), sizeof(cfg.pass) - 1);
+    strncpy(cfg.schoolName, server.arg("school").c_str(),
+            sizeof(cfg.schoolName) - 1);
+    strncpy(cfg.otaUrl, server.arg("ota").c_str(), sizeof(cfg.otaUrl) - 1);
+    strncpy(cfg.apiKey, server.arg("apikey").c_str(), sizeof(cfg.apiKey) - 1);
+    String u = server.arg("apiurl");
+    u.trim();
+    strncpy(cfg.apiUrl, u.c_str(), sizeof(cfg.apiUrl) - 1);
     saveConfig();
-    server.send(200,"text/html","<h3>Tersimpan! Restart 3 detik...</h3>");
-    delay(1500); ESP.restart();
+    server.send(200, "text/html", "<h3>Tersimpan! Restart 3 detik...</h3>");
+    delay(1500);
+    ESP.restart();
   });
 
   server.on("/sync", []() {
-    server.send(200,"text/html","<h3>Sinkronisasi dimulai...</h3>");
+    server.send(200, "text/html", "<h3>Sinkronisasi dimulai...</h3>");
     syncOfflineQueue();
+  });
+
+  server.on("/update-online", []() {
+    otaTriggered = true;
+    server.send(200, "text/html", "<h3>Memicu Update...</h3>");
+  });
+
+  server.on("/ota-trigger", []() {
+    String url = server.arg("url");
+    if (url.length() > 0) {
+      otaTriggerUrl = url;
+      otaTriggered = true;
+      server.send(
+          200, "text/html",
+          "<h3>Memicu Update Kustom...</h3><p>Cek layar perangkat.</p>");
+    } else {
+      server.send(400, "text/plain", "URL Kosong");
+    }
   });
 
   server.begin();
@@ -528,76 +959,114 @@ void setupWebConfig() {
 // SETUP
 // =====================================================
 void setup() {
-  Serial.begin(115200); delay(300);
-  EEPROM.begin(EEPROM_SIZE); loadConfig();
+  Serial.begin(115200);
+  delay(300);
+  EEPROM.begin(EEPROM_SIZE);
+  loadConfig();
 
-  pinMode(BUZZER_PIN, OUTPUT); digitalWrite(BUZZER_PIN, LOW);
-  pinMode(RST_PIN, OUTPUT);    digitalWrite(RST_PIN, HIGH);
+  pinMode(BUZZER_PIN, OUTPUT);
+  digitalWrite(BUZZER_PIN, LOW);
+  pinMode(RST_PIN, OUTPUT);
+  digitalWrite(RST_PIN, HIGH);
 
   Wire.begin(I2C_SDA, I2C_SCL);
-  lcd.init(); lcd.backlight(); backlightOn = true; lastActivity = millis();
+  lcd.init();
+  lcd.backlight();
+  backlightOn = true;
+  lastActivity = millis();
 
   if (!LittleFS.begin()) {
     Serial.println("[FS] Format LittleFS...");
-    LittleFS.format(); LittleFS.begin();
+    LittleFS.format();
+    LittleFS.begin();
   }
 
   setupWatchdog();
 
-  lcd.clear(); lcd.setCursor(0,0); lcd.print("SISTEM ABSENSI");
-  lcd.setCursor(0,1); lcd.print("Booting v4.0..."); delay(1000);
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("SISTEM ABSENSI");
+  lcd.setCursor(0, 1);
+  lcd.print("Booting v4.0...");
+  delay(1000);
 
   rtcReady = initRTC();
 
-  SPI.begin(); rfid.PCD_Init();
+  SPI.begin();
+  rfid.PCD_Init();
   Serial.println("[RFID] Initialized");
 
-  WiFi.mode(WIFI_STA);
+  WiFi.mode(WIFI_AP_STA);
+  WiFi.softAP(AP_SSID, AP_PASS);
+  Serial.println("[WiFi] SoftAP started: " + WiFi.softAPIP().toString());
+
   if (strlen(cfg.ssid) > 0) {
-    lcd.clear(); lcd.setCursor(0,0); lcd.print("Connecting WiFi");
-    lcd.setCursor(0,1); lcd.print(cfg.ssid);
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("Connecting WiFi");
+    lcd.setCursor(0, 1);
+    lcd.print(cfg.ssid);
     WiFi.begin(cfg.ssid, cfg.pass);
   }
 
-  unsigned long start = millis(); int dots = 0;
-  while (WiFi.status() != WL_CONNECTED && millis()-start < 15000) {
-    feedWatchdog(); delay(500);
-    lcd.setCursor(15,1); lcd.print(".");
-    if (++dots > 3) { lcd.setCursor(13,1); lcd.print("   "); dots=0; }
+  unsigned long start = millis();
+  int dots = 0;
+  while (WiFi.status() != WL_CONNECTED &&
+         millis() - start <
+             10000) { // Kurangi timeout ke 10 detik agar tidak lama menunggu
+    feedWatchdog();
+    delay(500);
+    lcd.setCursor(15, 1);
+    lcd.print(".");
+    if (++dots > 3) {
+      lcd.setCursor(13, 1);
+      lcd.print("   ");
+      dots = 0;
+    }
   }
 
   if (WiFi.status() == WL_CONNECTED) {
     bootWifiOK = true;
-    lcd.clear(); lcd.setCursor(0,0); lcd.print("WiFi Connected");
-    lcd.setCursor(0,1); lcd.print(WiFi.localIP());
-    if (MDNS.begin(OTA_HOSTNAME)) Serial.println("[mDNS] Ready");
-    setupOTA(); delay(1000);
-    
-    // Cek server di awal
-    lcd.clear(); lcd.setCursor(0,0); lcd.print("Cek Server...");
+    WiFi.softAPdisconnect(true);
+    WiFi.mode(WIFI_STA);
+    Serial.println("[WiFi] Connected, SoftAP turned off.");
+
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("WiFi Connected");
+    lcd.setCursor(0, 1);
+    lcd.print(WiFi.localIP());
+    if (MDNS.begin(OTA_HOSTNAME))
+      Serial.println("[mDNS] Ready");
+    setupOTA();
+    delay(1000);
+
+    // Cek server
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("Cek Server...");
     serverOnline = pingServer();
-    lcd.setCursor(0,1);
+    lcd.setCursor(0, 1);
     if (serverOnline) {
       lcd.print("Server ONLINE");
-      Serial.println("[SYSTEM] Server is ONLINE");
+      syncOfflineQueue();
     } else {
       lcd.print("Server OFFLINE");
-      Serial.println("[SYSTEM] Server is OFFLINE");
     }
     delay(1500);
-
-    if (serverOnline) syncOfflineQueue(); // Sync saat boot jika server hidup
-    showStandbyDisplay();
   } else {
     bootWifiOK = false;
-    WiFi.disconnect(true); WiFi.mode(WIFI_AP);
-    WiFi.softAP(AP_SSID, AP_PASS);
-    lcd.clear(); lcd.setCursor(0,0); lcd.print("MODE CONFIG");
-    lcd.setCursor(0,1); lcd.print(WiFi.softAPIP());
-    Serial.println("[WiFi] AP: " + WiFi.softAPIP().toString());
+    Serial.println("[WiFi] Connection failed. Entering Offline Mode.");
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("WIFI FAILED");
+    lcd.setCursor(0, 1);
+    lcd.print("OFFLINE MODE");
+    delay(2000);
   }
 
   setupWebConfig();
+  showStandbyDisplay();
   Serial.println("[SYSTEM] Ready! Queue: " + String(getQueueCount()));
 }
 
@@ -605,14 +1074,18 @@ void setup() {
 // LOOP
 // =====================================================
 void loop() {
-  feedWatchdog(); checkWatchdog();
-  if (bootWifiOK) { ArduinoOTA.handle(); MDNS.update(); }
+  feedWatchdog();
+  checkWatchdog();
+  if (bootWifiOK) {
+    ArduinoOTA.handle();
+    MDNS.update();
+  }
   server.handleClient();
   updateLcdDisplay();
 
   // Auto-sync periodik & Ping
   if (bootWifiOK && WiFi.status() == WL_CONNECTED &&
-      millis()-lastSyncAttempt > SYNC_INTERVAL) {
+      millis() - lastSyncAttempt > SYNC_INTERVAL) {
     lastSyncAttempt = millis();
     serverOnline = pingServer(); // Ping tiap interval
     if (serverOnline && getQueueCount() > 0) {
@@ -620,32 +1093,57 @@ void loop() {
     }
   }
 
-  if (otaInProgress || !bootWifiOK) { delay(100); return; }
+  if (otaTriggered) {
+    otaTriggered = false;
+    handleOnlineUpdate(otaTriggerUrl);
+  }
+
+  if (otaInProgress) {
+    delay(100);
+    return;
+  }
 
   // Reconnect jika terputus
   if (WiFi.status() != WL_CONNECTED) {
     static unsigned long lastRecon = 0;
-    if (millis()-lastRecon > 30000) {
-      lcd.clear(); lcd.setCursor(0,0); lcd.print("WiFi Terputus");
-      lcd.setCursor(0,1); lcd.print("Reconnecting...");
-      WiFi.reconnect(); lastRecon = millis();
+    if (millis() - lastRecon > 30000) {
+      // Hidupkan AP jika terputus agar tetap bisa dikonfigurasi
+      if (WiFi.getMode() != WIFI_AP_STA) {
+        WiFi.mode(WIFI_AP_STA);
+        WiFi.softAP(AP_SSID, AP_PASS);
+        Serial.println("[WiFi] Lost connection, SoftAP turned back on.");
+      }
+
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("WiFi Terputus");
+      lcd.setCursor(0, 1);
+      lcd.print("Reconnecting...");
+      WiFi.reconnect();
+      lastRecon = millis();
     }
-    // Tetap bisa scan dalam mode offline
   }
 
-  if (!rfid.PICC_IsNewCardPresent()) return;
-  if (!rfid.PICC_ReadCardSerial())   return;
+  if (!rfid.PICC_IsNewCardPresent())
+    return;
+  if (!rfid.PICC_ReadCardSerial())
+    return;
 
   resetActivityTimer();
   String uid = "";
-  for (byte i=0; i<rfid.uid.size; i++) {
-    if (rfid.uid.uidByte[i] < 0x10) uid += "0";
+  for (byte i = 0; i < rfid.uid.size; i++) {
+    if (rfid.uid.uidByte[i] < 0x10)
+      uid += "0";
     uid += String(rfid.uid.uidByte[i], HEX);
   }
   uid.toUpperCase();
   Serial.println("[RFID] Card: " + uid);
 
-  if (!checkCooldown(uid)) { rfid.PICC_HaltA(); rfid.PCD_StopCrypto1(); return; }
+  if (!checkCooldown(uid)) {
+    rfid.PICC_HaltA();
+    rfid.PCD_StopCrypto1();
+    return;
+  }
 
   if (WiFi.status() == WL_CONNECTED && serverOnline) {
     showProcessingDisplay();
@@ -675,16 +1173,19 @@ void loop() {
 bool sendToServer(String uid, String scannedAt) {
   feedWatchdog();
   String apiUrl = String(cfg.apiUrl) + "/api/rfid";
-  WiFiClient client; HTTPClient http;
+  WiFiClient client;
+  HTTPClient http;
   http.setTimeout(8000);
   http.begin(client, apiUrl);
   http.addHeader("Content-Type", "application/json");
 
   StaticJsonDocument<256> req;
   req["api_key"] = cfg.apiKey;
-  req["uid"]     = uid;
-  if (scannedAt.length() > 0) req["scanned_at"] = scannedAt;
-  String body; serializeJson(req, body);
+  req["uid"] = uid;
+  if (scannedAt.length() > 0)
+    req["scanned_at"] = scannedAt;
+  String body;
+  serializeJson(req, body);
 
   Serial.println("[HTTP] POST " + apiUrl + " | " + body);
   int code = http.POST(body);
@@ -697,19 +1198,22 @@ bool sendToServer(String uid, String scannedAt) {
     Serial.println("[HTTP] Response: " + payload);
     StaticJsonDocument<512> doc;
     if (deserializeJson(doc, payload) == DeserializationError::Ok) {
-      bool        ok      = doc["ok"].as<bool>();
+      bool ok = doc["ok"].as<bool>();
       const char *message = doc["message"] | "Error";
-      const char *nama    = doc["nama"]    | "";
-      const char *type    = doc["type"]    | "";
-      if (ok) showSuccessDisplay(nama, type);
-      else    showErrorDisplay(message, type);
+      const char *nama = doc["nama"] | "";
+      const char *type = doc["type"] | "";
+      if (ok)
+        showSuccessDisplay(nama, type);
+      else
+        showErrorDisplay(message, type);
       success = true;
     } else {
       showErrorDisplay("Format Salah");
-      success = true; // Request terkirim tapi format salah (bukan masalah offline)
+      success =
+          true; // Request terkirim tapi format salah (bukan masalah offline)
     }
   } else if (code > 0) {
-    showNetworkErrorDisplay(("Err:"+String(code)).c_str());
+    showNetworkErrorDisplay(("Err:" + String(code)).c_str());
     success = false; // Code misal 404/500, fallback ke offline
   } else {
     showNetworkErrorDisplay("Conn Failed");

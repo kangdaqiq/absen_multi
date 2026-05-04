@@ -54,13 +54,32 @@
         </tbody>
     </table>
 
-    <div class="footer">
+    <div style="margin-top: 30px; text-align: center; font-size: 12px;">
         <div>{{ $signatureLocation }}, {{ now()->isoFormat('D MMMM Y') }}</div>
-        <div class="signature">
-            <br><br><br>
-            _______________________<br>
-            Wali Kelas / Kepala Sekolah
-        </div>
     </div>
+
+    <div style="margin-top: 10px; text-align: center; font-size: 12px; font-weight: bold;">
+        Mengetahui,
+    </div>
+
+    <table style="width: 100%; margin-top: 10px; border: none;">
+        <tr>
+            <td style="width: 50%; text-align: center; border: none; vertical-align: top; padding: 0 20px;">
+                <div style="font-size: 12px; font-weight: bold;">Waka Kesiswaan</div>
+                <br><br><br><br>
+                <div style="font-size: 12px; border-top: 1px solid #000; display: inline-block; padding-top: 4px; min-width: 180px;">
+                    {{ $namaWaka ?: '.............................' }}
+                </div>
+            </td>
+            <td style="width: 50%; text-align: center; border: none; vertical-align: top; padding: 0 20px;">
+                <div style="font-size: 12px; font-weight: bold;">Kepala {{ $schoolName }}</div>
+                <br><br><br><br>
+                <div style="font-size: 12px; border-top: 1px solid #000; display: inline-block; padding-top: 4px; min-width: 180px;">
+                    {{ $namaKepsek ?: '.............................' }}
+                </div>
+            </td>
+        </tr>
+    </table>
+
 </body>
 </html>

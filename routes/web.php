@@ -67,6 +67,10 @@ Route::middleware(['auth', 'self_hosted_guard'])->prefix('super-admin')->name('s
         // WhatsApp Devices Overview
         Route::get('/whatsapp-devices', [App\Http\Controllers\SuperAdmin\WhatsappDevicesController::class, 'index'])->name('whatsapp-devices.index');
         Route::get('/whatsapp-devices/{schoolId}/status', [App\Http\Controllers\SuperAdmin\WhatsappDevicesController::class, 'status'])->name('whatsapp-devices.status');
+
+        // OTA Update Management
+        Route::get('/ota', [App\Http\Controllers\SuperAdmin\OtaController::class, 'index'])->name('ota.index');
+        Route::post('/ota/upload', [App\Http\Controllers\SuperAdmin\OtaController::class, 'upload'])->name('ota.upload');
     });
 });
 

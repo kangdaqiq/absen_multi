@@ -45,6 +45,7 @@ class MenuHelper
                     ['icon' => 'chat', 'name' => 'Status WA Device', 'path' => route('super-admin.whatsapp-devices.index', [], false)],
                     ['icon' => 'forms', 'name' => 'Pengumuman', 'path' => route('super-admin.announcements.index', [], false)],
                     ['icon' => 'authentication', 'name' => 'Kelola Lisensi', 'path' => route('super-admin.licenses.index', [], false)],
+                    ['icon' => 'ui-elements', 'name' => 'OTA Firmware', 'path' => route('super-admin.ota.index', [], false)],
                 ]
             ];
         }

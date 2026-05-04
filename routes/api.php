@@ -2,6 +2,7 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\DB;
 use App\Http\Controllers\Api\RfidController;
 
 Route::get('/user', function (Request $request) {
@@ -16,6 +17,14 @@ Route::any('/fingerprint/check-enroll', [App\Http\Controllers\Api\FingerprintCon
 Route::post('/license/validate', [App\Http\Controllers\Api\LicenseValidateController::class, 'validate']);
 
 Route::get('/debug-db', function () {
-    return DB::connection()->getDatabaseName(); });
+    return DB::connection()->getDatabaseName();
+});
+
 Route::get('/debug-db-full', function () {
-    return response()->json(['db' => DB::connection()->getDatabaseName(), 'host' => config('database.connections.mysql.host'), 'user' => config('database.connections.mysql.username'), 'port' => config('database.connections.mysql.port')]); });
+    return response()->json([
+        'db' => DB::connection()->getDatabaseName(),
+        'host' => config('database.connections.mysql.host'),
+        'user' => config('database.connections.mysql.username'),
+        'port' => config('database.connections.mysql.port')
+    ]);
+});

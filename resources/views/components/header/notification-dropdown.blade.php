@@ -1,21 +1,29 @@
 {{-- Notification Dropdown Component --}}
+@php
+    $latestAnnouncement = \App\Models\Announcement::where('is_active', true)->latest()->first();
+    $latestAnnouncementId = $latestAnnouncement?->id ?? 0;
+@endphp
 <div class="relative" x-data="{
     dropdownOpen: false,
-    notifying: true,
+    notifying: false,
+    latestId: {{ $latestAnnouncementId }},
+    init() {
+        if (this.latestId > 0) {
+            const readId = parseInt(localStorage.getItem('notif_read_id') || '0');
+            this.notifying = readId < this.latestId;
+        }
+    },
     toggleDropdown() {
         this.dropdownOpen = !this.dropdownOpen;
-        this.notifying = false;
+    },
+    markRead() {
+        if (this.notifying) {
+            this.notifying = false;
+            localStorage.setItem('notif_read_id', this.latestId);
+        }
     },
     closeDropdown() {
         this.dropdownOpen = false;
-    },
-    handleItemClick() {
-        console.log('Notification item clicked');
-        this.closeDropdown();
-    },
-    handleViewAllClick() {
-        console.log('View All Notifications clicked');
-        this.closeDropdown();
     }
 }" @click.away="closeDropdown()">
     <!-- Notification Button -->
@@ -97,7 +105,7 @@
                 @foreach ($announcements as $index => $announcement)
                     <li class="border-b border-gray-100 dark:border-gray-800 last:border-b-0">
                         <button 
-                            @click="selected !== {{ $index }} ? selected = {{ $index }} : selected = null; notifying = false;"
+                            @click="selected !== {{ $index }} ? (selected = {{ $index }}, markRead()) : selected = null"
                             class="flex w-full flex-col gap-2 p-3 px-4.5 py-3 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
                         >
                             <div class="flex items-start justify-between w-full">

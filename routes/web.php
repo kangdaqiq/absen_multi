@@ -60,6 +60,9 @@ Route::middleware(['auth', 'self_hosted_guard'])->prefix('super-admin')->name('s
         // Announcements
         Route::resource('announcements', App\Http\Controllers\SuperAdmin\AnnouncementController::class)->except(['show']);
 
+        // Packages (Subscriptions)
+        Route::resource('packages', App\Http\Controllers\SuperAdmin\PackageController::class)->except(['show']);
+
         // Licenses (Self-Hosted)
         Route::patch('licenses/{license}/regenerate', [App\Http\Controllers\SuperAdmin\LicenseController::class, 'regenerate'])->name('licenses.regenerate');
         Route::resource('licenses', App\Http\Controllers\SuperAdmin\LicenseController::class)->only(['index', 'store', 'update', 'destroy']);
@@ -90,6 +93,8 @@ Route::middleware('auth')->group(function () {
         Route::resource('kelas', KelasController::class)->except(['create', 'show', 'edit']);
         Route::resource('guru', GuruController::class)->except(['create', 'show', 'edit']);
         Route::patch('guru/{id}/toggle-bot-access', [GuruController::class, 'toggleBotAccess'])->name('guru.toggle-bot-access');
+        Route::delete('siswa/bulk-destroy', [SiswaController::class, 'bulkDestroy'])->name('siswa.bulk-destroy');
+        Route::put('siswa/bulk-update-kelas', [SiswaController::class, 'bulkUpdateKelas'])->name('siswa.bulk-update-kelas');
         Route::resource('siswa', SiswaController::class)->except(['create', 'show', 'edit']);
 
         // Absensi
@@ -150,6 +155,9 @@ Route::middleware('auth')->group(function () {
         // Setting
         Route::get('settings', [App\Http\Controllers\SettingsController::class, 'index'])->name('settings.index');
         Route::put('settings', [App\Http\Controllers\SettingsController::class, 'update'])->name('settings.update');
+
+        // Subscription / Paket Langganan
+        Route::get('subscription', [App\Http\Controllers\SubscriptionController::class, 'index'])->name('subscription.index');
 
         // Backup & Restore
         Route::get('/backup', [App\Http\Controllers\SchoolBackupController::class, 'index'])->name('backup.index');

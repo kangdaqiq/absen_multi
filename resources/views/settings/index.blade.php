@@ -86,6 +86,7 @@
                                     placeholder="Contoh: Siti Nurhaliza, S.Pd"
                                     class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
                             </div>
+                        </div>{{-- end kolom kiri --}}
 
                         <div class="space-y-6">
                             <div>

@@ -271,12 +271,13 @@
 
 <!-- Modal Import -->
 <x-ui.modal id="modalImportGuru" :is-open="false">
-    <div class="p-6">
+    <div class="p-6" x-data="importFormGuru()">
         <div class="flex items-center justify-between mb-5">
             <h3 class="text-xl font-bold text-gray-800 dark:text-white/90">Import Data {{ $labelKaryawan }}</h3>
-            <button @click="open = false" class="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white"><i class="fas fa-times"></i></button>
+            <button @click="open = false; if(!isImporting) reset();" class="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white"><i class="fas fa-times"></i></button>
         </div>
-        <form action="{{ route('guru.import') }}" method="POST" enctype="multipart/form-data">
+        
+        <form @submit.prevent="submitForm" x-show="!isImporting && !isFinished" enctype="multipart/form-data">
             @csrf
             <div class="mb-4 rounded-lg bg-info-50 p-4 text-sm text-info-700 dark:bg-info-500/15 dark:text-info-500">
                 <i class="fas fa-info-circle mr-1"></i> Gunakan file Excel (.xlsx) dengan format kolom: <strong>Nama, {{ $labelNIP }}, No WA</strong>.
@@ -284,7 +285,7 @@
             <div class="space-y-4">
                 <div>
                     <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Pilih File Excel</label>
-                    <input type="file" name="fileExcel" required accept=".xlsx,.xls" class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                    <input type="file" x-ref="fileInput" required accept=".xlsx,.xls,.csv" class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none dark:border-gray-800 dark:bg-gray-900 dark:text-white">
                 </div>
                 <div>
                     <a href="{{ route('guru.template') }}" class="text-sm font-medium text-brand-500 hover:underline"><i class="fas fa-download mr-1"></i> Download Template Excel</a>
@@ -295,6 +296,30 @@
                 <button type="submit" class="rounded-lg bg-success-500 px-4 py-2 text-white hover:bg-success-600">Import Data</button>
             </div>
         </form>
+
+        <!-- Progress Area -->
+        <div x-show="isImporting" class="py-4" style="display: none;">
+            <div class="mb-2 flex justify-between text-sm font-medium">
+                <span class="text-gray-700 dark:text-gray-300">Sedang memproses...</span>
+                <span class="text-brand-500" x-text="progress + '%'"></span>
+            </div>
+            <div class="h-2.5 w-full rounded-full bg-gray-200 dark:bg-gray-700">
+                <div class="h-2.5 rounded-full bg-brand-500 transition-all duration-300 ease-out" :style="'width: ' + progress + '%'"></div>
+            </div>
+            <p class="mt-3 text-center text-xs text-gray-500 dark:text-gray-400">Mohon tunggu, memproses data bisa memakan waktu.</p>
+        </div>
+
+        <!-- Success/Error Message -->
+        <div x-show="isFinished" class="py-4 text-center" style="display: none;">
+            <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full" :class="isSuccess ? 'bg-success-100 text-success-500' : 'bg-error-100 text-error-500'">
+                <i class="fas fa-2x" :class="isSuccess ? 'fa-check' : 'fa-times'"></i>
+            </div>
+            <h4 class="mb-2 text-lg font-bold text-gray-800 dark:text-white/90" x-text="isSuccess ? 'Selesai' : 'Terjadi Kesalahan'"></h4>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mb-6" x-text="message"></p>
+            <button type="button" @click="if(isSuccess) location.reload(); else { isFinished = false; progress = 0; }" class="rounded-lg bg-brand-500 px-6 py-2 text-white hover:bg-brand-600">
+                <span x-text="isSuccess ? 'Kembali' : 'Coba Lagi'"></span>
+            </button>
+        </div>
     </div>
 </x-ui.modal>
 
@@ -598,6 +623,77 @@
                 });
             });
         });
+
+        // Alpine component for handling import progress
+        function importFormGuru() {
+            return {
+                isImporting: false,
+                isFinished: false,
+                isSuccess: false,
+                progress: 0,
+                message: '',
+                interval: null,
+                reset() {
+                    this.isImporting = false;
+                    this.isFinished = false;
+                    this.progress = 0;
+                    if(this.$refs.fileInput) this.$refs.fileInput.value = '';
+                },
+                submitForm() {
+                    const fileInput = this.$refs.fileInput;
+                    if (!fileInput.files.length) return;
+
+                    this.isImporting = true;
+                    this.progress = 0;
+
+                    const formData = new FormData();
+                    formData.append('fileExcel', fileInput.files[0]);
+                    formData.append('_token', '{{ csrf_token() }}');
+
+                    // Simulate progress for UI (goes up to 90%)
+                    this.interval = setInterval(() => {
+                        if (this.progress < 90) {
+                            // Slow down as it gets higher
+                            const increment = Math.max(1, Math.floor((90 - this.progress) / 10));
+                            this.progress += increment;
+                        }
+                    }, 600);
+
+                    fetch('{{ route('guru.import') }}', {
+                        method: 'POST',
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'Accept': 'application/json'
+                        },
+                        body: formData
+                    })
+                    .then(response => {
+                        if (!response.ok) throw new Error('Network response was not ok');
+                        return response.json();
+                    })
+                    .then(data => {
+                        clearInterval(this.interval);
+                        this.progress = 100;
+                        setTimeout(() => {
+                            this.isImporting = false;
+                            this.isFinished = true;
+                            this.isSuccess = data.success;
+                            this.message = data.message;
+                        }, 500);
+                    })
+                    .catch(error => {
+                        clearInterval(this.interval);
+                        this.progress = 100;
+                        setTimeout(() => {
+                            this.isImporting = false;
+                            this.isFinished = true;
+                            this.isSuccess = false;
+                            this.message = 'Terjadi kesalahan sistem saat memproses file.';
+                        }, 500);
+                    });
+                }
+            }
+        }
     </script>
 
     @if($showBotCol)

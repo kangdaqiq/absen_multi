@@ -26,7 +26,8 @@ class SchoolController extends Controller
      */
     public function create()
     {
-        return view('super-admin.schools.create');
+        $packages = \App\Models\Package::where('is_active', true)->get();
+        return view('super-admin.schools.create', compact('packages'));
     }
 
     /**
@@ -45,7 +46,9 @@ class SchoolController extends Controller
             'student_limit'        => 'nullable|integer|min:0',
             'teacher_limit'        => 'nullable|integer|min:0',
             'bot_user_limit'       => 'nullable|integer|min:0',
-            'history_quota_months' => 'nullable|integer|in:3,6,9,12,24,36',
+            'history_quota_months' => 'nullable|integer|min:0',
+            'package_id'           => 'nullable|exists:packages,id',
+            'billing_cycle'        => 'nullable|in:monthly,yearly',
         ]);
         
         $validated['type'] = $request->type ?: 'school';
@@ -72,7 +75,39 @@ class SchoolController extends Controller
         $validated['teacher_limit']        = $request->teacher_limit ?: null;
         $validated['history_quota_months'] = $request->history_quota_months ?: null;
 
+        // Apply package configuration if selected
+        $packageId = $request->package_id;
+        $billingCycle = $request->billing_cycle ?? 'monthly';
+        
+        if ($packageId) {
+            $package = \App\Models\Package::find($packageId);
+            if ($package) {
+                $validated['student_limit'] = $package->student_limit;
+                $validated['teacher_limit'] = $package->teacher_limit;
+                $validated['bot_user_limit'] = $package->bot_user_limit;
+                $validated['history_quota_months'] = $package->history_quota_months;
+                $validated['wa_enabled'] = $package->wa_enabled;
+                $validated['bot_enabled'] = $package->bot_enabled;
+                $validated['expired_at'] = $billingCycle === 'yearly' ? now()->addYear() : now()->addMonth();
+            }
+        }
+
         $school = School::create($validated);
+
+        // Record Subscription
+        if ($packageId && isset($package)) {
+            $amount = $billingCycle === 'yearly' ? $package->price_yearly : $package->price_monthly;
+            $school->subscriptions()->create([
+                'package_id' => $package->id,
+                'amount' => $amount,
+                'status' => 'paid',
+                'billing_cycle' => $billingCycle,
+                'started_at' => now(),
+                'expired_at' => $validated['expired_at'],
+                'paid_at' => now(),
+                'payment_method' => 'manual',
+            ]);
+        }
 
         // Create default settings for the new school
         $defaultSettings = [
@@ -121,7 +156,10 @@ class SchoolController extends Controller
      */
     public function edit(School $school)
     {
-        return view('super-admin.schools.edit', compact('school'));
+        $packages = \App\Models\Package::where('is_active', true)->get();
+        // Load active subscription if any
+        $activeSubscription = $school->subscriptions()->where('status', 'paid')->latest()->first();
+        return view('super-admin.schools.edit', compact('school', 'packages', 'activeSubscription'));
     }
 
     /**
@@ -140,7 +178,9 @@ class SchoolController extends Controller
             'student_limit'        => 'nullable|integer|min:0',
             'teacher_limit'        => 'nullable|integer|min:0',
             'bot_user_limit'       => 'nullable|integer|min:0',
-            'history_quota_months' => 'nullable|integer|in:3,6,9,12,24,36',
+            'history_quota_months' => 'nullable|integer|min:0',
+            'package_id'           => 'nullable|exists:packages,id',
+            'billing_cycle'        => 'nullable|in:monthly,yearly',
         ]);
         
         $validated['type'] = $request->type ?: 'school';
@@ -171,6 +211,52 @@ class SchoolController extends Controller
         $validated['student_limit']        = $request->student_limit ?: null;
         $validated['teacher_limit']        = $request->teacher_limit ?: null;
         $validated['history_quota_months'] = $request->history_quota_months ?: null;
+
+        // Apply package configuration if a new package is selected or updated
+        $packageId = $request->package_id;
+        $billingCycle = $request->billing_cycle ?? 'monthly';
+
+        if ($packageId) {
+            // Check if it's a new subscription or renewing
+            $activeSub = $school->subscriptions()->where('status', 'paid')->latest()->first();
+            
+            if (!$activeSub || $activeSub->package_id != $packageId || $request->has('renew_subscription')) {
+                $package = \App\Models\Package::find($packageId);
+                if ($package) {
+                    $validated['student_limit'] = $package->student_limit;
+                    $validated['teacher_limit'] = $package->teacher_limit;
+                    $validated['bot_user_limit'] = $package->bot_user_limit;
+                    $validated['history_quota_months'] = $package->history_quota_months;
+                    $validated['wa_enabled'] = $package->wa_enabled;
+                    // For update, we don't automatically change bot_enabled to prevent accidentally turning it back on if manually disabled by admin
+                    // But if it's a completely new package, we might want to respect the package. Let's respect the package but only if turning ON.
+                    if ($package->bot_enabled) {
+                         $validated['bot_enabled'] = true;
+                    }
+                    
+                    // Extend expiration
+                    $expiredAt = $billingCycle === 'yearly' ? now()->addYear() : now()->addMonth();
+                    // If renewing an active subscription, add to existing expiration
+                    if ($activeSub && $activeSub->expired_at && $activeSub->expired_at > now()) {
+                        $expiredAt = $billingCycle === 'yearly' ? $activeSub->expired_at->addYear() : $activeSub->expired_at->addMonth();
+                    }
+                    $validated['expired_at'] = $expiredAt;
+
+                    // Record new subscription
+                    $amount = $billingCycle === 'yearly' ? $package->price_yearly : $package->price_monthly;
+                    $school->subscriptions()->create([
+                        'package_id' => $package->id,
+                        'amount' => $amount,
+                        'status' => 'paid',
+                        'billing_cycle' => $billingCycle,
+                        'started_at' => now(),
+                        'expired_at' => $expiredAt,
+                        'paid_at' => now(),
+                        'payment_method' => 'manual',
+                    ]);
+                }
+            }
+        }
 
         $school->update($validated);
 

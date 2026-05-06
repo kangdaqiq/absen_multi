@@ -23,6 +23,7 @@ class School extends Model
         'teacher_limit',
         'history_quota_months',
         'settings',
+        'expired_at',
     ];
 
     protected $casts = [
@@ -34,31 +35,8 @@ class School extends Model
         'teacher_limit'        => 'integer',
         'history_quota_months' => 'integer',
         'settings'             => 'array',
+        'expired_at'           => 'datetime',
     ];
-
-    /**
-     * Get wa_enabled attribute.
-     * Always returns true in self_hosted mode.
-     */
-    public function getWaEnabledAttribute($value): bool
-    {
-        if (config('app.mode', 'hosted') === 'self_hosted') {
-            return true;
-        }
-        return (bool) $value;
-    }
-
-    /**
-     * Get bot_enabled attribute.
-     * Always returns true in self_hosted mode.
-     */
-    public function getBotEnabledAttribute($value): bool
-    {
-        if (config('app.mode', 'hosted') === 'self_hosted') {
-            return true;
-        }
-        return (bool) $value;
-    }
 
     /**
      * Get all users for this school
@@ -98,6 +76,14 @@ class School extends Model
     public function admins()
     {
         return $this->users()->where('role', 'admin');
+    }
+
+    /**
+     * Get all subscriptions for this school
+     */
+    public function subscriptions()
+    {
+        return $this->hasMany(Subscription::class);
     }
 
     /**

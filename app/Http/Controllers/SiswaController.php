@@ -189,7 +189,9 @@ class SiswaController extends Controller
             if ($schoolId) {
                 $kelasMapQuery->where('school_id', $schoolId);
             }
-            $kelasMap = $kelasMapQuery->pluck('id', 'nama_kelas')->toArray();
+            $kelasMap = $kelasMapQuery->pluck('id', 'nama_kelas')->mapWithKeys(function($id, $nama) {
+                return [strtolower(trim($nama)) => $id];
+            })->toArray();
 
             // Scope Existing NIS by School
             $existingNisQuery = Siswa::query();
@@ -213,8 +215,19 @@ class SiswaController extends Controller
                     $tglLahir = null;
                     if ($tglLahirRaw) {
                         try {
-                            // Attempt to parse YYYY-MM-DD or standard formats
-                            $tglLahir = \Carbon\Carbon::parse($tglLahirRaw)->format('Y-m-d');
+                            // Support dd/mm/yyyy (primary), yyyy/mm/dd, yyyy-mm-dd, and other Carbon-parseable formats
+                            if (preg_match('/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/', $tglLahirRaw, $m)) {
+                                // dd/mm/yyyy or dd-mm-yyyy
+                                $tglLahir = \Carbon\Carbon::createFromFormat('d/m/Y', sprintf('%02d/%02d/%04d', $m[1], $m[2], $m[3]))->format('Y-m-d');
+                            } elseif (preg_match('/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/', $tglLahirRaw, $m)) {
+                                // yyyy/mm/dd or yyyy-mm-dd
+                                $tglLahir = \Carbon\Carbon::createFromFormat('Y/m/d', sprintf('%04d/%02d/%02d', $m[1], $m[2], $m[3]))->format('Y-m-d');
+                            } elseif (is_numeric($tglLahirRaw)) {
+                                // Excel serial date number
+                                $tglLahir = \Carbon\Carbon::instance(\PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject((float)$tglLahirRaw))->format('Y-m-d');
+                            } else {
+                                $tglLahir = \Carbon\Carbon::parse($tglLahirRaw)->format('Y-m-d');
+                            }
                         } catch (\Exception $e) {
                             $tglLahir = null;
                         }
@@ -241,25 +254,21 @@ class SiswaController extends Controller
 
                     // Resolve Kelas
                     $kelasId = null;
-                    // Resolve Kelas
-                    $kelasId = null;
                     if ($namaKelas !== '') {
-                        if (isset($kelasMap[$namaKelas])) {
-                            $kelasId = $kelasMap[$namaKelas];
+                        $namaKelasLower = strtolower($namaKelas);
+                        if (isset($kelasMap[$namaKelasLower])) {
+                            $kelasId = $kelasMap[$namaKelasLower];
                         } else {
-                            // Create new class with correct school_id
-                            $newKelasData = ['nama_kelas' => $namaKelas];
-                            if ($schoolId) {
-                                $newKelasData['school_id'] = $schoolId;
-                            }
-                            $newKelas = Kelas::create($newKelasData);
-                            $kelasId = $newKelas->id;
-                            $kelasMap[$namaKelas] = $kelasId;
+                            // Jika kelas tidak cocok dengan yang ada di database, biarkan kosong (null)
+                            $kelasId = null;
                         }
                     }
 
                     // Check Quota Limit before creating
                     if ($school && !$school->hasStudentQuota()) {
+                        if ($request->wantsJson()) {
+                            return response()->json(['success' => false, 'message' => "Import dihentikan: Kuota siswa penuh ({$school->student_limit} siswa). Berhasil diimpor: {$countSuccess} siswa."]);
+                        }
                         return redirect()->route('siswa.index')
                             ->with('error', "Import dihentikan: Kuota siswa penuh ({$school->student_limit} siswa). Berhasil diimpor: {$countSuccess} siswa.");
                     }
@@ -284,10 +293,16 @@ class SiswaController extends Controller
                 }
             }
 
+            if ($request->wantsJson()) {
+                return response()->json(['success' => true, 'message' => "Import selesai. Berhasil: $countSuccess. Dilewati/Gagal: $countSkip."]);
+            }
             return redirect()->route('siswa.index')->with('success', "Import selesai. Berhasil: $countSuccess. Dilewati/Gagal: $countSkip.");
 
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::error('Import Siswa Error: ' . $e->getMessage());
+            if ($request->wantsJson()) {
+                return response()->json(['success' => false, 'message' => 'Gagal import: ' . $e->getMessage()]);
+            }
             return redirect()->route('siswa.index')->with('error', 'Gagal import: ' . $e->getMessage());
         }
     }
@@ -300,7 +315,7 @@ class SiswaController extends Controller
         // Header
         $sheet->setCellValue('A1', 'Nama Lengkap');
         $sheet->setCellValue('B1', 'NIS');
-        $sheet->setCellValue('C1', 'Tanggal Lahir (YYYY-MM-DD)');
+        $sheet->setCellValue('C1', 'Tanggal Lahir (DD/MM/YYYY)');
         $sheet->setCellValue('D1', 'Nama Kelas');
         $sheet->setCellValue('E1', 'No WhatsApp Siswa');
         $sheet->setCellValue('F1', 'No WhatsApp Ortu');
@@ -308,10 +323,24 @@ class SiswaController extends Controller
         // Example
         $sheet->setCellValue('A2', 'Ahmad Dani');
         $sheet->setCellValue('B2', '12345');
-        $sheet->setCellValue('C2', '2005-01-01');
+        $sheet->setCellValue('C2', '01/01/2005');
         $sheet->setCellValue('D2', 'X TKJ 1');
         $sheet->setCellValue('E2', '081234567890');
         $sheet->setCellValue('F2', '081234567891');
+
+        // Format kolom C sebagai teks agar Excel tidak mengubah format tanggal
+        $sheet->getStyle('C2:C1000')->getNumberFormat()->setFormatCode(\PhpOffice\PhpSpreadsheet\Style\NumberFormat::FORMAT_TEXT);
+        // Set lebar kolom
+        $sheet->getColumnDimension('A')->setWidth(25);
+        $sheet->getColumnDimension('B')->setWidth(15);
+        $sheet->getColumnDimension('C')->setWidth(22);
+        $sheet->getColumnDimension('D')->setWidth(15);
+        $sheet->getColumnDimension('E')->setWidth(20);
+        $sheet->getColumnDimension('F')->setWidth(20);
+        // Style header
+        $sheet->getStyle('A1:F1')->getFont()->setBold(true);
+        $sheet->getStyle('A1:F1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB('FF3C50E0');
+        $sheet->getStyle('A1:F1')->getFont()->getColor()->setARGB('FFFFFFFF');
 
         $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
 
@@ -479,5 +508,52 @@ class SiswaController extends Controller
         $siswa->update(['id_finger' => null, 'enroll_finger_status' => 'none']);
 
         return response()->json(['ok' => true]);
+    }
+    public function bulkDestroy(Request $request)
+    {
+        $request->validate([
+            'ids' => 'required|array',
+            'ids.*' => 'integer|exists:siswa,id'
+        ]);
+
+        $query = Siswa::whereIn('id', $request->ids);
+        if (auth()->user() && !auth()->user()->isSuperAdmin()) {
+            $query->where('school_id', auth()->user()->school_id);
+        }
+        
+        $count = $query->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => "$count data siswa berhasil dihapus."
+        ]);
+    }
+
+    public function bulkUpdateKelas(Request $request)
+    {
+        $request->validate([
+            'ids' => 'required|array',
+            'ids.*' => 'integer|exists:siswa,id',
+            'kelas_id' => 'required|integer|exists:kelas,id'
+        ]);
+
+        $query = Siswa::whereIn('id', $request->ids);
+        if (auth()->user() && !auth()->user()->isSuperAdmin()) {
+            $query->where('school_id', auth()->user()->school_id);
+            // Verify that the requested kelas_id belongs to the same school
+            $kelas = \App\Models\Kelas::where('id', $request->kelas_id)
+                ->where('school_id', auth()->user()->school_id)
+                ->first();
+            if (!$kelas) {
+                return response()->json(['success' => false, 'message' => 'Kelas tidak valid.'], 403);
+            }
+        }
+
+        $count = $query->update(['kelas_id' => $request->kelas_id]);
+
+        return response()->json([
+            'success' => true,
+            'message' => "$count siswa berhasil dipindah kelas."
+        ]);
     }
 }

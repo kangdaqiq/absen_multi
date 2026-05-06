@@ -3,7 +3,8 @@
 @section('title', 'Data Siswa')
 
 @section('content')
-<div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between" x-data="{}">
+<div x-data="bulkSiswaActions()">
+<div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
     <h2 class="text-title-md2 font-semibold text-gray-800 dark:text-white/90">
         Data Siswa
     </h2>
@@ -37,7 +38,16 @@
     @endif
     <!-- Header & Search -->
     <div class="flex flex-col sm:flex-row justify-between items-center px-5 py-4 border-b border-gray-200 dark:border-gray-800 gap-4">
-        <h4 class="font-semibold text-gray-800 dark:text-white/90">Tabel Data Siswa</h4>
+        <div class="flex items-center gap-3">
+            <h4 class="font-semibold text-gray-800 dark:text-white/90">Tabel Data Siswa</h4>
+            
+            <!-- Bulk Actions Toolbar -->
+            <div x-show="selected.length > 0" x-cloak class="flex items-center gap-2 border-l border-gray-200 pl-3 dark:border-gray-700" style="display: none;">
+                <span class="text-sm font-medium text-brand-500" x-text="selected.length + ' terpilih'"></span>
+                <button @click="$dispatch('open-modal', 'modalBulkEditKelas')" class="rounded bg-brand-50 px-2 py-1 text-xs font-medium text-brand-600 hover:bg-brand-100 dark:bg-brand-500/15 dark:text-brand-500 dark:hover:bg-brand-500/25">Edit Kelas</button>
+                <button @click="$dispatch('open-modal', 'modalBulkHapusSiswa')" class="rounded bg-error-50 px-2 py-1 text-xs font-medium text-error-600 hover:bg-error-100 dark:bg-error-500/15 dark:text-error-500 dark:hover:bg-error-500/25">Hapus</button>
+            </div>
+        </div>
         
         <div class="relative w-full sm:w-64">
             <input type="text" id="clientSearch" placeholder="Cari di halaman ini..." 
@@ -52,7 +62,10 @@
         <table class="w-full table-auto">
             <thead>
                 <tr class="bg-gray-50 text-left dark:bg-gray-800/50 text-gray-800 dark:text-white/90 font-medium text-sm">
-                    <th class="px-4 py-4 xl:pl-6">No</th>
+                    <th class="px-4 py-4 w-10 text-center">
+                        <input type="checkbox" @change="toggleAll" x-bind:checked="isAllSelected" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800">
+                    </th>
+                    <th class="px-4 py-4">No</th>
                     <th class="px-4 py-4">Nama</th>
                     <th class="px-4 py-4">NIS</th>
                     <th class="px-4 py-4">Tgl Lahir</th>
@@ -66,7 +79,10 @@
             <tbody class="text-sm">
                 @forelse ($siswa as $s)
                     <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-                        <td class="border-b border-gray-100 px-4 py-4 dark:border-gray-800 xl:pl-6">
+                        <td class="border-b border-gray-100 px-4 py-4 dark:border-gray-800 text-center">
+                            <input type="checkbox" value="{{ $s->id }}" x-model="selected" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800">
+                        </td>
+                        <td class="border-b border-gray-100 px-4 py-4 dark:border-gray-800">
                             <p class="text-gray-500 dark:text-gray-400">{{ $loop->iteration + $siswa->firstItem() - 1 }}</p>
                         </td>
                         <td class="border-b border-gray-100 px-4 py-4 dark:border-gray-800">
@@ -134,7 +150,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="9" class="border-b border-gray-100 px-4 py-8 dark:border-gray-800 text-center text-gray-500 dark:text-gray-400">
+                        <td colspan="10" class="border-b border-gray-100 px-4 py-8 dark:border-gray-800 text-center text-gray-500 dark:text-gray-400">
                             Tidak ada data siswa ditemukan.
                         </td>
                     </tr>
@@ -150,6 +166,45 @@
 </div>
 
 <!-- ========================= MODALS ========================= -->
+
+<!-- Modal Bulk Edit Kelas -->
+<x-ui.modal id="modalBulkEditKelas" :is-open="false">
+    <div class="p-6">
+        <div class="flex items-center justify-between mb-5">
+            <h3 class="text-xl font-bold text-gray-800 dark:text-white/90">Edit Kelas Masal</h3>
+            <button @click="open = false" class="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white"><i class="fas fa-times"></i></button>
+        </div>
+        <p class="mb-4 text-gray-600 dark:text-gray-400">Pilih kelas baru untuk <span x-text="selected.length" class="font-bold text-brand-500"></span> siswa yang dipilih.</p>
+        <div class="mb-6">
+            <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Pilih Kelas</label>
+            <select id="bulk_kelas_id" class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                <option value="">-- Pilih Kelas --</option>
+                @foreach ($kelas as $k)
+                    <option value="{{ $k->id }}">{{ $k->nama_kelas }}</option>
+                @endforeach
+            </select>
+        </div>
+        <div class="flex justify-end gap-3">
+            <button type="button" @click="open = false" class="rounded-lg border border-gray-200 px-4 py-2 text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-gray-800">Batal</button>
+            <button type="button" @click="bulkUpdateKelas(document.getElementById('bulk_kelas_id').value)" class="rounded-lg bg-brand-500 px-4 py-2 text-white hover:bg-brand-600">Simpan Perubahan</button>
+        </div>
+    </div>
+</x-ui.modal>
+
+<!-- Modal Bulk Hapus -->
+<x-ui.modal id="modalBulkHapusSiswa" :is-open="false">
+    <div class="p-6">
+        <div class="flex items-center justify-between mb-5">
+            <h3 class="text-xl font-bold text-error-500">Hapus Masal Siswa</h3>
+            <button @click="open = false" class="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white"><i class="fas fa-times"></i></button>
+        </div>
+        <p class="text-gray-700 dark:text-gray-300 mb-6">Yakin ingin menghapus secara permanen <span x-text="selected.length" class="font-bold text-error-500"></span> siswa yang dipilih?</p>
+        <div class="flex justify-end gap-3">
+            <button type="button" @click="open = false" class="rounded-lg border border-gray-200 px-4 py-2 text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-gray-800">Batal</button>
+            <button type="button" @click="bulkDelete()" class="rounded-lg bg-error-500 px-4 py-2 text-white hover:bg-error-600">Hapus</button>
+        </div>
+    </div>
+</x-ui.modal>
 
 <!-- Modal Tambah -->
 <x-ui.modal id="modalTambahSiswa" :is-open="false">
@@ -275,12 +330,13 @@
 
 <!-- Modal Import -->
 <x-ui.modal id="modalImportSiswa" :is-open="false">
-    <div class="p-6">
+    <div class="p-6" x-data="importFormSiswa()">
         <div class="flex items-center justify-between mb-5">
             <h3 class="text-xl font-bold text-gray-800 dark:text-white/90">Import Data Siswa</h3>
-            <button @click="open = false" class="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white"><i class="fas fa-times"></i></button>
+            <button @click="open = false; if(!isImporting) reset();" class="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white"><i class="fas fa-times"></i></button>
         </div>
-        <form action="{{ route('siswa.import') }}" method="POST" enctype="multipart/form-data">
+        
+        <form @submit.prevent="submitForm" x-show="!isImporting && !isFinished" enctype="multipart/form-data">
             @csrf
             <div class="mb-4 rounded-lg bg-info-50 p-4 text-sm text-info-700 dark:bg-info-500/15 dark:text-info-500">
                 <i class="fas fa-info-circle mr-1"></i> Gunakan file Excel (.xlsx) dengan format kolom: <strong>Nama, NIS, Tgl Lahir, Kelas, WA Siswa, WA Ortu</strong>.
@@ -288,7 +344,7 @@
             <div class="space-y-4">
                 <div>
                     <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Pilih File Excel</label>
-                    <input type="file" name="fileExcel" required accept=".xlsx,.xls" class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                    <input type="file" x-ref="fileInput" required accept=".xlsx,.xls,.csv" class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none dark:border-gray-800 dark:bg-gray-900 dark:text-white">
                 </div>
                 <div>
                     <a href="{{ route('siswa.template') }}" class="text-sm font-medium text-brand-500 hover:underline"><i class="fas fa-download mr-1"></i> Download Template Excel</a>
@@ -299,6 +355,30 @@
                 <button type="submit" class="rounded-lg bg-success-500 px-4 py-2 text-white hover:bg-success-600">Import Data</button>
             </div>
         </form>
+
+        <!-- Progress Area -->
+        <div x-show="isImporting" class="py-4" style="display: none;">
+            <div class="mb-2 flex justify-between text-sm font-medium">
+                <span class="text-gray-700 dark:text-gray-300">Sedang memproses...</span>
+                <span class="text-brand-500" x-text="progress + '%'"></span>
+            </div>
+            <div class="h-2.5 w-full rounded-full bg-gray-200 dark:bg-gray-700">
+                <div class="h-2.5 rounded-full bg-brand-500 transition-all duration-300 ease-out" :style="'width: ' + progress + '%'"></div>
+            </div>
+            <p class="mt-3 text-center text-xs text-gray-500 dark:text-gray-400">Mohon tunggu, memproses data bisa memakan waktu.</p>
+        </div>
+
+        <!-- Success/Error Message -->
+        <div x-show="isFinished" class="py-4 text-center" style="display: none;">
+            <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full" :class="isSuccess ? 'bg-success-100 text-success-500' : 'bg-error-100 text-error-500'">
+                <i class="fas fa-2x" :class="isSuccess ? 'fa-check' : 'fa-times'"></i>
+            </div>
+            <h4 class="mb-2 text-lg font-bold text-gray-800 dark:text-white/90" x-text="isSuccess ? 'Selesai' : 'Terjadi Kesalahan'"></h4>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mb-6" x-text="message"></p>
+            <button type="button" @click="if(isSuccess) location.reload(); else { isFinished = false; progress = 0; }" class="rounded-lg bg-brand-500 px-6 py-2 text-white hover:bg-brand-600">
+                <span x-text="isSuccess ? 'Kembali' : 'Coba Lagi'"></span>
+            </button>
+        </div>
     </div>
 </x-ui.modal>
 
@@ -369,7 +449,7 @@
         </div>
     </div>
 </x-ui.modal>
-
+</div>
 @endsection
 
 @push('scripts')
@@ -608,5 +688,132 @@
                 });
             });
         });
+        
+        // Alpine component for Bulk Actions
+        function bulkSiswaActions() {
+            return {
+                selected: [],
+                allIds: {{ json_encode($siswa->pluck('id')->toArray()) }},
+                get isAllSelected() {
+                    return this.selected.length > 0 && this.selected.length === this.allIds.length;
+                },
+                toggleAll() {
+                    if (this.isAllSelected) {
+                        this.selected = [];
+                    } else {
+                        this.selected = [...this.allIds];
+                    }
+                },
+                bulkDelete() {
+                    if(this.selected.length === 0) return;
+                    $.ajax({
+                        url: '{{ route("siswa.bulk-destroy") }}',
+                        type: 'DELETE',
+                        data: {
+                            _token: '{{ csrf_token() }}',
+                            ids: this.selected
+                        },
+                        success: function(res) {
+                            if(res.success) location.reload();
+                        },
+                        error: function(err) {
+                            alert('Gagal menghapus data.');
+                        }
+                    });
+                },
+                bulkUpdateKelas(kelasId) {
+                    if(this.selected.length === 0 || !kelasId) {
+                        alert('Pastikan siswa dan kelas tujuan sudah dipilih.');
+                        return;
+                    }
+                    $.ajax({
+                        url: '{{ route("siswa.bulk-update-kelas") }}',
+                        type: 'PUT',
+                        data: {
+                            _token: '{{ csrf_token() }}',
+                            ids: this.selected,
+                            kelas_id: kelasId
+                        },
+                        success: function(res) {
+                            if(res.success) location.reload();
+                        },
+                        error: function(err) {
+                            alert('Gagal mengubah kelas.');
+                        }
+                    });
+                }
+            }
+        }
+        
+        // Alpine component for handling import progress
+        function importFormSiswa() {
+            return {
+                isImporting: false,
+                isFinished: false,
+                isSuccess: false,
+                progress: 0,
+                message: '',
+                interval: null,
+                reset() {
+                    this.isImporting = false;
+                    this.isFinished = false;
+                    this.progress = 0;
+                    if(this.$refs.fileInput) this.$refs.fileInput.value = '';
+                },
+                submitForm() {
+                    const fileInput = this.$refs.fileInput;
+                    if (!fileInput.files.length) return;
+
+                    this.isImporting = true;
+                    this.progress = 0;
+
+                    const formData = new FormData();
+                    formData.append('fileExcel', fileInput.files[0]);
+                    formData.append('_token', '{{ csrf_token() }}');
+
+                    // Simulate progress for UI (goes up to 90%)
+                    this.interval = setInterval(() => {
+                        if (this.progress < 90) {
+                            // Slow down as it gets higher
+                            const increment = Math.max(1, Math.floor((90 - this.progress) / 10));
+                            this.progress += increment;
+                        }
+                    }, 600);
+
+                    fetch('{{ route('siswa.import') }}', {
+                        method: 'POST',
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'Accept': 'application/json'
+                        },
+                        body: formData
+                    })
+                    .then(response => {
+                        if (!response.ok) throw new Error('Network response was not ok');
+                        return response.json();
+                    })
+                    .then(data => {
+                        clearInterval(this.interval);
+                        this.progress = 100;
+                        setTimeout(() => {
+                            this.isImporting = false;
+                            this.isFinished = true;
+                            this.isSuccess = data.success;
+                            this.message = data.message;
+                        }, 500);
+                    })
+                    .catch(error => {
+                        clearInterval(this.interval);
+                        this.progress = 100;
+                        setTimeout(() => {
+                            this.isImporting = false;
+                            this.isFinished = true;
+                            this.isSuccess = false;
+                            this.message = 'Terjadi kesalahan sistem saat memproses file.';
+                        }, 500);
+                    });
+                }
+            }
+        }
     </script>
 @endpush

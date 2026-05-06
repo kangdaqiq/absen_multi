@@ -44,3 +44,7 @@ Schedule::command('absen:auto-delete-history')->dailyAt('01:00')->withoutOverlap
 
 // Refresh license validation cache (Runs at 00:30 AM) — only in self_hosted mode
 Schedule::command('license:validate')->dailyAt('00:30')->withoutOverlapping();
+
+// Daily Subscription and Package Check (Runs at 08:00 AM)
+Schedule::command('subscription:check')->dailyAt('08:00')->withoutOverlapping();
+

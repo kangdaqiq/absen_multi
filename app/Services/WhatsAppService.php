@@ -76,7 +76,7 @@ class WhatsAppService
             if ($isLate) {
                 [$lateHours, $lateMinutes] = $this->parseLateDuration($keterangan);
 
-                $msgOrtu = WhatsAppMessageTemplates::checkInLate(
+                $msgOrtu = WhatsAppMessageTemplates::checkInLateParent(
                     nama: $name,
                     jamMasuk: $time,
                     kelas: $kelas,
@@ -84,7 +84,7 @@ class WhatsAppService
                     lateMinutes: $lateMinutes
                 );
             } else {
-                $msgOrtu = WhatsAppMessageTemplates::checkIn(
+                $msgOrtu = WhatsAppMessageTemplates::checkInParent(
                     nama: $name,
                     jamMasuk: $time,
                     kelas: $kelas,
@@ -141,7 +141,7 @@ class WhatsAppService
 
         // Send to parent if phone number exists
         if ($phoneOrtu) {
-            $msgOrtu = WhatsAppMessageTemplates::checkOut(
+            $msgOrtu = WhatsAppMessageTemplates::checkOutParent(
                 nama: $name,
                 jamMasuk: $jamMasuk,
                 jamPulang: $time,

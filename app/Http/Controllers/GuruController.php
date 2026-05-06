@@ -397,6 +397,9 @@ class GuruController extends Controller
                 if ($schoolId) {
                     $school = $school ?? \App\Models\School::find($schoolId);
                     if ($school && !$school->hasTeacherQuota()) {
+                        if ($request->wantsJson()) {
+                            return response()->json(['success' => false, 'message' => "Import dihentikan: Kuota guru/staff penuh ({$school->teacher_limit} guru). Berhasil diimpor: {$countSuccess} guru."]);
+                        }
                         return redirect()->route('guru.index')->with('error', "Import dihentikan: Kuota guru/staff penuh ({$school->teacher_limit} guru). Berhasil diimpor: {$countSuccess} guru.");
                     }
                 }
@@ -411,9 +414,15 @@ class GuruController extends Controller
                 $countSuccess++;
             }
 
+            if ($request->wantsJson()) {
+                return response()->json(['success' => true, 'message' => "Import selesai. Berhasil: $countSuccess. Dilewati (Duplikat/Kosong): $countSkip."]);
+            }
             return redirect()->route('guru.index')->with('success', "Import selesai. Berhasil: $countSuccess. Dilewati (Duplikat/Kosong): $countSkip.");
 
         } catch (\Exception $e) {
+            if ($request->wantsJson()) {
+                return response()->json(['success' => false, 'message' => 'Gagal import file: ' . $e->getMessage()]);
+            }
             return redirect()->route('guru.index')->with('error', 'Gagal import file: ' . $e->getMessage());
         }
     }

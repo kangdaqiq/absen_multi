@@ -947,3 +947,188 @@ pre[class*='language-'] {
     margin-right: -60px !important;
   }
 }
+
+/* =============================================================
+   DARK MODE GLOBAL FIXES
+   Comprehensive overrides for tables, forms, toggles, etc.
+   ============================================================= */
+
+/* ── Body & Page background ─────────────────────────── */
+.dark body {
+  @apply bg-gray-900 text-gray-200;
+}
+
+/* ── Typography ─────────────────────────────────────── */
+.dark h1, .dark h2, .dark h3, .dark h4, .dark h5, .dark h6 {
+  @apply text-white/90;
+}
+.dark p, .dark span, .dark li, .dark td, .dark th, .dark label {
+  color: inherit;
+}
+
+/* ── Tables ─────────────────────────────────────────── */
+.dark table {
+  @apply border-gray-800;
+}
+.dark thead, .dark thead tr {
+  @apply bg-gray-800;
+}
+.dark thead th {
+  @apply text-gray-300 border-gray-700;
+}
+.dark tbody tr {
+  @apply border-gray-800;
+}
+.dark tbody tr:hover {
+  @apply bg-gray-800/60;
+}
+.dark tbody td {
+  @apply text-gray-300 border-gray-800;
+}
+.dark table .text-black {
+  @apply text-white/90;
+}
+.dark table .text-gray-600,
+.dark table .text-gray-700,
+.dark table .text-gray-800 {
+  @apply !text-gray-300;
+}
+.dark table .text-gray-400,
+.dark table .text-gray-500 {
+  @apply !text-gray-500;
+}
+
+/* ── Form Inputs, Textarea, Select ─────────────────── */
+.dark input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='submit']):not([type='button']):not([type='reset']):not([type='file']),
+.dark textarea,
+.dark select {
+  @apply bg-gray-800 border-gray-700 text-gray-200 placeholder-gray-500;
+}
+.dark input:not([type='checkbox']):not([type='radio']):focus,
+.dark textarea:focus,
+.dark select:focus {
+  @apply border-brand-500 ring-brand-500/20;
+}
+.dark input[readonly],
+.dark input:disabled,
+.dark select:disabled,
+.dark textarea:disabled {
+  @apply bg-gray-700/60 text-gray-400 border-gray-700 cursor-not-allowed;
+}
+.dark input[type='file'] {
+  @apply bg-gray-800 border-gray-700 text-gray-400;
+}
+.dark input[type='file']::file-selector-button {
+  @apply bg-gray-700 text-gray-300 border-0;
+}
+.dark input[type='time'],
+.dark input[type='date'] {
+  color-scheme: dark;
+}
+
+/* ── Toggle Switch (custom `.toggle-bg`, `.dot`) ──── */
+.dark .toggle-bg {
+  @apply bg-gray-700;
+}
+.dark input:checked ~ .toggle-bg {
+  background-color: #3C50E0 !important;
+}
+.dark input:checked ~ .toggle-dot,
+.dark .toggle-dot {
+  @apply bg-white;
+}
+
+/* ── Custom Checkbox (`.box`) ────────────────────────── */
+.dark .box {
+  @apply border-gray-600 bg-gray-700;
+}
+.dark input[type='checkbox']:checked ~ .box,
+.dark input[type='radio']:checked ~ .box {
+  @apply border-brand-500 bg-brand-500;
+}
+.dark input[type='checkbox']:checked ~ .box span,
+.dark input[type='radio']:checked ~ .box span {
+  @apply opacity-100;
+}
+
+/* ── Select2 / native select arrow ─────────────────── */
+.dark .relative.z-20 > select {
+  @apply bg-gray-800 text-gray-200 border-gray-700;
+}
+
+/* ── Badges / Pills ─────────────────────────────────── */
+.dark .bg-success\/10 { background-color: rgba(18, 183, 106, 0.15); }
+.dark .bg-danger\/10  { background-color: rgba(240, 68, 56, 0.15); }
+.dark .bg-warning\/10 { background-color: rgba(247, 144, 9, 0.15); }
+.dark .bg-info\/10    { background-color: rgba(11, 165, 236, 0.15); }
+.dark .bg-gray-100 { @apply bg-gray-800; }
+.dark .bg-gray-50  { @apply bg-gray-800/60; }
+
+/* ── Cards / Panels ─────────────────────────────────── */
+.dark .rounded-2xl.border,
+.dark .rounded-xl.border,
+.dark .rounded-lg.border {
+  @apply border-gray-800;
+}
+.dark .bg-white {
+  @apply bg-gray-dark;
+}
+.dark .bg-white\/90 { background-color: rgba(26,34,49,0.9); }
+
+/* ── Dividers / Borders ─────────────────────────────── */
+.dark .border-gray-200 { @apply border-gray-800; }
+.dark .border-gray-100 { border-color: #1d2939; }
+.dark hr { @apply border-gray-800; }
+
+/* ── Alert / Notice Boxes ───────────────────────────── */
+.dark .bg-warning\/10.border-warning {
+  border-color: rgba(247,144,9,0.4);
+  background-color: rgba(247,144,9,0.1);
+}
+.dark .bg-brand-500\/5 {
+  background-color: rgba(79,107,237,0.1);
+}
+
+/* ── Sidebar Widget ─────────────────────────────────── */
+.dark .border-gray-200.bg-gray-50 {
+  @apply border-gray-800 bg-gray-800/40;
+}
+
+/* ── Pagination ─────────────────────────────────────── */
+.dark nav[aria-label] a,
+.dark nav[aria-label] span {
+  @apply bg-gray-800 border-gray-700 text-gray-300;
+}
+.dark nav[aria-label] a:hover {
+  @apply bg-gray-700;
+}
+.dark nav[aria-label] .bg-brand-500,
+.dark nav[aria-label] [aria-current='page'] {
+  @apply bg-brand-500 text-white border-brand-500;
+}
+
+/* ── Modals & Overlays ──────────────────────────────── */
+.dark .modal-content,
+.dark [role='dialog'] {
+  @apply bg-gray-dark border-gray-800;
+}
+
+/* ── Progress Bars ──────────────────────────────────── */
+.dark .h-1\.5.w-full.rounded-full {
+  @apply bg-gray-700;
+}
+
+/* ── Scrollbar ─────────────────────────────────────── */
+.dark ::-webkit-scrollbar-track {
+  background-color: #1a2231;
+}
+.dark ::-webkit-scrollbar-thumb {
+  background-color: #344054;
+  border-radius: 9999px;
+}
+
+/* ── Text color overrides for common patterns ───────── */
+.dark .text-black { @apply !text-white/90; }
+.dark .text-gray-800 { @apply !text-gray-200; }
+.dark .text-gray-700 { @apply !text-gray-300; }
+.dark .text-gray-600 { @apply !text-gray-400; }

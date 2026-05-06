@@ -12,7 +12,7 @@ class WhatsAppMessageTemplates
     public static function checkIn(string $nama, string $jamMasuk, string $kelas, string $status = 'Hadir'): string
     {
         return "✅ *Notifikasi Absen Masuk*\n\n" .
-            "Assalamualaikum, *{$nama}*,\n\n" .
+            "Halo, *{$nama}*,\n\n" .
             "📅 Tanggal: " . now()->format('d/m/Y') . "\n" .
             "🕐 Jam Masuk: {$jamMasuk}\n" .
             "📊 Status: {$status}\n" .
@@ -32,7 +32,7 @@ class WhatsAppMessageTemplates
         string $authorizedBy
     ): string {
         return "🏠 *Notifikasi Absen Pulang*\n\n" .
-            "Assalamualaikum, *{$nama}*,\n\n" .
+            "Halo, *{$nama}*,\n\n" .
             "📅 Tanggal: " . now()->format('d/m/Y') . "\n" .
             "🕐 Jam Masuk: {$jamMasuk}\n" .
             "🕐 Jam Pulang: {$jamPulang}\n" .
@@ -61,7 +61,7 @@ class WhatsAppMessageTemplates
         }
 
         return "⚠️ *Notifikasi Terlambat*\n\n" .
-            "Assalamualaikum, *{$nama}*,\n\n" .
+            "Halo, *{$nama}*,\n\n" .
             "📅 Tanggal: " . now()->format('d/m/Y') . "\n" .
             "🕐 Jam Masuk: {$jamMasuk}\n" .
             "⏰ Keterlambatan: {$lateDuration}\n" .
@@ -72,12 +72,79 @@ class WhatsAppMessageTemplates
     }
 
     /**
+     * Check-in notification to parent
+     */
+    public static function checkInParent(string $nama, string $jamMasuk, string $kelas, string $status = 'Hadir'): string
+    {
+        return "✅ *Notifikasi Absen Masuk Anak*\n\n" .
+            "Halo, Orang Tua/Wali dari *{$nama}*,\n\n" .
+            "Anak Anda telah tercatat hadir di sekolah.\n\n" .
+            "📅 Tanggal: " . now()->format('d/m/Y') . "\n" .
+            "🕐 Jam Masuk: {$jamMasuk}\n" .
+            "📊 Status: {$status}\n" .
+            "🏫 Kelas: {$kelas}\n\n" .
+            "_Notifikasi otomatis dari sistem absensi sekolah._";
+    }
+
+    /**
+     * Late check-in notification to parent
+     */
+    public static function checkInLateParent(
+        string $nama,
+        string $jamMasuk,
+        string $kelas,
+        int $lateHours = 0,
+        int $lateMinutes = 0
+    ): string {
+        if ($lateHours > 0 && $lateMinutes > 0) {
+            $lateDuration = "{$lateHours} jam {$lateMinutes} menit";
+        } elseif ($lateHours > 0) {
+            $lateDuration = "{$lateHours} jam";
+        } else {
+            $lateDuration = "{$lateMinutes} menit";
+        }
+
+        return "⚠️ *Notifikasi Terlambat Anak*\n\n" .
+            "Halo, Orang Tua/Wali dari *{$nama}*,\n\n" .
+            "Anak Anda telah tercatat hadir di sekolah, namun *terlambat*.\n\n" .
+            "📅 Tanggal: " . now()->format('d/m/Y') . "\n" .
+            "🕐 Jam Masuk: {$jamMasuk}\n" .
+            "⏰ Keterlambatan: {$lateDuration}\n" .
+            "📊 Status: Terlambat\n" .
+            "🏫 Kelas: {$kelas}\n\n" .
+            "Mohon bantuannya untuk mengingatkan anak agar lebih disiplin.\n\n" .
+            "_Notifikasi otomatis dari sistem absensi sekolah._";
+    }
+
+    /**
+     * Check-out notification to parent
+     */
+    public static function checkOutParent(
+        string $nama,
+        string $jamMasuk,
+        string $jamPulang,
+        int $hours,
+        int $minutes,
+        string $authorizedBy
+    ): string {
+        return "🏠 *Notifikasi Absen Pulang Anak*\n\n" .
+            "Halo, Orang Tua/Wali dari *{$nama}*,\n\n" .
+            "Anak Anda telah tercatat pulang dari sekolah.\n\n" .
+            "📅 Tanggal: " . now()->format('d/m/Y') . "\n" .
+            "🕐 Jam Masuk: {$jamMasuk}\n" .
+            "🕐 Jam Pulang: {$jamPulang}\n" .
+            "⏱️ Durasi: {$hours} jam {$minutes} menit\n" .
+            "👤 Diotorisasi oleh: {$authorizedBy}\n\n" .
+            "_Notifikasi otomatis dari sistem absensi sekolah._";
+    }
+
+    /**
      * Alpha (absent) notification to student
      */
     public static function alphaStudent(string $nama): string
     {
         return "❌ *Pemberitahuan Ketidakhadiran*\n\n" .
-            "Assalamualaikum, *{$nama}*,\n\n" .
+            "Halo, *{$nama}*,\n\n" .
             "📅 Tanggal: " . now()->format('d/m/Y') . "\n" .
             "📊 Status: Alpha (Tidak Hadir)\n\n" .
             "Anda tercatat tidak hadir hari ini tanpa keterangan.\n" .
@@ -91,7 +158,7 @@ class WhatsAppMessageTemplates
     public static function alphaParent(string $nama, string $kelas): string
     {
         return "❌ *Pemberitahuan Ketidakhadiran Anak*\n\n" .
-            "Assalamualaikum, Orang Tua/Wali dari *{$nama}*,\n\n" .
+            "Halo, Orang Tua/Wali dari *{$nama}*,\n\n" .
             "📅 Tanggal: " . now()->format('d/m/Y') . "\n" .
             "📊 Status: Alpha (Tidak Hadir)\n" .
             "⚠️ Kelas: {$kelas}\n\n" .
@@ -291,7 +358,7 @@ class WhatsAppMessageTemplates
     public static function teacherSchedule(string $namaGuru, array $jadwalHariIni): string
     {
         $msg = "📚 *Jadwal Mengajar Hari Ini*\n\n";
-        $msg .= "Assalamualaikum, *{$namaGuru}*,\n\n";
+        $msg .= "Halo, *{$namaGuru}*,\n\n";
         $msg .= "📅 " . now()->locale('id')->isoFormat('dddd, D MMMM YYYY') . "\n";
         $msg .= str_repeat("─", 30) . "\n\n";
 

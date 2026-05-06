@@ -79,9 +79,17 @@ class CheckSubscriptions extends Command
         }
 
         // Add to WA Message Queue
+        // Set school_id to null so it uses the SuperAdmin's WA device
+        
+        $phone = preg_replace('/[^0-9]/', '', $school->operator_phone);
+        if (empty($phone)) return;
+        if (substr($phone, 0, 1) === '0') $phone = '62' . substr($phone, 1);
+        elseif (substr($phone, 0, 2) !== '62') $phone = '62' . $phone;
+        $phone .= '@s.whatsapp.net';
+
         MessageQueue::create([
-            'school_id' => $school->id,
-            'phone_number' => $school->operator_phone,
+            'school_id' => null,
+            'phone_number' => $phone,
             'message' => "Halo Admin {$school->name},\n\n{$message}\n\nTerima kasih.",
             'status' => 'pending',
         ]);

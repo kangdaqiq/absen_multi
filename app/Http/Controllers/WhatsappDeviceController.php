@@ -21,6 +21,9 @@ class WhatsappDeviceController extends Controller
 
     private function deviceId(): string
     {
+        if (Auth::user()->isSuperAdmin()) {
+            return 'superadmin';
+        }
         $schoolId = Auth::user()->school_id;
         return (string)$schoolId;
     }

@@ -8,7 +8,7 @@
             <h2 class="text-title-md2 font-semibold text-gray-800 dark:text-white/90">
                 WhatsApp Device
             </h2>
-            <p class="text-sm font-medium text-gray-500 dark:text-gray-400 mt-1">Hubungkan nomor WhatsApp untuk sekolah ini
+            <p class="text-sm font-medium text-gray-500 dark:text-gray-400 mt-1">Hubungkan nomor WhatsApp untuk pengiriman notifikasi
             </p>
         </div>
     </div>
@@ -46,8 +46,8 @@
                             </div>
                         </div>
                         <h4 class="mb-2 text-2xl font-bold text-success-600 dark:text-success-500">WhatsApp Terhubung!</h4>
-                        <p class="mb-8 text-gray-500 dark:text-gray-400 max-w-md mx-auto">Nomor WhatsApp sekolah ini sudah
-                            aktif dan siap digunakan untuk mengirim notifikasi absensi.</p>
+                        <p class="mb-8 text-gray-500 dark:text-gray-400 max-w-md mx-auto">Nomor WhatsApp ini sudah
+                            aktif dan siap digunakan untuk mengirim pesan dan notifikasi.</p>
 
                         <!-- Form Test WA -->
                         <div class="mb-8 max-w-md mx-auto p-5 bg-gray-50 border border-gray-100 dark:border-gray-700 dark:bg-gray-800 rounded-xl text-left">
@@ -152,11 +152,11 @@
                     <ul class="flex flex-col gap-3 text-sm text-gray-500 dark:text-gray-400">
                         <li class="flex gap-2">
                             <i class="fas fa-check text-success-500 mt-1"></i>
-                            <span>Setiap sekolah memiliki nomor WhatsApp tersendiri.</span>
+                            <span>Pastikan handphone Anda selalu terkoneksi dengan internet.</span>
                         </li>
                         <li class="flex gap-2">
                             <i class="fas fa-check text-success-500 mt-1"></i>
-                            <span>Notifikasi absensi akan dikirim dari nomor WhatsApp yang sudah di-scan di halaman
+                            <span>Notifikasi akan dikirim dari nomor WhatsApp yang sudah di-scan di halaman
                                 ini.</span>
                         </li>
                         <li class="flex gap-2">

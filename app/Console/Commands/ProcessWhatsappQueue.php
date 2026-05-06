@@ -78,7 +78,8 @@ class ProcessWhatsappQueue extends Command
         $user    = env('GOWA_API_USER', 'admin');
         $pass    = env('GOWA_API_PASS', 'jagattech');
 
-        $headers = $schoolId ? ['X-Device-Id' => (string)$schoolId] : [];
+        $deviceId = $schoolId ? (string)$schoolId : 'superadmin';
+        $headers = ['X-Device-Id' => $deviceId];
 
         try {
             $response = Http::timeout(20)

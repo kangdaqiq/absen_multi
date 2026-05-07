@@ -37,8 +37,6 @@ class RfidController extends Controller
         $this->wa = $wa;
     }
 
-    // ... (handle method omitted) ...
-
     private function handleGateScan($uid, $gateCard, $apiKey, $device, $now = null)
     {
         try {
@@ -757,4 +755,3 @@ class RfidController extends Controller
         return $phone . '@s.whatsapp.net';
     }
 }
-                                                                                                                                                                      

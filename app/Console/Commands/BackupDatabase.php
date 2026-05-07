@@ -71,7 +71,18 @@ class BackupDatabase extends Command
         if ($returnVar === 0) {
             $this->info("Backup successful: $filename");
             
-            // Clean old backups (Keep last 7 days)
+            // Upload to Cloudflare R2 if configured
+            if (env('CLOUDFLARE_R2_ENDPOINT')) {
+                $this->info("Uploading backup to Cloudflare R2...");
+                try {
+                    Storage::disk('r2')->put("backups/$filename", file_get_contents($filePath));
+                    $this->info("Backup successfully uploaded to Cloudflare R2.");
+                } catch (\Exception $e) {
+                    $this->error("Failed to upload to Cloudflare R2: " . $e->getMessage());
+                }
+            }
+
+            // Clean old backups locally (Keep last 7 days)
             $this->cleanOldBackups($path);
             
         } else {

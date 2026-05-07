@@ -9,19 +9,19 @@
     <style>
         [x-cloak] { display: none !important; }
         .bg-grid {
-            background-image: radial-gradient(circle, #e5e7eb 1px, transparent 1px);
-            background-size: 30px 30px;
+            background-image: radial-gradient(circle, #e5e7eb 1.5px, transparent 1.5px);
+            background-size: 40px 40px;
         }
         .dark .bg-grid {
-            background-image: radial-gradient(circle, #374151 1px, transparent 1px);
+            background-image: radial-gradient(circle, #1f2937 1.5px, transparent 1.5px);
         }
         @keyframes pulse-red {
-            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
-            70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
-            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.5); opacity: 0.5; }
+            100% { transform: scale(1); opacity: 1; }
         }
         .live-indicator {
-            animation: pulse-red 2s infinite;
+            animation: pulse-red 1.5s ease-in-out infinite;
         }
     </style>
 </head>
@@ -57,75 +57,76 @@
         </div>
 
         {{-- Main Content --}}
-        <div class="flex-1 flex flex-row gap-6 overflow-hidden">
+        <div class="flex-1 flex flex-row gap-8 overflow-hidden">
             
-            {{-- Left Column: Stats (Fixed Width) --}}
-            <div class="w-1/3 flex flex-col gap-6 overflow-y-auto no-scrollbar">
+            {{-- Left Column: Stats (Fixed width to prevent squashing) --}}
+            <div class="w-[380px] flex flex-col gap-5 overflow-y-auto no-scrollbar flex-shrink-0">
+                
                 {{-- Major Stats --}}
-                <div class="flex flex-col gap-4">
-                    <div class="bg-white dark:bg-boxdark rounded-2xl shadow-lg border-l-[10px] border-blue-500 p-6">
-                        <p class="text-xs font-bold text-gray-400 mb-1 uppercase tracking-widest">Total Siswa</p>
-                        <div class="flex items-baseline gap-2">
-                            <span id="stat-total" class="text-5xl font-black text-gray-800 dark:text-white">--</span>
-                            <span class="text-lg font-medium text-gray-400">Siswa</span>
-                        </div>
-                    </div>
-
-                    <div class="bg-white dark:bg-boxdark rounded-2xl shadow-lg border-l-[10px] border-red-500 p-6">
-                        <p class="text-xs font-bold text-red-400 mb-1 uppercase tracking-widest">Siswa Absen</p>
-                        <div class="flex items-baseline gap-2">
-                            <span id="stat-absen" class="text-5xl font-black text-red-600 dark:text-red-400">--</span>
-                            <span class="text-lg font-medium text-red-300">A/S/I/B</span>
-                        </div>
-                    </div>
-
-                    <div class="bg-white dark:bg-boxdark rounded-2xl shadow-lg border-l-[10px] border-orange-500 p-6">
-                        <p class="text-xs font-bold text-orange-400 mb-1 uppercase tracking-widest">Belum Tap</p>
-                        <div class="flex items-baseline gap-2">
-                            <span id="stat-belum" class="text-5xl font-black text-orange-600 dark:text-orange-400">--</span>
-                            <span class="text-lg font-medium text-orange-300">Orang</span>
-                        </div>
+                <div class="bg-white dark:bg-boxdark rounded-3xl shadow-xl border-l-[12px] border-blue-600 p-8 flex flex-col justify-center min-h-[160px]">
+                    <p class="text-xs font-black text-blue-600 dark:text-blue-400 uppercase tracking-[0.2em] mb-2">Total Siswa</p>
+                    <div class="flex items-baseline gap-3">
+                        <span id="stat-total" class="text-7xl font-black text-gray-900 dark:text-white leading-none">--</span>
+                        <span class="text-xl font-bold text-gray-400 uppercase">Siswa</span>
                     </div>
                 </div>
 
-                {{-- Detail Stats --}}
-                <div class="grid grid-cols-2 gap-4">
-                    <div class="bg-green-500 rounded-2xl p-5 text-white shadow-lg">
-                        <p class="text-[10px] font-bold opacity-80 uppercase mb-1">Hadir</p>
-                        <p id="stat-hadir" class="text-3xl font-black">--</p>
+                <div class="bg-white dark:bg-boxdark rounded-3xl shadow-xl border-l-[12px] border-red-600 p-8 flex flex-col justify-center min-h-[160px]">
+                    <p class="text-xs font-black text-red-600 dark:text-red-400 uppercase tracking-[0.2em] mb-2">Siswa Absen</p>
+                    <div class="flex items-baseline gap-3">
+                        <span id="stat-absen" class="text-7xl font-black text-red-600 dark:text-red-400 leading-none">--</span>
+                        <span class="text-xl font-bold text-red-300 uppercase">A/S/I/B</span>
                     </div>
-                    <div class="bg-red-600 rounded-2xl p-5 text-white shadow-lg">
-                        <p class="text-[10px] font-bold opacity-80 uppercase mb-1">Alpha</p>
-                        <p id="stat-alpha" class="text-3xl font-black">--</p>
+                </div>
+
+                <div class="bg-white dark:bg-boxdark rounded-3xl shadow-xl border-l-[12px] border-orange-500 p-8 flex flex-col justify-center min-h-[160px]">
+                    <p class="text-xs font-black text-orange-500 uppercase tracking-[0.2em] mb-2">Belum Tap</p>
+                    <div class="flex items-baseline gap-3">
+                        <span id="stat-belum" class="text-7xl font-black text-orange-600 dark:text-orange-400 leading-none">--</span>
+                        <span class="text-xl font-bold text-orange-300 uppercase">Orang</span>
                     </div>
-                    <div class="bg-blue-500 rounded-2xl p-5 text-white shadow-lg">
-                        <p class="text-[10px] font-bold opacity-80 uppercase mb-1">Izin</p>
-                        <p id="stat-izin" class="text-3xl font-black">--</p>
+                </div>
+
+                {{-- Detail Stats Grid --}}
+                <div class="grid grid-cols-2 gap-4 mt-auto">
+                    <div class="bg-emerald-500 rounded-3xl p-6 text-white shadow-lg shadow-emerald-500/30 flex flex-col items-center justify-center text-center">
+                        <p class="text-[10px] font-black opacity-80 uppercase tracking-widest mb-1">Hadir</p>
+                        <p id="stat-hadir" class="text-4xl font-black">--</p>
                     </div>
-                    <div class="bg-yellow-500 rounded-2xl p-5 text-white shadow-lg">
-                        <p class="text-[10px] font-bold opacity-80 uppercase mb-1">Sakit</p>
-                        <p id="stat-sakit" class="text-3xl font-black">--</p>
+                    <div class="bg-rose-600 rounded-3xl p-6 text-white shadow-lg shadow-rose-600/30 flex flex-col items-center justify-center text-center">
+                        <p class="text-[10px] font-black opacity-80 uppercase tracking-widest mb-1">Alpha</p>
+                        <p id="stat-alpha" class="text-4xl font-black">--</p>
+                    </div>
+                    <div class="bg-sky-500 rounded-3xl p-6 text-white shadow-lg shadow-sky-500/30 flex flex-col items-center justify-center text-center">
+                        <p class="text-[10px] font-black opacity-80 uppercase tracking-widest mb-1">Izin</p>
+                        <p id="stat-izin" class="text-4xl font-black">--</p>
+                    </div>
+                    <div class="bg-amber-500 rounded-3xl p-6 text-white shadow-lg shadow-amber-500/30 flex flex-col items-center justify-center text-center">
+                        <p class="text-[10px] font-black opacity-80 uppercase tracking-widest mb-1">Sakit</p>
+                        <p id="stat-sakit" class="text-4xl font-black">--</p>
                     </div>
                 </div>
             </div>
 
-            {{-- Right Column: Live Logs (Flexible Width) --}}
-            <div class="flex-1 bg-white dark:bg-boxdark rounded-3xl shadow-xl border border-stroke dark:border-strokedark flex flex-col overflow-hidden">
-                <div class="px-8 py-6 border-b border-stroke dark:border-strokedark flex items-center justify-between bg-gray-50 dark:bg-meta-4/10">
+            {{-- Right Column: Live Logs (Takes remaining space) --}}
+            <div class="flex-1 bg-white dark:bg-boxdark rounded-[3rem] shadow-2xl border border-stroke dark:border-strokedark flex flex-col overflow-hidden">
+                <div class="px-12 py-10 border-b border-stroke dark:border-strokedark flex items-center justify-between bg-gray-50 dark:bg-meta-4/10">
                     <div>
-                        <h3 class="text-xl font-black text-gray-800 dark:text-white uppercase tracking-tight">Aktivitas Terbaru</h3>
-                        <p class="text-xs text-gray-500 dark:text-gray-400">Log absensi realtime dari perangkat</p>
+                        <h3 class="text-3xl font-black text-gray-900 dark:text-white tracking-tighter">AKTIVITAS TERBARU</h3>
+                        <p class="text-gray-500 dark:text-gray-400 font-medium">Monitoring absensi real-time dari seluruh perangkat terhubung</p>
                     </div>
-                    <div class="flex flex-col items-end">
-                        <span class="text-[10px] font-bold text-brand-500 uppercase tracking-widest mb-1">Live Sync</span>
-                        <div class="flex gap-1">
-                            <div class="h-1 w-6 bg-brand-500 rounded-full animate-pulse"></div>
+                    <div class="flex items-center gap-4">
+                        <div class="text-right">
+                            <span class="text-[10px] font-black text-brand-500 uppercase tracking-[0.3em]">Live Sync</span>
+                            <div class="flex justify-end gap-1 mt-1">
+                                <div class="h-1.5 w-12 bg-brand-500 rounded-full animate-pulse"></div>
+                            </div>
                         </div>
                     </div>
                 </div>
                 
-                <div class="flex-1 overflow-y-auto p-4 no-scrollbar">
-                    <table class="w-full border-separate border-spacing-y-2">
+                <div class="flex-1 overflow-y-auto px-8 py-6 no-scrollbar bg-gray-50/30 dark:bg-transparent">
+                    <table class="w-full border-separate border-spacing-y-4">
                         <tbody id="log-body">
                             {{-- Data injected via JS --}}
                             <tr>
@@ -192,18 +193,18 @@
                             : '<div class="h-12 w-12 rounded-full bg-red-50 dark:bg-red-900/20 flex items-center justify-center text-red-500 text-2xl"><i class="fas fa-times"></i></div>';
 
                         newRows += `
-                            <tr class="bg-gray-50/50 dark:bg-meta-4/5 rounded-2xl transition-all hover:bg-gray-100 dark:hover:bg-meta-4/10">
-                                <td class="px-6 py-3 rounded-l-2xl w-24">
-                                    <p class="text-lg font-black font-mono text-gray-400">${log.time}</p>
+                            <tr class="bg-white dark:bg-meta-4/20 rounded-[2rem] shadow-sm transition-all hover:shadow-md hover:bg-gray-50 dark:hover:bg-meta-4/30">
+                                <td class="px-10 py-6 rounded-l-[2rem] w-36">
+                                    <p class="text-3xl font-black font-mono text-gray-400 dark:text-gray-500">${log.time}</p>
                                 </td>
-                                <td class="px-4 py-3 w-32">
-                                    <span class="${actionColor} px-3 py-1 rounded-full text-[9px] font-black tracking-widest">${actionLabel}</span>
+                                <td class="px-6 py-6 w-44">
+                                    <span class="${actionColor} px-5 py-2 rounded-full text-xs font-black tracking-[0.2em] shadow-sm">${actionLabel}</span>
                                 </td>
-                                <td class="px-4 py-3">
-                                    <p class="text-base font-bold text-gray-800 dark:text-white uppercase tracking-tight">${log.message}</p>
-                                    <p class="text-[9px] text-gray-400 font-mono tracking-tighter">${log.uid || '-'}</p>
+                                <td class="px-6 py-6">
+                                    <p class="text-2xl font-black text-gray-900 dark:text-white uppercase tracking-tight">${log.message}</p>
+                                    <p class="text-sm text-gray-400 font-mono tracking-tight">${log.uid || '-'}</p>
                                 </td>
-                                <td class="px-6 py-3 rounded-r-2xl text-right">
+                                <td class="px-10 py-6 rounded-r-[2rem] text-right">
                                     ${statusIcon}
                                 </td>
                             </tr>

@@ -246,10 +246,10 @@
                 </div>
             </div>
             <div class="stat-card red">
-                <div class="stat-label">Siswa Absen</div>
+                <div class="stat-label">Sudah Tap</div>
                 <div class="stat-value">
                     <span class="stat-number" id="stat-absen">--</span>
-                    <span class="stat-unit">A/S/I/B</span>
+                    <span class="stat-unit">Siswa</span>
                 </div>
             </div>
             <div class="stat-card org">

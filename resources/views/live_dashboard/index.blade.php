@@ -47,23 +47,23 @@
                 </div>
             </div>
 
-            {{-- Siswa Absen (A+S+I+B) --}}
+            {{-- Sudah Tap --}}
             <div
-                class="bg-white dark:bg-boxdark rounded-xl shadow-sm border-l-4 border-red-500 p-6 flex items-center justify-between transition-all hover:shadow-md">
+                class="bg-white dark:bg-boxdark rounded-xl shadow-sm border-l-4 border-green-500 p-6 flex items-center justify-between transition-all hover:shadow-md">
                 <div>
-                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Siswa Absen</p>
-                    <h3 id="stat-absen" class="text-3xl font-bold text-red-600 dark:text-red-400 mt-1">--</h3>
+                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Sudah Tap</p>
+                    <h3 id="stat-absen" class="text-3xl font-bold text-green-600 dark:text-green-400 mt-1">--</h3>
                 </div>
-                <div class="h-12 w-12 rounded-full bg-red-50 dark:bg-red-900/20 flex items-center justify-center">
-                    <i class="fas fa-user-times text-red-500 text-xl"></i>
+                <div class="h-12 w-12 rounded-full bg-green-50 dark:bg-green-900/20 flex items-center justify-center">
+                    <i class="fas fa-fingerprint text-green-500 text-xl"></i>
                 </div>
             </div>
 
-            {{-- Siswa Belum Absen --}}
+            {{-- Belum Tap --}}
             <div
                 class="bg-white dark:bg-boxdark rounded-xl shadow-sm border-l-4 border-orange-500 p-6 flex items-center justify-between transition-all hover:shadow-md">
                 <div>
-                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Belum Absen</p>
+                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Belum Tap</p>
                     <h3 id="stat-belum" class="text-3xl font-bold text-orange-600 dark:text-orange-400 mt-1">--</h3>
                 </div>
                 <div class="h-12 w-12 rounded-full bg-orange-50 dark:bg-orange-900/20 flex items-center justify-center">

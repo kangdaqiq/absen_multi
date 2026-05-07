@@ -41,8 +41,8 @@ class LiveDashboardController extends Controller
         $sakitCount = $attendanceToday->where('status', 'S')->count();
         $bolosCount = $attendanceToday->where('status', 'B')->count();
 
-        $totalAbsen = $alphaCount + $izinCount + $sakitCount + $bolosCount;
-        $belumAbsen = $totalSiswa - ($hadirCount + $totalAbsen);
+        $sudahTap = $attendanceToday->count(); // semua yang sudah tap hari ini
+        $belumTap = max(0, $totalSiswa - $sudahTap);
 
         // 2. Real-time Logs (Latest 15 API Logs for this school)
         // We use ApiLog to show "Live tapping" events
@@ -64,8 +64,8 @@ class LiveDashboardController extends Controller
         return response()->json([
             'stats' => [
                 'total' => $totalSiswa,
-                'absen' => $totalAbsen,
-                'belum' => $belumAbsen > 0 ? $belumAbsen : 0,
+                'absen' => $sudahTap,
+                'belum' => $belumTap,
                 'hadir' => $hadirCount,
                 'alpha' => $alphaCount,
                 'izin' => $izinCount,

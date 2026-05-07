@@ -16,6 +16,11 @@ class LiveDashboardController extends Controller
         return view('live_dashboard.index');
     }
 
+    public function fullscreen()
+    {
+        return view('live_dashboard.fullscreen');
+    }
+
     public function data()
     {
         $schoolId = auth()->user()->school_id;

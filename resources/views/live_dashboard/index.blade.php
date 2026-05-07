@@ -13,6 +13,9 @@
                     <span class="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
                 </span>
                 LIVE Monitoring Absensi
+                <a href="{{ route('live.fullscreen') }}" target="_blank" class="ml-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-gray-100 dark:bg-meta-4 text-xs font-bold text-gray-600 dark:text-gray-400 hover:bg-brand-500 hover:text-white transition-all">
+                    <i class="fas fa-expand"></i> Fullscreen
+                </a>
             </h2>
             <p class="text-gray-500 dark:text-gray-400 text-sm mt-1">Data diperbarui secara real-time dari seluruh perangkat.</p>
         </div>

@@ -1,261 +1,400 @@
 <!DOCTYPE html>
-<html lang="id" class="h-full">
+<html lang="id">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>LIVE MONITORING | {{ config('app.name') }}</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
-    <link href="{{ asset('vendor/fontawesome-free/css/all.min.css') }}" rel="stylesheet" type="text/css">
+    <link href="{{ asset('vendor/fontawesome-free/css/all.min.css') }}" rel="stylesheet">
     <style>
-        [x-cloak] { display: none !important; }
-        .bg-grid {
-            background-image: radial-gradient(circle, #e5e7eb 1.5px, transparent 1.5px);
-            background-size: 40px 40px;
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background: #f1f5f9;
+            font-family: 'Inter', system-ui, sans-serif;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            padding: 20px;
         }
-        .dark .bg-grid {
-            background-image: radial-gradient(circle, #1f2937 1.5px, transparent 1.5px);
+
+        /* ── Header ─────────────────────────────── */
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: white;
+            border-radius: 20px;
+            padding: 18px 32px;
+            box-shadow: 0 2px 20px rgba(0,0,0,0.06);
+            flex-shrink: 0;
         }
-        @keyframes pulse-red {
-            0% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.5); opacity: 0.5; }
-            100% { transform: scale(1); opacity: 1; }
+        .header-left { display: flex; align-items: center; gap: 20px; }
+        .live-dot {
+            width: 14px; height: 14px;
+            background: #ef4444; border-radius: 50%;
+            box-shadow: 0 0 0 4px rgba(239,68,68,0.2);
+            animation: livePulse 1.5s ease-in-out infinite;
         }
-        .live-indicator {
-            animation: pulse-red 1.5s ease-in-out infinite;
+        @keyframes livePulse {
+            0%, 100% { box-shadow: 0 0 0 4px rgba(239,68,68,0.3); }
+            50% { box-shadow: 0 0 0 10px rgba(239,68,68,0.05); }
         }
+        .header-title { font-size: 28px; font-weight: 900; letter-spacing: -1px; color: #0f172a; }
+        .header-sep { width: 1px; height: 40px; background: #e2e8f0; }
+        .header-sub { font-size: 12px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 2px; }
+        .clock {
+            font-size: 52px; font-weight: 900; font-variant-numeric: tabular-nums;
+            letter-spacing: -2px; color: #0f172a;
+            background: #f8fafc; padding: 4px 24px; border-radius: 14px;
+        }
+        .btn-fullscreen {
+            background: white; border: 1px solid #e2e8f0;
+            padding: 12px 16px; border-radius: 14px; cursor: pointer;
+            font-size: 16px; color: #64748b;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+            transition: all .2s;
+        }
+        .btn-fullscreen:hover { background: #f8fafc; transform: scale(1.05); }
+
+        /* ── Main Layout ─────────────────────────── */
+        .main {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 400px 1fr;
+            gap: 20px;
+            overflow: hidden;
+            min-height: 0;
+        }
+
+        /* ── Left Panel ─────────────────────────── */
+        .left-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            overflow: hidden;
+            min-height: 0;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 24px;
+            padding: 28px 32px;
+            box-shadow: 0 2px 16px rgba(0,0,0,0.06);
+            border-left: 10px solid;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            flex: 1;
+        }
+        .stat-card.blue { border-color: #3b82f6; }
+        .stat-card.red  { border-color: #ef4444; }
+        .stat-card.org  { border-color: #f97316; }
+
+        .stat-label {
+            font-size: 11px; font-weight: 800; text-transform: uppercase;
+            letter-spacing: 2.5px; color: #94a3b8;
+        }
+        .stat-card.red  .stat-label { color: #f87171; }
+        .stat-card.org  .stat-label { color: #fb923c; }
+
+        .stat-value {
+            display: flex; align-items: baseline; gap: 10px;
+        }
+        .stat-number {
+            font-size: 72px; font-weight: 900; line-height: 1;
+            letter-spacing: -4px; color: #0f172a;
+        }
+        .stat-card.red  .stat-number { color: #ef4444; }
+        .stat-card.org  .stat-number { color: #f97316; }
+        .stat-unit { font-size: 18px; font-weight: 700; color: #cbd5e1; text-transform: uppercase; }
+
+        /* ── 4 mini cards ─────────────────────────── */
+        .mini-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+            flex-shrink: 0;
+        }
+        .mini-card {
+            border-radius: 20px; padding: 20px 24px;
+            color: white; display: flex; flex-direction: column;
+            align-items: flex-start; gap: 6px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+        }
+        .mini-card.green  { background: linear-gradient(135deg, #22c55e, #16a34a); }
+        .mini-card.red    { background: linear-gradient(135deg, #ef4444, #dc2626); }
+        .mini-card.blue   { background: linear-gradient(135deg, #3b82f6, #2563eb); }
+        .mini-card.yellow { background: linear-gradient(135deg, #f59e0b, #d97706); }
+
+        .mini-label { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 2px; opacity: 0.8; }
+        .mini-number { font-size: 44px; font-weight: 900; line-height: 1; letter-spacing: -2px; }
+
+        /* ── Right Panel (Log) ───────────────────── */
+        .right-panel {
+            background: white;
+            border-radius: 28px;
+            box-shadow: 0 2px 20px rgba(0,0,0,0.06);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            min-height: 0;
+        }
+        .log-header {
+            padding: 28px 40px;
+            border-bottom: 1px solid #f1f5f9;
+            display: flex; align-items: center; justify-content: space-between;
+            flex-shrink: 0;
+        }
+        .log-title { font-size: 22px; font-weight: 900; color: #0f172a; letter-spacing: -0.5px; }
+        .log-sub { font-size: 13px; color: #94a3b8; font-weight: 500; margin-top: 2px; }
+        .sync-badge {
+            display: flex; align-items: center; gap: 8px;
+            background: #eff6ff; padding: 8px 16px; border-radius: 50px;
+        }
+        .sync-dot { width: 8px; height: 8px; background: #3b82f6; border-radius: 50%; animation: livePulse 1.2s infinite; }
+        .sync-text { font-size: 11px; font-weight: 800; color: #3b82f6; text-transform: uppercase; letter-spacing: 1.5px; }
+
+        .log-body { flex: 1; overflow-y: auto; padding: 20px 32px; }
+        .log-body::-webkit-scrollbar { width: 4px; }
+        .log-body::-webkit-scrollbar-track { background: transparent; }
+        .log-body::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 4px; }
+
+        .log-row {
+            display: grid;
+            grid-template-columns: 100px 120px 1fr 60px;
+            align-items: center;
+            gap: 16px;
+            padding: 18px 24px;
+            border-radius: 16px;
+            margin-bottom: 10px;
+            background: #f8fafc;
+            transition: background .15s;
+        }
+        .log-row:hover { background: #f1f5f9; }
+
+        .log-time { font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; color: #94a3b8; }
+        .log-badge {
+            display: inline-block; padding: 5px 14px; border-radius: 50px;
+            font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px;
+        }
+        .badge-masuk   { background: #dcfce7; color: #16a34a; }
+        .badge-pulang  { background: #dbeafe; color: #2563eb; }
+        .badge-gerbang { background: #ede9fe; color: #7c3aed; }
+        .badge-unknown { background: #fee2e2; color: #dc2626; }
+        .badge-default { background: #f1f5f9; color: #64748b; }
+
+        .log-message { display: flex; flex-direction: column; gap: 2px; }
+        .log-name { font-size: 18px; font-weight: 800; color: #0f172a; text-transform: uppercase; letter-spacing: -0.3px; }
+        .log-uid  { font-size: 11px; color: #cbd5e1; font-family: monospace; }
+
+        .log-icon { display: flex; justify-content: flex-end; }
+        .icon-ok   { color: #22c55e; font-size: 22px; }
+        .icon-fail { color: #ef4444; font-size: 22px; }
+
+        .log-empty {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            height: 100%; gap: 16px; color: #cbd5e1;
+        }
+        .log-empty i { font-size: 56px; }
+        .log-empty p { font-size: 18px; font-weight: 600; }
+
+        /* ── Footer ─────────────────────────────── */
+        .footer {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 0 8px;
+            flex-shrink: 0;
+        }
+        .footer-left { font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 2px; }
+        .footer-right { display: flex; align-items: center; gap: 8px; }
+        .footer-right span { width: 8px; height: 8px; background: #22c55e; border-radius: 50%; }
+        .footer-right p { font-size: 11px; font-weight: 700; color: #3b82f6; text-transform: uppercase; letter-spacing: 1.5px; }
     </style>
 </head>
-<body class="bg-gray-50 dark:bg-gray-900 h-full overflow-hidden bg-grid font-sans text-gray-900 dark:text-white">
-    <div class="h-full flex flex-col p-6 gap-6">
-        
-        {{-- Top Header --}}
-        <div class="flex items-center justify-between bg-white dark:bg-boxdark rounded-2xl shadow-lg border border-stroke dark:border-strokedark px-8 py-4">
-            <div class="flex items-center gap-6">
-                <div class="flex items-center gap-3">
-                    <div class="h-4 w-4 bg-red-500 rounded-full live-indicator"></div>
-                    <h1 class="text-3xl font-black tracking-tight">LIVE MONITORING</h1>
-                </div>
-                <div class="h-10 w-px bg-gray-200 dark:bg-gray-700"></div>
-                <div class="text-sm font-medium text-gray-500 dark:text-gray-400">
-                    <p id="live-date">--</p>
-                    <p class="uppercase tracking-widest text-brand-500">Sistem Absensi v2.0</p>
-                </div>
-            </div>
-            
-            <div class="text-center">
-                <p id="live-clock" class="text-5xl font-black font-mono text-gray-800 dark:text-white"></p>
-            </div>
+<body>
 
-            <div class="flex items-center gap-4">
-                <button onclick="toggleFullscreen()" class="p-3 rounded-xl bg-gray-100 dark:bg-meta-4 hover:bg-gray-200 dark:hover:bg-opacity-50 transition-colors">
-                    <i class="fas fa-expand"></i>
-                </button>
-                <div class="h-12 w-12 rounded-2xl bg-brand-500 flex items-center justify-center shadow-lg shadow-brand-500/30">
-                    <i class="fas fa-desktop text-white text-xl"></i>
+    {{-- ── HEADER ─────────────────────────────── --}}
+    <div class="header">
+        <div class="header-left">
+            <div class="live-dot"></div>
+            <span class="header-title">LIVE MONITORING</span>
+            <div class="header-sep"></div>
+            <div>
+                <p id="live-date" class="header-sub">--</p>
+                <p style="font-size:11px;font-weight:700;color:#3b82f6;letter-spacing:1px;">JAGAT TECH ABSENSI SYSTEM</p>
+            </div>
+        </div>
+        <div class="clock" id="live-clock">--:--:--</div>
+        <button class="btn-fullscreen" onclick="toggleFullscreen()">
+            <i class="fas fa-expand"></i>
+        </button>
+    </div>
+
+    {{-- ── MAIN ────────────────────────────────── --}}
+    <div class="main">
+
+        {{-- Left Panel --}}
+        <div class="left-panel">
+            <div class="stat-card blue">
+                <div class="stat-label">Total Siswa</div>
+                <div class="stat-value">
+                    <span class="stat-number" id="stat-total">--</span>
+                    <span class="stat-unit">Siswa</span>
+                </div>
+            </div>
+            <div class="stat-card red">
+                <div class="stat-label">Siswa Absen</div>
+                <div class="stat-value">
+                    <span class="stat-number" id="stat-absen">--</span>
+                    <span class="stat-unit">A/S/I/B</span>
+                </div>
+            </div>
+            <div class="stat-card org">
+                <div class="stat-label">Belum Tap</div>
+                <div class="stat-value">
+                    <span class="stat-number" id="stat-belum">--</span>
+                    <span class="stat-unit">Orang</span>
+                </div>
+            </div>
+            <div class="mini-grid">
+                <div class="mini-card green">
+                    <div class="mini-label">Hadir</div>
+                    <div class="mini-number" id="stat-hadir">--</div>
+                </div>
+                <div class="mini-card red">
+                    <div class="mini-label">Alpha</div>
+                    <div class="mini-number" id="stat-alpha">--</div>
+                </div>
+                <div class="mini-card blue">
+                    <div class="mini-label">Izin</div>
+                    <div class="mini-number" id="stat-izin">--</div>
+                </div>
+                <div class="mini-card yellow">
+                    <div class="mini-label">Sakit</div>
+                    <div class="mini-number" id="stat-sakit">--</div>
                 </div>
             </div>
         </div>
 
-        {{-- Main Content --}}
-        <div class="flex-1 flex flex-row gap-8 overflow-hidden">
-            
-            {{-- Left Column: Stats (Fixed width to prevent squashing) --}}
-            <div class="w-[380px] flex flex-col gap-5 overflow-y-auto no-scrollbar flex-shrink-0">
-                
-                {{-- Major Stats --}}
-                <div class="bg-white dark:bg-boxdark rounded-3xl shadow-xl border-l-[12px] border-blue-600 p-8 flex flex-col justify-center min-h-[160px]">
-                    <p class="text-xs font-black text-blue-600 dark:text-blue-400 uppercase tracking-[0.2em] mb-2">Total Siswa</p>
-                    <div class="flex items-baseline gap-3">
-                        <span id="stat-total" class="text-7xl font-black text-gray-900 dark:text-white leading-none">--</span>
-                        <span class="text-xl font-bold text-gray-400 uppercase">Siswa</span>
-                    </div>
+        {{-- Right Panel --}}
+        <div class="right-panel">
+            <div class="log-header">
+                <div>
+                    <div class="log-title">Aktivitas Real-time</div>
+                    <div class="log-sub">Memantau tap masuk & pulang secara langsung</div>
                 </div>
-
-                <div class="bg-white dark:bg-boxdark rounded-3xl shadow-xl border-l-[12px] border-red-600 p-8 flex flex-col justify-center min-h-[160px]">
-                    <p class="text-xs font-black text-red-600 dark:text-red-400 uppercase tracking-[0.2em] mb-2">Siswa Absen</p>
-                    <div class="flex items-baseline gap-3">
-                        <span id="stat-absen" class="text-7xl font-black text-red-600 dark:text-red-400 leading-none">--</span>
-                        <span class="text-xl font-bold text-red-300 uppercase">A/S/I/B</span>
-                    </div>
-                </div>
-
-                <div class="bg-white dark:bg-boxdark rounded-3xl shadow-xl border-l-[12px] border-orange-500 p-8 flex flex-col justify-center min-h-[160px]">
-                    <p class="text-xs font-black text-orange-500 uppercase tracking-[0.2em] mb-2">Belum Tap</p>
-                    <div class="flex items-baseline gap-3">
-                        <span id="stat-belum" class="text-7xl font-black text-orange-600 dark:text-orange-400 leading-none">--</span>
-                        <span class="text-xl font-bold text-orange-300 uppercase">Orang</span>
-                    </div>
-                </div>
-
-                {{-- Detail Stats Grid --}}
-                <div class="grid grid-cols-2 gap-4 mt-auto">
-                    <div class="bg-emerald-500 rounded-3xl p-6 text-white shadow-lg shadow-emerald-500/30 flex flex-col items-center justify-center text-center">
-                        <p class="text-[10px] font-black opacity-80 uppercase tracking-widest mb-1">Hadir</p>
-                        <p id="stat-hadir" class="text-4xl font-black">--</p>
-                    </div>
-                    <div class="bg-rose-600 rounded-3xl p-6 text-white shadow-lg shadow-rose-600/30 flex flex-col items-center justify-center text-center">
-                        <p class="text-[10px] font-black opacity-80 uppercase tracking-widest mb-1">Alpha</p>
-                        <p id="stat-alpha" class="text-4xl font-black">--</p>
-                    </div>
-                    <div class="bg-sky-500 rounded-3xl p-6 text-white shadow-lg shadow-sky-500/30 flex flex-col items-center justify-center text-center">
-                        <p class="text-[10px] font-black opacity-80 uppercase tracking-widest mb-1">Izin</p>
-                        <p id="stat-izin" class="text-4xl font-black">--</p>
-                    </div>
-                    <div class="bg-amber-500 rounded-3xl p-6 text-white shadow-lg shadow-amber-500/30 flex flex-col items-center justify-center text-center">
-                        <p class="text-[10px] font-black opacity-80 uppercase tracking-widest mb-1">Sakit</p>
-                        <p id="stat-sakit" class="text-4xl font-black">--</p>
-                    </div>
+                <div class="sync-badge">
+                    <div class="sync-dot"></div>
+                    <span class="sync-text">Live Sync</span>
                 </div>
             </div>
-
-            {{-- Right Column: Live Logs (Takes remaining space) --}}
-            <div class="flex-1 bg-white dark:bg-boxdark rounded-[3rem] shadow-2xl border border-stroke dark:border-strokedark flex flex-col overflow-hidden">
-                <div class="px-12 py-10 border-b border-stroke dark:border-strokedark flex items-center justify-between bg-gray-50 dark:bg-meta-4/10">
-                    <div>
-                        <h3 class="text-3xl font-black text-gray-900 dark:text-white tracking-tighter">AKTIVITAS TERBARU</h3>
-                        <p class="text-gray-500 dark:text-gray-400 font-medium">Monitoring absensi real-time dari seluruh perangkat terhubung</p>
-                    </div>
-                    <div class="flex items-center gap-4">
-                        <div class="text-right">
-                            <span class="text-[10px] font-black text-brand-500 uppercase tracking-[0.3em]">Live Sync</span>
-                            <div class="flex justify-end gap-1 mt-1">
-                                <div class="h-1.5 w-12 bg-brand-500 rounded-full animate-pulse"></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="flex-1 overflow-y-auto px-8 py-6 no-scrollbar bg-gray-50/30 dark:bg-transparent">
-                    <table class="w-full border-separate border-spacing-y-4">
-                        <tbody id="log-body">
-                            {{-- Data injected via JS --}}
-                            <tr>
-                                <td colspan="4" class="text-center py-20 text-gray-400 italic text-xl">
-                                    Menghubungkan ke server...
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+            <div class="log-body" id="log-body">
+                <div class="log-empty">
+                    <i class="fas fa-satellite-dish"></i>
+                    <p>Menghubungkan ke server...</p>
                 </div>
             </div>
         </div>
+    </div>
 
-        {{-- Footer --}}
-        <div class="flex justify-between items-center text-gray-400 text-xs font-bold tracking-[0.2em] uppercase px-4">
-            <p>&copy; {{ date('Y') }} JAGAT TECH - ABSENSI MULTI TENANT</p>
-            <p id="last-sync-footer">LAST SYNC: --</p>
+    {{-- ── FOOTER ──────────────────────────────── --}}
+    <div class="footer">
+        <div class="footer-left">&copy; {{ date('Y') }} Jagat Tech Solutions</div>
+        <div class="footer-right">
+            <span></span>
+            <p id="last-sync">CONNECTED</p>
         </div>
     </div>
 
     <script>
+        // Clock
         function updateClock() {
             const now = new Date();
-            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-            document.getElementById('live-date').textContent = now.toLocaleDateString('id-ID', options);
-            document.getElementById('live-clock').textContent = now.toLocaleTimeString('id-ID', { hour12: false });
+            document.getElementById('live-date').textContent =
+                now.toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }).toUpperCase();
+            document.getElementById('live-clock').textContent =
+                now.toLocaleTimeString('id-ID', { hour12: false });
         }
 
-        async function fetchLiveData() {
+        // Fetch data
+        async function fetchData() {
             try {
-                const response = await fetch('{{ route('live.data') }}');
-                const data = await response.json();
+                const res = await fetch('{{ route('live.data') }}');
+                const data = await res.json();
+                const s = data.stats;
 
-                // Update Stats with Animation
-                animateValue("stat-total", data.stats.total);
-                animateValue("stat-absen", data.stats.absen);
-                animateValue("stat-belum", data.stats.belum);
-                animateValue("stat-hadir", data.stats.hadir);
-                animateValue("stat-alpha", data.stats.alpha);
-                animateValue("stat-izin", data.stats.izin);
-                animateValue("stat-sakit", data.stats.sakit);
-                
-                document.getElementById('last-sync-footer').textContent = 'LAST SYNC: ' + new Date().toLocaleTimeString('id-ID', { hour12: false });
+                setText('stat-total',  s.total);
+                setText('stat-absen',  s.absen);
+                setText('stat-belum',  s.belum);
+                setText('stat-hadir',  s.hadir);
+                setText('stat-alpha',  s.alpha);
+                setText('stat-izin',   s.izin);
+                setText('stat-sakit',  s.sakit);
 
-                // Update Logs
-                const logBody = document.getElementById('log-body');
-                const oldContent = logBody.innerHTML;
-                
-                let newRows = '';
-                if (data.logs.length === 0) {
-                    newRows = '<tr><td colspan="4" class="px-6 py-10 text-center text-gray-400 italic">Belum ada aktivitas.</td></tr>';
-                } else {
-                    data.logs.forEach(log => {
-                        let actionColor = 'bg-gray-100 text-gray-700';
-                        let actionLabel = log.action;
+                document.getElementById('last-sync').textContent =
+                    'SYNC: ' + new Date().toLocaleTimeString('id-ID', { hour12: false });
 
-                        if (log.action === 'checkin_success') { actionColor = 'bg-green-100 text-green-700'; actionLabel = 'MASUK'; }
-                        else if (log.action === 'checkout_success') { actionColor = 'bg-blue-100 text-blue-700'; actionLabel = 'PULANG'; }
-                        else if (log.action === 'gate_access') { actionColor = 'bg-purple-100 text-purple-700'; actionLabel = 'GERBANG'; }
-                        else if (log.action === 'unknown_card') { actionColor = 'bg-red-100 text-red-700'; actionLabel = 'UNKNOWN'; }
-
-                        const statusIcon = log.success 
-                            ? '<div class="h-12 w-12 rounded-full bg-green-50 dark:bg-green-900/20 flex items-center justify-center text-green-500 text-2xl"><i class="fas fa-check"></i></div>' 
-                            : '<div class="h-12 w-12 rounded-full bg-red-50 dark:bg-red-900/20 flex items-center justify-center text-red-500 text-2xl"><i class="fas fa-times"></i></div>';
-
-                        newRows += `
-                            <tr class="bg-white dark:bg-meta-4/20 rounded-[2rem] shadow-sm transition-all hover:shadow-md hover:bg-gray-50 dark:hover:bg-meta-4/30">
-                                <td class="px-10 py-6 rounded-l-[2rem] w-36">
-                                    <p class="text-3xl font-black font-mono text-gray-400 dark:text-gray-500">${log.time}</p>
-                                </td>
-                                <td class="px-6 py-6 w-44">
-                                    <span class="${actionColor} px-5 py-2 rounded-full text-xs font-black tracking-[0.2em] shadow-sm">${actionLabel}</span>
-                                </td>
-                                <td class="px-6 py-6">
-                                    <p class="text-2xl font-black text-gray-900 dark:text-white uppercase tracking-tight">${log.message}</p>
-                                    <p class="text-sm text-gray-400 font-mono tracking-tight">${log.uid || '-'}</p>
-                                </td>
-                                <td class="px-10 py-6 rounded-r-[2rem] text-right">
-                                    ${statusIcon}
-                                </td>
-                            </tr>
-                        `;
-                    });
-                }
-                
-                if (oldContent !== newRows) {
-                    logBody.innerHTML = newRows;
-                }
-            } catch (error) {
-                console.error('Failed to fetch live data:', error);
+                renderLogs(data.logs);
+            } catch(e) {
+                console.error(e);
             }
         }
 
-        function animateValue(id, end) {
-            const obj = document.getElementById(id);
-            const start = parseInt(obj.textContent) || 0;
-            if (start === end) return;
-            
-            const range = Math.abs(end - start);
-            let current = start;
-            const increment = end > start ? 1 : -1;
-            const stepTime = Math.max(1, Math.floor(1000 / (range || 1)));
-            
-            const timer = setInterval(() => {
-                if ((increment > 0 && current >= end) || (increment < 0 && current <= end)) {
-                    obj.textContent = end;
-                    clearInterval(timer);
-                    return;
-                }
-                current += increment;
-                obj.textContent = current;
-            }, stepTime);
+        function setText(id, val) {
+            const el = document.getElementById(id);
+            if (el) el.textContent = val;
+        }
+
+        function renderLogs(logs) {
+            const body = document.getElementById('log-body');
+            if (!logs || logs.length === 0) {
+                body.innerHTML = `<div class="log-empty">
+                    <i class="fas fa-clock"></i>
+                    <p>Belum ada aktivitas hari ini</p>
+                </div>`;
+                return;
+            }
+
+            const badgeMap = {
+                checkin_success:  { cls: 'badge-masuk',   label: 'MASUK' },
+                checkout_success: { cls: 'badge-pulang',  label: 'PULANG' },
+                gate_access:      { cls: 'badge-gerbang', label: 'GERBANG' },
+                unknown_card:     { cls: 'badge-unknown', label: 'UNKNOWN' },
+            };
+
+            body.innerHTML = logs.map(log => {
+                const b = badgeMap[log.action] || { cls: 'badge-default', label: log.action };
+                const icon = log.success
+                    ? '<i class="fas fa-check-circle icon-ok"></i>'
+                    : '<i class="fas fa-times-circle icon-fail"></i>';
+
+                return `<div class="log-row">
+                    <div class="log-time">${log.time}</div>
+                    <div><span class="log-badge ${b.cls}">${b.label}</span></div>
+                    <div class="log-message">
+                        <div class="log-name">${log.message}</div>
+                        <div class="log-uid">${log.uid || '-'}</div>
+                    </div>
+                    <div class="log-icon">${icon}</div>
+                </div>`;
+            }).join('');
         }
 
         function toggleFullscreen() {
             if (!document.fullscreenElement) {
                 document.documentElement.requestFullscreen();
             } else {
-                if (document.exitFullscreen) {
-                    document.exitFullscreen();
-                }
+                document.exitFullscreen();
             }
         }
 
-        // Initialize
         setInterval(updateClock, 1000);
-        setInterval(fetchLiveData, 3000);
+        setInterval(fetchData, 3000);
         updateClock();
-        fetchLiveData();
+        fetchData();
     </script>
 </body>
 </html>

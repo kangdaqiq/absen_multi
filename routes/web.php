@@ -62,6 +62,11 @@ Route::middleware(['auth', 'self_hosted_guard'])->prefix('super-admin')->name('s
 
         // Packages (Subscriptions)
         Route::resource('packages', App\Http\Controllers\SuperAdmin\PackageController::class)->except(['show']);
+        
+        // Active Subscriptions per School
+        Route::post('schools/{school}/subscriptions/quick-renew', [App\Http\Controllers\SuperAdmin\SchoolSubscriptionController::class, 'quickRenew'])->name('schools.subscriptions.quick-renew');
+        Route::post('schools/{school}/subscriptions/{subscription}/confirm', [App\Http\Controllers\SuperAdmin\SchoolSubscriptionController::class, 'confirm'])->name('schools.subscriptions.confirm');
+        Route::resource('schools.subscriptions', App\Http\Controllers\SuperAdmin\SchoolSubscriptionController::class)->except(['show']);
 
         // Licenses (Self-Hosted)
         Route::patch('licenses/{license}/regenerate', [App\Http\Controllers\SuperAdmin\LicenseController::class, 'regenerate'])->name('licenses.regenerate');
@@ -158,6 +163,7 @@ Route::middleware('auth')->group(function () {
 
         // Subscription / Paket Langganan
         Route::get('subscription', [App\Http\Controllers\SubscriptionController::class, 'index'])->name('subscription.index');
+        Route::post('subscription', [App\Http\Controllers\SubscriptionController::class, 'store'])->name('subscription.store');
 
         // Backup & Restore
         Route::get('/backup', [App\Http\Controllers\SchoolBackupController::class, 'index'])->name('backup.index');

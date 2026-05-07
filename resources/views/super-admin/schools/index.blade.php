@@ -117,6 +117,9 @@
                                 <a href="{{ route('super-admin.schools.admins.index', $school) }}" class="text-info-500 hover:text-info-700 hover:bg-info-50 p-2 rounded-lg transition" title="Kelola Admin">
                                     <i class="fas fa-users-cog"></i>
                                 </a>
+                                <a href="{{ route('super-admin.schools.subscriptions.index', $school) }}" class="text-success-500 hover:text-success-700 hover:bg-success-50 p-2 rounded-lg transition" title="Kelola Langganan">
+                                    <i class="fas fa-file-invoice-dollar"></i>
+                                </a>
                                 <a href="{{ route('super-admin.schools.devices.index', $school) }}" class="text-theme-purple-500 hover:text-theme-purple-700 hover:bg-theme-purple-500/10 p-2 rounded-lg transition" title="Kelola Device">
                                     <i class="fas fa-microchip"></i>
                                 </a>

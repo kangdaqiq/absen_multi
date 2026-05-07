@@ -117,7 +117,6 @@ class MenuHelper
                 ['name' => 'Jam Masuk/Pulang', 'path' => route('jadwal.index', [], false)],
                 ['name' => 'Device / Mesin', 'path' => route('devices.index', [], false)],
                 ['name' => 'Pengaturan Umum', 'path' => route('settings.index', [], false)],
-                ['name' => 'Paket Langganan', 'path' => route('subscription.index', [], false)],
             ];
             if ($school && $school->wa_enabled) {
                 $pengaturanSubItems[] = ['name' => 'WhatsApp Device', 'path' => route('whatsapp.device.index', [], false)];

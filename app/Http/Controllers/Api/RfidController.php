@@ -212,7 +212,12 @@ class RfidController extends Controller
         $this->currentApiKey = $apiKey;
 
         // 1. Auth API Key
-        $device = $this->authenticate($apiKey);
+        if ($apiKey === '') {
+            $this->logFailedAuth('', 'API key kosong', $request);
+            return $this->response(false, 'gagal', 'API key tidak boleh kosong', 'error');
+        }
+
+        $device = $this->authenticate($apiKey, $request);
         if (!$device) {
             return $this->response(false, 'gagal', 'API key tidak valid', 'error');
         }
@@ -279,14 +284,30 @@ class RfidController extends Controller
 
     // ... Helper Methods ...
 
-    private function authenticate($apiKey)
+    private function logFailedAuth(string $apiKey, string $reason, $request = null)
+    {
+        ApiLog::create([
+            'school_id'   => null,
+            'api_key'     => $apiKey,
+            'action'      => 'auth_failed',
+            'uid'         => null,
+            'success'     => false,
+            'message'     => $reason,
+            'ip_address'  => $request ? $request->ip() : request()->ip(),
+            'user_agent'  => $request ? $request->userAgent() : request()->userAgent(),
+            'created_at'  => now(),
+        ]);
+    }
+
+    private function authenticate($apiKey, $request = null)
     {
         if (empty($apiKey))
             return null;
 
         $device = Device::where('api_key', $apiKey)->where('active', true)->first();
         if (!$device) {
-            $this->logRequest($apiKey, 'auth_failed', '', false, 'Invalid API key');
+            // Log auth failure dengan IP — visible ke SuperAdmin
+            $this->logFailedAuth($apiKey, 'API key tidak valid / tidak aktif', $request);
             return null;
         }
 

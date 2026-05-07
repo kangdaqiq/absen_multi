@@ -35,8 +35,25 @@ public function handle(Request $request)
 $apiKey = trim($request->input('api_key', ''));
 $this->currentApiKey = $apiKey;
 
+// Parse scanned_at (offline sync)
+$now = now();
+$scannedAt = trim($request->input('scanned_at', ''));
+if ($scannedAt !== '') {
+    try {
+        $parsed = Carbon::parse($scannedAt);
+        if ($parsed->lte(now()) && $parsed->gte(now()->subDays(7))) {
+            $now = $parsed;
+        }
+    } catch (\Exception $e) {}
+}
+
 // 1. Auth: Get Device
-$device = $this->authenticate($apiKey);
+if ($apiKey === '') {
+    $this->logFailedAuth('', 'API Key Kosong', $request);
+    return $this->response(false, 'gagal', 'API Key Kosong');
+}
+
+$device = $this->authenticate($apiKey, $request);
 if (!$device) {
 return $this->response(false, 'gagal', 'API Key Invalid');
 }
@@ -67,7 +84,7 @@ return $this->finalizeEnrollment($fingerId, $device);
 
 // 3. Scan Logic
 if ($fingerId) {
-return $this->handleScan($fingerId, $device);
+return $this->handleScan($fingerId, $device, $now);
 }
 
 return $this->response(false, 'gagal', 'Finger ID required');
@@ -210,8 +227,40 @@ return $this->response(false, 'error', 'Enroll Gagal');
 }
 }
 
-    private function handleScan($fingerId, $device)
+    private function logFailedAuth(string $apiKey, string $reason, $request = null)
     {
+        ApiLog::create([
+            'school_id'  => null,
+            'api_key'    => $apiKey,
+            'action'     => 'auth_failed',
+            'uid'        => null,
+            'success'    => false,
+            'message'    => $reason,
+            'ip_address' => $request ? $request->ip() : request()->ip(),
+            'user_agent' => $request ? $request->userAgent() : request()->userAgent(),
+            'created_at' => now(),
+        ]);
+    }
+
+    private function authenticate($apiKey, $request = null)
+    {
+        if (empty($apiKey))
+            return null;
+        $device = Device::where('api_key', $apiKey)->where('active', true)->first();
+        if (!$device) {
+            $this->logFailedAuth($apiKey, 'API key tidak valid / tidak aktif', $request);
+        }
+        if ($device) {
+            $this->currentSchoolId = $device->school_id;
+            DB::table('api_keys')->where('id', $device->id)->update(['last_used_at' => now()]);
+        }
+        return $device;
+    }
+
+    private function handleScan($fingerId, $device, $now = null)
+    {
+        $now = $now ?? now();
+        
         // Check Gate Card first
         $gateCard = GateCard::with('guru')
             ->where('school_id', $device->school_id)
@@ -221,7 +270,6 @@ return $this->response(false, 'error', 'Enroll Gagal');
         if ($gateCard) {
             try {
                 DB::beginTransaction();
-                $now = now();
                 
                 $gateName = $gateCard->guru_id ? ($gateCard->guru->nama ?? $gateCard->name) : $gateCard->name;
                 
@@ -232,8 +280,8 @@ return $this->response(false, 'error', 'Enroll Gagal');
                     'teacher_name' => $gateName,
                     'uid_rfid' => $fingerId,
                     'status' => 'open',
-                    'expires_at' => now()->addMinutes(30),
-                    'created_at' => now()
+                    'expires_at' => $now->copy()->addMinutes(30),
+                    'created_at' => $now
                 ]);
 
                 DB::commit();
@@ -245,7 +293,7 @@ return $this->response(false, 'error', 'Enroll Gagal');
                     'uid' => $fingerId,
                     'success' => true,
                     'message' => 'Sesi Kepulangan Dibuka: ' . $gateName,
-                    'created_at' => now()
+                    'created_at' => $now
                 ]);
 
                 return $this->response(true, 'success', "Gerbang Dibuka (30 Menit).", 'ok', [
@@ -260,7 +308,6 @@ return $this->response(false, 'error', 'Enroll Gagal');
         }
 
         // Check Guru
-        // Note: GuruFingerprint links to Device -> School is implicit, but better to check
         $guruFingerprint = GuruFingerprint::where('device_id', $device->id)
             ->where('finger_id', $fingerId)
             ->with('guru')
@@ -271,7 +318,6 @@ return $this->response(false, 'error', 'Enroll Gagal');
 
             try {
                 DB::beginTransaction();
-                $now = now();
                 $today = $now->format('Y-m-d');
 
                 // ABSENSI HARIAN (Daily)
@@ -292,7 +338,8 @@ return $this->response(false, 'error', 'Enroll Gagal');
                         'jam_masuk' => $now->toTimeString(),
                         'waktu_hadir' => $now, // Legacy field
                         'status' => 'Hadir', // Default Hadir
-                        'keterangan' => null
+                        'keterangan' => null,
+                        'created_at' => $now
                     ]);
 
                     DB::commit();
@@ -311,7 +358,7 @@ return $this->response(false, 'error', 'Enroll Gagal');
                         'uid' => $fingerId,
                         'success' => true,
                         'message' => 'Guru Masuk: ' . $guru->nama,
-                        'created_at' => now()
+                        'created_at' => $now
                     ]);
 
                     return $this->response(true, 'success', "Selamat Pagi, {$guru->nama}.", 'ok', [
@@ -335,7 +382,7 @@ return $this->response(false, 'error', 'Enroll Gagal');
                             'uid' => $fingerId,
                             'success' => true,
                             'message' => 'Sudah Absen Masuk: ' . $guru->nama,
-                            'created_at' => now()
+                            'created_at' => $now
                         ]);
                         return $this->response(true, 'success', "Sudah Absen Masuk.", 'ok', [
                             'type' => 'absen_sudah_masuk_guru',
@@ -380,7 +427,7 @@ return $this->response(false, 'error', 'Enroll Gagal');
                         'uid' => $fingerId,
                         'success' => true,
                         'message' => 'Guru Pulang: ' . $guru->nama,
-                        'created_at' => now()
+                        'created_at' => $now
                     ]);
 
                     return $this->response(true, 'success', "Absen pulang berhasil.", 'ok', [
@@ -397,206 +444,212 @@ return $this->response(false, 'error', 'Enroll Gagal');
             }
         }
 
-// Check Siswa
-$siswaFingerprint = SiswaFingerprint::where('device_id', $device->id)
-->where('finger_id', $fingerId)
-->with('student.kelas')
-->first();
+        // Check Siswa
+        $siswaFingerprint = SiswaFingerprint::where('device_id', $device->id)
+            ->where('finger_id', $fingerId)
+            ->with('student.kelas')
+            ->first();
 
-if ($siswaFingerprint && $siswaFingerprint->student) {
-$siswa = $siswaFingerprint->student;
+        if ($siswaFingerprint && $siswaFingerprint->student) {
+            $siswa = $siswaFingerprint->student;
 
-try {
-return $this->handleStudentAttendance($siswa, $fingerId, $device);
-} catch (\Exception $e) {
-Log::error("Student finger scan error: " . $e->getMessage());
-return $this->response(false, 'error', 'System Error');
-}
-}
+            try {
+                return $this->handleStudentAttendance($siswa, $fingerId, $device, $now);
+            } catch (\Exception $e) {
+                Log::error("Student finger scan error: " . $e->getMessage());
+                return $this->response(false, 'error', 'System Error');
+            }
+        }
 
-// Neither found
-return $this->response(false, 'gagal', 'ID Sidik Jari Tidak Dikenal di Device Ini');
-}
+        // Neither found
+        return $this->response(false, 'gagal', 'ID Sidik Jari Tidak Dikenal di Device Ini');
+    }
 
-private function handleStudentAttendance($siswa, $fingerId, $device)
+    private function handleStudentAttendance($siswa, $fingerId, $device, $now = null)
+    {
+        $now = $now ?? now();
+        $today = $now->format('Y-m-d');
+
+        // Get Jadwal (Schedule) SCOPED
+        $indexHari = $now->format('N');
+        $jadwal = \App\Models\Jadwal::where('index_hari', $indexHari)
+            ->where('school_id', $device->school_id)
+            ->where('is_active', 1)
+            ->first();
+
+        if (!$jadwal) {
+            return $this->response(false, 'gagal', 'Jadwal Libur/Kosong', 'warning');
+        }
+
+        $jamMasuk = \Carbon\Carbon::parse($now->format('Y-m-d') . ' ' . $jadwal->jam_masuk);
+        $jamPulang = \Carbon\Carbon::parse($now->format('Y-m-d') . ' ' . $jadwal->jam_pulang);
+        
+        $awalAbsenMasuk = \Carbon\Carbon::parse($now->format('Y-m-d') . ' ' . $jadwal->awal_absen_masuk);
+        $akhirAbsenMasuk = \Carbon\Carbon::parse($now->format('Y-m-d') . ' ' . $jadwal->akhir_absen_masuk);
+        $akhirAbsenPulang = \Carbon\Carbon::parse($now->format('Y-m-d') . ' ' . $jadwal->akhir_absen_pulang);
+        $batasTelat = $jamMasuk;
+
+        DB::beginTransaction();
+
+        $att = Attendance::where('student_id', $siswa->id)
+            ->where('tanggal', $today)
+            ->lockForUpdate()
+            ->first();
+
+        // Case 1: Already complete
+        if ($att && $att->jam_pulang) {
+            DB::rollBack();
+            return $this->response(true, 'success', 'Absen Lengkap', 'ok', [
+                'type' => 'sudah_lengkap',
+                'nama' => $siswa->nama
+            ]);
+        }
+
+        // Case 2: Check-out
+        if ($att && !$att->jam_pulang) {
+            // Check if checkout is enabled in settings SCOPED
+            $checkoutEnabled = \App\Models\Setting::where('school_id', $device->school_id)
+                ->where('setting_key', 'enable_checkout_attendance')
+                ->value('setting_value') ?? 'true';
+
+            // If checkout is disabled, treat as complete attendance
+            if ($checkoutEnabled === 'false') {
+                DB::rollBack();
+                return $this->response(true, 'success', 'Absen Lengkap', 'ok', [
+                    'type' => 'sudah_lengkap',
+                    'nama' => $siswa->nama
+                ]);
+            }
+
+            // Check teacher authorization SCOPED
+            $teacherSession = TeacherCheckoutSession::select('teacher_checkout_sessions.*')
+                ->join('guru', 'teacher_checkout_sessions.teacher_id', '=', 'guru.id')
+                ->where('guru.school_id', $device->school_id)
+                ->where('teacher_checkout_sessions.expires_at', '>', $now)
+                ->where('teacher_checkout_sessions.status', 'open')
+                ->orderBy('teacher_checkout_sessions.created_at', 'desc')
+                ->first();
+
+            $isAutoCheckoutTime = $now->between($jamPulang, $akhirAbsenPulang);
+
+            if ($now->gt($akhirAbsenPulang) && !$teacherSession) {
+                 DB::rollBack();
+                 return $this->response(false, 'gagal', 'Pulang Ditutup', 'warning', ['type' => 'checkout_closed', 'nama' => $siswa->nama]);
+            }
+
+            if (!$isAutoCheckoutTime && !$teacherSession) {
+                if ($now->between($awalAbsenMasuk, $akhirAbsenMasuk)) {
+                    DB::rollBack();
+                    return $this->response(true, 'success', 'Sudah Absen Masuk', 'ok', ['type' => 'sudah_absen_masuk', 'nama' => $siswa->nama]);
+                }
+
+                DB::rollBack();
+                return $this->response(false, 'gagal', 'Belum waktu pulang', 'warning', ['type' => 'no_authorization', 'nama' => $siswa->nama]);
+            }
+
+            // Process check-out
+            $masuk = \Carbon\Carbon::parse($att->jam_masuk);
+            $totalSeconds = $now->diffInSeconds($masuk, false);
+            if ($totalSeconds < 0) $totalSeconds = abs($totalSeconds);
+
+            $att->update([
+                'jam_pulang' => $now->toTimeString(),
+                'total_seconds' => $totalSeconds,
+                'updated_at' => now(),
+            ]);
+            DB::commit();
+
+            $hours = floor($totalSeconds / 3600);
+            $mins = floor(($totalSeconds % 3600) / 60);
+            $authorizedBy = $teacherSession ? $teacherSession->teacher_name : 'Sistem Otomatis';
+            
+            $this->wa->sendCheckOut($siswa->nama, $siswa->no_wa, $now->format('H:i'), $hours, $mins, $authorizedBy, $device->school_id, $masuk->format('H:i'), $siswa->wa_ortu);
+
+            ApiLog::create([
+                'school_id' => $this->currentSchoolId,
+                'api_key' => $this->currentApiKey,
+                'action' => 'checkout_success',
+                'uid' => $fingerId,
+                'success' => true,
+                'message' => 'Pulang: ' . $siswa->nama,
+                'created_at' => $now
+            ]);
+
+            return $this->response(true, 'success', 'Absen pulang berhasil', 'ok', [
+                'type' => 'absen_pulang',
+                'nama' => $siswa->nama,
+                'authorized_by' => $authorizedBy
+            ]);
+        }
+
+        // Case 3: Check-in
+        if (!$att) {
+            if ($now->lt($awalAbsenMasuk)) {
+                DB::rollBack();
+                return $this->response(false, 'gagal', 'Absen Tutup (Terlalu Pagi)', 'warning', ['type' => 'too_early']);
+            }
+            if ($now->gt($akhirAbsenMasuk)) {
+                DB::rollBack();
+                return $this->response(false, 'gagal', 'Absen Masuk Ditutup', 'warning', ['type' => 'checkin_closed']);
+            }
+
+            $status = 'H';
+            $keterangan = null;
+
+            if ($now->gt($batasTelat)) {
+                $diff = $now->timestamp - $batasTelat->timestamp;
+                $jam = floor($diff / 3600);
+                $menit = floor(($diff % 3600) / 60);
+                if ($jam > 0) {
+                    $keterangan = "Telat {$jam} jam {$menit} menit";
+                } else {
+                    $keterangan = "Telat {$menit} menit";
+                }
+            }
+
+            Attendance::create([
+                'student_id' => $siswa->id,
+                'tanggal' => $today,
+                'jam_masuk' => $now->toTimeString(),
+                'status' => $status,
+                'keterangan' => $keterangan,
+                'created_at' => $now,
+            ]);
+            DB::commit();
+
+            $this->wa->sendCheckIn($siswa->nama, $siswa->no_wa, $now->format('H:i'), $status, $device->school_id, $keterangan, $siswa->wa_ortu, $siswa->kelas->nama_kelas ?? '-');
+
+            ApiLog::create([
+                'school_id' => $this->currentSchoolId,
+                'api_key' => $this->currentApiKey,
+                'action' => 'checkin_success',
+                'uid' => $fingerId,
+                'success' => true,
+                'message' => 'Masuk: ' . $siswa->nama,
+                'created_at' => $now
+            ]);
+
+            return $this->response(true, 'success', 'Absen masuk berhasil', 'ok', [
+                'type' => 'absen_masuk',
+                'nama' => $siswa->nama,
+                'attendance_status' => $status
+            ]);
+        }
+    }
+
+private function authenticate($apiKey, $request = null)
 {
-// Use similar logic to RfidController for student check-in/out
-$now = now();
-$today = $now->format('Y-m-d');
-
-// Get Jadwal (Schedule) SCOPED
-$indexHari = date('N');
-$jadwal = \App\Models\Jadwal::where('index_hari', $indexHari)
-->where('school_id', $device->school_id)
-->where('is_active', 1)
-->first();
-
-if (!$jadwal) {
-return $this->response(false, 'gagal', 'Jadwal Libur/Kosong', 'warning');
-}
-
-$jamMasuk = \Carbon\Carbon::parse($now->format('Y-m-d') . ' ' . $jadwal->jam_masuk);
-$jamPulang = \Carbon\Carbon::parse($now->format('Y-m-d') . ' ' . $jadwal->jam_pulang);
-$toleransi = $jadwal->toleransi;
-
-$batasTelat = $jamMasuk->copy()->addMinutes($toleransi);
-$awalAbsenMasuk = $jamMasuk->copy()->subHour();
-$akhirAbsenMasuk = $jamMasuk->copy()->addHours(2);
-
-DB::beginTransaction();
-
-$att = Attendance::where('student_id', $siswa->id)
-->where('tanggal', $today)
-->lockForUpdate()
-->first();
-
-// Case 1: Already complete
-if ($att && $att->jam_pulang) {
-DB::rollBack();
-return $this->response(true, 'success', 'Absen Lengkap', 'ok', [
-'type' => 'sudah_lengkap',
-'nama' => $siswa->nama
-]);
-}
-
-// Case 2: Check-out
-if ($att && !$att->jam_pulang) {
-// Check if checkout is enabled in settings SCOPED
-$checkoutEnabled = \App\Models\Setting::where('school_id', $device->school_id)
-->where('setting_key', 'enable_checkout_attendance')
-->value('setting_value') ?? 'true';
-
-// If checkout is disabled, treat as complete attendance
-if ($checkoutEnabled === 'false') {
-DB::rollBack();
-return $this->response(true, 'success', 'Absen Lengkap', 'ok', [
-'type' => 'sudah_lengkap',
-'nama' => $siswa->nama
-]);
-}
-
-// Check teacher authorization SCOPED (Join Guru table)
-$teacherSession = TeacherCheckoutSession::select('teacher_checkout_sessions.*')
-->join('guru', 'teacher_checkout_sessions.teacher_id', '=', 'guru.id')
-->where('guru.school_id', $device->school_id)
-->where('teacher_checkout_sessions.expires_at', '>', now())
-->where('teacher_checkout_sessions.status', 'open')
-->orderBy('teacher_checkout_sessions.created_at', 'desc')
-->first();
-
-if (!$teacherSession && $now->between($awalAbsenMasuk, $akhirAbsenMasuk)) {
-DB::rollBack();
-return $this->response(true, 'success', 'Sudah Absen Masuk', 'ok', [
-'type' => 'sudah_absen_masuk',
-'nama' => $siswa->nama
-]);
-}
-
-if (!$teacherSession) {
-DB::rollBack();
-return $this->response(false, 'gagal', 'Belum ada izin guru.', 'warning', [
-'type' => 'no_authorization',
-'nama' => $siswa->nama
-]);
-}
-
-// Process check-out
-$masuk = \Carbon\Carbon::parse($att->jam_masuk);
-$totalSeconds = $now->diffInSeconds($masuk);
-
-$att->update([
-'jam_pulang' => $now->toTimeString(),
-'total_seconds' => abs($totalSeconds),
-'updated_at' => now(),
-]);
-DB::commit();
-
-ApiLog::create([
-'school_id' => $this->currentSchoolId,
-'api_key' => $this->currentApiKey,
-'action' => 'student_checkout_finger',
-'uid' => $fingerId,
-'success' => true,
-'message' => 'Pulang: ' . $siswa->nama,
-'created_at' => now()
-]);
-
-return $this->response(true, 'success', 'Absen pulang berhasil', 'ok', [
-'type' => 'absen_pulang',
-'nama' => $siswa->nama,
-'authorized_by' => $teacherSession->teacher_name
-]);
-}
-
-// Case 3: Check-in
-if (!$att) {
-if ($now->lt($awalAbsenMasuk)) {
-DB::rollBack();
-return $this->response(false, 'gagal', 'Absen Tutup (Terlalu Pagi)', 'warning', ['type' => 'too_early']);
-}
-if ($now->gt($akhirAbsenMasuk)) {
-DB::rollBack();
-return $this->response(false, 'gagal', 'Absen Masuk Ditutup', 'warning', ['type' => 'checkin_closed']);
-}
-
-$status = 'H';
-$keterangan = null;
-
-if ($now->gt($batasTelat)) {
-$diff = $now->timestamp - $awalAbsenMasuk->timestamp; // Should be diff with batasTelat logic?
-// Logic in RfidController was different: $now->timestamp - $batasTelat->timestamp
-// Here it calculates from awalAbsenMasuk? Let's align with RfidController logic for consistency.
-// Rfid logic: $diff = $now->timestamp - $batasTelat->timestamp;
-$diff = $now->timestamp - $batasTelat->timestamp;
-
-$jam = floor($diff / 3600);
-$menit = floor(($diff % 3600) / 60);
-if ($jam > 0) {
-$keterangan = "Telat {$jam} jam {$menit} menit";
-} else {
-$keterangan = "Telat {$menit} menit";
-}
-}
-
-Attendance::create([
-'student_id' => $siswa->id,
-'tanggal' => $today,
-'jam_masuk' => $now->toTimeString(),
-'status' => $status,
-'keterangan' => $keterangan,
-'created_at' => now(),
-]);
-DB::commit();
-
-ApiLog::create([
-'school_id' => $this->currentSchoolId,
-'api_key' => $this->currentApiKey,
-'action' => 'student_checkin_finger',
-'uid' => $fingerId,
-'success' => true,
-'message' => 'Masuk: ' . $siswa->nama,
-'created_at' => now()
-]);
-
-return $this->response(true, 'success', 'Absen masuk berhasil', 'ok', [
-'type' => 'absen_masuk',
-'nama' => $siswa->nama,
-'attendance_status' => $status
-]);
-}
-}
-
-private function authenticate($apiKey)
-{
-if (empty($apiKey))
-return null;
-// Use full namespace model if needed, or imported. Imported 'Device' above.
-$device = Device::where('api_key', $apiKey)->where('active', true)->first();
-if ($device) {
-$this->currentSchoolId = $device->school_id;
-DB::table('api_keys')->where('id', $device->id)->update(['last_used_at' => now()]);
-}
-return $device;
+    if (empty($apiKey))
+        return null;
+    $device = Device::where('api_key', $apiKey)->where('active', true)->first();
+    if (!$device) {
+        $this->logFailedAuth($apiKey, 'API key tidak valid / tidak aktif', $request);
+    }
+    if ($device) {
+        $this->currentSchoolId = $device->school_id;
+        DB::table('api_keys')->where('id', $device->id)->update(['last_used_at' => now()]);
+    }
+    return $device;
 }
 
 private function response($ok, $status, $message, $sound = 'ok', $extra = [])

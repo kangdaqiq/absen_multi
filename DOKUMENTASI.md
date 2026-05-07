@@ -221,7 +221,20 @@ Response OK:
 | `last_ping_at` | TIMESTAMP | Terakhir client validasi |
 | `notes` | TEXT | Catatan internal |
 
-### 8. Persyaratan Server
+### 8. Auto Backup Database ke Cloudflare R2
+
+Sistem akan melakukan backup database secara otomatis menggunakan `mysqldump` setiap jam 02:00 pagi via scheduler (`db:backup`).
+
+**Fitur utama:**
+- Otomatis menyimpan file `.sql` di folder lokal `storage/app/backups/`.
+- Otomatis menghapus file backup lokal yang berusia lebih dari 7 hari.
+- **[BARU]** Integrasi langsung dengan **Cloudflare R2** (S3 Compatible Cloud Storage). Jika konfigurasi `CLOUDFLARE_R2_ENDPOINT` di `.env` telah diisi, sistem akan otomatis mengunggah file `.sql` tersebut ke cloud storage.
+
+**Kebutuhan Server:**
+- Pastikan server terinstal `mysql-client` (Ubuntu) atau `mysqldump` dapat diakses dari PATH.
+- *Package* `league/flysystem-aws-s3-v3` harus sudah terinstal (`composer install`).
+
+### 9. Persyaratan Server
 
 #### Minimum Spesifikasi
 
@@ -541,6 +554,7 @@ sudo supervisorctl restart absen-queue:*
 
 ### v2.4.0 (2026-05-01)
 - 🔐 **[SECURITY] CheckLicense berbasis integrity file** — deteksi mode self-hosted tidak lagi bergantung `APP_MODE`, mencegah bypass client
+- 🆕 **Auto Backup to Cloudflare R2** — mendukung auto-upload file `.sql` setiap jam 02:00 pagi ke S3-compatible storage.
 - 🆕 **`max_teachers`** di tabel `licenses` — batasi kuota guru per lisensi (terpisah dari `teacher_limit` di `schools`)
 - 🆕 **`max_bot_users`** di tabel `licenses` — batasi jumlah user yang boleh menggunakan bot WhatsApp
 - 🆕 API response `/api/license/validate` kini menyertakan `max_teachers` dan `max_bot_users`

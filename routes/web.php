@@ -145,6 +145,9 @@ Route::middleware('auth')->group(function () {
         Route::post('/siswa/import', [SiswaController::class, 'import'])->name('siswa.import');
         Route::get('/siswa/template', [SiswaController::class, 'downloadTemplate'])->name('siswa.template');
 
+        Route::post('/kelas/import', [KelasController::class, 'import'])->name('kelas.import');
+        Route::get('/kelas/template', [KelasController::class, 'downloadTemplate'])->name('kelas.template');
+
         Route::post('/siswa/{id}/enroll', [SiswaController::class, 'enrollRequest']);
         Route::post('/siswa/{id}/enroll-cancel', [SiswaController::class, 'cancelEnroll']);
         Route::get('/siswa/{id}/enroll-check', [SiswaController::class, 'enrollCheck']);

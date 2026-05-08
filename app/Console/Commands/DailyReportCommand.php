@@ -14,7 +14,7 @@ use Carbon\Carbon;
 
 class DailyReportCommand extends Command
 {
-    protected $signature = 'absen:daily-report {targetJid?}';
+    protected $signature = 'absen:daily-report {targetJid?} {--force}';
     protected $description = 'Generate daily attendance report and send to WhatsApp Group';
 
     public function handle()
@@ -45,7 +45,7 @@ class DailyReportCommand extends Command
                 $q->where('school_id', $schoolId);
             })->exists();
 
-        if (!$hasAttendance) {
+        if (!$hasAttendance && !$this->option('force')) {
             $this->info("Today has no student attendance for school ID $schoolId. Assumed Holiday. Skipped.");
             return;
         }
@@ -81,7 +81,7 @@ class DailyReportCommand extends Command
 
         // 4. Debounce check (Per School)
         $lastRun = Setting::where('school_id', $schoolId)->where('setting_key', 'last_daily_report_date')->value('setting_value');
-        if ($lastRun === $today) {
+        if ($lastRun === $today && !$this->option('force')) {
             $this->info("DailyReport already ran today for this school.");
             return;
         }
@@ -94,8 +94,14 @@ class DailyReportCommand extends Command
             ->where('is_active_report', true)
             ->get();
 
-        if ($kelasWithGroupId->isEmpty() && !$targetJid) {
-            $this->warn("No classes with WhatsApp Group ID and no target JID found for this school.");
+        // 5. Check if we have anything to report (Groups, Admin, or Wali Kelas)
+        $hasWaliKelas = Kelas::where('school_id', $schoolId)
+            ->whereNotNull('wali_kelas_id')
+            ->where('is_active_attendance', true)
+            ->exists();
+
+        if ($kelasWithGroupId->isEmpty() && !$targetJid && !$hasWaliKelas) {
+            $this->warn("No report targets (Groups, Admin, or Wali Kelas) found for this school. Skipped.");
             return;
         }
 

@@ -32,8 +32,6 @@ class AutoBolosCommand extends Command
 
         $this->info("Processing School: {$school->nama_sekolah} (ID: $schoolId) for $today");
 
-        $this->info("Processing School: {$school->nama_sekolah} (ID: $schoolId) for $today");
-
         // 0. Check Schedule Time (Per School)
         $scheduleTime = Setting::where('school_id', $schoolId)
             ->where('setting_key', 'schedule_process_daily')

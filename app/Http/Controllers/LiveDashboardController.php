@@ -47,6 +47,7 @@ class LiveDashboardController extends Controller
         // 2. Real-time Logs (Latest 15 API Logs for this school)
         // We use ApiLog to show "Live tapping" events
         $logs = ApiLog::where('school_id', $schoolId)
+            ->whereDate('created_at', $today)
             ->whereIn('action', ['checkin_success', 'checkout_success', 'gate_access', 'unknown_card', 'auth_failed'])
             ->orderBy('created_at', 'desc')
             ->limit(15)

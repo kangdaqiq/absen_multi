@@ -658,6 +658,7 @@ class RfidController extends Controller
                 $keterangan = null;
 
                 if ($now->gt($batasTelat)) {
+                    $status = 'T'; // Set status to Terlambat
                     // Calculate late duration from jam_masuk
                     $diff = $now->timestamp - $batasTelat->timestamp;
                     $jam = floor($diff / 3600);

@@ -120,21 +120,17 @@ class RekapController extends Controller
 
         $summary = [];
         foreach ($allSiswa as $s) {
-            $summary[$s->id] = ['H' => 0, 'I' => 0, 'S' => 0, 'A' => 0, 'B' => 0];
+            $summary[$s->id] = ['H' => 0, 'I' => 0, 'S' => 0, 'A' => 0, 'B' => 0, 'T' => 0];
         }
         foreach ($attendances as $att) {
             if (isset($summary[$att->student_id])) {
                 $status = $att->status;
-                // Normalize legacy T to H
-                if ($status == 'T')
-                    $status = 'H';
-                if ($status == 'Hadir')
-                    $status = 'H'; // strict check
+                
+                if ($status == 'Hadir') $status = 'H';
+                if ($status == 'Telat') $status = 'T';
 
                 if (isset($summary[$att->student_id][$status])) {
                     $summary[$att->student_id][$status]++;
-                } elseif ($status == 'H') { // Fallback if T was mapped to H but H key exists
-                    $summary[$att->student_id]['H']++;
                 }
             }
         }
@@ -151,10 +147,11 @@ class RekapController extends Controller
         $sheet->setCellValue('C4', 'Nama Siswa');
         $sheet->setCellValue('D4', 'Kelas');
         $sheet->setCellValue('E4', 'Hadir (H)');
-        $sheet->setCellValue('F4', 'Sakit (S)');
-        $sheet->setCellValue('G4', 'Izin (I)');
-        $sheet->setCellValue('H4', 'Bolos (B)');
-        $sheet->setCellValue('I4', 'Alpha (A)');
+        $sheet->setCellValue('F4', 'Terlambat (T)');
+        $sheet->setCellValue('G4', 'Sakit (S)');
+        $sheet->setCellValue('H4', 'Izin (I)');
+        $sheet->setCellValue('I4', 'Bolos (B)');
+        $sheet->setCellValue('J4', 'Alpha (A)');
 
         $row = 5;
         $no = 1;
@@ -165,10 +162,11 @@ class RekapController extends Controller
             $sheet->setCellValue('C' . $row, $s->nama);
             $sheet->setCellValue('D' . $row, $s->kelas->nama_kelas ?? '-');
             $sheet->setCellValue('E' . $row, $sum['H']);
-            $sheet->setCellValue('F' . $row, $sum['S']);
-            $sheet->setCellValue('G' . $row, $sum['I']);
-            $sheet->setCellValue('H' . $row, $sum['B']);
-            $sheet->setCellValue('I' . $row, $sum['A']);
+            $sheet->setCellValue('F' . $row, $sum['T']);
+            $sheet->setCellValue('G' . $row, $sum['S']);
+            $sheet->setCellValue('H' . $row, $sum['I']);
+            $sheet->setCellValue('I' . $row, $sum['B']);
+            $sheet->setCellValue('J' . $row, $sum['A']);
             $row++;
         }
 
@@ -273,6 +271,7 @@ class RekapController extends Controller
             $summary[$s->id] = [
                 'nama' => $s->nama,
                 'hadir' => 0,
+                'telat' => 0,
                 'izin' => 0,
                 'sakit' => 0,
                 'alpha' => 0,
@@ -284,16 +283,11 @@ class RekapController extends Controller
         foreach ($attendances as $att) {
             if (isset($summary[$att->student_id])) {
                 $status = $att->status;
-                $key = strtolower($status == 'H' ? 'hadir' : ($status == 'I' ? 'izin' : ($status == 'S' ? 'sakit' : ($status == 'A' ? 'alpha' : ($status == 'B' ? 'bolos' : 'telat')))));
 
-                // Fallback for simple mapping codes
-                // Assuming status is single char uppercase: H, I, S, A, B, T? 
-                // Or full word? Let's check DB. It's varchar(20). 
-                // Previous logic used $att->status directly as key.
-                // Let's normalize to lowercase keys used in view.
-
-                if ($status == 'H' || $status == 'Hadir' || $status == 'T' || $status == 'Telat')
+                if ($status == 'H' || $status == 'Hadir')
                     $summary[$att->student_id]['hadir']++;
+                elseif ($status == 'T' || $status == 'Telat')
+                    $summary[$att->student_id]['telat']++;
                 elseif ($status == 'I' || $status == 'Izin')
                     $summary[$att->student_id]['izin']++;
                 elseif ($status == 'S' || $status == 'Sakit')

@@ -65,11 +65,12 @@
                 <tr class="bg-gray-50 text-left dark:bg-gray-800/50 text-gray-800 dark:text-white/90 font-medium text-sm">
                     <th rowspan="2" class="px-4 py-4 xl:pl-6 align-middle border-b border-gray-200 dark:border-gray-800 border-r">Nama Siswa</th>
                     <th rowspan="2" class="px-4 py-4 align-middle border-b border-gray-200 dark:border-gray-800 border-r">Kelas</th>
-                    <th colspan="5" class="px-4 py-2 text-center border-b border-gray-200 dark:border-gray-800 border-r">Jumlah Kehadiran</th>
+                    <th colspan="6" class="px-4 py-2 text-center border-b border-gray-200 dark:border-gray-800 border-r">Jumlah Kehadiran</th>
                     <th rowspan="2" class="px-4 py-4 align-middle text-center border-b border-gray-200 dark:border-gray-800">Aksi</th>
                 </tr>
                 <tr class="text-xs text-white">
                     <th class="px-2 py-2 text-center bg-success-500 border-r border-white/20">Hadir</th>
+                    <th class="px-2 py-2 text-center bg-warning-500 border-r border-white/20">Telat</th>
                     <th class="px-2 py-2 text-center bg-info-500 border-r border-white/20">Izin</th>
                     <th class="px-2 py-2 text-center bg-warning-500 border-r border-white/20">Sakit</th>
                     <th class="px-2 py-2 text-center bg-error-500 border-r border-white/20">Bolos</th>
@@ -79,7 +80,7 @@
             <tbody class="text-sm">
                 @forelse($allSiswa as $s)
                     @php 
-                        $sum = $summary[$s->id] ?? ['H'=>0,'I'=>0,'S'=>0,'B'=>0,'A'=>0];
+                        $sum = $summary[$s->id] ?? ['H'=>0,'T'=>0,'I'=>0,'S'=>0,'B'=>0,'A'=>0];
                     @endphp
                     <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors border-b border-gray-100 dark:border-gray-800 last:border-b-0">
                         <td class="px-4 py-3 xl:pl-6 border-r border-gray-100 dark:border-gray-800">
@@ -89,6 +90,7 @@
                             <p class="text-gray-500 dark:text-gray-400">{{ $s->kelas->nama_kelas ?? '-' }}</p>
                         </td>
                         <td class="px-2 py-3 text-center font-bold text-success-600 dark:text-success-400 border-r border-gray-100 dark:border-gray-800 bg-success-50/50 dark:bg-success-500/5">{{ $sum['H'] }}</td>
+                        <td class="px-2 py-3 text-center font-bold text-warning-600 dark:text-warning-400 border-r border-gray-100 dark:border-gray-800 bg-warning-50/50 dark:bg-warning-500/5">{{ $sum['T'] }}</td>
                         <td class="px-2 py-3 text-center font-bold text-info-600 dark:text-info-400 border-r border-gray-100 dark:border-gray-800 bg-info-50/50 dark:bg-info-500/5">{{ $sum['I'] }}</td>
                         <td class="px-2 py-3 text-center font-bold text-warning-600 dark:text-warning-400 border-r border-gray-100 dark:border-gray-800 bg-warning-50/50 dark:bg-warning-500/5">{{ $sum['S'] }}</td>
                         <td class="px-2 py-3 text-center font-bold text-error-600 dark:text-error-400 border-r border-gray-100 dark:border-gray-800 bg-error-50/50 dark:bg-error-500/5">{{ $sum['B'] }}</td>

@@ -604,6 +604,7 @@ return $this->response(false, 'error', 'Enroll Gagal');
             $keterangan = null;
 
             if ($now->gt($batasTelat)) {
+                $status = 'T'; // Set status to Terlambat
                 $diff = $now->timestamp - $batasTelat->timestamp;
                 $jam = floor($diff / 3600);
                 $menit = floor(($diff % 3600) / 60);

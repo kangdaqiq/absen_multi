@@ -50,8 +50,9 @@
         <thead>
             <tr>
                 <th width="5%">No</th>
-                <th width="35%">Nama Siswa</th>
+                <th width="30%">Nama Siswa</th>
                 <th width="10%">Hadir</th>
+                <th width="10%">Telat</th>
                 <th width="10%">Izin</th>
                 <th width="10%">Sakit</th>
                 <th width="10%">Alpha</th>
@@ -64,6 +65,7 @@
                 <td>{{ $loop->iteration }}</td>
                 <td style="text-align: left; padding-left: 10px;">{{ $r['nama'] }}</td>
                 <td>{{ $r['hadir'] }}</td>
+                <td>{{ $r['telat'] }}</td>
                 <td>{{ $r['izin'] }}</td>
                 <td>{{ $r['sakit'] }}</td>
                 <td>{{ $r['alpha'] }}</td>
@@ -75,6 +77,7 @@
             <tr style="font-weight: bold; background-color: #f2f2f2;">
                 <td colspan="2">TOTAL</td>
                 <td>{{ collect($rekap)->sum('hadir') }}</td>
+                <td>{{ collect($rekap)->sum('telat') }}</td>
                 <td>{{ collect($rekap)->sum('izin') }}</td>
                 <td>{{ collect($rekap)->sum('sakit') }}</td>
                 <td>{{ collect($rekap)->sum('alpha') }}</td>

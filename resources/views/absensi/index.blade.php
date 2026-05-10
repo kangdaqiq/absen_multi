@@ -181,6 +181,7 @@
                     <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Status</label>
                     <select name="status" id="edit_status" required class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
                         <option value="H">Hadir (H)</option>
+                        <option value="T">Terlambat (T)</option>
                         <option value="I">Izin (I)</option>
                         <option value="S">Sakit (S)</option>
                         <option value="A">Alpha (A)</option>

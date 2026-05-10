@@ -165,15 +165,7 @@
                         class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2.5 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white" />
                 </div>
 
-                <div>
-                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                        UID RFID <span class="text-gray-400 font-normal">(Opsional)</span>
-                    </label>
-                    <input type="text" name="uid_rfid" placeholder="Contoh: A1B2C3D4"
-                        class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2.5 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white" />
-                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Biarkan kosong jika ingin mendaftarkan
-                        menggunakan Enroll RFID.</p>
-                </div>
+
 
                 <div class="flex justify-end gap-3 pt-2">
                     <button type="button" @click="open = false"
@@ -234,10 +226,10 @@
 
                 <div>
                     <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                        UID RFID <span class="text-gray-400 font-normal">(Opsional)</span>
+                        UID RFID
                     </label>
-                    <input type="text" name="uid_rfid" id="edit_uid_rfid"
-                        class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2.5 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white" />
+                    <input type="text" name="uid_rfid" id="edit_uid_rfid" readonly
+                        class="w-full rounded-lg border border-gray-200 bg-gray-100 px-4 py-2.5 outline-none dark:border-gray-800 dark:bg-gray-800 dark:text-gray-400" />
                 </div>
 
                 <div class="flex justify-end gap-3 pt-2">

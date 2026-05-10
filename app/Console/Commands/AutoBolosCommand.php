@@ -176,27 +176,7 @@ class AutoBolosCommand extends Command
             return;
         }
 
-        // Group by status
-        $grouped = $absentStudents->groupBy('status');
-
-        // Use template
-        $message = WhatsAppMessageTemplates::finalAbsenceReport(
-            totalAbsent: $absentStudents->count(),
-            absentStudentsGrouped: $grouped
-        );
-
-        // Queue message to all classes (grup WA)
-        foreach ($kelasWithGroupId as $kelas) {
-            MessageQueue::create([
-                'school_id'    => $schoolId,
-                'phone_number' => $kelas->wa_group_id,
-                'message'      => $message,
-                'status'       => 'pending',
-                'created_at'   => now()
-            ]);
-        }
-
-        // Kirim laporan per kelas ke Wali Kelas
+        // Kirim laporan per kelas ke Grup WA Kelas dan Wali Kelas
         $allKelas = \App\Models\Kelas::where('school_id', $schoolId)
             ->where('is_active_attendance', true)
             ->where('is_active_report', true)
@@ -204,51 +184,68 @@ class AutoBolosCommand extends Command
             ->get();
 
         foreach ($allKelas as $kelas) {
-            $wali = $kelas->waliKelas;
-            if (!$wali || empty($wali->no_wa)) {
-                continue;
-            }
-
             // Ambil siswa tidak hadir khusus kelas ini
             $absenKelas = $absentStudents->filter(function ($att) use ($kelas) {
                 return $att->student->kelas_id == $kelas->id;
             });
 
             if ($absenKelas->isEmpty()) {
-                continue;
+                continue; // Tidak ada yang absen di kelas ini, skip
             }
 
+            $wali = $kelas->waliKelas;
+            $namaWali = $wali ? $wali->nama : '-';
+
             $groupedKelas = $absenKelas->groupBy('status');
-            $msgWali = WhatsAppMessageTemplates::finalAbsenceReport(
+            $msgKelas = WhatsAppMessageTemplates::finalAbsenceReport(
                 totalAbsent: $absenKelas->count(),
                 absentStudentsGrouped: $groupedKelas
             );
 
-            $msgWali = "📋 *Laporan Kelas {$kelas->nama_kelas}*\n" .
-                       "👤 Wali Kelas: {$wali->nama}\n\n" . $msgWali;
+            $msgKelas = "📋 *Laporan Kelas {$kelas->nama_kelas}*\n" .
+                       "👤 Wali Kelas: {$namaWali}\n\n" . $msgKelas;
 
-            // Normalisasi nomor WA
-            $noWa = $wali->no_wa;
-            if (!str_contains($noWa, '@')) {
-                $noWa = preg_replace('/^0/', '62', $noWa);
-                $noWa = $noWa . '@s.whatsapp.net';
+            // 1. Kirim ke Grup WA Kelas (jika diatur)
+            if (!empty($kelas->wa_group_id)) {
+                MessageQueue::create([
+                    'school_id'    => $schoolId,
+                    'phone_number' => $kelas->wa_group_id,
+                    'message'      => $msgKelas,
+                    'status'       => 'pending',
+                    'created_at'   => now()
+                ]);
             }
 
-            MessageQueue::create([
-                'school_id'    => $schoolId,
-                'phone_number' => $noWa,
-                'message'      => $msgWali,
-                'status'       => 'pending',
-                'created_at'   => now()
-            ]);
+            // 2. Kirim ke Nomor WA Pribadi Wali Kelas (jika ada)
+            if ($wali && !empty($wali->no_wa)) {
+                $noWa = $wali->no_wa;
+                if (!str_contains($noWa, '@')) {
+                    $noWa = preg_replace('/^0/', '62', $noWa);
+                    $noWa = $noWa . '@s.whatsapp.net';
+                }
+
+                MessageQueue::create([
+                    'school_id'    => $schoolId,
+                    'phone_number' => $noWa,
+                    'message'      => $msgKelas,
+                    'status'       => 'pending',
+                    'created_at'   => now()
+                ]);
+            }
         }
 
-        // Legacy target
+        // Legacy target (Kirim laporan global seluruh kelas)
         if ($legacyTarget) {
+            $groupedGlobal = $absentStudents->groupBy('status');
+            $messageGlobal = WhatsAppMessageTemplates::finalAbsenceReport(
+                totalAbsent: $absentStudents->count(),
+                absentStudentsGrouped: $groupedGlobal
+            );
+
             MessageQueue::create([
                 'school_id'    => $schoolId,
                 'phone_number' => $legacyTarget,
-                'message'      => $message,
+                'message'      => $messageGlobal,
                 'status'       => 'pending',
                 'created_at'   => now()
             ]);

@@ -183,6 +183,9 @@ class GateCardController extends Controller
             return response()->json(['ok' => true, 'uid' => $gateCard->uid_rfid]);
         } elseif (str_starts_with($gateCard->enroll_status, 'error:')) {
             $errorMsg = substr($gateCard->enroll_status, 6);
+            if ($errorMsg === 'UID Dipakai') {
+                $errorMsg = 'Kartu sudah terdaftar di sistem.';
+            }
             $gateCard->update(['enroll_status' => 'none']);
             return response()->json(['ok' => false, 'error' => $errorMsg]);
         }

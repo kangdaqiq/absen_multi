@@ -85,7 +85,7 @@ class CheckSubscriptions extends Command
         if (empty($phone)) return;
         if (substr($phone, 0, 1) === '0') $phone = '62' . substr($phone, 1);
         elseif (substr($phone, 0, 2) !== '62') $phone = '62' . $phone;
-        $phone .= '@s.whatsapp.net';
+        // $phone .= '@s.whatsapp.net';
 
         MessageQueue::create([
             'school_id' => null,

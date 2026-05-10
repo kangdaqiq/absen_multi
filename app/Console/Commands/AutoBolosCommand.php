@@ -239,7 +239,7 @@ class AutoBolosCommand extends Command
                 $noWa = $wali->no_wa;
                 if (!str_contains($noWa, '@')) {
                     $noWa = preg_replace('/^0/', '62', $noWa);
-                    $noWa = $noWa . '@s.whatsapp.net';
+                    // $noWa = $noWa . '@s.whatsapp.net';
                 }
 
                 MessageQueue::create([
@@ -285,7 +285,7 @@ class AutoBolosCommand extends Command
                 $noWa = $guru->no_wa;
                 if (!str_contains($noWa, '@')) {
                     $noWa = preg_replace('/^0/', '62', $noWa);
-                    $noWa = $noWa . '@s.whatsapp.net';
+                    // $noWa = $noWa . '@s.whatsapp.net';
                 }
 
                 MessageQueue::create([

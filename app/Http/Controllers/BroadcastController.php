@@ -102,6 +102,6 @@ class BroadcastController extends Controller
         } elseif (substr($phone, 0, 2) !== '62') {
             $phone = '62' . $phone;
         }
-        return $phone . '@s.whatsapp.net';
+        return $phone;
     }
 }

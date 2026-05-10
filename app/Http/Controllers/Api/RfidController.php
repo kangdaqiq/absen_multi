@@ -410,13 +410,13 @@ class RfidController extends Controller
 
                 Siswa::where('enroll_status', 'requested')
                     ->where('school_id', $device->school_id)
-                    ->update(['enroll_status' => 'error:Kartu sudah terdaftar']);
+                    ->update(['enroll_status' => 'error:UID Dipakai']);
                 Guru::where('enroll_status', 'requested')
                     ->where('school_id', $device->school_id)
-                    ->update(['enroll_status' => 'error:Kartu sudah terdaftar']);
+                    ->update(['enroll_status' => 'error:UID Dipakai']);
                 GateCard::where('enroll_status', 'requested')
                     ->where('school_id', $device->school_id)
-                    ->update(['enroll_status' => 'error:Kartu sudah terdaftar']);
+                    ->update(['enroll_status' => 'error:UID Dipakai']);
 
                 return $this->response(false, 'gagal', 'Kartu sudah terdaftar di sekolah ini', 'warning');
             }
@@ -773,6 +773,6 @@ class RfidController extends Controller
         elseif (substr($phone, 0, 2) !== '62')
             $phone = '62' . $phone;
 
-        return $phone . '@s.whatsapp.net';
+        return $phone;
     }
 }

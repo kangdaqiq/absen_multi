@@ -218,6 +218,9 @@ class GuruController extends Controller
             return response()->json(['ok' => true, 'uid' => $guru->uid_rfid]);
         } elseif (str_starts_with($guru->enroll_status, 'error:')) {
             $errorMsg = substr($guru->enroll_status, 6);
+            if ($errorMsg === 'UID Dipakai') {
+                $errorMsg = 'Kartu sudah terdaftar di sistem.';
+            }
             $guru->update(['enroll_status' => 'none']);
             return response()->json(['ok' => true, 'uid' => null, 'error' => $errorMsg]);
         }

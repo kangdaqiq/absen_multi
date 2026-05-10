@@ -21,6 +21,10 @@ class MessageQueue extends Model
         }
 
         // If it already contains '@', assume it is already a JID (e.g. @s.whatsapp.net or @g.us)
+        // Since we are changing to pure numeric format, we will STRIP @s.whatsapp.net if it exists
+        if (str_ends_with($value, '@s.whatsapp.net')) {
+            $value = str_replace('@s.whatsapp.net', '', $value);
+        }
         if (str_contains($value, '@')) {
             $this->attributes['phone_number'] = $value;
             return;
@@ -43,6 +47,7 @@ class MessageQueue extends Model
         }
 
         // Append WhatsApp domain
-        $this->attributes['phone_number'] = $phone . '@s.whatsapp.net';
+        // $this->attributes['phone_number'] = $phone . '@s.whatsapp.net';
+        $this->attributes['phone_number'] = $phone;
     }
 }

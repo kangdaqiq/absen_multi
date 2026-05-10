@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\GateCard;
 use App\Models\Guru;
+use App\Models\Siswa;
 
 class GateCardController extends Controller
 {
@@ -32,7 +33,23 @@ class GateCardController extends Controller
         $request->validate([
             'guru_id' => 'nullable|exists:guru,id',
             'name' => 'required_without:guru_id|string|max:100|nullable',
-            'uid_rfid' => 'nullable|string|max:50',
+            'uid_rfid' => [
+                'nullable',
+                'string',
+                'max:50',
+                function ($attribute, $value, $fail) {
+                    $schoolId = auth()->user()->school_id;
+                    if (GateCard::where('uid_rfid', $value)->where('school_id', $schoolId)->exists()) {
+                        $fail('UID RFID sudah digunakan oleh kartu gerbang lain.');
+                    }
+                    if (Guru::where('uid_rfid', $value)->where('school_id', $schoolId)->exists()) {
+                        $fail('UID RFID sudah digunakan oleh seorang guru.');
+                    }
+                    if (Siswa::where('uid_rfid', $value)->where('school_id', $schoolId)->exists()) {
+                        $fail('UID RFID sudah digunakan oleh seorang siswa.');
+                    }
+                },
+            ],
         ]);
 
         $name = $request->name;
@@ -77,7 +94,23 @@ class GateCardController extends Controller
         $request->validate([
             'guru_id' => 'nullable|exists:guru,id',
             'name' => 'required_without:guru_id|string|max:100|nullable',
-            'uid_rfid' => 'nullable|string|max:50',
+            'uid_rfid' => [
+                'nullable',
+                'string',
+                'max:50',
+                function ($attribute, $value, $fail) use ($gateCard) {
+                    $schoolId = auth()->user()->school_id;
+                    if (GateCard::where('uid_rfid', $value)->where('school_id', $schoolId)->where('id', '!=', $gateCard->id)->exists()) {
+                        $fail('UID RFID sudah digunakan oleh kartu gerbang lain.');
+                    }
+                    if (Guru::where('uid_rfid', $value)->where('school_id', $schoolId)->exists()) {
+                        $fail('UID RFID sudah digunakan oleh seorang guru.');
+                    }
+                    if (Siswa::where('uid_rfid', $value)->where('school_id', $schoolId)->exists()) {
+                        $fail('UID RFID sudah digunakan oleh seorang siswa.');
+                    }
+                },
+            ],
         ]);
 
         $name = $request->name;

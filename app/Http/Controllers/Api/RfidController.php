@@ -256,6 +256,12 @@ class RfidController extends Controller
 
         // 5. Mode Detection
 
+        // Check Enrollment - SCOPED
+        // Process enrollment FIRST to catch duplicates of already registered cards
+        if ($this->hasEnrollmentRequest($device->school_id)) {
+            return $this->handleEnroll($uid, $apiKey, $device);
+        }
+
         // Check Gate Card - SCOPED
         $gateCard = GateCard::with('guru')
             ->whereRaw('UPPER(uid_rfid) = ?', [$uid])
@@ -269,11 +275,6 @@ class RfidController extends Controller
         $teacher = $this->checkTeacherCard($uid, $device->school_id);
         if ($teacher) {
             return $this->handleTeacherScan($uid, $teacher, $apiKey, $device, $now);
-        }
-
-        // Check Enrollment - SCOPED
-        if ($this->hasEnrollmentRequest($device->school_id)) {
-            return $this->handleEnroll($uid, $apiKey, $device);
         }
 
         // Default: Scan Absensi - SCOPED

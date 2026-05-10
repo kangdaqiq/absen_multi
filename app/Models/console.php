@@ -11,7 +11,8 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::command('db:backup')->dailyAt('23:59');
-Schedule::command('absen:process-daily')->dailyAt('13:43');
+// Dijalankan setiap menit; waktu eksekusi dikontrol oleh setting 'schedule_process_daily' di DB per sekolah
+Schedule::command('absen:process-daily')->everyMinute();
 
 Schedule::command('wa:process')->everyMinute();
 Schedule::command('schedule:send-teacher-schedule')->dailyAt('07:30');

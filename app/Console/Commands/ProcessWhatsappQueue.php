@@ -44,6 +44,13 @@ class ProcessWhatsappQueue extends Command
             }
         });
 
+        // Auto-retry: Reset failed messages (retry_count < 3) back to pending
+        MessageQueue::where('status', 'failed')
+            ->where(function ($q) {
+                $q->whereNull('retry_count')->orWhere('retry_count', '<', 3);
+            })
+            ->update(['status' => 'pending', 'updated_at' => now()]);
+
         if (empty($messages)) {
             // $this->info('No pending messages.'); // Reduce noise
             return;
@@ -59,9 +66,10 @@ class ProcessWhatsappQueue extends Command
 
             // Final Update
             $msg->update([
-                'status' => $success ? 'sent' : 'failed',
-                'updated_at' => now(),
-                'last_error' => $success ? null : 'API Request Failed'
+                'status'      => $success ? 'sent' : 'failed',
+                'updated_at'  => now(),
+                'retry_count' => $success ? $msg->retry_count : (($msg->retry_count ?? 0) + 1),
+                'last_error'  => $success ? null : 'API Request Failed',
             ]);
 
             $this->info("Message ID {$msg->id} -> " . ($success ? 'SENT' : 'FAILED'));

@@ -185,25 +185,72 @@ class AutoBolosCommand extends Command
             absentStudentsGrouped: $grouped
         );
 
-        // Queue message to all classes
+        // Queue message to all classes (grup WA)
         foreach ($kelasWithGroupId as $kelas) {
             MessageQueue::create([
-                'school_id' => $schoolId, // Ensure queue has school_id if supported, else it's just phone number based
+                'school_id'    => $schoolId,
                 'phone_number' => $kelas->wa_group_id,
-                'message' => $message,
-                'status' => 'pending',
-                'created_at' => now()
+                'message'      => $message,
+                'status'       => 'pending',
+                'created_at'   => now()
+            ]);
+        }
+
+        // Kirim laporan per kelas ke Wali Kelas
+        $allKelas = \App\Models\Kelas::where('school_id', $schoolId)
+            ->where('is_active_attendance', true)
+            ->where('is_active_report', true)
+            ->with('waliKelas')
+            ->get();
+
+        foreach ($allKelas as $kelas) {
+            $wali = $kelas->waliKelas;
+            if (!$wali || empty($wali->no_wa)) {
+                continue;
+            }
+
+            // Ambil siswa tidak hadir khusus kelas ini
+            $absenKelas = $absentStudents->filter(function ($att) use ($kelas) {
+                return $att->student->kelas_id == $kelas->id;
+            });
+
+            if ($absenKelas->isEmpty()) {
+                continue;
+            }
+
+            $groupedKelas = $absenKelas->groupBy('status');
+            $msgWali = WhatsAppMessageTemplates::finalAbsenceReport(
+                totalAbsent: $absenKelas->count(),
+                absentStudentsGrouped: $groupedKelas
+            );
+
+            $msgWali = "📋 *Laporan Kelas {$kelas->nama_kelas}*\n" .
+                       "👤 Wali Kelas: {$wali->nama}\n\n" . $msgWali;
+
+            // Normalisasi nomor WA
+            $noWa = $wali->no_wa;
+            if (!str_contains($noWa, '@')) {
+                $noWa = preg_replace('/^0/', '62', $noWa);
+                $noWa = $noWa . '@s.whatsapp.net';
+            }
+
+            MessageQueue::create([
+                'school_id'    => $schoolId,
+                'phone_number' => $noWa,
+                'message'      => $msgWali,
+                'status'       => 'pending',
+                'created_at'   => now()
             ]);
         }
 
         // Legacy target
         if ($legacyTarget) {
             MessageQueue::create([
-                'school_id' => $schoolId,
+                'school_id'    => $schoolId,
                 'phone_number' => $legacyTarget,
-                'message' => $message,
-                'status' => 'pending',
-                'created_at' => now()
+                'message'      => $message,
+                'status'       => 'pending',
+                'created_at'   => now()
             ]);
         }
 

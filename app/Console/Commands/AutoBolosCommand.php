@@ -154,29 +154,9 @@ class AutoBolosCommand extends Command
                 'updated_at' => now()
             ]);
             $countA++;
-
-            // Queue personal notifications for Alpha students
-            if (!empty($s->no_wa)) {
-                MessageQueue::create([
-                    'school_id' => $schoolId,
-                    'phone_number' => $s->no_wa,
-                    'message' => \App\Services\WhatsAppMessageTemplates::alphaStudent($s->nama),
-                    'status' => 'pending',
-                    'created_at' => now()
-                ]);
-            }
-            if (!empty($s->wa_ortu)) {
-                MessageQueue::create([
-                    'school_id' => $schoolId,
-                    'phone_number' => $s->wa_ortu,
-                    'message' => \App\Services\WhatsAppMessageTemplates::alphaParent($s->nama, $s->kelas->nama_kelas ?? '-'),
-                    'status' => 'pending',
-                    'created_at' => now()
-                ]);
-            }
         }
 
-        $this->info("Marked $countA students as Alpha (A) and queued personal notifications for school ID $schoolId.");
+        $this->info("Marked $countA students as Alpha (A) for school ID $schoolId.");
 
         // Update Setting for this school
         Setting::updateOrCreate(

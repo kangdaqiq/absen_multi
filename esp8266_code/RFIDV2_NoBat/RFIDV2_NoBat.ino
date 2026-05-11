@@ -33,11 +33,11 @@ const char *CURRENT_VERSION = "4.0.1";
 
 #define EEPROM_SIZE 512
 #define CONFIG_MAGIC 0xA9
-#define SS_PIN 16    // D0
-#define RST_PIN 0    // D3
+#define SS_PIN 16     // D0
+#define RST_PIN 0     // D3
 #define BUZZER_PIN 15 // D8
-#define I2C_SDA 4    // D2
-#define I2C_SCL 5    // D1
+#define I2C_SDA 4     // D2
+#define I2C_SCL 5     // D1
 #define RESPONSE_DISPLAY_TIME 3000
 #define STANDBY_SCROLL_INTERVAL 500
 #define BACKLIGHT_TIMEOUT 10000
@@ -118,72 +118,6 @@ String getRtcDatetime() {
   snprintf(buf, sizeof(buf), "%04d-%02d-%02d %02d:%02d:%02d", now.year(),
            now.month(), now.day(), now.hour(), now.minute(), now.second());
   return String(buf);
-}
-static constexpr float ADC_VREF = 3.3f;
-static constexpr float VOLTAGE_DIVIDER = 2.0f;
-static constexpr float VOLTAGE_OFFSET =
-    0.253f; // kalibrasi: V_multimeter - V_serial
-static constexpr float BAT_EMA_ALPHA = 0.10f;
-static constexpr int BAT_STEP = 5;
-static constexpr unsigned long BAT_DEBUG_MS = 5000UL;
-
-struct BatPoint {
-  float voltage;
-  int pct;
-};
-
-static const BatPoint BAT_CURVE[] = {
-    {4.00f, 100}, {3.98f, 97}, {3.95f, 93}, {3.91f, 87}, {3.87f, 80},
-    {3.83f, 73},  {3.79f, 67}, {3.75f, 60}, {3.71f, 53}, {3.67f, 47},
-    {3.63f, 40},  {3.59f, 33}, {3.55f, 27}, {3.49f, 20}, {3.42f, 13},
-    {3.30f, 7},   {3.00f, 0},
-};
-static constexpr int BAT_CURVE_LEN = sizeof(BAT_CURVE) / sizeof(BAT_CURVE[0]);
-
-static int voltToPct(float v) {
-  if (v >= BAT_CURVE[0].voltage)
-    return 100;
-  if (v <= BAT_CURVE[BAT_CURVE_LEN - 1].voltage)
-    return 0;
-
-  for (int i = 0; i < BAT_CURVE_LEN - 1; i++) {
-    const BatPoint &hi = BAT_CURVE[i];
-    const BatPoint &lo = BAT_CURVE[i + 1];
-    if (v <= hi.voltage && v >= lo.voltage) {
-      float t = (v - lo.voltage) / (hi.voltage - lo.voltage);
-      return static_cast<int>(lo.pct + t * (hi.pct - lo.pct) + 0.5f);
-    }
-  }
-  return 0;
-}
-
-int getBatteryPercentage() {
-  static float smoothedRaw = -1.0f;
-
-  int raw = analogRead(A0);
-
-  if (smoothedRaw < 0.0f) {
-    smoothedRaw = static_cast<float>(raw);
-  } else {
-    smoothedRaw += BAT_EMA_ALPHA * (raw - smoothedRaw);
-  }
-
-  float vAdc = (smoothedRaw / 1023.0f) * ADC_VREF;
-  float vBattery = (vAdc * VOLTAGE_DIVIDER) + VOLTAGE_OFFSET;
-
-  int pct = voltToPct(vBattery);
-  pct = (pct / BAT_STEP) * BAT_STEP;
-
-  static unsigned long lastPrint = 0;
-  unsigned long now = millis();
-  if (now - lastPrint >= BAT_DEBUG_MS) {
-    lastPrint = now;
-    Serial.printf(
-        "[BATTERY] Raw: %d | V_adc: %.3fV | V_bat: %.3fV | Pct: %d%%\n", raw,
-        vAdc, vBattery, pct);
-  }
-
-  return pct;
 }
 
 bool initRTC() {
@@ -685,11 +619,16 @@ void updateStandbyDisplay() {
     return;
   lastStandbyUpdate = millis();
 
-  // Baris 1: ABSENSI + Battery
+  // Baris 1: ABSENSI HH:MM
   lcd.setCursor(0, 0);
-  int bat = getBatteryPercentage();
   char buf[17];
-  snprintf(buf, sizeof(buf), "ABSENSI     %3d%%", bat);
+  if (rtcReady) {
+    DateTime now = rtc.now();
+    snprintf(buf, sizeof(buf), "ABSENSI    %02d:%02d", now.hour(),
+             now.minute());
+  } else {
+    snprintf(buf, sizeof(buf), "ABSENSI         ");
+  }
   lcd.print(buf);
 
   // Baris 2: Running Text (School Name only)

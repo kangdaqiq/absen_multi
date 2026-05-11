@@ -137,7 +137,7 @@ class RfidController extends Controller
 
             } else {
                 // CASE: ALREADY CHECKED IN (Check for Check-Out logic)
-                
+
                 // Check if Teacher Check-Out is enabled
                 $checkoutEnabled = \App\Models\Setting::where('school_id', $device->school_id)
                     ->where('setting_key', 'enable_checkout_teacher')
@@ -146,7 +146,7 @@ class RfidController extends Controller
                 if ($checkoutEnabled === 'false') {
                     DB::commit();
                     $this->logRequest($apiKey, 'checkin_success', $uid, true, 'Sudah Absen Masuk: ' . $teacher->nama);
-                    return $this->response(true, 'success', "Sudah Absen Masuk.", 'ok', [
+                    return $this->response(true, 'success', "Sudah Absen.", 'ok', [
                         'type' => 'absen_sudah_masuk_guru',
                         'nama' => $teacher->nama
                     ]);
@@ -182,7 +182,7 @@ class RfidController extends Controller
                 // Send WA Check-Out
                 $hours = floor($totalSeconds / 3600);
                 $mins = floor(($totalSeconds % 3600) / 60);
-                
+
                 try {
                     $this->wa->sendCheckOut($teacher->nama, $teacher->no_wa, $now->format('H:i'), $hours, $mins, $gateSession->teacher_name, $device->school_id, $masuk->format('H:i'));
                 } catch (\Exception $e) {
@@ -190,7 +190,7 @@ class RfidController extends Controller
                 }
 
                 $this->logRequest($apiKey, 'checkout_success', $uid, true, 'Guru Pulang: ' . $teacher->nama);
-                return $this->response(true, 'success', "Absen pulang berhasil.", 'ok', [
+                return $this->response(true, 'success', "Absen Berhasil.", 'ok', [
                     'type' => 'absen_pulang_guru',
                     'nama' => $teacher->nama,
                     'authorized_by' => $gateSession->teacher_name
@@ -286,15 +286,15 @@ class RfidController extends Controller
     private function logFailedAuth(string $apiKey, string $reason, $request = null)
     {
         ApiLog::create([
-            'school_id'   => null,
-            'api_key'     => $apiKey,
-            'action'      => 'auth_failed',
-            'uid'         => null,
-            'success'     => false,
-            'message'     => $reason,
-            'ip_address'  => $request ? $request->ip() : request()->ip(),
-            'user_agent'  => $request ? $request->userAgent() : request()->userAgent(),
-            'created_at'  => now(),
+            'school_id' => null,
+            'api_key' => $apiKey,
+            'action' => 'auth_failed',
+            'uid' => null,
+            'success' => false,
+            'message' => $reason,
+            'ip_address' => $request ? $request->ip() : request()->ip(),
+            'user_agent' => $request ? $request->userAgent() : request()->userAgent(),
+            'created_at' => now(),
         ]);
     }
 
@@ -548,7 +548,7 @@ class RfidController extends Controller
             }
             $jamMasuk = Carbon::parse($now->format('Y-m-d') . ' ' . $jadwal->jam_masuk);
             $jamPulang = Carbon::parse($now->format('Y-m-d') . ' ' . $jadwal->jam_pulang);
-            
+
             $awalAbsenMasuk = Carbon::parse($now->format('Y-m-d') . ' ' . $jadwal->awal_absen_masuk);
             $akhirAbsenMasuk = Carbon::parse($now->format('Y-m-d') . ' ' . $jadwal->akhir_absen_masuk);
             $akhirAbsenPulang = Carbon::parse($now->format('Y-m-d') . ' ' . $jadwal->akhir_absen_pulang);
@@ -608,8 +608,8 @@ class RfidController extends Controller
 
                 // Jika sudah melewati batas akhir absen pulang dan tidak ada sesi guru, tolak
                 if ($now->gt($akhirAbsenPulang) && !$teacherSession) {
-                     DB::rollBack();
-                     return $this->response(false, 'gagal', 'Pulang Ditutup', 'warning', ['type' => 'checkout_closed', 'nama' => $siswa->nama]);
+                    DB::rollBack();
+                    return $this->response(false, 'gagal', 'Pulang Ditutup', 'warning', ['type' => 'checkout_closed', 'nama' => $siswa->nama]);
                 }
 
                 // Jika belum masuk waktu pulang otomatis dan tidak ada izin guru, tolak
@@ -617,11 +617,11 @@ class RfidController extends Controller
                     // Beri pesan berbeda jika masih di jam masuk (mencegah spam absen 2x)
                     if ($now->between($awalAbsenMasuk, $akhirAbsenMasuk)) {
                         DB::rollBack();
-                        return $this->response(true, 'success', 'Sudah Absen Masuk', 'ok', ['type' => 'sudah_absen_masuk', 'nama' => $siswa->nama]);
+                        return $this->response(true, 'success', 'Sudah Absen', 'ok', ['type' => 'sudah_absen_masuk', 'nama' => $siswa->nama]);
                     }
 
                     DB::rollBack();
-                    return $this->response(false, 'gagal', 'Belum waktu pulang', 'warning', ['type' => 'no_authorization', 'nama' => $siswa->nama]);
+                    return $this->response(false, 'gagal', 'Belum pulang', 'warning', ['type' => 'no_authorization', 'nama' => $siswa->nama]);
                 }
 
                 // Pulang
@@ -649,7 +649,7 @@ class RfidController extends Controller
                 $this->wa->sendCheckOut($siswa->nama, $siswa->no_wa, $now->format('H:i'), $hours, $mins, $authorizedBy, $device->school_id, $masuk->format('H:i'), $siswa->wa_ortu);
 
                 $this->logRequest($apiKey, 'checkout_success', $uid, true, 'Pulang: ' . $siswa->nama);
-                return $this->response(true, 'success', 'Absen pulang berhasil', 'ok', [
+                return $this->response(true, 'success', 'Absen Berhasil', 'ok', [
                     'type' => 'absen_pulang',
                     'nama' => $siswa->nama,
                     'authorized_by' => $authorizedBy
@@ -660,11 +660,11 @@ class RfidController extends Controller
             if (!$att) {
                 if ($now->lt($awalAbsenMasuk)) {
                     DB::rollBack();
-                    return $this->response(false, 'gagal', 'Absen Tutup (Terlalu Pagi)', 'warning', ['type' => 'too_early']);
+                    return $this->response(false, 'gagal', 'Absen Tutup', 'warning', ['type' => 'too_early']);
                 }
                 if ($now->gt($akhirAbsenMasuk)) {
                     DB::rollBack();
-                    return $this->response(false, 'gagal', 'Absen Masuk Ditutup', 'warning', ['type' => 'checkin_closed']);
+                    return $this->response(false, 'gagal', 'Absen Tutup', 'warning', ['type' => 'checkin_closed']);
                 }
 
                 $status = 'H';
@@ -699,7 +699,7 @@ class RfidController extends Controller
 
 
                 $this->logRequest($apiKey, 'checkin_success', $uid, true, 'Masuk: ' . $siswa->nama);
-                return $this->response(true, 'success', 'Absen masuk berhasil', 'ok', [
+                return $this->response(true, 'success', 'Absen Berhasil', 'ok', [
                     'type' => 'absen_masuk',
                     'nama' => $siswa->nama,
                     'attendance_status' => $status

@@ -274,22 +274,47 @@ class DailyReportCommand extends Command
             $this->info("Queued class report: {$kelas->nama_kelas}");
         }
 
-        // --- SEND GLOBAL REPORT TO LEGACY TARGET ---
-        if ($targetJid) {
+        // --- SEND GLOBAL REPORT ---
+        $guruGlobal = \App\Models\Guru::where('school_id', $schoolId)
+            ->where('is_global_report', true)
+            ->whereNotNull('no_wa')
+            ->where('no_wa', '!=', '')
+            ->get();
+
+        if ($targetJid || $guruGlobal->isNotEmpty()) {
             $msg = WhatsAppMessageTemplates::dailyReportGlobal(
                 totalMasuk: $totalMasuk,
                 totalTidakMasuk: $totalTidakMasuk,
                 absentByStatus: $absentByStatus
             );
 
-            MessageQueue::create([
-                'school_id' => $schoolId,
-                'phone_number' => $targetJid,
-                'message' => $msg,
-                'status' => 'pending',
-                'created_at' => now()
-            ]);
-            $this->info("Queued global report to admin ($targetJid)");
+            if ($targetJid) {
+                MessageQueue::create([
+                    'school_id' => $schoolId,
+                    'phone_number' => $targetJid,
+                    'message' => $msg,
+                    'status' => 'pending',
+                    'created_at' => now()
+                ]);
+                $this->info("Queued global report to legacy admin ($targetJid)");
+            }
+
+            foreach ($guruGlobal as $guru) {
+                $noWa = $guru->no_wa;
+                if (!str_contains($noWa, '@')) {
+                    $noWa = preg_replace('/^0/', '62', $noWa);
+                    // $noWa = $noWa . '@s.whatsapp.net';
+                }
+
+                MessageQueue::create([
+                    'school_id' => $schoolId,
+                    'phone_number' => $noWa,
+                    'message' => $msg,
+                    'status' => 'pending',
+                    'created_at' => now()
+                ]);
+                $this->info("Queued global report to Guru: {$guru->nama}");
+            }
         }
 
         // --- LAPORAN PER WALI KELAS ---

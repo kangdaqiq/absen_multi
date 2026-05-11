@@ -193,9 +193,9 @@ class AutoBolosCommand extends Command
             return;
         }
 
-        // Get all absent students (A, B, I, S) for this school
+        // Get all absent/late students (A, B, I, S, T) for this school
         $absentStudents = Attendance::where('tanggal', $today)
-            ->whereIn('status', ['A', 'B', 'I', 'S'])
+            ->whereIn('status', ['A', 'B', 'I', 'S', 'T'])
             ->whereHas('student', function ($q) use ($schoolId) {
                 $q->where('school_id', $schoolId);
             })
@@ -206,9 +206,9 @@ class AutoBolosCommand extends Command
             ->orderBy('status')
             ->get();
 
-        // Get all present students (H, T) for this school to count
+        // Get all present students (H only) for this school to count
         $presentStudents = Attendance::where('tanggal', $today)
-            ->whereIn('status', ['H', 'T'])
+            ->where('status', 'H')
             ->whereHas('student', function ($q) use ($schoolId) {
                 $q->where('school_id', $schoolId);
             })
@@ -217,8 +217,9 @@ class AutoBolosCommand extends Command
             })
             ->get();
 
-        // Jika tidak ada siswa absen SAMA SEKALI di sekolah, bisa langsung return
-        if ($absentStudents->isEmpty()) {
+        // Jika tidak ada siswa absen (non-T) SAMA SEKALI di sekolah, bisa langsung return
+        $hasRealAbsent = $absentStudents->whereIn('status', ['A', 'B', 'I', 'S'])->isNotEmpty();
+        if (!$hasRealAbsent && $absentStudents->where('status', 'T')->isEmpty()) {
             return;
         }
 
@@ -297,7 +298,7 @@ class AutoBolosCommand extends Command
             $groupedGlobal = $absentStudents->groupBy('status');
             $totalPresentGlobal = $presentStudents->count();
 
-            $messageGlobal = WhatsAppMessageTemplates::finalAbsenceReport(
+            $messageGlobal = WhatsAppMessageTemplates::finalAbsenceReportGlobal(
                 totalPresent: $totalPresentGlobal,
                 totalAbsent: $absentStudents->count(),
                 absentStudentsGrouped: $groupedGlobal

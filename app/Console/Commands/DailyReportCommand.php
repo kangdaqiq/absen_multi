@@ -68,8 +68,8 @@ class DailyReportCommand extends Command
             ->where('setting_key', 'schedule_daily_report')
             ->value('setting_value') ?? '08:15';
 
-        if (now()->format('H:i') < $scheduleTime) {
-            // Too early
+        if (now()->format('H:i') < $scheduleTime && !$this->option('force')) {
+            $this->info("Too early for school ID $schoolId. Schedule: $scheduleTime. Skipped.");
             return;
         }
 
@@ -188,6 +188,7 @@ class DailyReportCommand extends Command
 
         $totalMasuk = 0;
         $absentByStatus = [
+            'T' => [],
             'A' => [],
             'I' => [],
             'S' => [],
@@ -199,6 +200,10 @@ class DailyReportCommand extends Command
                 $att = $attendance[$s->id];
                 if ($att->status === 'H') {
                     $totalMasuk++;
+                } elseif ($att->status === 'T') {
+                    $totalMasuk++; // Terlambat tetap dihitung masuk
+                    $kelas = $s->kelas->nama_kelas ?? '-';
+                    $absentByStatus['T'][] = "{$s->nama} ({$kelas})";
                 } else {
                     $status = $att->status;
                     if (isset($absentByStatus[$status])) {
@@ -213,10 +218,10 @@ class DailyReportCommand extends Command
             }
         }
 
-        // Calculate total absent
+        // Calculate total absent (T tidak dihitung sebagai tidak masuk)
         $totalTidakMasuk = 0;
-        foreach ($absentByStatus as $students) {
-            $totalTidakMasuk += count($students);
+        foreach (['A', 'I', 'S', 'B'] as $st) {
+            $totalTidakMasuk += count($absentByStatus[$st]);
         }
 
         // --- SEND CLASS-SPECIFIC REPORTS TO CLASS GROUPS ---
@@ -233,6 +238,7 @@ class DailyReportCommand extends Command
             $masuk = 0;
             $tidakMasuk = 0;
             $absentByStatusClass = [
+                'T' => [],
                 'A' => [],
                 'I' => [],
                 'S' => [],
@@ -244,6 +250,9 @@ class DailyReportCommand extends Command
                     $att = $attendance[$s->id];
                     if ($att->status === 'H') {
                         $masuk++;
+                    } elseif ($att->status === 'T') {
+                        $masuk++; // Terlambat tetap dihitung masuk
+                        $absentByStatusClass['T'][] = $s->nama;
                     } else {
                         $tidakMasuk++;
                         $status = $att->status;
@@ -334,12 +343,16 @@ class DailyReportCommand extends Command
             $masuk = 0;
             $tidakMasuk = 0;
             $listAbsen = [];
+            $listTerlambat = [];
 
             foreach ($siswaKelas as $s) {
                 if ($attendance->has($s->id)) {
                     $att = $attendance[$s->id];
                     if ($att->status === 'H') {
                         $masuk++;
+                    } elseif ($att->status === 'T') {
+                        $masuk++; // Terlambat tetap dihitung masuk
+                        $listTerlambat[] = $s->nama;
                     } else {
                         $tidakMasuk++;
                         $statusKet = match ($att->status) {
@@ -362,7 +375,8 @@ class DailyReportCommand extends Command
                 namaWali: $wali->nama,
                 masuk: $masuk,
                 tidakMasuk: $tidakMasuk,
-                listAbsen: $listAbsen
+                listAbsen: $listAbsen,
+                listTerlambat: $listTerlambat
             );
 
             MessageQueue::create([

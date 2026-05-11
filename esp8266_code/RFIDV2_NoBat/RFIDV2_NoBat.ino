@@ -121,12 +121,23 @@ String getRtcDatetime() {
 }
 
 bool initRTC() {
+  Serial.println("[I2C] Scanning bus...");
+  int devices = 0;
+  for(byte address = 1; address < 127; address++ ) {
+    Wire.beginTransmission(address);
+    if (Wire.endTransmission() == 0) {
+      Serial.print("[I2C] Found device at 0x");
+      Serial.println(address, HEX);
+      devices++;
+    }
+  }
+  if (devices == 0) Serial.println("[I2C] No devices found!");
+
   if (!rtc.begin()) {
-    Serial.println("[RTC] Not found");
+    Serial.println("[RTC] Not found! Pastikan alamat 0x68 muncul di atas.");
     return false;
   }
 
-  // DS1307 menggunakan isrunning(), bukan lostPower()
   if (!rtc.isrunning()) {
     Serial.println("[RTC] Not running, setting time...");
     rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
@@ -627,7 +638,7 @@ void updateStandbyDisplay() {
     snprintf(buf, sizeof(buf), "ABSENSI    %02d:%02d", now.hour(),
              now.minute());
   } else {
-    snprintf(buf, sizeof(buf), "ABSENSI         ");
+    snprintf(buf, sizeof(buf), "ABSENSI  NO RTC ");
   }
   lcd.print(buf);
 

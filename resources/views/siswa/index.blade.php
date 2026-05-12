@@ -87,7 +87,7 @@
                     </th>
                     <th class="px-4 py-4">No</th>
                     <th class="px-4 py-4">Nama</th>
-                    <th class="px-4 py-4">NIS</th>
+                    <th class="px-4 py-4">NISN</th>
                     <th class="px-4 py-4">Tgl Lahir</th>
                     <th class="px-4 py-4">Kelas</th>
                     <th class="px-4 py-4">No WA Siswa / Ortu</th>
@@ -292,7 +292,7 @@
                     <input type="text" name="nama" id="edit_nama" required class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
                 </div>
                 <div>
-                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">NIS</label>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">NISN</label>
                     <input type="text" name="nis" id="edit_nis" required class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
                 </div>
                 <div>

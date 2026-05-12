@@ -31,7 +31,9 @@
             </div>
             <div class="w-full sm:w-auto relative min-w-[250px]">
                 <label for="search" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Cari Siswa</label>
-                <input type="text" name="search" id="search" value="{{ request('search') }}" placeholder="Ketik nama siswa..." class="w-full rounded-lg border border-gray-200 bg-transparent py-2 pl-4 pr-10 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                <input type="text" name="search" id="search" value="{{ request('search') }}" placeholder="Ketik nama siswa..." 
+                    oninput="clearTimeout(this.delay); this.delay = setTimeout(() => { this.form.submit() }, 500);"
+                    class="w-full rounded-lg border border-gray-200 bg-transparent py-2 pl-4 pr-10 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
                 <div class="absolute right-3 bottom-2 text-gray-400">
                     <i class="fas fa-search"></i>
                 </div>

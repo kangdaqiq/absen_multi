@@ -43,7 +43,9 @@
             </div>
             <div class="w-full md:w-auto min-w-[250px]">
                 <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Cari Nama:</label>
-                <input type="text" name="search" value="{{ request('search') }}" placeholder="Ketik nama..." class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                <input type="text" name="search" value="{{ request('search') }}" placeholder="Ketik nama..." 
+                    oninput="clearTimeout(this.delay); this.delay = setTimeout(() => { this.form.submit() }, 500);"
+                    class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
             </div>
             
             <div class="w-full md:w-auto flex flex-wrap gap-2 mt-2 md:mt-0">

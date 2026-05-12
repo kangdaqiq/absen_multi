@@ -52,6 +52,7 @@
         
         <form action="{{ route('guru.index') }}" method="GET" class="relative w-full sm:w-64">
             <input type="text" name="search" value="{{ request('search') }}" placeholder="Cari {{ $labelKaryawan }}..." 
+                oninput="clearTimeout(this.delay); this.delay = setTimeout(() => { this.form.submit() }, 500);"
                 class="w-full rounded-lg border border-gray-200 bg-transparent py-2 pl-4 pr-10 text-sm outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:focus:border-brand-500 text-gray-800 dark:text-white/90">
             <button type="submit" class="absolute right-0 top-0 h-full px-3 text-gray-500 hover:text-brand-500 dark:text-gray-400">
                 <i class="fas fa-search"></i>

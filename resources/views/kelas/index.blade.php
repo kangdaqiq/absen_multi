@@ -25,14 +25,14 @@
             class="flex flex-col sm:flex-row justify-between items-center px-5 py-4 border-b border-gray-200 dark:border-gray-800 gap-4">
             <h4 class="font-semibold text-gray-800 dark:text-white/90">Daftar Kelas</h4>
 
-            <div class="relative w-full sm:w-64">
-                <input type="text" id="clientSearch" placeholder="Cari di halaman ini..."
-                    class="client-search w-full rounded-lg border border-gray-200 bg-transparent py-2 pl-4 pr-10 text-sm outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:focus:border-brand-500 text-gray-800 dark:text-white/90">
-                <button type="button"
+            <form action="{{ route('kelas.index') }}" method="GET" class="relative w-full sm:w-64">
+                <input type="text" name="search" value="{{ request('search') }}" placeholder="Cari Kelas..."
+                    class="w-full rounded-lg border border-gray-200 bg-transparent py-2 pl-4 pr-10 text-sm outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:focus:border-brand-500 text-gray-800 dark:text-white/90">
+                <button type="submit"
                     class="absolute right-0 top-0 h-full px-3 text-gray-500 hover:text-brand-500 dark:text-gray-400">
                     <i class="fas fa-search"></i>
                 </button>
-            </div>
+            </form>
         </div>
 
         <div class="max-w-full overflow-x-auto">

@@ -21,6 +21,7 @@
 #include <Ticker.h>
 #include <WiFiClientSecure.h>
 #include <Wire.h>
+#include <time.h>
 
 // =====================================================
 // KONFIGURASI
@@ -144,6 +145,44 @@ bool initRTC() {
   }
   Serial.println("[RTC] Ready: " + getRtcDatetime());
   return true;
+}
+
+void syncNTPtoRTC() {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Sync NTP Time...");
+  Serial.print("[NTP] Syncing time...");
+
+  // Waktu WIB = GMT+7 (7 * 3600 = 25200)
+  configTime(25200, 0, "pool.ntp.org", "time.nist.gov");
+
+  time_t now = time(nullptr);
+  int retries = 0;
+  // Tunggu hingga tahun valid (bukan 1970)
+  while (now < 8 * 3600 * 2 && retries < 15) {
+    delay(500);
+    Serial.print(".");
+    now = time(nullptr);
+    retries++;
+    feedWatchdog();
+  }
+  Serial.println();
+
+  if (now > 8 * 3600 * 2) {
+    struct tm timeinfo;
+    gmtime_r(&now, &timeinfo);
+    if (rtcReady) {
+      rtc.adjust(DateTime(timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday, timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec));
+      Serial.println("[NTP] RTC Updated: " + getRtcDatetime());
+      lcd.setCursor(0, 1);
+      lcd.print("NTP Sync OK   ");
+    }
+  } else {
+    Serial.println("[NTP] Sync Failed (Timeout)");
+    lcd.setCursor(0, 1);
+    lcd.print("NTP Failed    ");
+  }
+  delay(1000);
 }
 
 // =====================================================
@@ -990,6 +1029,9 @@ void setup() {
       Serial.println("[mDNS] Ready");
     setupOTA();
     delay(1000);
+
+    // Sync NTP Time
+    syncNTPtoRTC();
 
     // Cek server
     lcd.clear();

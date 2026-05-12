@@ -131,7 +131,7 @@ class WhatsAppService
         return [$hours, $minutes];
     }
 
-    public function sendCheckOut($name, $phone, $time, $hours, $mins, $authorizer, $schoolId, $jamMasuk = '-', $phoneOrtu = null)
+    public function sendCheckOut($name, $phone, $time, $hours, $mins, $authorizer, $schoolId, $jamMasuk = '-', $phoneOrtu = null, $tanggal = null)
     {
         // Skip if both phone numbers are empty
         if (!$phone && !$phoneOrtu)
@@ -145,7 +145,8 @@ class WhatsAppService
                 jamPulang: $time,
                 hours: $hours,
                 minutes: $mins,
-                authorizedBy: $authorizer
+                authorizedBy: $authorizer,
+                tanggal: $tanggal
             );
             $this->queueMessage($phone, $msg, $schoolId);
         }
@@ -158,7 +159,8 @@ class WhatsAppService
                 jamPulang: $time,
                 hours: $hours,
                 minutes: $mins,
-                authorizedBy: $authorizer
+                authorizedBy: $authorizer,
+                tanggal: $tanggal
             );
             $this->queueMessage($phoneOrtu, $msgOrtu, $schoolId);
         }

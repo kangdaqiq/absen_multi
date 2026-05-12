@@ -167,7 +167,7 @@ class RfidController extends Controller
                 }
 
                 // Process Pulang
-                $masuk = Carbon::parse($absensi->jam_masuk);
+                $masuk = Carbon::parse($absensi->tanggal . ' ' . $absensi->jam_masuk);
                 $totalSeconds = $masuk->diffInSeconds($now, false);
                 if ($totalSeconds < 0) {
                     $totalSeconds = abs($totalSeconds);
@@ -184,7 +184,7 @@ class RfidController extends Controller
                 $mins = floor(($totalSeconds % 3600) / 60);
 
                 try {
-                    $this->wa->sendCheckOut($teacher->nama, $teacher->no_wa, $now->format('H:i'), $hours, $mins, $gateSession->teacher_name, $device->school_id, $masuk->format('H:i'));
+                    $this->wa->sendCheckOut($teacher->nama, $teacher->no_wa, $now->format('H:i'), $hours, $mins, $gateSession->teacher_name, $device->school_id, $masuk->format('H:i'), null, $now->format('d/m/Y'));
                 } catch (\Exception $e) {
                     Log::error("WA Guru Checkout Error: " . $e->getMessage());
                 }
@@ -625,7 +625,7 @@ class RfidController extends Controller
                 }
 
                 // Pulang
-                $masuk = Carbon::parse($att->jam_masuk);
+                $masuk = Carbon::parse($att->tanggal . ' ' . $att->jam_masuk);
                 // Calculate duration from check-in to check-out
                 // Use diffInSeconds with proper order: from $masuk to $now
                 $totalSeconds = $masuk->diffInSeconds($now, false); // false = signed difference
@@ -635,9 +635,28 @@ class RfidController extends Controller
                     $totalSeconds = abs($totalSeconds);
                 }
 
+                $newStatus = $att->status;
+                $newKeterangan = $att->keterangan;
+
+                // Jika sebelumnya terkena Auto Bolos (B), kembalikan statusnya ke H (Hadir) atau T (Terlambat)
+                if ($att->status === 'B') {
+                    $waktuMasuk = Carbon::parse($att->tanggal . ' ' . $att->jam_masuk);
+                    $newStatus = $waktuMasuk->gt($batasTelat) ? 'T' : 'H';
+                    
+                    // Bersihkan teks keterangan dari Auto Bolos
+                    if ($newKeterangan) {
+                        $newKeterangan = trim(str_replace('[Auto: Tidak Absen Pulang]', '', $newKeterangan));
+                        if (empty($newKeterangan)) {
+                            $newKeterangan = null;
+                        }
+                    }
+                }
+
                 $att->update([
                     'jam_pulang' => $now->toTimeString(),
                     'total_seconds' => $totalSeconds,
+                    'status' => $newStatus,
+                    'keterangan' => $newKeterangan,
                     'updated_at' => now(), // Attendance has timestamp columns? In model I defined them.
                 ]);
                 DB::commit();
@@ -646,7 +665,7 @@ class RfidController extends Controller
                 $hours = floor($totalSeconds / 3600);
                 $mins = floor(($totalSeconds % 3600) / 60);
                 $authorizedBy = $teacherSession ? $teacherSession->teacher_name : 'Sistem Otomatis';
-                $this->wa->sendCheckOut($siswa->nama, $siswa->no_wa, $now->format('H:i'), $hours, $mins, $authorizedBy, $device->school_id, $masuk->format('H:i'), $siswa->wa_ortu);
+                $this->wa->sendCheckOut($siswa->nama, $siswa->no_wa, $now->format('H:i'), $hours, $mins, $authorizedBy, $device->school_id, $masuk->format('H:i'), $siswa->wa_ortu, $now->format('d/m/Y'));
 
                 $this->logRequest($apiKey, 'checkout_success', $uid, true, 'Pulang: ' . $siswa->nama);
                 return $this->response(true, 'success', 'Absen Berhasil', 'ok', [

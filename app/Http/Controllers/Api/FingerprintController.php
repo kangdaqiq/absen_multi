@@ -402,7 +402,7 @@ return $this->response(false, 'error', 'Enroll Gagal');
                     }
 
                     // Process Pulang
-                    $masuk = \Carbon\Carbon::parse($absensi->jam_masuk);
+                    $masuk = \Carbon\Carbon::parse($absensi->tanggal . ' ' . $absensi->jam_masuk);
                     $totalSeconds = $now->diffInSeconds($masuk);
                     
                     $absensi->update([
@@ -415,7 +415,7 @@ return $this->response(false, 'error', 'Enroll Gagal');
                     $mins = floor(($totalSeconds % 3600) / 60);
 
                     try {
-                        $this->wa->sendCheckOut($guru->nama, $guru->no_wa, $now->format('H:i'), $hours, $mins, $gateSession->teacher_name, $device->school_id, $masuk->format('H:i'));
+                        $this->wa->sendCheckOut($guru->nama, $guru->no_wa, $now->format('H:i'), $hours, $mins, $gateSession->teacher_name, $device->school_id, $masuk->format('H:i'), null, $now->format('d/m/Y'));
                     } catch (\Exception $e) {
                         Log::error("WA Guru Checkout Error: " . $e->getMessage());
                     }
@@ -555,13 +555,32 @@ return $this->response(false, 'error', 'Enroll Gagal');
             }
 
             // Process check-out
-            $masuk = \Carbon\Carbon::parse($att->jam_masuk);
+            $masuk = \Carbon\Carbon::parse($att->tanggal . ' ' . $att->jam_masuk);
             $totalSeconds = $now->diffInSeconds($masuk, false);
             if ($totalSeconds < 0) $totalSeconds = abs($totalSeconds);
+
+            $newStatus = $att->status;
+            $newKeterangan = $att->keterangan;
+
+            // Jika sebelumnya terkena Auto Bolos (B), kembalikan statusnya ke H (Hadir) atau T (Terlambat)
+            if ($att->status === 'B') {
+                $waktuMasuk = \Carbon\Carbon::parse($att->tanggal . ' ' . $att->jam_masuk);
+                $newStatus = $waktuMasuk->gt($batasTelat) ? 'T' : 'H';
+                
+                // Bersihkan teks keterangan dari Auto Bolos
+                if ($newKeterangan) {
+                    $newKeterangan = trim(str_replace('[Auto: Tidak Absen Pulang]', '', $newKeterangan));
+                    if (empty($newKeterangan)) {
+                        $newKeterangan = null;
+                    }
+                }
+            }
 
             $att->update([
                 'jam_pulang' => $now->toTimeString(),
                 'total_seconds' => $totalSeconds,
+                'status' => $newStatus,
+                'keterangan' => $newKeterangan,
                 'updated_at' => now(),
             ]);
             DB::commit();
@@ -570,7 +589,7 @@ return $this->response(false, 'error', 'Enroll Gagal');
             $mins = floor(($totalSeconds % 3600) / 60);
             $authorizedBy = $teacherSession ? $teacherSession->teacher_name : 'Sistem Otomatis';
             
-            $this->wa->sendCheckOut($siswa->nama, $siswa->no_wa, $now->format('H:i'), $hours, $mins, $authorizedBy, $device->school_id, $masuk->format('H:i'), $siswa->wa_ortu);
+            $this->wa->sendCheckOut($siswa->nama, $siswa->no_wa, $now->format('H:i'), $hours, $mins, $authorizedBy, $device->school_id, $masuk->format('H:i'), $siswa->wa_ortu, $now->format('d/m/Y'));
 
             ApiLog::create([
                 'school_id' => $this->currentSchoolId,

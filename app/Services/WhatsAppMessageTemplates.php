@@ -29,11 +29,13 @@ class WhatsAppMessageTemplates
         string $jamPulang,
         int $hours,
         int $minutes,
-        string $authorizedBy
+        string $authorizedBy,
+        ?string $tanggal = null
     ): string {
+        $tgl = $tanggal ?? now()->format('d/m/Y');
         return "🏠 *Notifikasi Absen Pulang*\n\n" .
             "Halo, *{$nama}*,\n\n" .
-            "📅 Tanggal: " . now()->format('d/m/Y') . "\n" .
+            "📅 Tanggal: " . $tgl . "\n" .
             "🕐 Jam Masuk: {$jamMasuk}\n" .
             "🕐 Jam Pulang: {$jamPulang}\n" .
             "⏱️ Durasi: {$hours} jam {$minutes} menit\n" .
@@ -125,12 +127,14 @@ class WhatsAppMessageTemplates
         string $jamPulang,
         int $hours,
         int $minutes,
-        string $authorizedBy
+        string $authorizedBy,
+        ?string $tanggal = null
     ): string {
+        $tgl = $tanggal ?? now()->format('d/m/Y');
         return "🏠 *Notifikasi Absen Pulang Anak*\n\n" .
             "Halo, Orang Tua/Wali dari *{$nama}*,\n\n" .
             "Anak Anda telah tercatat pulang dari sekolah.\n\n" .
-            "📅 Tanggal: " . now()->format('d/m/Y') . "\n" .
+            "📅 Tanggal: " . $tgl . "\n" .
             "🕐 Jam Masuk: {$jamMasuk}\n" .
             "🕐 Jam Pulang: {$jamPulang}\n" .
             "⏱️ Durasi: {$hours} jam {$minutes} menit\n" .

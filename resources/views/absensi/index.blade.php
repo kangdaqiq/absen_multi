@@ -29,6 +29,18 @@
                     @endforeach
                 </select>
             </div>
+            <div class="w-full sm:w-auto min-w-[150px]">
+                <label for="statusFilter" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Status</label>
+                <select name="status" id="statusFilter" class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                    <option value="">Semua Status</option>
+                    <option value="H" {{ request('status') == 'H' ? 'selected' : '' }}>Hadir</option>
+                    <option value="I" {{ request('status') == 'I' ? 'selected' : '' }}>Izin</option>
+                    <option value="S" {{ request('status') == 'S' ? 'selected' : '' }}>Sakit</option>
+                    <option value="T" {{ request('status') == 'T' ? 'selected' : '' }}>Terlambat</option>
+                    <option value="A" {{ request('status') == 'A' ? 'selected' : '' }}>Alpha</option>
+                    <option value="B" {{ request('status') == 'B' ? 'selected' : '' }}>Bolos</option>
+                </select>
+            </div>
             <div class="w-full sm:w-auto relative min-w-[250px]">
                 <label for="search" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Cari Siswa</label>
                 <input type="text" name="search" id="search" value="{{ request('search') }}" placeholder="Ketik nama siswa..." 
@@ -48,16 +60,27 @@
 </div>
 
 <!-- Data Table Card -->
-<div class="rounded-2xl border border-gray-200 bg-white shadow-theme-sm dark:border-gray-800 dark:bg-gray-dark">
+<div x-data="bulkAbsensiActions()" class="rounded-2xl border border-gray-200 bg-white shadow-theme-sm dark:border-gray-800 dark:bg-gray-dark">
     <div class="border-b border-gray-200 px-5 py-4 dark:border-gray-800 flex justify-between items-center">
-        <h6 class="font-semibold text-gray-800 dark:text-white/90">Log Absensi: {{ \Carbon\Carbon::parse($tanggal)->format('d-m-Y') }}</h6>
+        <div class="flex items-center gap-3">
+            <h6 class="font-semibold text-gray-800 dark:text-white/90">Log Absensi: {{ \Carbon\Carbon::parse($tanggal)->format('d-m-Y') }}</h6>
+            
+            <!-- Bulk Actions Toolbar -->
+            <div x-show="selected.length > 0" x-cloak class="flex items-center gap-2 border-l border-gray-200 pl-3 dark:border-gray-700" style="display: none;">
+                <span class="text-sm font-medium text-brand-500" x-text="selected.length + ' terpilih'"></span>
+                <button @click="$dispatch('open-modal', 'modalBulkEditAbsensi')" class="rounded bg-brand-50 px-2 py-1 text-xs font-medium text-brand-600 hover:bg-brand-100 dark:bg-brand-500/15 dark:text-brand-500 dark:hover:bg-brand-500/25">Update Status</button>
+            </div>
+        </div>
     </div>
 
     <div class="max-w-full overflow-x-auto">
         <table class="w-full table-auto">
             <thead>
                 <tr class="bg-gray-50 text-left dark:bg-gray-800/50 text-gray-800 dark:text-white/90 font-medium text-sm">
-                    <th class="px-4 py-4 xl:pl-6">Nama Siswa</th>
+                    <th class="px-4 py-4 xl:pl-6 w-10 text-center">
+                        <input type="checkbox" @change="toggleAll" x-bind:checked="isAllSelected" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800">
+                    </th>
+                    <th class="px-4 py-4">Nama Siswa</th>
                     <th class="px-4 py-4">Kelas</th>
                     <th class="px-4 py-4 text-center">Jam Masuk</th>
                     <th class="px-4 py-4 text-center">Jam Pulang</th>
@@ -66,64 +89,67 @@
                     <th class="px-4 py-4 text-center">Aksi</th>
                 </tr>
             </thead>
-            <tbody class="text-sm" x-data="{}">
-                @forelse($data as $row)
-                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors border-b border-gray-100 dark:border-gray-800 last:border-b-0">
-                        <td class="px-4 py-4 xl:pl-6">
-                            <p class="font-medium text-gray-800 dark:text-white/90">{{ $row->nama }}</p>
+            <tbody class="text-sm">
+                @forelse($data as $d)
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors {{ $d->status == 'B' ? 'bg-error-50/50 dark:bg-error-500/5' : '' }}">
+                        <td class="border-b border-gray-100 px-4 py-4 dark:border-gray-800 xl:pl-6 text-center">
+                            <input type="checkbox" value="{{ $d->id }}" x-model="selected" class="row-checkbox rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800">
                         </td>
-                        <td class="px-4 py-4">
-                            <p class="text-gray-500 dark:text-gray-400">{{ $row->kelas }}</p>
+                        <td class="border-b border-gray-100 px-4 py-4 dark:border-gray-800">
+                            <p class="font-medium text-gray-800 dark:text-white/90">{{ $d->nama }}</p>
                         </td>
-                        <td class="px-4 py-4 text-center">
-                            @if($row->jam_masuk != '-')
+                        <td class="border-b border-gray-100 px-4 py-4 dark:border-gray-800">
+                            <p class="text-gray-500 dark:text-gray-400">{{ $d->kelas }}</p>
+                        </td>
+                        <td class="border-b border-gray-100 px-4 py-4 text-center dark:border-gray-800">
+                            @if($d->jam_masuk != '-')
                                 <span class="inline-block rounded px-2 py-1 bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300 font-mono text-xs">
-                                    {{ \Carbon\Carbon::parse($row->jam_masuk)->format('H:i') }}
+                                    {{ \Carbon\Carbon::parse($d->jam_masuk)->format('H:i') }}
                                 </span>
                             @else
                                 <span class="text-gray-400">-</span>
                             @endif
                         </td>
-                        <td class="px-4 py-4 text-center">
-                            @if($row->jam_pulang != '-')
+                        <td class="border-b border-gray-100 px-4 py-4 text-center dark:border-gray-800">
+                            @if($d->jam_pulang != '-')
                                 <span class="inline-block rounded px-2 py-1 bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300 font-mono text-xs">
-                                    {{ \Carbon\Carbon::parse($row->jam_pulang)->format('H:i') }}
+                                    {{ \Carbon\Carbon::parse($d->jam_pulang)->format('H:i') }}
                                 </span>
                             @else
                                 <span class="text-gray-400">-</span>
                             @endif
                         </td>
-                        <td class="px-4 py-4 text-center">
-                            @if($row->status == 'H')
+                        <td class="border-b border-gray-100 px-4 py-4 text-center dark:border-gray-800">
+                            @if($d->status == 'H')
                                 <span class="inline-flex rounded-full bg-success-50 px-3 py-1 text-xs font-medium text-success-600 dark:bg-success-500/15 dark:text-success-500">Hadir</span>
-                            @elseif($row->status == 'I')
+                            @elseif($d->status == 'I')
                                 <span class="inline-flex rounded-full bg-info-50 px-3 py-1 text-xs font-medium text-info-600 dark:bg-info-500/15 dark:text-info-500">Izin</span>
-                            @elseif($row->status == 'S')
+                            @elseif($d->status == 'S')
                                 <span class="inline-flex rounded-full bg-warning-50 px-3 py-1 text-xs font-medium text-warning-600 dark:bg-warning-500/15 dark:text-warning-500">Sakit</span>
-                            @elseif($row->status == 'T')
+                            @elseif($d->status == 'T')
                                 <span class="inline-flex rounded-full bg-warning-50 px-3 py-1 text-xs font-medium text-warning-600 dark:bg-warning-500/15 dark:text-warning-500">Terlambat</span>
-                            @elseif($row->status == 'B')
+                            @elseif($d->status == 'B')
                                 <span class="inline-flex rounded-full bg-error-50 px-3 py-1 text-xs font-medium text-error-600 dark:bg-error-500/15 dark:text-error-500">Bolos</span>
                             @else
                                 <span class="inline-flex rounded-full bg-error-50 px-3 py-1 text-xs font-medium text-error-600 dark:bg-error-500/15 dark:text-error-500">Alpha</span>
                             @endif
                         </td>
-                        <td class="px-4 py-4">
-                            <p class="text-gray-500 dark:text-gray-400 text-xs">{{ $row->keterangan }}</p>
+                        <td class="border-b border-gray-100 px-4 py-4 dark:border-gray-800">
+                            <p class="text-gray-500 dark:text-gray-400 text-xs">{{ $d->keterangan }}</p>
                         </td>
-                        <td class="px-4 py-4">
+                        <td class="border-b border-gray-100 px-4 py-4 text-center dark:border-gray-800">
                             <div class="flex items-center justify-center gap-2">
                                 <button class="btnEditStatus text-brand-500 hover:text-brand-700 hover:bg-brand-50 p-2 rounded-lg transition" 
-                                    data-id="{{ $row->id }}" data-nama="{{ $row->nama }}" data-status="{{ $row->status }}" data-keterangan="{{ $row->keterangan }}"
-                                    data-masuk="{{ $row->jam_masuk != '-' ? \Carbon\Carbon::parse($row->jam_masuk)->format('H:i') : '' }}"
-                                    data-pulang="{{ $row->jam_pulang != '-' ? \Carbon\Carbon::parse($row->jam_pulang)->format('H:i') : '' }}"
+                                    data-id="{{ $d->id }}" data-nama="{{ $d->nama }}" data-status="{{ $d->status }}" data-keterangan="{{ $d->keterangan }}"
+                                    data-masuk="{{ $d->jam_masuk != '-' ? \Carbon\Carbon::parse($d->jam_masuk)->format('H:i') : '' }}"
+                                    data-pulang="{{ $d->jam_pulang != '-' ? \Carbon\Carbon::parse($d->jam_pulang)->format('H:i') : '' }}"
                                     @click="$dispatch('open-modal', 'modalEditStatus')" title="Edit Status">
                                     <i class="fas fa-edit"></i>
                                 </button>
                                 
-                                @if($row->absen_id)
+                                @if($d->absen_id)
                                     <button class="btnHapus text-error-500 hover:text-error-700 hover:bg-error-50 p-2 rounded-lg transition" 
-                                        data-id="{{ $row->id }}" data-nama="{{ $row->nama }}"
+                                        data-id="{{ $d->id }}" data-nama="{{ $d->nama }}"
                                         @click="$dispatch('open-modal', 'modalHapus')" title="Hapus Data">
                                         <i class="fas fa-trash"></i>
                                     </button>
@@ -133,19 +159,62 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="7" class="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
-                            Tidak ada data absensi ditemukan untuk filter yang dipilih.
+                        <td colspan="8" class="border-b border-gray-100 px-4 py-8 dark:border-gray-800 text-center text-gray-500 dark:text-gray-400">
+                            Tidak ada data siswa / absensi.
                         </td>
                     </tr>
                 @endforelse
             </tbody>
         </table>
     </div>
-    
+
     <!-- Pagination -->
     <div class="px-5 py-4 border-t border-gray-200 dark:border-gray-800">
         {{ $allSiswa->links('vendor.pagination.tailwind') }}
     </div>
+
+    <!-- Modal Bulk Edit Absensi -->
+    <x-ui.modal id="modalBulkEditAbsensi" :is-open="false">
+        <div class="p-6">
+            <div class="flex items-center justify-between mb-5">
+                <h3 class="text-xl font-bold text-gray-800 dark:text-white/90">Update Status Massal</h3>
+                <button @click="open = false" class="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white"><i class="fas fa-times"></i></button>
+            </div>
+            <form action="{{ route('absensi.bulkUpdate') }}" method="POST">
+                @csrf
+                <input type="hidden" name="tanggal" value="{{ $tanggal }}">
+                <input type="hidden" name="student_ids" x-bind:value="selected.join(',')">
+                
+                <div class="mb-4">
+                    <p class="text-sm text-gray-600 dark:text-gray-400">Anda akan mengupdate status absensi untuk <span class="font-bold text-brand-500" x-text="selected.length"></span> siswa terpilih pada tanggal <span class="font-bold">{{ \Carbon\Carbon::parse($tanggal)->format('d-m-Y') }}</span>.</p>
+                </div>
+                
+                <div class="space-y-4">
+                    <div>
+                        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Ubah Status Menjadi</label>
+                        <select name="status" required class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                            <option value="">-- Pilih Status --</option>
+                            <option value="H">Hadir</option>
+                            <option value="I">Izin</option>
+                            <option value="S">Sakit</option>
+                            <option value="A">Alpha</option>
+                            <option value="B">Bolos</option>
+                            <option value="T">Terlambat</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Keterangan (Opsional)</label>
+                        <input type="text" name="keterangan" placeholder="Keterangan massal..." class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                    </div>
+                </div>
+                
+                <div class="mt-6 flex justify-end gap-3">
+                    <button type="button" @click="open = false" class="rounded-lg border border-gray-200 px-4 py-2 text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-gray-800">Batal</button>
+                    <button type="submit" class="rounded-lg bg-brand-500 px-4 py-2 text-white hover:bg-brand-600">Simpan Perubahan</button>
+                </div>
+            </form>
+        </div>
+    </x-ui.modal>
 </div>
 
 <!-- ========================= MODALS ========================= -->
@@ -267,5 +336,22 @@
                 $('#hapus_nama').text(nama);
             });
         });
+        
+        function bulkAbsensiActions() {
+            return {
+                selected: [],
+                allIds: {{ json_encode($allSiswa->pluck('id')->toArray()) }},
+                get isAllSelected() {
+                    return this.selected.length > 0 && this.selected.length === this.allIds.length;
+                },
+                toggleAll() {
+                    if (this.isAllSelected) {
+                        this.selected = [];
+                    } else {
+                        this.selected = [...this.allIds].map(String);
+                    }
+                }
+            }
+        }
     </script>
 @endpush

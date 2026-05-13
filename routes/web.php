@@ -111,6 +111,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/absensi/guru/store', [App\Http\Controllers\TeacherAttendanceReportController::class, 'store'])->name('absensi-guru.store');
         Route::delete('/absensi/guru/destroy', [App\Http\Controllers\TeacherAttendanceReportController::class, 'destroy'])->name('absensi-guru.destroy');
         Route::post('/absensi/update', [App\Http\Controllers\AttendanceController::class, 'update'])->name('absensi.update');
+        Route::post('/absensi/bulk-update', [App\Http\Controllers\AttendanceController::class, 'bulkUpdate'])->name('absensi.bulkUpdate');
         Route::delete('/absensi/destroy', [App\Http\Controllers\AttendanceController::class, 'destroy'])->name('absensi.destroy');
 
         // Rekap

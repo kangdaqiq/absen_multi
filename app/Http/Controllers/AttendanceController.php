@@ -17,6 +17,9 @@ class AttendanceController extends Controller
 
         // Filter by Class (optional)
         $kelasId = $request->input('kelas_id');
+        
+        // Filter by Status (optional)
+        $statusFilter = $request->input('status');
 
         // Fetch all students (filtered by class if needed) to ensure we list everyone
         $siswaQuery = Siswa::with('kelas')->orderBy('nama');
@@ -33,6 +36,24 @@ class AttendanceController extends Controller
         if ($request->has('search') && !empty($request->search)) {
             $search = $request->search;
             $siswaQuery->where('nama', 'like', "%{$search}%");
+        }
+        
+        // Apply Status Filter
+        if ($statusFilter && $statusFilter !== '') {
+            if ($statusFilter === 'A') {
+                // Alpha means NO attendance record for that date, or an explicit 'A' record
+                $siswaQuery->where(function($q) use ($tanggal) {
+                    $q->whereDoesntHave('attendance', function($q2) use ($tanggal) {
+                        $q2->where('tanggal', $tanggal);
+                    })->orWhereHas('attendance', function($q2) use ($tanggal) {
+                        $q2->where('tanggal', $tanggal)->where('status', 'A');
+                    });
+                });
+            } else {
+                $siswaQuery->whereHas('attendance', function($q) use ($tanggal, $statusFilter) {
+                    $q->where('tanggal', $tanggal)->where('status', $statusFilter);
+                });
+            }
         }
 
         $allSiswa = $siswaQuery->paginate(50)->withQueryString();
@@ -67,7 +88,7 @@ class AttendanceController extends Controller
 
         $allKelas = $kelasQuery->get();
 
-        return view('absensi.index', compact('data', 'allSiswa', 'tanggal', 'allKelas', 'kelasId'));
+        return view('absensi.index', compact('data', 'allSiswa', 'tanggal', 'allKelas', 'kelasId', 'statusFilter'));
     }
 
     // Manual Update (e.g., Izin, Sakit)
@@ -135,5 +156,40 @@ class AttendanceController extends Controller
         }
 
         return back()->with('error', 'Data absensi tidak ditemukan.');
+    }
+
+    // Bulk Update
+    public function bulkUpdate(Request $request)
+    {
+        $request->validate([
+            'student_ids' => 'required|string',
+            'tanggal' => 'required|date',
+            'status' => 'required|in:H,I,S,A,B,T',
+            'keterangan' => 'nullable',
+        ]);
+
+        $studentIds = explode(',', $request->student_ids);
+        $date = $request->tanggal;
+        $status = $request->status;
+
+        foreach ($studentIds as $id) {
+            $att = Attendance::where('student_id', $id)->where('tanggal', $date)->first();
+
+            if ($att) {
+                $att->update([
+                    'status' => $status,
+                    'keterangan' => $request->keterangan,
+                ]);
+            } else {
+                Attendance::create([
+                    'student_id' => $id,
+                    'tanggal' => $date,
+                    'status' => $status,
+                    'keterangan' => $request->keterangan,
+                ]);
+            }
+        }
+
+        return back()->with('success', count($studentIds) . ' status absensi berhasil diperbarui.');
     }
 }

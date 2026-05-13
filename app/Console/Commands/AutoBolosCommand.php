@@ -202,7 +202,7 @@ class AutoBolosCommand extends Command
             ->whereHas('student.kelas', function ($q) {
                 $q->where('is_active_attendance', true);
             })
-            ->with(['student.kelas'])
+            ->with(['student.kelas', 'student.kelas.jurusan'])
             ->orderBy('status')
             ->get();
 
@@ -215,6 +215,7 @@ class AutoBolosCommand extends Command
             ->whereHas('student.kelas', function ($q) {
                 $q->where('is_active_attendance', true);
             })
+            ->with(['student.kelas', 'student.kelas.jurusan'])
             ->get();
 
         // Jika tidak ada siswa absen (non-T) SAMA SEKALI di sekolah, bisa langsung return
@@ -298,10 +299,49 @@ class AutoBolosCommand extends Command
             $groupedGlobal = $absentStudents->groupBy('status');
             $totalPresentGlobal = $presentStudents->count();
 
+            $statsByJurusan = [];
+            $allStudents = $presentStudents->concat($absentStudents);
+            
+            foreach ($allStudents as $att) {
+                $s = $att->student;
+                $kelasObj = $s->kelas;
+                $kelasName = $kelasObj->nama_kelas ?? 'Tanpa Kelas';
+                $jurusanName = ($kelasObj && $kelasObj->jurusan) ? $kelasObj->jurusan->nama_jurusan : 'Tanpa Jurusan';
+
+                if (!isset($statsByJurusan[$jurusanName])) {
+                    $statsByJurusan[$jurusanName] = [];
+                }
+                if (!isset($statsByJurusan[$jurusanName][$kelasName])) {
+                    $statsByJurusan[$jurusanName][$kelasName] = [
+                        'total' => 0,
+                        'H' => 0,
+                        'T' => 0,
+                        'A' => 0,
+                        'S' => 0,
+                        'I' => 0,
+                        'B' => 0
+                    ];
+                }
+
+                $statsByJurusan[$jurusanName][$kelasName]['total']++;
+                $status = $att->status;
+                if (isset($statsByJurusan[$jurusanName][$kelasName][$status])) {
+                    $statsByJurusan[$jurusanName][$kelasName][$status]++;
+                }
+            }
+
+            // Sort by Jurusan Name, then by Kelas Name
+            ksort($statsByJurusan);
+            foreach ($statsByJurusan as &$kelasArr) {
+                ksort($kelasArr);
+            }
+            unset($kelasArr);
+
             $messageGlobal = WhatsAppMessageTemplates::finalAbsenceReportGlobal(
                 totalPresent: $totalPresentGlobal,
-                totalAbsent: $absentStudents->count(),
-                absentStudentsGrouped: $groupedGlobal
+                totalAbsent: $absentStudents->whereIn('status', ['A', 'B', 'I', 'S'])->count(),
+                absentStudentsGrouped: $groupedGlobal,
+                statsByJurusan: $statsByJurusan
             );
 
             // Legacy target

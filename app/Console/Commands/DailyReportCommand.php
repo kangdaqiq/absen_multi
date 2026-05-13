@@ -238,9 +238,26 @@ class DailyReportCommand extends Command
                     }
                 }
             } else {
-                // No record = Alpha
+                // No record = Alpha — count it in report AND persist to DB
                 $statsByJurusan[$jurusanName][$kelasName]['A']++;
                 $absentByStatus['A'][] = "{$s->nama} ({$kelasName})";
+
+                // Persist Alpha record so live monitoring shows it correctly
+                // Flag is_auto_alpha = true so offline sync can override it later
+                Attendance::firstOrCreate(
+                    ['student_id' => $s->id, 'tanggal' => $today],
+                    [
+                        'jam_masuk'   => null,
+                        'jam_pulang'  => null,
+                        'jam_kerja'   => null,
+                        'status'      => 'A',
+                        'keterangan'  => 'Alpha (Laporan Pagi)',
+                        'is_auto_alpha' => true,
+                        'lokasi_masuk' => 'System',
+                        'created_at'  => now(),
+                        'updated_at'  => now(),
+                    ]
+                );
             }
         }
 

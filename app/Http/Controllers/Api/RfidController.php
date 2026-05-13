@@ -561,9 +561,11 @@ class RfidController extends Controller
                 ->lockForUpdate()
                 ->first();
 
-            // If record exists but jam_masuk is NULL (Sakit, Izin, or Alpha from system)
+            // If record exists but jam_masuk is NULL (Sakit, Izin, Alpha auto-marked from system/daily-report)
             // allow a fresh check-in to override the system record
-            if ($att && $att->jam_masuk === null && in_array($att->status, ['S', 'I', 'A', 'B'])) {
+            $isSystemAlpha = $att && $att->jam_masuk === null && ($att->is_auto_alpha || in_array($att->status, ['S', 'I', 'A', 'B']));
+            if ($isSystemAlpha) {
+                Log::info("[SCAN] Override system auto-record (status={$att->status}, is_auto_alpha=" . ($att->is_auto_alpha ? 'true' : 'false') . ") for student_id={$siswa->id} on {$today}");
                 $att->delete();
                 $att = null;
             }

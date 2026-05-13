@@ -604,6 +604,7 @@ class RfidController extends Controller
                         Log::error("WA Checkout (disabled mode) Error: " . $e->getMessage());
                     }
 
+                    $this->logRequest($apiKey, 'checkout_success', $uid, true, 'Pulang (mode nonaktif): ' . $siswa->nama);
                     return $this->response(true, 'success', 'Absen Pulang Berhasil.', 'ok', [
                         'type'  => 'absen_pulang',
                         'nama'  => $siswa->nama,

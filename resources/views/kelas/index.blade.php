@@ -43,6 +43,7 @@
                         class="bg-gray-50 text-left dark:bg-gray-800/50 text-gray-800 dark:text-white/90 font-medium text-sm">
                         <th class="px-4 py-4 xl:pl-6 w-16">No</th>
                         <th class="px-4 py-4">Nama Kelas</th>
+                        <th class="px-4 py-4">Jurusan</th>
                         <th class="px-4 py-4">Wali Kelas</th>
                         @if(auth()->user()->school && auth()->user()->school->wa_enabled)
                             <th class="px-4 py-4">ID Grup WA</th>

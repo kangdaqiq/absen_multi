@@ -583,9 +583,17 @@ class RfidController extends Controller
                     ->where('setting_key', 'enable_checkout_attendance')
                     ->value('setting_value') ?? 'true';
 
-                // If checkout is disabled, treat as complete attendance
+                // If checkout is disabled, still record jam_pulang silently (so final report is accurate)
+                // but don't show a checkout confirmation to the user, and no bolos will occur
                 if ($checkoutEnabled === 'false') {
-                    DB::rollBack();
+                    $masuk = Carbon::parse($att->tanggal . ' ' . $att->jam_masuk);
+                    $totalSeconds = abs($masuk->diffInSeconds($now, false));
+                    $att->update([
+                        'jam_pulang'    => $now->toTimeString(),
+                        'total_seconds' => $totalSeconds,
+                        'updated_at'    => now(),
+                    ]);
+                    DB::commit();
                     return $this->response(true, 'success', 'Absen Lengkap', 'ok', ['type' => 'sudah_lengkap', 'nama' => $siswa->nama]);
                 }
 

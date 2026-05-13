@@ -23,7 +23,14 @@
         <!-- Header & Search -->
         <div
             class="flex flex-col sm:flex-row justify-between items-center px-5 py-4 border-b border-gray-200 dark:border-gray-800 gap-4">
-            <h4 class="font-semibold text-gray-800 dark:text-white/90">Daftar Kelas</h4>
+            <div class="flex items-center gap-3">
+                <h4 class="font-semibold text-gray-800 dark:text-white/90">Daftar Kelas</h4>
+                <button type="button" id="btnBulkEdit"
+                    class="hidden rounded-lg bg-brand-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-600 transition"
+                    @click="$dispatch('open-modal', 'modalBulkEdit')">
+                    <i class="fas fa-edit mr-1"></i> Edit Masal
+                </button>
+            </div>
 
             <form action="{{ route('kelas.index') }}" method="GET" class="relative w-full sm:w-64">
                 <input type="text" name="search" value="{{ request('search') }}" placeholder="Cari Kelas..."
@@ -41,7 +48,10 @@
                 <thead>
                     <tr
                         class="bg-gray-50 text-left dark:bg-gray-800/50 text-gray-800 dark:text-white/90 font-medium text-sm">
-                        <th class="px-4 py-4 xl:pl-6 w-16">No</th>
+                        <th class="px-4 py-4 xl:pl-6 w-12 text-center">
+                            <input type="checkbox" id="checkAll" class="rounded border-gray-300 text-brand-600 focus:border-brand-500 focus:ring-brand-500 cursor-pointer">
+                        </th>
+                        <th class="px-4 py-4 w-16">No</th>
                         <th class="px-4 py-4">Nama Kelas</th>
                         <th class="px-4 py-4">Jurusan</th>
                         <th class="px-4 py-4">Wali Kelas</th>
@@ -56,7 +66,10 @@
                 <tbody class="text-sm">
                     @forelse ($kelas as $k)
                         <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-                            <td class="border-b border-gray-100 px-4 py-4 dark:border-gray-800 xl:pl-6">
+                            <td class="border-b border-gray-100 px-4 py-4 dark:border-gray-800 xl:pl-6 text-center">
+                                <input type="checkbox" name="selected_ids[]" value="{{ $k->id }}" class="checkItem rounded border-gray-300 text-brand-600 focus:border-brand-500 focus:ring-brand-500 cursor-pointer">
+                            </td>
+                            <td class="border-b border-gray-100 px-4 py-4 dark:border-gray-800">
                                 <p class="text-gray-500 dark:text-gray-400">{{ $loop->iteration + $kelas->firstItem() - 1 }}</p>
                             </td>
                             <td class="border-b border-gray-100 px-4 py-4 dark:border-gray-800">
@@ -136,7 +149,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="{{ auth()->user()->school && auth()->user()->school->wa_enabled ? '8' : '7' }}"
+                            <td colspan="{{ auth()->user()->school && auth()->user()->school->wa_enabled ? '9' : '8' }}"
                                 class="border-b border-gray-100 px-4 py-8 dark:border-gray-800 text-center text-gray-500 dark:text-gray-400">
                                 Tidak ada data kelas ditemukan.
                             </td>
@@ -391,6 +404,61 @@
         </div>
     </x-ui.modal>
 
+    <!-- Modal Bulk Edit -->
+    <x-ui.modal id="modalBulkEdit" :is-open="false">
+        <div class="p-6">
+            <div class="flex items-center justify-between mb-5">
+                <h3 class="text-xl font-bold text-gray-800 dark:text-white/90">Edit Masal Kelas</h3>
+                <button @click="open = false"
+                    class="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white"><i
+                        class="fas fa-times"></i></button>
+            </div>
+            <form action="{{ route('kelas.bulk-update') }}" method="POST" id="formBulkEdit">
+                @csrf
+                @method('PUT')
+                <div id="bulkEditIdsContainer"></div>
+
+                <div class="space-y-4">
+                    <div>
+                        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Jurusan</label>
+                        <select name="jurusan_id"
+                            class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                            <option value="no_change">-- Jangan Ubah --</option>
+                            <option value="null">Kosongkan Jurusan (Tanpa Jurusan)</option>
+                            @foreach ($jurusans as $j)
+                                <option value="{{ $j->id }}">{{ $j->nama_jurusan }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Status Absen</label>
+                        <select name="is_active_attendance"
+                            class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                            <option value="no_change">-- Jangan Ubah --</option>
+                            <option value="1">Aktif</option>
+                            <option value="0">Nonaktif</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Status Report WA</label>
+                        <select name="is_active_report"
+                            class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                            <option value="no_change">-- Jangan Ubah --</option>
+                            <option value="1">Aktif</option>
+                            <option value="0">Nonaktif</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="mt-6 flex justify-end gap-3">
+                    <button type="button" @click="open = false"
+                        class="rounded-lg border border-gray-200 px-4 py-2 text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-gray-800">Batal</button>
+                    <button type="submit"
+                        class="rounded-lg bg-brand-500 px-4 py-2 text-white hover:bg-brand-600">Update Masal</button>
+                </div>
+            </form>
+        </div>
+    </x-ui.modal>
+
 @endsection
 
 @push('scripts')
@@ -416,6 +484,37 @@
                 var id = $(this).data('id');
                 $('#hapus_nama_kelas').text($(this).data('nama'));
                 $('#formHapusKelas').attr('action', '{{ url('kelas') }}/' + id);
+            });
+
+            // Bulk Edit Checkboxes
+            function toggleBulkEditBtn() {
+                if ($('.checkItem:checked').length > 0) {
+                    $('#btnBulkEdit').removeClass('hidden');
+                } else {
+                    $('#btnBulkEdit').addClass('hidden');
+                }
+            }
+
+            $('#checkAll').on('change', function () {
+                $('.checkItem').prop('checked', this.checked);
+                toggleBulkEditBtn();
+            });
+
+            $('.checkItem').on('change', function () {
+                if ($('.checkItem:checked').length === $('.checkItem').length) {
+                    $('#checkAll').prop('checked', true);
+                } else {
+                    $('#checkAll').prop('checked', false);
+                }
+                toggleBulkEditBtn();
+            });
+
+            $('#formBulkEdit').on('submit', function() {
+                var container = $('#bulkEditIdsContainer');
+                container.empty();
+                $('.checkItem:checked').each(function() {
+                    container.append('<input type="hidden" name="kelas_ids[]" value="' + $(this).val() + '">');
+                });
             });
         });
 

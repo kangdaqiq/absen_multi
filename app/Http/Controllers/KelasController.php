@@ -263,4 +263,42 @@ class KelasController extends Controller
 
         return $response;
     }
+
+    public function bulkUpdate(Request $request)
+    {
+        $schoolId = auth()->user()->isSuperAdmin() ? null : auth()->user()->school_id;
+
+        $request->validate([
+            'kelas_ids' => 'required|array',
+            'kelas_ids.*' => 'exists:kelas,id',
+            'jurusan_id' => 'nullable|string', // can be empty string for "Don't change"
+            'is_active_attendance' => 'nullable|string',
+            'is_active_report' => 'nullable|string',
+        ]);
+
+        $ids = $request->kelas_ids;
+        $updates = [];
+
+        if ($request->filled('jurusan_id') && $request->jurusan_id !== 'no_change') {
+            $updates['jurusan_id'] = $request->jurusan_id === 'null' ? null : $request->jurusan_id;
+        }
+
+        if ($request->filled('is_active_attendance') && $request->is_active_attendance !== 'no_change') {
+            $updates['is_active_attendance'] = $request->is_active_attendance === '1';
+        }
+
+        if ($request->filled('is_active_report') && $request->is_active_report !== 'no_change') {
+            $updates['is_active_report'] = $request->is_active_report === '1';
+        }
+
+        if (!empty($updates)) {
+            $query = Kelas::whereIn('id', $ids);
+            if ($schoolId) {
+                $query->where('school_id', $schoolId);
+            }
+            $query->update($updates);
+        }
+
+        return back()->with('success', count($ids) . ' kelas berhasil diperbarui secara massal.');
+    }
 }

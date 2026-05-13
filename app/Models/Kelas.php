@@ -8,7 +8,7 @@ class Kelas extends Model
 {
     protected $table = 'kelas';
     public $timestamps = false;
-    protected $fillable = ['nama_kelas', 'wali_kelas_id', 'wa_group_id', 'is_active_attendance', 'is_active_report', 'school_id'];
+    protected $fillable = ['nama_kelas', 'wali_kelas_id', 'wa_group_id', 'is_active_attendance', 'is_active_report', 'school_id', 'jurusan_id'];
 
     public function waliKelas()
     {
@@ -18,5 +18,10 @@ class Kelas extends Model
     public function jadwalPelajaran()
     {
         return $this->hasMany(JadwalPelajaran::class, 'kelas_id');
+    }
+
+    public function jurusan()
+    {
+        return $this->belongsTo(Jurusan::class, 'jurusan_id');
     }
 }

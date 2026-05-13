@@ -62,6 +62,9 @@
                                 <p class="font-medium text-gray-800 dark:text-white/90">{{ $k->nama_kelas }}</p>
                             </td>
                             <td class="border-b border-gray-100 px-4 py-4 dark:border-gray-800">
+                                <p class="text-gray-500 dark:text-gray-400">{{ $k->jurusan ? $k->jurusan->nama_jurusan : '-' }}</p>
+                            </td>
+                            <td class="border-b border-gray-100 px-4 py-4 dark:border-gray-800">
                                 @if($k->waliKelas)
                                     <a href="{{ route('guru.index') }}"
                                         class="text-brand-500 hover:underline">{{ $k->waliKelas->nama }}</a>
@@ -115,7 +118,7 @@
                                     <button
                                         class="btnEdit text-warning-500 hover:text-warning-700 hover:bg-warning-50 p-2 rounded-lg transition"
                                         data-id="{{ $k->id }}" data-nama="{{ $k->nama_kelas }}"
-                                        data-wali="{{ $k->wali_kelas_id }}" data-wa-group-id="{{ $k->wa_group_id }}"
+                                        data-wali="{{ $k->wali_kelas_id }}" data-jurusan="{{ $k->jurusan_id }}" data-wa-group-id="{{ $k->wa_group_id }}"
                                         @click="$dispatch('open-modal', 'modalEditKelas')" title="Edit">
                                         <i class="fas fa-edit"></i>
                                     </button>
@@ -132,7 +135,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="{{ auth()->user()->school && auth()->user()->school->wa_enabled ? '7' : '6' }}"
+                            <td colspan="{{ auth()->user()->school && auth()->user()->school->wa_enabled ? '8' : '7' }}"
                                 class="border-b border-gray-100 px-4 py-8 dark:border-gray-800 text-center text-gray-500 dark:text-gray-400">
                                 Tidak ada data kelas ditemukan.
                             </td>
@@ -174,6 +177,17 @@
                             <option value="">-- Pilih Wali Kelas --</option>
                             @foreach($gurus as $g)
                                 <option value="{{ $g->id }}">{{ $g->nama }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Jurusan
+                            (Opsional)</label>
+                        <select name="jurusan_id"
+                            class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                            <option value="">-- Pilih Jurusan --</option>
+                            @foreach ($jurusans as $j)
+                                <option value="{{ $j->id }}">{{ $j->nama_jurusan }}</option>
                             @endforeach
                         </select>
                     </div>
@@ -229,6 +243,17 @@
                             <option value="">-- Pilih Wali Kelas --</option>
                             @foreach($gurus as $g)
                                 <option value="{{ $g->id }}">{{ $g->nama }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Jurusan
+                            (Opsional)</label>
+                        <select name="jurusan_id" id="edit_jurusan_id"
+                            class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                            <option value="">-- Pilih Jurusan --</option>
+                            @foreach ($jurusans as $j)
+                                <option value="{{ $j->id }}">{{ $j->nama_jurusan }}</option>
                             @endforeach
                         </select>
                     </div>
@@ -375,10 +400,12 @@
                 var id = $(this).data('id');
                 var nama = $(this).data('nama');
                 var wali = $(this).data('wali');
+                var jurusan = $(this).data('jurusan');
                 var waGroupId = $(this).data('wa-group-id');
 
                 $('#edit_nama_kelas').val(nama);
                 $('#edit_wali_kelas').val(wali).trigger('change');
+                $('#edit_jurusan_id').val(jurusan).trigger('change');
                 $('#edit_wa_group_id').val(waGroupId);
                 $('#formEditKelas').attr('action', '{{ url('kelas') }}/' + id);
             });

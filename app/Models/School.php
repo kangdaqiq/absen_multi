@@ -71,6 +71,14 @@ class School extends Model
     }
 
     /**
+     * Get all jurusan for this school
+     */
+    public function jurusan()
+    {
+        return $this->hasMany(Jurusan::class);
+    }
+
+    /**
      * Get all admins for this school
      */
     public function admins()

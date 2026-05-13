@@ -113,6 +113,7 @@ class MenuHelper
                     'name' => 'Master Data',
                     'icon' => 'tables',
                     'subItems' => [
+                        ['name' => 'Jurusan', 'path' => route('jurusan.index', [], false)],
                         ['name' => 'Kelas', 'path' => route('kelas.index', [], false)]
                     ]
                 ];

@@ -15,13 +15,15 @@ class KelasController extends Controller
 {
     public function index(Request $request)
     {
-        $kelasQuery = Kelas::with('waliKelas')->orderBy('nama_kelas');
+        $kelasQuery = Kelas::with(['waliKelas', 'jurusan'])->orderBy('nama_kelas');
         $gurusQuery = \App\Models\Guru::orderBy('nama');
+        $jurusansQuery = \App\Models\Jurusan::orderBy('nama_jurusan');
 
         // Filter by school_id for non-super admin users
         if (auth()->user() && !auth()->user()->isSuperAdmin()) {
             $kelasQuery->where('school_id', auth()->user()->school_id);
             $gurusQuery->where('school_id', auth()->user()->school_id);
+            $jurusansQuery->where('school_id', auth()->user()->school_id);
         }
 
         // Search functionality
@@ -32,7 +34,8 @@ class KelasController extends Controller
 
         $kelas = $kelasQuery->paginate(20)->withQueryString();
         $gurus = $gurusQuery->get();
-        return view('kelas.index', compact('kelas', 'gurus'));
+        $jurusans = $jurusansQuery->get();
+        return view('kelas.index', compact('kelas', 'gurus', 'jurusans'));
     }
 
     public function store(Request $request)
@@ -49,6 +52,7 @@ class KelasController extends Controller
                 })
             ],
             'wali_kelas_id' => 'nullable|exists:guru,id',
+            'jurusan_id' => 'nullable|exists:jurusan,id',
             'wa_group_id' => 'nullable|string|max:100',
         ]);
 
@@ -79,6 +83,7 @@ class KelasController extends Controller
                 })
             ],
             'wali_kelas_id' => 'nullable|exists:guru,id',
+            'jurusan_id' => 'nullable|exists:jurusan,id',
             'wa_group_id' => 'nullable|string|max:100',
         ]);
 

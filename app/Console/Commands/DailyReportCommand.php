@@ -126,18 +126,19 @@ class DailyReportCommand extends Command
                 // Count consecutive "Sakit" days backwards starting from yesterday
                 $consecutiveDays = 1;
                 $checkDate = \Carbon\Carbon::parse($yesterday)->subDay();
-                
+
                 // Maximum safety loop
                 for ($i = 0; $i < 30; $i++) {
                     $prevRecord = Attendance::where('student_id', $att->student_id)
                         ->where('tanggal', $checkDate->format('Y-m-d'))
                         ->where('status', 'S')
                         ->exists();
-                    
+
                     if ($prevRecord) {
                         $consecutiveDays++;
                         $checkDate->subDay();
-                        if ($consecutiveDays >= $maxSakitDays) break;
+                        if ($consecutiveDays >= $maxSakitDays)
+                            break;
                     } else {
                         break;
                     }
@@ -247,15 +248,15 @@ class DailyReportCommand extends Command
                 Attendance::firstOrCreate(
                     ['student_id' => $s->id, 'tanggal' => $today],
                     [
-                        'jam_masuk'   => null,
-                        'jam_pulang'  => null,
-                        'jam_kerja'   => null,
-                        'status'      => 'A',
-                        'keterangan'  => 'Alpha (Laporan Pagi)',
+                        'jam_masuk' => null,
+                        'jam_pulang' => null,
+                        'jam_kerja' => null,
+                        'status' => 'A',
+                        'keterangan' => 'Alpha',
                         'is_auto_alpha' => true,
                         'lokasi_masuk' => 'System',
-                        'created_at'  => now(),
-                        'updated_at'  => now(),
+                        'created_at' => now(),
+                        'updated_at' => now(),
                     ]
                 );
             }

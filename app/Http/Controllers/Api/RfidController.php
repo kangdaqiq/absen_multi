@@ -589,13 +589,13 @@ class RfidController extends Controller
                     $masuk = Carbon::parse($att->tanggal . ' ' . $att->jam_masuk);
                     $totalSeconds = abs($masuk->diffInSeconds($now, false));
                     $att->update([
-                        'jam_pulang'    => $now->toTimeString(),
+                        'jam_pulang' => $now->toTimeString(),
                         'total_seconds' => $totalSeconds,
-                        'updated_at'    => now(),
+                        'updated_at' => now(),
                     ]);
                     DB::commit();
                     $hours = floor($totalSeconds / 3600);
-                    $mins  = floor(($totalSeconds % 3600) / 60);
+                    $mins = floor(($totalSeconds % 3600) / 60);
 
                     // Kirim notif WA pulang seperti biasa
                     try {
@@ -604,12 +604,12 @@ class RfidController extends Controller
                         Log::error("WA Checkout (disabled mode) Error: " . $e->getMessage());
                     }
 
-                    $this->logRequest($apiKey, 'checkout_success', $uid, true, 'Pulang (mode nonaktif): ' . $siswa->nama);
+                    $this->logRequest($apiKey, 'checkout_success', $uid, true, 'Pulang : ' . $siswa->nama);
                     return $this->response(true, 'success', 'Absen Pulang Berhasil.', 'ok', [
-                        'type'  => 'absen_pulang',
-                        'nama'  => $siswa->nama,
+                        'type' => 'absen_pulang',
+                        'nama' => $siswa->nama,
                         'hours' => $hours,
-                        'mins'  => $mins,
+                        'mins' => $mins,
                     ]);
                 }
 
@@ -668,7 +668,7 @@ class RfidController extends Controller
                 if ($att->status === 'B') {
                     $waktuMasuk = Carbon::parse($att->tanggal . ' ' . $att->jam_masuk);
                     $newStatus = $waktuMasuk->gt($batasTelat) ? 'T' : 'H';
-                    
+
                     // Bersihkan teks keterangan dari Auto Bolos
                     if ($newKeterangan) {
                         $newKeterangan = trim(str_replace('[Auto: Tidak Absen Pulang]', '', $newKeterangan));

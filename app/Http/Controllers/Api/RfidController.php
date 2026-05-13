@@ -596,6 +596,14 @@ class RfidController extends Controller
                     DB::commit();
                     $hours = floor($totalSeconds / 3600);
                     $mins  = floor(($totalSeconds % 3600) / 60);
+
+                    // Kirim notif WA pulang seperti biasa
+                    try {
+                        $this->wa->sendCheckOut($siswa->nama, $siswa->no_wa, $now->format('H:i'), $hours, $mins, 'Sistem Otomatis', $device->school_id, $masuk->format('H:i'), $siswa->wa_ortu, $now->format('d/m/Y'));
+                    } catch (\Exception $e) {
+                        Log::error("WA Checkout (disabled mode) Error: " . $e->getMessage());
+                    }
+
                     return $this->response(true, 'success', 'Absen Pulang Berhasil.', 'ok', [
                         'type'  => 'absen_pulang',
                         'nama'  => $siswa->nama,

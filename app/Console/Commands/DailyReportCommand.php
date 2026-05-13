@@ -176,7 +176,7 @@ class DailyReportCommand extends Command
         $siswaAll = Siswa::where('school_id', $schoolId)
             ->whereHas('kelas', function ($q) {
                 $q->where('is_active_attendance', true);
-            })->with('kelas')->orderBy('nama')->get();
+            })->with(['kelas', 'kelas.jurusan'])->orderBy('nama')->get();
 
         // Get Attendance SCOPED (Implicit by student_id, but good to optimize)
         // We can just fetch all attendance for today and filter by student IDs in memory or query
@@ -195,28 +195,61 @@ class DailyReportCommand extends Command
             'B' => []
         ];
 
+        $statsByJurusan = [];
+
         foreach ($siswaAll as $s) {
+            $kelasObj = $s->kelas;
+            $kelasName = $kelasObj->nama_kelas ?? 'Tanpa Kelas';
+            $jurusanName = ($kelasObj && $kelasObj->jurusan) ? $kelasObj->jurusan->nama_jurusan : 'Tanpa Jurusan';
+
+            if (!isset($statsByJurusan[$jurusanName])) {
+                $statsByJurusan[$jurusanName] = [];
+            }
+            if (!isset($statsByJurusan[$jurusanName][$kelasName])) {
+                $statsByJurusan[$jurusanName][$kelasName] = [
+                    'total' => 0,
+                    'H' => 0,
+                    'T' => 0,
+                    'A' => 0,
+                    'S' => 0,
+                    'I' => 0,
+                    'B' => 0
+                ];
+            }
+
+            $statsByJurusan[$jurusanName][$kelasName]['total']++;
+
             if ($attendance->has($s->id)) {
                 $att = $attendance[$s->id];
-                if ($att->status === 'H') {
+                $status = $att->status;
+
+                if (isset($statsByJurusan[$jurusanName][$kelasName][$status])) {
+                    $statsByJurusan[$jurusanName][$kelasName][$status]++;
+                }
+
+                if ($status === 'H') {
                     $totalMasuk++;
-                } elseif ($att->status === 'T') {
+                } elseif ($status === 'T') {
                     $totalMasuk++; // Terlambat tetap dihitung masuk
-                    $kelas = $s->kelas->nama_kelas ?? '-';
-                    $absentByStatus['T'][] = "{$s->nama} ({$kelas})";
+                    $absentByStatus['T'][] = "{$s->nama} ({$kelasName})";
                 } else {
-                    $status = $att->status;
                     if (isset($absentByStatus[$status])) {
-                        $kelas = $s->kelas->nama_kelas ?? '-';
-                        $absentByStatus[$status][] = "{$s->nama} ({$kelas})";
+                        $absentByStatus[$status][] = "{$s->nama} ({$kelasName})";
                     }
                 }
             } else {
                 // No record = Alpha
-                $kelas = $s->kelas->nama_kelas ?? '-';
-                $absentByStatus['A'][] = "{$s->nama} ({$kelas})";
+                $statsByJurusan[$jurusanName][$kelasName]['A']++;
+                $absentByStatus['A'][] = "{$s->nama} ({$kelasName})";
             }
         }
+
+        // Sort by Jurusan Name, then by Kelas Name
+        ksort($statsByJurusan);
+        foreach ($statsByJurusan as &$kelasArr) {
+            ksort($kelasArr);
+        }
+        unset($kelasArr);
 
         // Calculate total absent (T tidak dihitung sebagai tidak masuk)
         $totalTidakMasuk = 0;
@@ -294,7 +327,8 @@ class DailyReportCommand extends Command
             $msg = WhatsAppMessageTemplates::dailyReportGlobal(
                 totalMasuk: $totalMasuk,
                 totalTidakMasuk: $totalTidakMasuk,
-                absentByStatus: $absentByStatus
+                absentByStatus: $absentByStatus,
+                statsByJurusan: $statsByJurusan
             );
 
             if ($targetJid) {

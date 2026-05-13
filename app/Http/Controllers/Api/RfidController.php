@@ -584,7 +584,7 @@ class RfidController extends Controller
                     ->value('setting_value') ?? 'true';
 
                 // If checkout is disabled, still record jam_pulang silently (so final report is accurate)
-                // but don't show a checkout confirmation to the user, and no bolos will occur
+                // LCD still shows checkout screen ('absen_pulang'), but no bolos will be issued
                 if ($checkoutEnabled === 'false') {
                     $masuk = Carbon::parse($att->tanggal . ' ' . $att->jam_masuk);
                     $totalSeconds = abs($masuk->diffInSeconds($now, false));
@@ -594,7 +594,14 @@ class RfidController extends Controller
                         'updated_at'    => now(),
                     ]);
                     DB::commit();
-                    return $this->response(true, 'success', 'Absen Lengkap', 'ok', ['type' => 'sudah_lengkap', 'nama' => $siswa->nama]);
+                    $hours = floor($totalSeconds / 3600);
+                    $mins  = floor(($totalSeconds % 3600) / 60);
+                    return $this->response(true, 'success', 'Absen Pulang Berhasil.', 'ok', [
+                        'type'  => 'absen_pulang',
+                        'nama'  => $siswa->nama,
+                        'hours' => $hours,
+                        'mins'  => $mins,
+                    ]);
                 }
 
                 // Check Teacher Session (only open gates) Global? Or should be scoped?

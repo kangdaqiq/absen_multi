@@ -201,7 +201,7 @@ class DailyReportCommand extends Command
         foreach ($siswaAll as $s) {
             $kelasObj = $s->kelas;
             $kelasName = $kelasObj->nama_kelas ?? 'Tanpa Kelas';
-            $jurusanName = ($kelasObj && $kelasObj->jurusan) ? $kelasObj->jurusan->nama_jurusan : 'Tanpa Jurusan';
+            $jurusanName = ($kelasObj && $kelasObj->jurusan) ? $kelasObj->jurusan->nama_jurusan : 'belum di mapping';
 
             if (!isset($statsByJurusan[$jurusanName])) {
                 $statsByJurusan[$jurusanName] = [];

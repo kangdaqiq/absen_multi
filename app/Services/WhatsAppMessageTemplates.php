@@ -347,7 +347,7 @@ class WhatsAppMessageTemplates
                     $msg .= "Total Siswa : {$stats['total']}\n";
                     $msg .= "Hadir : {$stats['H']}\n";
                     $msg .= "Terlambat: {$stats['T']}\n";
-                    $msg .= "Alpa : {$stats['A']}\n";
+                    $msg .= "Alpha : {$stats['A']}\n";
                     $msg .= "Sakit : {$stats['S']}\n";
                     $msg .= "Izin : {$stats['I']}\n";
                     $msg .= "Bolos : {$stats['B']}\n\n";
@@ -421,7 +421,7 @@ class WhatsAppMessageTemplates
         iterable $absentStudentsGrouped,
         array $statsByJurusan = []
     ): string {
-        $msg = "📋 *LAPORAN FINAL ABSENSI (Global)*\n";
+        $msg = "📋 *LAPORAN FINAL ABSENSI*\n";
         $msg .= "📅 Tanggal: " . now()->format('d/m/Y') . "\n";
         $msg .= str_repeat("─", 30) . "\n";
         $msg .= "✅ Siswa Hadir: *{$totalPresent}*\n";

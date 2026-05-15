@@ -90,16 +90,25 @@ return $this->handleScan($fingerId, $device, $now);
 return $this->response(false, 'gagal', 'Finger ID required');
 }
 
-public function checkEnrollRequest(Request $request)
-{
-$apiKey = $request->input('api_key');
-// Validate API Key
-$device = $this->authenticate($apiKey);
-if (!$device) {
-return $this->response(false, 'gagal', 'Auth Failed');
-}
+    public function checkEnrollRequest(Request $request)
+    {
+        $apiKey = $request->input('api_key');
+        // Validate API Key
+        $device = $this->authenticate($apiKey);
+        if (!$device) {
+            return $this->response(false, 'gagal', 'Auth Failed');
+        }
 
-// Check Guru Enroll Request first SCOPED
+        // Cek apakah ada perintah delete di cache
+        $deleteId = \Illuminate\Support\Facades\Cache::pull('delete_finger_' . $device->id);
+        if ($deleteId) {
+            return $this->response(true, 'delete_mode', 'Delete Mode Active', 'ok', [
+                'enroll_id' => $deleteId, // reuse parameter enroll_id untuk id yang akan dihapus
+                'type' => 'delete'
+            ]);
+        }
+
+        // Check Guru Enroll Request first SCOPED
 $guru = Guru::where('enroll_finger_status', 'requested')
 ->where('school_id', $device->school_id)
 ->where('updated_at', '>=', now()->subMinutes(15))
@@ -107,11 +116,13 @@ $guru = Guru::where('enroll_finger_status', 'requested')
 ->first();
 
 if ($guru) {
-return $this->response(true, 'enroll_mode', 'Enroll Mode Active (Guru)', 'ok', [
-'enroll_id' => $guru->id,
-'nama' => $guru->nama,
-'type' => 'guru'
-]);
+    $nextId = $this->getNextFreeFingerId($device->id);
+    if ($nextId === -1) return $this->response(false, 'standby', 'Sensor Full');
+    return $this->response(true, 'enroll_mode', 'Enroll Mode Active (Guru)', 'ok', [
+        'enroll_id' => $nextId,
+        'nama' => $guru->nama,
+        'type' => 'guru'
+    ]);
 }
 
 // Check Siswa Enroll Request SCOPED
@@ -122,11 +133,13 @@ $siswa = Siswa::where('enroll_finger_status', 'requested')
 ->first();
 
 if ($siswa) {
-return $this->response(true, 'enroll_mode', 'Enroll Mode Active (Siswa)', 'ok', [
-'enroll_id' => $siswa->id,
-'nama' => $siswa->nama,
-'type' => 'siswa'
-]);
+    $nextId = $this->getNextFreeFingerId($device->id);
+    if ($nextId === -1) return $this->response(false, 'standby', 'Sensor Full');
+    return $this->response(true, 'enroll_mode', 'Enroll Mode Active (Siswa)', 'ok', [
+        'enroll_id' => $nextId,
+        'nama' => $siswa->nama,
+        'type' => 'siswa'
+    ]);
 }
 
         // Check Gate Card Enroll Request SCOPED
@@ -137,14 +150,35 @@ return $this->response(true, 'enroll_mode', 'Enroll Mode Active (Siswa)', 'ok', 
             ->first();
 
         if ($gate) {
+            $nextId = $this->getNextFreeFingerId($device->id);
+            if ($nextId === -1) return $this->response(false, 'standby', 'Sensor Full');
             return $this->response(true, 'enroll_mode', 'Enroll Mode Active (Gerbang)', 'ok', [
-                'enroll_id' => $gate->id,
+                'enroll_id' => $nextId,
                 'nama' => $gate->name,
                 'type' => 'gate_card'
             ]);
         }
 
         return $this->response(false, 'standby', 'No Enrollment');
+}
+
+private function getNextFreeFingerId($deviceId) {
+    $usedSiswa = SiswaFingerprint::where('device_id', $deviceId)->pluck('finger_id')->toArray();
+    $usedGuru = GuruFingerprint::where('device_id', $deviceId)->pluck('finger_id')->toArray();
+    
+    // GateCards are usually scoped by school
+    $device = Device::find($deviceId);
+    $usedGate = GateCard::where('school_id', $device->school_id)->pluck('uid_rfid')->toArray();
+    
+    $allUsed = array_merge($usedSiswa, $usedGuru, $usedGate);
+    $allUsed = array_map('intval', $allUsed);
+    
+    for ($i = 1; $i <= 200; $i++) {
+        if (!in_array($i, $allUsed)) {
+            return $i;
+        }
+    }
+    return -1;
 }
 
 private function finalizeEnrollment($fingerId, $device)
@@ -171,6 +205,15 @@ $guru->update([
 ]);
 
 DB::commit();
+ApiLog::create([
+    'school_id' => $this->currentSchoolId,
+    'api_key' => $this->currentApiKey,
+    'action' => 'enroll_success',
+    'uid' => $fingerId,
+    'success' => true,
+    'message' => 'Enroll Berhasil (Guru): ' . $guru->nama,
+    'created_at' => now()
+]);
 return $this->response(true, 'success', 'Enroll Berhasil (Guru): ' . $guru->nama, 'success');
 }
 
@@ -194,6 +237,15 @@ $siswa->update([
 ]);
 
 DB::commit();
+ApiLog::create([
+    'school_id' => $this->currentSchoolId,
+    'api_key' => $this->currentApiKey,
+    'action' => 'enroll_success',
+    'uid' => $fingerId,
+    'success' => true,
+    'message' => 'Enroll Berhasil (Siswa): ' . $siswa->nama,
+    'created_at' => now()
+]);
 return $this->response(true, 'success', 'Enroll Berhasil (Siswa): ' . $siswa->nama, 'success');
 }
 
@@ -213,6 +265,15 @@ return $this->response(true, 'success', 'Enroll Berhasil (Siswa): ' . $siswa->na
             ]);
 
             DB::commit();
+            ApiLog::create([
+                'school_id' => $this->currentSchoolId,
+                'api_key' => $this->currentApiKey,
+                'action' => 'enroll_success',
+                'uid' => $fingerId,
+                'success' => true,
+                'message' => 'Enroll Berhasil (Gerbang): ' . $gate->name,
+                'created_at' => now()
+            ]);
             return $this->response(true, 'success', 'Enroll Berhasil (Gerbang): ' . $gate->name, 'success');
         }
 
@@ -462,6 +523,7 @@ return $this->response(false, 'error', 'Enroll Gagal');
         }
 
         // Neither found
+        ApiLog::create(['school_id' => $device->school_id, 'api_key' => $this->currentApiKey, 'action' => 'scan_failed', 'uid' => $fingerId, 'success' => false, 'message' => 'Sidik Jari Tidak Dikenal', 'created_at' => now()]);
         return $this->response(false, 'gagal', 'ID Sidik Jari Tidak Dikenal di Device Ini');
     }
 
@@ -478,6 +540,7 @@ return $this->response(false, 'error', 'Enroll Gagal');
             ->first();
 
         if (!$jadwal) {
+            ApiLog::create(['school_id' => $device->school_id, 'api_key' => $this->currentApiKey, 'action' => 'scan_failed', 'uid' => $fingerId, 'success' => false, 'message' => 'Jadwal Libur/Kosong', 'created_at' => now()]);
             return $this->response(false, 'gagal', 'Jadwal Libur/Kosong', 'warning');
         }
 
@@ -541,6 +604,7 @@ return $this->response(false, 'error', 'Enroll Gagal');
 
             if ($now->gt($akhirAbsenPulang) && !$teacherSession) {
                  DB::rollBack();
+                 ApiLog::create(['school_id' => $device->school_id, 'api_key' => $this->currentApiKey, 'action' => 'scan_failed', 'uid' => $fingerId, 'success' => false, 'message' => 'Pulang Ditutup: ' . $siswa->nama, 'created_at' => now()]);
                  return $this->response(false, 'gagal', 'Pulang Ditutup', 'warning', ['type' => 'checkout_closed', 'nama' => $siswa->nama]);
             }
 
@@ -551,6 +615,7 @@ return $this->response(false, 'error', 'Enroll Gagal');
                 }
 
                 DB::rollBack();
+                ApiLog::create(['school_id' => $device->school_id, 'api_key' => $this->currentApiKey, 'action' => 'scan_failed', 'uid' => $fingerId, 'success' => false, 'message' => 'Belum waktu pulang: ' . $siswa->nama, 'created_at' => now()]);
                 return $this->response(false, 'gagal', 'Belum waktu pulang', 'warning', ['type' => 'no_authorization', 'nama' => $siswa->nama]);
             }
 
@@ -612,10 +677,12 @@ return $this->response(false, 'error', 'Enroll Gagal');
         if (!$att) {
             if ($now->lt($awalAbsenMasuk)) {
                 DB::rollBack();
+                ApiLog::create(['school_id' => $device->school_id, 'api_key' => $this->currentApiKey, 'action' => 'scan_failed', 'uid' => $fingerId, 'success' => false, 'message' => 'Terlalu Pagi: ' . $siswa->nama, 'created_at' => now()]);
                 return $this->response(false, 'gagal', 'Absen Tutup (Terlalu Pagi)', 'warning', ['type' => 'too_early']);
             }
             if ($now->gt($akhirAbsenMasuk)) {
                 DB::rollBack();
+                ApiLog::create(['school_id' => $device->school_id, 'api_key' => $this->currentApiKey, 'action' => 'scan_failed', 'uid' => $fingerId, 'success' => false, 'message' => 'Masuk Ditutup: ' . $siswa->nama, 'created_at' => now()]);
                 return $this->response(false, 'gagal', 'Absen Masuk Ditutup', 'warning', ['type' => 'checkin_closed']);
             }
 
@@ -664,20 +731,6 @@ return $this->response(false, 'error', 'Enroll Gagal');
         }
     }
 
-private function authenticate($apiKey, $request = null)
-{
-    if (empty($apiKey))
-        return null;
-    $device = Device::where('api_key', $apiKey)->where('active', true)->first();
-    if (!$device) {
-        $this->logFailedAuth($apiKey, 'API key tidak valid / tidak aktif', $request);
-    }
-    if ($device) {
-        $this->currentSchoolId = $device->school_id;
-        DB::table('api_keys')->where('id', $device->id)->update(['last_used_at' => now()]);
-    }
-    return $device;
-}
 
 private function response($ok, $status, $message, $sound = 'ok', $extra = [])
 {

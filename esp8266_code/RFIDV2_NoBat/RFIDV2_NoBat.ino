@@ -170,7 +170,7 @@ void syncNTPtoRTC() {
 
   if (now > 8 * 3600 * 2) {
     struct tm timeinfo;
-    gmtime_r(&now, &timeinfo);
+    localtime_r(&now, &timeinfo);
     if (rtcReady) {
       rtc.adjust(DateTime(timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday, timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec));
       Serial.println("[NTP] RTC Updated: " + getRtcDatetime());

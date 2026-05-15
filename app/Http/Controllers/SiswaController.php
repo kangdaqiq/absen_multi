@@ -506,12 +506,12 @@ class SiswaController extends Controller
                 if ($latestLog && $latestLog->ip_address) {
                     try {
                         $url = "http://{$latestLog->ip_address}/delete-finger?id={$fingerprint->finger_id}";
-                        Http::timeout(3)->get($url);
-                        \Log::info("Delete fingerprint push sent to {$latestLog->ip_address} for finger_id {$fingerprint->finger_id}");
-                    } catch (\Exception $e) {
-                        \Log::error("Failed to send delete push: " . $e->getMessage());
-                    }
+                        \Illuminate\Support\Facades\Http::timeout(3)->get($url);
+                    } catch (\Exception $e) {}
                 }
+                
+                // Tambahan: Gunakan sistem Polling/Cache agar lebih robust
+                \Illuminate\Support\Facades\Cache::put('delete_finger_' . $device->id, $fingerprint->finger_id, now()->addMinutes(5));
             }
         }
 

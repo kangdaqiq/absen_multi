@@ -391,7 +391,7 @@
             ID Sidik Jari: <strong id="enroll_finger_id" class="text-lg"></strong>
         </div>
 
-        <div id="enroll_finger_status" class="mb-6 h-10 flex items-center justify-center"></div>
+        <div id="enroll_finger_status" class="mb-6 min-h-10 flex items-center justify-center text-sm text-center"></div>
 
         <div class="flex flex-col gap-3">
             <button type="button" class="rounded-lg bg-success-500 p-3 font-medium text-white hover:bg-success-600 transition" id="btnMulaiEnrollFinger">
@@ -583,7 +583,7 @@
                     return;
                 }
 
-                $('#enroll_finger_status').html('<span class="text-success-500 animate-pulse"><i class="fas fa-spinner fa-spin mr-2"></i>Silakan tempelkan jari pada sensor...</span>');
+                $('#enroll_finger_status').html('<span class="text-success-500 animate-pulse"><i class="fas fa-hand-point-up mr-2"></i>Tempelkan jari ke sensor...</span>');
 
                 // Request Enroll with device_id
                 $.post('{{ url('guru') }}/' + enrollFingerId + '/enroll-finger', {
@@ -602,6 +602,20 @@
                 if (enrollFingerInterval) clearInterval(enrollFingerInterval);
                 let counter = 0;
 
+                // Pesan bertahap sesuai fase enroll hardware:
+                // Fase 1 (0-3 poll ~0-4.5 dtk): Tempel jari pertama
+                // Fase 2 (4-6 poll ~6-9 dtk): Angkat jari
+                // Fase 3 (7+ poll ~10.5+ dtk): Tempel jari kedua
+                function updateStepMessage(c) {
+                    if (c <= 3) {
+                        $('#enroll_finger_status').html('<span class="text-success-500 animate-pulse"><i class="fas fa-hand-point-up mr-2"></i><b>Langkah 1/2:</b> Tempelkan jari ke sensor...</span>');
+                    } else if (c <= 6) {
+                        $('#enroll_finger_status').html('<span class="text-warning-500 animate-pulse"><i class="fas fa-arrow-up mr-2"></i><b>Langkah 1 selesai!</b> Sekarang <u>angkat jari</u>...</span>');
+                    } else {
+                        $('#enroll_finger_status').html('<span class="text-brand-500 animate-pulse"><i class="fas fa-hand-point-up mr-2"></i><b>Langkah 2/2:</b> Tempelkan jari <b>sekali lagi</b>...</span>');
+                    }
+                }
+
                 enrollFingerInterval = setInterval(function () {
                     counter++;
                     if (counter > 40) { // 60 sec timeout
@@ -609,6 +623,9 @@
                         $('#enroll_finger_status').html('<span class="text-warning-500"><i class="fas fa-exclamation-triangle mr-1"></i>Waktu habis. Coba lagi.</span>');
                         return;
                     }
+
+                    // Update step guidance message
+                    updateStepMessage(counter);
 
                     $.get('{{ url('guru') }}/' + id + '/enroll-finger-check', function (res) {
                         if (res.ok && res.id_finger) {

@@ -45,14 +45,12 @@
 <body>
     <div class="header">
         @php
-            $school = auth()->user()->school;
-            $hasKop = $school && !empty($school->kop_surat);
             $kopPath = null;
-            if ($hasKop) {
-                if (\Illuminate\Support\Str::startsWith($school->kop_surat, 'schools/')) {
-                    $kopPath = storage_path('app/public/' . $school->kop_surat);
+            if (!empty($kopSurat)) {
+                if (\Illuminate\Support\Str::startsWith($kopSurat, 'schools/')) {
+                    $kopPath = storage_path('app/public/' . $kopSurat);
                 } else {
-                    $kopPath = public_path('img/' . $school->kop_surat);
+                    $kopPath = public_path('img/' . $kopSurat);
                 }
             } else {
                 $kopPath = public_path('img/default_kop.png');
@@ -62,8 +60,8 @@
         @if($kopPath && file_exists($kopPath))
             <img src="{{ $kopPath }}" style="width: 100%; max-height: 120px; object-fit: contain; margin-bottom: 10px;">
         @else
-            <h2>{{ $school ? $school->name : 'Rekapitulasi' }}</h2>
-            <p style="margin: 0; font-size: 10px;">{{ $school ? $school->alamat : '' }}</p>
+            <h2>{{ $schoolName ?: 'Rekapitulasi' }}</h2>
+            <p style="margin: 0; font-size: 10px;">{{ $schoolAddress }}</p>
             <hr style="border: 1px double #000; margin-top: 10px;">
         @endif
 
@@ -139,7 +137,7 @@
     </table>
 
     <div style="margin-top: 30px; text-align: right; font-size: 12px; padding-right: 40px;">
-        {{ $school ? $school->signature_location : 'Lokasi' }}, {{ now()->isoFormat('DD MMMM Y') }}
+        {{ $signatureLocation ? $signatureLocation . ',' : '' }} {{ now()->isoFormat('DD MMMM Y') }}
     </div>
 
     <table style="width: 100%; margin-top: 30px; border: none;">
@@ -149,10 +147,10 @@
                 <div style="font-size: 12px; font-weight: bold;">Kepala Sekolah</div>
                 <br><br><br><br>
                 <div style="font-size: 12px; display: inline-block; padding-top: 4px; min-width: 180px;">
-                    {{ $school ? $school->kepsek : 'Nama Kepsek' }}
+                    {{ $namaKepsek }}
                 </div>
-                @if($school && $school->nip_kepsek)
-                    <div style="font-size: 11px;">NIP. {{ $school->nip_kepsek }}</div>
+                @if($nipKepsek)
+                    <div style="font-size: 11px;">NIP. {{ $nipKepsek }}</div>
                 @endif
             </td>
             <td style="width: 50%; text-align: center; border: none; vertical-align: top; padding: 0 20px;">
@@ -160,10 +158,10 @@
                 <div style="font-size: 12px; font-weight: bold;">Waka Kesiswaan</div>
                 <br><br><br><br>
                 <div style="font-size: 12px; display: inline-block; padding-top: 4px; min-width: 180px;">
-                    {{ $school ? $school->waka_kesiswaan : 'Nama Waka' }}
+                    {{ $namaWaka }}
                 </div>
-                @if($school && $school->nip_waka)
-                    <div style="font-size: 11px;">NIP. {{ $school->nip_waka }}</div>
+                @if($nipWaka)
+                    <div style="font-size: 11px;">NIP. {{ $nipWaka }}</div>
                 @endif
             </td>
         </tr>

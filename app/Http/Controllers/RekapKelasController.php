@@ -237,7 +237,25 @@ class RekapKelasController extends Controller
             }
         }
 
-        $pdf = Pdf::loadView('rekap-kelas.pdf', compact('allKelas', 'summary', 'startDate', 'endDate'));
+        // Fetch signature metadata from settings
+        $schoolId = auth()->user()->isSuperAdmin()
+            ? ($allKelas->first()->school_id ?? null)
+            : auth()->user()->school_id;
+
+        $signatureLocation = \App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'alamat_ttd')->value('setting_value') ?? '';
+        $namaKepsek       = \App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'nama_kepala_sekolah')->value('setting_value') ?? '';
+        $nipKepsek        = \App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'nip_kepala_sekolah')->value('setting_value') ?? '';
+        $namaWaka         = \App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'nama_waka_kesiswaan')->value('setting_value') ?? '';
+        $nipWaka          = \App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'nip_waka_kesiswaan')->value('setting_value') ?? '';
+        $kopSurat         = \App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'kop_surat')->value('setting_value') ?? '';
+        $schoolName       = \App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'nama_sekolah')->value('setting_value') ?? '';
+        $schoolAddress    = \App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'alamat_sekolah')->value('setting_value') ?? '';
+
+        $pdf = Pdf::loadView('rekap-kelas.pdf', compact(
+            'allKelas', 'summary', 'startDate', 'endDate',
+            'signatureLocation', 'namaKepsek', 'nipKepsek',
+            'namaWaka', 'nipWaka', 'kopSurat', 'schoolName', 'schoolAddress'
+        ));
         return $pdf->stream('Rekap_Kelas.pdf');
     }
 }

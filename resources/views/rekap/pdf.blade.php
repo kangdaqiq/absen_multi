@@ -90,38 +90,56 @@
         <thead>
             <tr>
                 <th width="5%">No</th>
-                <th width="30%">Nama Siswa</th>
-                <th width="10%">Hadir</th>
-                <th width="10%">Telat</th>
-                <th width="10%">Izin</th>
-                <th width="10%">Sakit</th>
-                <th width="10%">Alpha</th>
-                <th width="10%">Bolos</th>
+                <th width="20%">Nama Siswa</th>
+                <th width="8%">Hadir</th>
+                <th width="12%">Tidak Hadir</th>
+                <th width="8%">Telat</th>
+                <th width="8%">Izin</th>
+                <th width="8%">Sakit</th>
+                <th width="8%">Alpha</th>
+                <th width="8%">Bolos</th>
+                <th width="15%">% Hadir</th>
             </tr>
         </thead>
         <tbody>
             @foreach($rekap as $r)
+                @php
+                    $tidakHadir = $r['izin'] + $r['sakit'] + $r['alpha'] + $r['bolos'];
+                    $total = $r['hadir'] + $r['telat'] + $tidakHadir;
+                    $persentase = $total > 0 ? round((($r['hadir'] + $r['telat']) / $total) * 100, 1) : 0;
+                @endphp
                 <tr>
                     <td>{{ $loop->iteration }}</td>
                     <td style="text-align: left; padding-left: 10px;">{{ $r['nama'] }}</td>
                     <td>{{ $r['hadir'] }}</td>
+                    <td>{{ $tidakHadir }}</td>
                     <td>{{ $r['telat'] }}</td>
                     <td>{{ $r['izin'] }}</td>
                     <td>{{ $r['sakit'] }}</td>
                     <td>{{ $r['alpha'] }}</td>
                     <td>{{ $r['bolos'] }}</td>
+                    <td>{{ $persentase }}%</td>
                 </tr>
             @endforeach
         </tbody>
         <tfoot>
+            @php
+                $totHadir = collect($rekap)->sum('hadir');
+                $totTelat = collect($rekap)->sum('telat');
+                $totTidakHadir = collect($rekap)->sum('izin') + collect($rekap)->sum('sakit') + collect($rekap)->sum('alpha') + collect($rekap)->sum('bolos');
+                $totAll = $totHadir + $totTelat + $totTidakHadir;
+                $totPersen = $totAll > 0 ? round((($totHadir + $totTelat) / $totAll) * 100, 1) : 0;
+            @endphp
             <tr style="font-weight: bold; background-color: #f2f2f2;">
                 <td colspan="2">TOTAL</td>
-                <td>{{ collect($rekap)->sum('hadir') }}</td>
-                <td>{{ collect($rekap)->sum('telat') }}</td>
+                <td>{{ $totHadir }}</td>
+                <td>{{ $totTidakHadir }}</td>
+                <td>{{ $totTelat }}</td>
                 <td>{{ collect($rekap)->sum('izin') }}</td>
                 <td>{{ collect($rekap)->sum('sakit') }}</td>
                 <td>{{ collect($rekap)->sum('alpha') }}</td>
                 <td>{{ collect($rekap)->sum('bolos') }}</td>
+                <td>{{ $totPersen }}%</td>
             </tr>
         </tfoot>
     </table>

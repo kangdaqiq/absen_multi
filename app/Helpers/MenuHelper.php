@@ -76,17 +76,24 @@ class MenuHelper
                 'title' => 'Data Utama',
                 'items' => $schoolItems
             ];
+        }
 
-            // ABSENSI
+        // ABSENSI
+        if (in_array($role, ['admin', 'teacher', 'wali_kelas', 'waka_kurikulum'])) {
             $absensiSubItems = [];
             if (!$isOffice) {
                 $absensiSubItems[] = ['name' => 'Absensi Siswa', 'path' => route('absensi.index', [], false)];
             }
-            $absensiSubItems[] = ['name' => "Absensi $labelKaryawan", 'path' => route('absensi-guru.index', [], false)];
+            if (in_array($role, ['admin', 'teacher'])) {
+                $absensiSubItems[] = ['name' => "Absensi $labelKaryawan", 'path' => route('absensi-guru.index', [], false)];
+            }
             if (!$isOffice) {
                 $absensiSubItems[] = ['name' => 'Rekap Siswa', 'path' => route('rekap.index', [], false)];
+                $absensiSubItems[] = ['name' => 'Rekap Kelas', 'path' => route('rekap-kelas.index', [], false)];
             }
-            $absensiSubItems[] = ['name' => "Rekap $labelKaryawan", 'path' => route('rekap-guru.index', [], false)];
+            if (in_array($role, ['admin', 'teacher'])) {
+                $absensiSubItems[] = ['name' => "Rekap $labelKaryawan", 'path' => route('rekap-guru.index', [], false)];
+            }
 
             $menu[] = [
                 'title' => 'Kehadiran',

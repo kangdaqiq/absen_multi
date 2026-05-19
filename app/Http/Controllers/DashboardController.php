@@ -19,6 +19,17 @@ class DashboardController extends Controller
         $today = Carbon::today();
         $isSuperAdmin = $user->isSuperAdmin();
         $schoolId = $isSuperAdmin ? null : $user->school_id;
+        $isWaliKelas = $user->role === 'wali_kelas';
+        $managedKelasIds = [];
+
+        if ($isWaliKelas) {
+            $guru = $user->guru;
+            if ($guru) {
+                $managedKelasIds = \App\Models\Kelas::where('wali_kelas_id', $guru->id)->pluck('id')->toArray();
+            } else {
+                $managedKelasIds = [-1]; // No classes
+            }
+        }
 
         if ($user->role === 'student') {
             $siswa = $user->student; // relasi hasOne
@@ -47,17 +58,26 @@ class DashboardController extends Controller
             return view('dashboard-student', compact('siswa', 'stats', 'recentLogs') + ['linked' => true]);
         }
 
-        // Admin / Teacher View
+        // Admin / Teacher / Wali Kelas / Waka Kurikulum View
         // 1. Counts SCOPED
-        $countSiswa = Siswa::when(!$isSuperAdmin, fn($q) => $q->where('school_id', $schoolId))->count();
+        $countSiswa = Siswa::when(!$isSuperAdmin, fn($q) => $q->where('school_id', $schoolId))
+            ->when($isWaliKelas, fn($q) => $q->whereIn('kelas_id', $managedKelasIds))
+            ->count();
         $countGuru = Guru::when(!$isSuperAdmin, fn($q) => $q->where('school_id', $schoolId))->count();
-        $countKelas = Kelas::when(!$isSuperAdmin, fn($q) => $q->where('school_id', $schoolId))->count();
+        $countKelas = Kelas::when(!$isSuperAdmin, fn($q) => $q->where('school_id', $schoolId))
+            ->when($isWaliKelas, fn($q) => $q->whereIn('id', $managedKelasIds))
+            ->count();
 
         // 2. Attendance Today SCOPED [Via Student]
         $countHadir = Attendance::whereDate('tanggal', $today)
             ->where('status', 'H')
-            ->when(!$isSuperAdmin, function ($q) use ($schoolId) {
-                $q->whereHas('student', fn($sub) => $sub->where('school_id', $schoolId));
+            ->when(!$isSuperAdmin, function ($q) use ($schoolId, $isWaliKelas, $managedKelasIds) {
+                $q->whereHas('student', function ($sub) use ($schoolId, $isWaliKelas, $managedKelasIds) {
+                    $sub->where('school_id', $schoolId);
+                    if ($isWaliKelas) {
+                        $sub->whereIn('kelas_id', $managedKelasIds);
+                    }
+                });
             })
             ->count();
 
@@ -66,8 +86,13 @@ class DashboardController extends Controller
         // 3. Recent Activity (Last 5) SCOPED
         $recentLogs = Attendance::with('student.kelas')
             ->whereDate('tanggal', $today)
-            ->when(!$isSuperAdmin, function ($q) use ($schoolId) {
-                $q->whereHas('student', fn($sub) => $sub->where('school_id', $schoolId));
+            ->when(!$isSuperAdmin, function ($q) use ($schoolId, $isWaliKelas, $managedKelasIds) {
+                $q->whereHas('student', function ($sub) use ($schoolId, $isWaliKelas, $managedKelasIds) {
+                    $sub->where('school_id', $schoolId);
+                    if ($isWaliKelas) {
+                        $sub->whereIn('kelas_id', $managedKelasIds);
+                    }
+                });
             })
             ->orderBy('updated_at', 'desc')
             ->take(5)
@@ -87,8 +112,13 @@ class DashboardController extends Controller
             $dates[] = Carbon::today()->subDays($i)->format('d M'); // Label: 26 Dec
 
             $dailyStats = Attendance::whereDate('tanggal', $date)
-                ->when(!$isSuperAdmin, function ($q) use ($schoolId) {
-                    $q->whereHas('student', fn($sub) => $sub->where('school_id', $schoolId));
+                ->when(!$isSuperAdmin, function ($q) use ($schoolId, $isWaliKelas, $managedKelasIds) {
+                    $q->whereHas('student', function ($sub) use ($schoolId, $isWaliKelas, $managedKelasIds) {
+                        $sub->where('school_id', $schoolId);
+                        if ($isWaliKelas) {
+                            $sub->whereIn('kelas_id', $managedKelasIds);
+                        }
+                    });
                 })
                 ->selectRaw('status, count(*) as count')
                 ->groupBy('status')

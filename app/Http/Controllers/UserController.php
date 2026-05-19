@@ -11,12 +11,12 @@ class UserController extends Controller
 {
     public function index(Request $request)
     {
-        $query = User::whereIn('role', ['admin', 'super_admin'])->orderBy('full_name');
+        $query = User::whereIn('role', ['admin', 'super_admin', 'wali_kelas', 'waka_kurikulum'])->orderBy('full_name');
 
         // Filter by school_id for non-super admin users
         if (auth()->user() && !auth()->user()->isSuperAdmin()) {
             $query->where('school_id', auth()->user()->school_id)
-                  ->where('role', 'admin');
+                  ->whereIn('role', ['admin', 'wali_kelas', 'waka_kurikulum']);
         }
 
         $users = $query->get();
@@ -25,7 +25,12 @@ class UserController extends Controller
 
     public function create()
     {
-        return view('users.create');
+        $gurusQuery = \App\Models\Guru::orderBy('nama');
+        if (auth()->user() && !auth()->user()->isSuperAdmin()) {
+            $gurusQuery->where('school_id', auth()->user()->school_id);
+        }
+        $gurus = $gurusQuery->get();
+        return view('users.create', compact('gurus'));
     }
 
     public function store(Request $request)
@@ -35,23 +40,39 @@ class UserController extends Controller
             'username' => 'required|string|max:255|unique:users',
             'email' => 'required|string|max:255|unique:users',
             'password' => 'required|string|min:8|confirmed',
-            'role' => 'required|in:admin,super_admin',
+            'role' => 'required|in:admin,super_admin,wali_kelas,waka_kurikulum',
+            'guru_id' => 'nullable|exists:guru,id'
         ]);
 
-        User::create([
+        $data = [
             'full_name' => $request->name,
             'username' => $request->username,
             'email' => $request->email,
             'password_hash' => Hash::make($request->password),
             'role' => $request->role,
-        ]);
+        ];
+
+        if (auth()->user() && !auth()->user()->isSuperAdmin()) {
+            $data['school_id'] = auth()->user()->school_id;
+        }
+
+        $user = User::create($data);
+
+        if (in_array($request->role, ['wali_kelas', 'waka_kurikulum']) && $request->filled('guru_id')) {
+            \App\Models\Guru::where('id', $request->guru_id)->update(['user_id' => $user->id]);
+        }
 
         return redirect()->route('users.index')->with('success', 'User berhasil ditambahkan.');
     }
 
     public function edit(User $user)
     {
-        return view('users.edit', compact('user'));
+        $gurusQuery = \App\Models\Guru::orderBy('nama');
+        if (auth()->user() && !auth()->user()->isSuperAdmin()) {
+            $gurusQuery->where('school_id', auth()->user()->school_id);
+        }
+        $gurus = $gurusQuery->get();
+        return view('users.edit', compact('user', 'gurus'));
     }
 
     public function update(Request $request, User $user)
@@ -61,7 +82,8 @@ class UserController extends Controller
             'username' => ['required', 'string', 'max:255', Rule::unique('users')->ignore($user->id)],
             'email' => ['required', 'string', 'max:255', Rule::unique('users')->ignore($user->id)],
             'password' => 'nullable|string|min:4|confirmed',
-            'role' => 'required|in:admin,super_admin',
+            'role' => 'required|in:admin,super_admin,wali_kelas,waka_kurikulum',
+            'guru_id' => 'nullable|exists:guru,id'
         ]);
 
         $user->full_name = $request->name;
@@ -75,6 +97,14 @@ class UserController extends Controller
 
         $user->save();
 
+        if (in_array($request->role, ['wali_kelas', 'waka_kurikulum'])) {
+            // Unlink previous guru if any
+            \App\Models\Guru::where('user_id', $user->id)->update(['user_id' => null]);
+            if ($request->filled('guru_id')) {
+                \App\Models\Guru::where('id', $request->guru_id)->update(['user_id' => $user->id]);
+            }
+        }
+
         return redirect()->route('users.index')->with('success', 'User berhasil diperbarui.');
     }
 
@@ -83,6 +113,8 @@ class UserController extends Controller
         if ($user->id === auth()->id()) {
             return back()->with('error', 'Tidak dapat menghapus akun sendiri.');
         }
+
+        \App\Models\Guru::where('user_id', $user->id)->update(['user_id' => null]);
 
         $user->delete();
         return redirect()->route('users.index')->with('success', 'User berhasil dihapus.');
@@ -106,6 +138,8 @@ class UserController extends Controller
         if (empty($userIds)) {
             return back()->with('error', 'Tidak ada user yang dapat dihapus.');
         }
+
+        \App\Models\Guru::whereIn('user_id', $userIds)->update(['user_id' => null]);
 
         $deletedCount = User::whereIn('id', $userIds)->delete();
 

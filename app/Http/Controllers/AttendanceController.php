@@ -29,6 +29,27 @@ class AttendanceController extends Controller
             $siswaQuery->where('school_id', auth()->user()->school_id);
         }
 
+        // Apply Wali Kelas logic
+        if (auth()->user() && auth()->user()->role === 'wali_kelas') {
+            $guru = auth()->user()->guru;
+            if ($guru) {
+                // Get all kelas managed by this guru
+                $managedKelasIds = \App\Models\Kelas::where('wali_kelas_id', $guru->id)->pluck('id');
+                $siswaQuery->whereIn('kelas_id', $managedKelasIds);
+                // Also restrict the class filter dropdown list
+                $kelasQuery = Kelas::whereIn('id', $managedKelasIds)->orderBy('nama_kelas');
+            } else {
+                // If no guru associated, return nothing
+                $siswaQuery->where('id', -1);
+                $kelasQuery = Kelas::where('id', -1);
+            }
+        } else {
+            $kelasQuery = Kelas::orderBy('nama_kelas');
+            if (auth()->user() && !auth()->user()->isSuperAdmin()) {
+                $kelasQuery->where('school_id', auth()->user()->school_id);
+            }
+        }
+
         if ($kelasId) {
             $siswaQuery->where('kelas_id', $kelasId);
         }
@@ -77,13 +98,6 @@ class AttendanceController extends Controller
                 'status' => $att ? $att->status : 'A', // Default Alpha if no record
                 'keterangan' => $att ? $att->keterangan : '-',
             ];
-        }
-
-        $kelasQuery = Kelas::orderBy('nama_kelas');
-
-        // Filter by school_id for non-super admin users
-        if (auth()->user() && !auth()->user()->isSuperAdmin()) {
-            $kelasQuery->where('school_id', auth()->user()->school_id);
         }
 
         $allKelas = $kelasQuery->get();

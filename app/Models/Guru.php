@@ -10,7 +10,7 @@ class Guru extends Model
     public $timestamps = true;
     // timestamps enabled by default
     // const UPDATED_AT = null;  // Column does not exist in DB
-    protected $fillable = ['nama', 'nip', 'no_wa', 'bot_access', 'is_global_report', 'id_finger', 'uid_rfid', 'enroll_status', 'enroll_finger_status', 'created_at', 'updated_at', 'school_id'];
+    protected $fillable = ['nama', 'nip', 'no_wa', 'bot_access', 'is_global_report', 'id_finger', 'uid_rfid', 'enroll_status', 'enroll_finger_status', 'created_at', 'updated_at', 'school_id', 'user_id'];
 
     protected $casts = [
         'bot_access' => 'boolean',
@@ -35,5 +35,10 @@ class Guru extends Model
     public function kelas()
     {
         return $this->hasOne(Kelas::class, 'wali_kelas_id');
+    }
+
+    public function user()
+    {
+        return $this->belongsTo(User::class, 'user_id');
     }
 }

@@ -52,6 +52,11 @@ class User extends Authenticatable
         return $this->hasOne(Siswa::class, 'user_id');
     }
 
+    public function guru()
+    {
+        return $this->hasOne(Guru::class, 'user_id');
+    }
+
     /**
      * Get the school that owns the user
      */

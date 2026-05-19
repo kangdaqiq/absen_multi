@@ -106,7 +106,10 @@ Route::middleware('auth')->group(function () {
         Route::delete('siswa/bulk-destroy', [SiswaController::class, 'bulkDestroy'])->name('siswa.bulk-destroy');
         Route::put('siswa/bulk-update-kelas', [SiswaController::class, 'bulkUpdateKelas'])->name('siswa.bulk-update-kelas');
         Route::resource('siswa', SiswaController::class)->except(['create', 'show', 'edit']);
+    });
 
+    // Absensi & Rekap Routes (Includes Wali Kelas & Waka Kurikulum)
+    Route::middleware('role:admin,teacher,wali_kelas,waka_kurikulum')->group(function () {
         // Absensi
         Route::get('/absensi', [App\Http\Controllers\AttendanceController::class, 'index'])->name('absensi.index');
         Route::get('/absensi/guru', [App\Http\Controllers\TeacherAttendanceReportController::class, 'index'])->name('absensi-guru.index');
@@ -116,10 +119,15 @@ Route::middleware('auth')->group(function () {
         Route::post('/absensi/bulk-update', [App\Http\Controllers\AttendanceController::class, 'bulkUpdate'])->name('absensi.bulkUpdate');
         Route::delete('/absensi/destroy', [App\Http\Controllers\AttendanceController::class, 'destroy'])->name('absensi.destroy');
 
-        // Rekap
+        // Rekap Siswa
         Route::get('/rekap', [App\Http\Controllers\RekapController::class, 'index'])->name('rekap.index');
         Route::get('/rekap/export', [App\Http\Controllers\RekapController::class, 'export'])->name('rekap.export');
         Route::get('/rekap/pdf', [App\Http\Controllers\RekapController::class, 'printPdf'])->name('rekap.pdf');
+        
+        // Rekap Kelas
+        Route::get('/rekap-kelas', [App\Http\Controllers\RekapKelasController::class, 'index'])->name('rekap-kelas.index');
+        Route::get('/rekap-kelas/export', [App\Http\Controllers\RekapKelasController::class, 'export'])->name('rekap-kelas.export');
+        Route::get('/rekap-kelas/pdf', [App\Http\Controllers\RekapKelasController::class, 'printPdf'])->name('rekap-kelas.pdf');
 
         Route::get('/rekap-guru', [App\Http\Controllers\RekapGuruController::class, 'index'])->name('rekap-guru.index');
         Route::get('/rekap-guru/export', [App\Http\Controllers\RekapGuruController::class, 'export'])->name('rekap-guru.export');

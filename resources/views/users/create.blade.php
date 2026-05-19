@@ -60,6 +60,8 @@
                 <div class="relative z-20 bg-transparent dark:bg-form-input">
                     <select name="role" required class="relative z-20 w-full appearance-none rounded border border-stroke bg-transparent py-3 px-5 outline-none transition focus:border-brand-500 active:border-brand-500 dark:border-form-strokedark dark:bg-form-input dark:focus:border-brand-500 @error('role') border-danger @enderror">
                         <option value="admin" {{ old('role') == 'admin' ? 'selected' : '' }}>Admin</option>
+                        <option value="wali_kelas" {{ old('role') == 'wali_kelas' ? 'selected' : '' }}>Wali Kelas</option>
+                        <option value="waka_kurikulum" {{ old('role') == 'waka_kurikulum' ? 'selected' : '' }}>Waka Kurikulum</option>
                     </select>
                     <span class="absolute top-1/2 right-4 z-30 -translate-y-1/2">
                         <i class="fas fa-chevron-down text-sm"></i>
@@ -68,6 +70,20 @@
                 @error('role')
                     <p class="mt-1 text-xs text-danger">{{ $message }}</p>
                 @enderror
+            </div>
+
+            <div class="mb-4.5" id="guru_select_container" style="display: {{ in_array(old('role'), ['wali_kelas', 'waka_kurikulum']) ? 'block' : 'none' }};">
+                <label class="mb-2.5 block text-black dark:text-white">
+                    Pilih Guru <span class="text-meta-1">*</span> (Khusus Wali Kelas / Waka Kurikulum)
+                </label>
+                <div class="relative z-20 bg-transparent dark:bg-form-input">
+                    <select name="guru_id" class="relative z-20 w-full appearance-none rounded border border-stroke bg-transparent py-3 px-5 outline-none transition focus:border-brand-500 active:border-brand-500 dark:border-form-strokedark dark:bg-form-input dark:focus:border-brand-500">
+                        <option value="">-- Pilih Guru --</option>
+                        @foreach($gurus as $guru)
+                            <option value="{{ $guru->id }}" {{ old('guru_id') == $guru->id ? 'selected' : '' }}>{{ $guru->nama }}</option>
+                        @endforeach
+                    </select>
+                </div>
             </div>
 
             <div class="mb-5.5 flex flex-col gap-5 sm:flex-row">
@@ -95,4 +111,19 @@
         </form>
     </div>
 </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const roleSelect = document.querySelector('select[name="role"]');
+        const guruContainer = document.getElementById('guru_select_container');
+        
+        roleSelect.addEventListener('change', function() {
+            if (this.value === 'wali_kelas' || this.value === 'waka_kurikulum') {
+                guruContainer.style.display = 'block';
+            } else {
+                guruContainer.style.display = 'none';
+            }
+        });
+    });
+</script>
 @endsection

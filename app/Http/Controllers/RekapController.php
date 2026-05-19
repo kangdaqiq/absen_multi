@@ -37,6 +37,24 @@ class RekapController extends Controller
             $siswaQuery->where('school_id', auth()->user()->school_id);
         }
 
+        // Apply Wali Kelas logic
+        if (auth()->user() && auth()->user()->role === 'wali_kelas') {
+            $guru = auth()->user()->guru;
+            if ($guru) {
+                $managedKelasIds = \App\Models\Kelas::where('wali_kelas_id', $guru->id)->pluck('id');
+                $siswaQuery->whereIn('kelas_id', $managedKelasIds);
+                $kelasQuery = Kelas::whereIn('id', $managedKelasIds)->orderBy('nama_kelas');
+            } else {
+                $siswaQuery->where('id', -1);
+                $kelasQuery = Kelas::where('id', -1);
+            }
+        } else {
+            $kelasQuery = Kelas::orderBy('nama_kelas');
+            if (auth()->user() && !auth()->user()->isSuperAdmin()) {
+                $kelasQuery->where('school_id', auth()->user()->school_id);
+            }
+        }
+
         if ($kelasId) {
             $siswaQuery->where('kelas_id', $kelasId);
         }
@@ -86,13 +104,6 @@ class RekapController extends Controller
         // Or simpy: Count H, I, S, A, B, T.
         // If system auto-generates Alpha (via AutoBolos or manual crons), database reflects reality.
 
-        $kelasQuery = Kelas::orderBy('nama_kelas');
-
-        // Filter by school_id for non-super admin users
-        if (auth()->user() && !auth()->user()->isSuperAdmin()) {
-            $kelasQuery->where('school_id', auth()->user()->school_id);
-        }
-
         $allKelas = $kelasQuery->get();
 
         return view('rekap.index', compact('allSiswa', 'summary', 'startDate', 'endDate', 'allKelas', 'kelasId'));
@@ -110,6 +121,17 @@ class RekapController extends Controller
         // Filter by school_id for non-super admin users
         if (auth()->user() && !auth()->user()->isSuperAdmin()) {
             $siswaQuery->where('school_id', auth()->user()->school_id);
+        }
+
+        // Apply Wali Kelas logic
+        if (auth()->user() && auth()->user()->role === 'wali_kelas') {
+            $guru = auth()->user()->guru;
+            if ($guru) {
+                $managedKelasIds = \App\Models\Kelas::where('wali_kelas_id', $guru->id)->pluck('id');
+                $siswaQuery->whereIn('kelas_id', $managedKelasIds);
+            } else {
+                $siswaQuery->where('id', -1);
+            }
         }
 
         if ($kelasId) {
@@ -147,26 +169,34 @@ class RekapController extends Controller
         $sheet->setCellValue('C4', 'Nama Siswa');
         $sheet->setCellValue('D4', 'Kelas');
         $sheet->setCellValue('E4', 'Hadir (H)');
-        $sheet->setCellValue('F4', 'Terlambat (T)');
-        $sheet->setCellValue('G4', 'Sakit (S)');
-        $sheet->setCellValue('H4', 'Izin (I)');
-        $sheet->setCellValue('I4', 'Bolos (B)');
-        $sheet->setCellValue('J4', 'Alpha (A)');
+        $sheet->setCellValue('F4', 'Tidak Hadir');
+        $sheet->setCellValue('G4', 'Terlambat (T)');
+        $sheet->setCellValue('H4', 'Sakit (S)');
+        $sheet->setCellValue('I4', 'Izin (I)');
+        $sheet->setCellValue('J4', 'Bolos (B)');
+        $sheet->setCellValue('K4', 'Alpha (A)');
+        $sheet->setCellValue('L4', '% Hadir');
 
         $row = 5;
         $no = 1;
         foreach ($allSiswa as $s) {
             $sum = $summary[$s->id];
+            $tidakHadir = $sum['I'] + $sum['S'] + $sum['B'] + $sum['A'];
+            $total = $sum['H'] + $sum['T'] + $tidakHadir;
+            $persentase = $total > 0 ? round((($sum['H'] + $sum['T']) / $total) * 100, 1) : 0;
+            
             $sheet->setCellValue('A' . $row, $no++);
             $sheet->setCellValue('B' . $row, $s->nis);
             $sheet->setCellValue('C' . $row, $s->nama);
             $sheet->setCellValue('D' . $row, $s->kelas->nama_kelas ?? '-');
             $sheet->setCellValue('E' . $row, $sum['H']);
-            $sheet->setCellValue('F' . $row, $sum['T']);
-            $sheet->setCellValue('G' . $row, $sum['S']);
-            $sheet->setCellValue('H' . $row, $sum['I']);
-            $sheet->setCellValue('I' . $row, $sum['B']);
-            $sheet->setCellValue('J' . $row, $sum['A']);
+            $sheet->setCellValue('F' . $row, $tidakHadir);
+            $sheet->setCellValue('G' . $row, $sum['T']);
+            $sheet->setCellValue('H' . $row, $sum['S']);
+            $sheet->setCellValue('I' . $row, $sum['I']);
+            $sheet->setCellValue('J' . $row, $sum['B']);
+            $sheet->setCellValue('K' . $row, $sum['A']);
+            $sheet->setCellValue('L' . $row, $persentase . '%');
             $row++;
         }
 
@@ -257,6 +287,17 @@ class RekapController extends Controller
         // Filter by school_id for non-super admin users
         if (auth()->user() && !auth()->user()->isSuperAdmin()) {
             $siswaQuery->where('school_id', auth()->user()->school_id);
+        }
+
+        // Apply Wali Kelas logic
+        if (auth()->user() && auth()->user()->role === 'wali_kelas') {
+            $guru = auth()->user()->guru;
+            if ($guru) {
+                $managedKelasIds = \App\Models\Kelas::where('wali_kelas_id', $guru->id)->pluck('id');
+                $siswaQuery->whereIn('kelas_id', $managedKelasIds);
+            } else {
+                $siswaQuery->where('id', -1);
+            }
         }
 
         if ($kelasId) {

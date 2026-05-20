@@ -5,7 +5,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>Login — Sistem Absensi</title>
+    <title>{{ isset($school) ? $school->name . ' — Sistem Absensi' : 'Login — Sistem Absensi' }}</title>
     <link rel="icon" type="image/x-icon" href="{{ asset('images/logo/logo-icon.ico') }}">
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
@@ -45,7 +45,14 @@
 
             {{-- Logo --}}
             <div class="relative z-10">
-                <img src="/images/logo/logo-dark.svg" alt="Jagat Tech" class="h-10 w-auto">
+                @if(isset($school) && $school->logo)
+                    <div class="flex items-center gap-3">
+                        <img src="{{ asset('storage/' . $school->logo) }}" alt="{{ $school->name }}" class="h-12 w-auto object-contain bg-white/10 p-2 rounded-xl backdrop-blur-sm">
+                        <span class="text-lg font-bold text-white tracking-wide">{{ $school->name }}</span>
+                    </div>
+                @else
+                    <img src="/images/logo/logo-dark.svg" alt="Jagat Tech" class="h-10 w-auto">
+                @endif
             </div>
 
             {{-- Center content --}}
@@ -58,8 +65,11 @@
                     Pantau Kehadiran<br>dengan Mudah
                 </h2>
                 <p class="text-lg text-white/70 max-w-sm mx-auto">
-                    Sistem absensi digital berbasis RFID & fingerprint untuk mencatat kehadiran secara otomatis dan
-                    real-time.
+                    @if(isset($school))
+                        Sistem absensi digital terintegrasi untuk mencatat kehadiran {{ $school->employeeLabel() }} & siswa secara otomatis dan real-time.
+                    @else
+                        Sistem absensi digital berbasis RFID & fingerprint untuk mencatat kehadiran secara otomatis dan real-time.
+                    @endif
                 </p>
             </div>
 
@@ -85,14 +95,23 @@
 
             {{-- Mobile logo --}}
             <div class="mb-8 lg:hidden flex flex-col items-center gap-3">
-                <img src="/images/logo/logo.svg" alt="Jagat Tech" class="h-12 w-auto">
+                @if(isset($school) && $school->logo)
+                    <img src="{{ asset('storage/' . $school->logo) }}" alt="{{ $school->name }}" class="h-16 w-auto object-contain bg-white dark:bg-gray-800 p-2 rounded-xl shadow-md border border-gray-100 dark:border-gray-700">
+                    <span class="text-base font-bold text-gray-800 dark:text-white">{{ $school->name }}</span>
+                @else
+                    <img src="/images/logo/logo.svg" alt="Jagat Tech" class="h-12 w-auto">
+                @endif
             </div>
 
             <div class="w-full max-w-md">
                 {{-- Heading --}}
                 <div class="mb-6 sm:mb-8 text-center sm:text-left">
-                    <h1 class="text-2xl sm:text-3xl font-bold text-gray-800 dark:text-white/90">Selamat Datang 👋</h1>
-                    <p class="mt-1.5 sm:mt-2 text-sm text-gray-500 dark:text-gray-400">Masukkan kredensial Anda untuk mengakses dashboard</p>
+                    <h1 class="text-2xl sm:text-3xl font-bold text-gray-800 dark:text-white/90">
+                        {{ isset($school) ? $school->name : 'Selamat Datang 👋' }}
+                    </h1>
+                    <p class="mt-1.5 sm:mt-2 text-sm text-gray-500 dark:text-gray-400">
+                        {{ isset($school) ? 'Silakan masuk menggunakan akun Anda' : 'Masukkan kredensial Anda untuk mengakses dashboard' }}
+                    </p>
                 </div>
 
                 {{-- Error alert --}}

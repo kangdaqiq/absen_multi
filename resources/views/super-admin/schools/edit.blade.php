@@ -107,6 +107,17 @@
                     </div>
 
                     <div class="mb-4.5">
+                        <label class="mb-2.5 block text-black dark:text-white">
+                            Domain Custom / Subdomain (Contoh: smpn1.sch.id atau smpn1.siabsen.com)
+                        </label>
+                        <input type="text" name="domain" value="{{ old('domain', $school->domain) }}" placeholder="Contoh: smpn1.sch.id" class="w-full rounded border border-stroke bg-transparent py-3 px-5 outline-none transition focus:border-brand-500 active:border-brand-500 dark:border-form-strokedark dark:bg-form-input dark:focus:border-brand-500 @error('domain') border-danger @enderror" />
+                        <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">Hubungkan domain custom/addon atau subdomain khusus untuk sekolah ini. Halaman login domain ini akan otomatis menggunakan logo sekolah.</p>
+                        @error('domain')
+                            <p class="mt-1 text-xs text-danger">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <div class="mb-4.5">
                         <label class="mb-2.5 block text-black dark:text-white">Logo Sekolah</label>
                         @if($school->logo)
                             <div class="mb-3 flex items-center gap-4">

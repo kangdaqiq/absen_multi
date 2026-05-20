@@ -9,9 +9,21 @@ use Illuminate\Support\Str;
 
 class AuthController extends Controller
 {
-    public function showLoginForm()
+    public function showLoginForm(Request $request)
     {
-        return view('auth.login');
+        $host = strtolower($request->getHost());
+        $school = null;
+
+        // Cari sekolah yang aktif dengan domain/subdomain ini (mengabaikan www.)
+        $normalizedHost = str_replace('www.', '', $host);
+        
+        $school = \App\Models\School::where('is_active', true)
+            ->where(function($query) use ($normalizedHost) {
+                $query->where('domain', $normalizedHost);
+            })
+            ->first();
+
+        return view('auth.login', compact('school'));
     }
 
     public function login(Request $request)

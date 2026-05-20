@@ -106,6 +106,17 @@
                     </div>
 
                     <div class="mb-4.5">
+                        <label class="mb-2.5 block text-black dark:text-white">
+                            Domain Custom / Subdomain (Contoh: smpn1.sch.id atau smpn1.siabsen.com)
+                        </label>
+                        <input type="text" name="domain" value="{{ old('domain') }}" placeholder="Contoh: smpn1.sch.id" class="w-full rounded border border-stroke bg-transparent py-3 px-5 outline-none transition focus:border-brand-500 active:border-brand-500 dark:border-form-strokedark dark:bg-form-input dark:focus:border-brand-500 @error('domain') border-danger @enderror" />
+                        <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">Hubungkan domain custom/addon atau subdomain khusus untuk sekolah ini. Halaman login domain ini akan otomatis menggunakan logo sekolah.</p>
+                        @error('domain')
+                            <p class="mt-1 text-xs text-danger">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <div class="mb-4.5">
                         <label class="mb-2.5 block text-black dark:text-white">Logo Sekolah</label>
                         <input type="file" name="logo" accept="image/*" class="w-full cursor-pointer rounded-lg border-[1.5px] border-stroke bg-transparent font-medium outline-none transition file:mr-5 file:border-collapse file:cursor-pointer file:border-0 file:border-r file:border-solid file:border-stroke file:bg-whiter file:py-3 file:px-5 file:hover:bg-brand-500 file:hover:bg-opacity-10 focus:border-brand-500 active:border-brand-500 dark:border-form-strokedark dark:bg-form-input dark:file:border-form-strokedark dark:file:bg-white/30 dark:file:text-white dark:focus:border-brand-500 @error('logo') border-danger @enderror" />
                         <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">Format: JPG, PNG. Maksimal 10MB</p>

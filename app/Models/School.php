@@ -15,6 +15,7 @@ class School extends Model
         'operator_phone',
         'email',
         'logo',
+        'domain',
         'is_active',
         'wa_enabled',
         'bot_enabled',

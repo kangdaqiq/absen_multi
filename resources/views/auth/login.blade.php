@@ -44,16 +44,11 @@
             </div>
 
             {{-- Logo --}}
-            <div class="relative z-10">
-                @if(isset($school) && $school->logo)
-                    <div class="flex items-center gap-3">
-                        <img src="{{ asset('storage/' . $school->logo) }}" alt="{{ $school->name }}" class="h-12 w-auto object-contain bg-white/10 p-2 rounded-xl backdrop-blur-sm">
-                        <span class="text-lg font-bold text-white tracking-wide">{{ $school->name }}</span>
-                    </div>
-                @else
+            @if(!isset($school))
+                <div class="relative z-10">
                     <img src="/images/logo/logo-dark.svg" alt="Jagat Tech" class="h-10 w-auto">
-                @endif
-            </div>
+                </div>
+            @endif
 
             {{-- Center content --}}
             <div class="relative z-10 text-center">

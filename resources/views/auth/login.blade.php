@@ -113,7 +113,7 @@
                 {{-- Heading --}}
                 <div class="mb-6 sm:mb-8 text-center sm:text-left">
                     <h1 class="text-2xl sm:text-3xl font-bold text-gray-800 dark:text-white/90">
-                        {{ isset($school) ? $school->name : 'Selamat Datang 👋' }}
+                        Selamat Datang 👋
                     </h1>
                     <p class="mt-1.5 sm:mt-2 text-sm text-gray-500 dark:text-gray-400">
                         {{ isset($school) ? 'Silakan masuk menggunakan akun Anda' : 'Masukkan kredensial Anda untuk mengakses dashboard' }}

@@ -58,9 +58,20 @@
             {{-- Center content --}}
             <div class="relative z-10 text-center">
                 <div
-                    class="mb-8 inline-flex h-24 w-24 items-center justify-center rounded-3xl bg-white/20 backdrop-blur-sm">
-                    <i class="fas fa-fingerprint text-5xl text-white"></i>
+                    class="mb-6 inline-flex h-28 w-28 items-center justify-center rounded-3xl bg-white/20 backdrop-blur-sm p-4">
+                    @if(isset($school) && $school->logo)
+                        <img src="{{ asset('storage/' . $school->logo) }}" alt="{{ $school->name }}" class="max-h-full max-w-full object-contain">
+                    @else
+                        <i class="fas fa-fingerprint text-5xl text-white"></i>
+                    @endif
                 </div>
+                
+                @if(isset($school))
+                    <div class="mb-4 text-xl font-bold text-white tracking-wider uppercase">
+                        {{ $school->name }}
+                    </div>
+                @endif
+
                 <h2 class="mb-4 text-4xl font-bold text-white leading-tight">
                     Pantau Kehadiran<br>dengan Mudah
                 </h2>

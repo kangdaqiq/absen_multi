@@ -35,7 +35,7 @@
 
         {{-- ── LEFT PANEL — Branding ── --}}
         <div
-            class="hidden lg:flex flex-col justify-between bg-brand-600 dark:bg-gray-dark p-12 relative overflow-hidden">
+            class="hidden lg:flex flex-col {{ isset($school) ? 'justify-center items-center' : 'justify-between' }} bg-brand-600 dark:bg-gray-dark p-12 relative overflow-hidden">
             {{-- Decorative blobs --}}
             <div class="absolute -top-24 -left-24 w-96 h-96 rounded-full bg-white/10 blur-3xl"></div>
             <div class="absolute -bottom-24 -right-24 w-80 h-80 rounded-full bg-white/10 blur-3xl"></div>
@@ -50,18 +50,72 @@
                 </div>
             @endif
 
-            {{-- Center content --}}
-            <div class="relative z-10 text-center">
+            {{-- Center content / Premium Card --}}
+            <div class="relative z-10 w-full flex flex-col items-center justify-center">
                 @if(isset($school))
-                    {{-- School Branding Mode --}}
-                    @if($school->logo)
-                        <div class="mb-6 inline-flex h-40 w-40 items-center justify-center rounded-3xl bg-white/10 backdrop-blur-md p-5 border border-white/10 shadow-lg">
-                            <img src="{{ asset('storage/' . $school->logo) }}" alt="{{ $school->name }}" class="max-h-full max-w-full object-contain">
+                    {{-- Premium School Portal Card --}}
+                    <div class="max-w-md w-full bg-white/10 backdrop-blur-xl rounded-[2rem] p-8 border border-white/20 shadow-2xl flex flex-col items-center text-center mt-12 relative hover:scale-[1.02] transition-all duration-500 ease-out">
+                        
+                        {{-- Floating Logo Badge --}}
+                        <div class="w-32 h-32 flex items-center justify-center rounded-3xl bg-white shadow-xl p-4 absolute -top-16 border border-white/30 transform hover:rotate-3 transition-transform duration-300">
+                            @if($school->logo)
+                                <img src="{{ asset('storage/' . $school->logo) }}" alt="{{ $school->name }}" class="max-h-full max-w-full object-contain">
+                            @else
+                                <div class="w-full h-full rounded-2xl bg-brand-500/10 flex items-center justify-center">
+                                    <i class="fas fa-school text-4xl text-brand-500"></i>
+                                </div>
+                            @endif
                         </div>
-                    @endif
-                    <h2 class="text-2xl sm:text-3xl font-extrabold text-white tracking-wide uppercase leading-snug max-w-md mx-auto">
-                        {{ $school->name }}
-                    </h2>
+
+                        {{-- Card Header & Badge --}}
+                        <div class="pt-16 space-y-4">
+                            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-white text-xs font-medium uppercase tracking-widest">
+                                <span class="w-1.5 h-1.5 rounded-full bg-success-400 animate-pulse"></span>
+                                Portal Resmi Sekolah
+                            </span>
+                            
+                            <h2 class="text-xl sm:text-2xl font-black text-white tracking-wide uppercase leading-tight font-outfit">
+                                {{ $school->name }}
+                            </h2>
+                            
+                            <p class="text-xs font-semibold text-brand-200 tracking-wider uppercase font-outfit">
+                                Sistem Absensi Terintegrasi
+                            </p>
+                        </div>
+
+                        {{-- Divider --}}
+                        <div class="w-16 h-0.5 bg-gradient-to-r from-transparent via-white/30 to-transparent my-6"></div>
+
+                        {{-- Welcome message --}}
+                        <p class="text-sm text-white/80 leading-relaxed font-outfit">
+                            Selamat datang di aplikasi absensi digital terpadu. Silakan gunakan kredensial Anda pada panel login di sebelah kanan untuk mengakses dasbor.
+                        </p>
+
+                        {{-- Features Grid inside Card --}}
+                        <div class="w-full grid grid-cols-3 gap-3 pt-6 mt-6 border-t border-white/10">
+                            <div class="flex flex-col items-center">
+                                <div class="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center mb-1 text-white">
+                                    <i class="fas fa-shield-alt text-sm"></i>
+                                </div>
+                                <span class="text-xs font-bold text-white">Aman</span>
+                                <span class="text-[9px] text-white/50 mt-0.5 leading-none">Anti-Fraud</span>
+                            </div>
+                            <div class="flex flex-col items-center">
+                                <div class="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center mb-1 text-white">
+                                    <i class="fas fa-bolt text-sm"></i>
+                                </div>
+                                <span class="text-xs font-bold text-white">Cepat</span>
+                                <span class="text-[9px] text-white/50 mt-0.5 leading-none">Real-time</span>
+                            </div>
+                            <div class="flex flex-col items-center">
+                                <div class="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center mb-1 text-white">
+                                    <i class="fas fa-bell text-sm"></i>
+                                </div>
+                                <span class="text-xs font-bold text-white">Notifikasi</span>
+                                <span class="text-[9px] text-white/50 mt-0.5 leading-none">WhatsApp</span>
+                            </div>
+                        </div>
+                    </div>
                 @else
                     {{-- Default Branding Mode --}}
                     <div class="mb-6 inline-flex h-28 w-28 items-center justify-center rounded-3xl bg-white/20 backdrop-blur-sm p-4">
@@ -76,21 +130,23 @@
                 @endif
             </div>
 
-            {{-- Stats --}}
-            <div class="relative z-10 grid grid-cols-3 gap-4">
-                <div class="rounded-2xl bg-white/10 backdrop-blur-sm p-4 text-center">
-                    <p class="text-2xl font-bold text-white">Aman</p>
-                    <p class="text-xs text-white/60 mt-1">Tidak Bisa Dipalusukan</p>
+            {{-- Stats (Only for Default Branding) --}}
+            @if(!isset($school))
+                <div class="relative z-10 grid grid-cols-3 gap-4">
+                    <div class="rounded-2xl bg-white/10 backdrop-blur-sm p-4 text-center">
+                        <p class="text-2xl font-bold text-white">Aman</p>
+                        <p class="text-xs text-white/60 mt-1">Tidak Bisa Dipalusukan</p>
+                    </div>
+                    <div class="rounded-2xl bg-white/10 backdrop-blur-sm p-4 text-center">
+                        <p class="text-2xl font-bold text-white">Tepat</p>
+                        <p class="text-xs text-white/60 mt-1">Akurasi Tinggi</p>
+                    </div>
+                    <div class="rounded-2xl bg-white/10 backdrop-blur-sm p-4 text-center">
+                        <p class="text-2xl font-bold text-white">Auto</p>
+                        <p class="text-xs text-white/60 mt-1">Notifikasi WA</p>
+                    </div>
                 </div>
-                <div class="rounded-2xl bg-white/10 backdrop-blur-sm p-4 text-center">
-                    <p class="text-2xl font-bold text-white">Tepat</p>
-                    <p class="text-xs text-white/60 mt-1">Akurasi Tinggi</p>
-                </div>
-                <div class="rounded-2xl bg-white/10 backdrop-blur-sm p-4 text-center">
-                    <p class="text-2xl font-bold text-white">Auto</p>
-                    <p class="text-xs text-white/60 mt-1">Notifikasi WA</p>
-                </div>
-            </div>
+            @endif
         </div>
 
         {{-- ── RIGHT PANEL — Login Form ── --}}

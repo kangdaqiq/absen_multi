@@ -11,6 +11,9 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <link href="{{ asset('vendor/fontawesome-free/css/all.min.css') }}" rel="stylesheet">
 
+    {{-- Google Fonts: Inter for clean readable text --}}
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
     {{-- Prevent dark mode flash --}}
     <script>
         (function () {
@@ -26,116 +29,85 @@
             });
         })();
     </script>
+
+    <style>
+        body { font-family: 'Inter', 'Outfit', sans-serif; }
+        .school-name-text { font-family: 'Inter', sans-serif; }
+    </style>
 </head>
 
-<body class="min-h-screen bg-gray-50 dark:bg-gray-900 font-outfit" x-data="{ showPass: false }">
+<body class="min-h-screen bg-gray-50 dark:bg-gray-900" x-data="{ showPass: false }">
 
     {{-- ─── LAYOUT: split screen ─── --}}
     <div class="min-h-screen lg:grid lg:grid-cols-2">
 
         {{-- ── LEFT PANEL — Branding ── --}}
-        <div
-            class="hidden lg:flex flex-col {{ isset($school) ? 'justify-center items-center' : 'justify-between' }} bg-brand-600 dark:bg-gray-dark p-12 relative overflow-hidden">
-            {{-- Decorative blobs --}}
-            <div class="absolute -top-24 -left-24 w-96 h-96 rounded-full bg-white/10 blur-3xl"></div>
-            <div class="absolute -bottom-24 -right-24 w-80 h-80 rounded-full bg-white/10 blur-3xl"></div>
-            <div
-                class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full bg-white/5 blur-3xl">
-            </div>
+        <div class="hidden lg:flex flex-col bg-brand-600 dark:bg-gray-dark relative overflow-hidden
+            @if(isset($school)) items-center justify-center @else justify-between p-12 @endif">
 
-            {{-- Logo --}}
-            @if(!isset($school))
+            {{-- Decorative blobs --}}
+            <div class="pointer-events-none absolute -top-40 -left-40 w-[28rem] h-[28rem] rounded-full bg-white/10 blur-[80px]"></div>
+            <div class="pointer-events-none absolute -bottom-40 -right-40 w-[28rem] h-[28rem] rounded-full bg-white/10 blur-[80px]"></div>
+            <div class="pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full bg-white/5 blur-[100px]"></div>
+
+            @if(isset($school))
+                {{-- ── SCHOOL BRANDING: Simple centered column ── --}}
+                <div class="relative z-10 flex flex-col items-center text-center gap-6 px-12 w-full max-w-md">
+
+                    {{-- Logo --}}
+                    @if($school->logo)
+                        <div class="w-32 h-32 rounded-2xl bg-white shadow-2xl flex items-center justify-center flex-shrink-0 p-3">
+                            <img src="{{ asset('storage/' . $school->logo) }}"
+                                 alt="{{ $school->name }}"
+                                 class="w-full h-full object-contain">
+                        </div>
+                    @else
+                        <div class="w-24 h-24 rounded-2xl bg-white/20 flex items-center justify-center">
+                            <i class="fas fa-school text-4xl text-white"></i>
+                        </div>
+                    @endif
+
+                    {{-- School name --}}
+                    <div class="space-y-2">
+                        <h2 class="school-name-text text-xl font-bold text-white leading-tight tracking-normal">
+                            {{ $school->name }}
+                        </h2>
+                        <p class="text-xs font-medium text-white/50 tracking-widest uppercase">
+                            Sistem Absensi Digital
+                        </p>
+                    </div>
+
+                    {{-- Thin separator --}}
+                    <div class="w-8 h-0.5 bg-white/20 rounded-full"></div>
+
+                    {{-- Short tagline --}}
+                    <p class="text-sm text-white/60 leading-relaxed">
+                        Silakan masuk menggunakan akun Anda untuk mengakses sistem absensi.
+                    </p>
+                </div>
+
+            @else
+                {{-- ── DEFAULT BRANDING ── --}}
                 <div class="relative z-10">
                     <img src="/images/logo/logo-dark.svg" alt="Jagat Tech" class="h-10 w-auto">
                 </div>
-            @endif
 
-            {{-- Center content / Premium Card --}}
-            <div class="relative z-10 w-full flex flex-col items-center justify-center">
-                @if(isset($school))
-                    {{-- Premium School Portal Card --}}
-                    <div class="max-w-md w-full bg-white/10 backdrop-blur-xl rounded-[2rem] p-8 border border-white/20 shadow-2xl flex flex-col items-center text-center mt-12 relative hover:scale-[1.02] transition-all duration-500 ease-out">
-                        
-                        {{-- Floating Logo Badge --}}
-                        <div class="w-32 h-32 flex items-center justify-center rounded-3xl bg-white shadow-xl p-4 absolute -top-16 border border-white/30 transform hover:rotate-3 transition-transform duration-300">
-                            @if($school->logo)
-                                <img src="{{ asset('storage/' . $school->logo) }}" alt="{{ $school->name }}" class="max-h-full max-w-full object-contain">
-                            @else
-                                <div class="w-full h-full rounded-2xl bg-brand-500/10 flex items-center justify-center">
-                                    <i class="fas fa-school text-4xl text-brand-500"></i>
-                                </div>
-                            @endif
-                        </div>
-
-                        {{-- Card Header & Badge --}}
-                        <div class="pt-16 space-y-4">
-                            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-white text-xs font-medium uppercase tracking-widest">
-                                <span class="w-1.5 h-1.5 rounded-full bg-success-400 animate-pulse"></span>
-                                Portal Resmi Sekolah
-                            </span>
-                            
-                            <h2 class="text-xl sm:text-2xl font-black text-white tracking-wide uppercase leading-tight font-outfit">
-                                {{ $school->name }}
-                            </h2>
-                            
-                            <p class="text-xs font-semibold text-brand-200 tracking-wider uppercase font-outfit">
-                                Sistem Absensi Terintegrasi
-                            </p>
-                        </div>
-
-                        {{-- Divider --}}
-                        <div class="w-16 h-0.5 bg-gradient-to-r from-transparent via-white/30 to-transparent my-6"></div>
-
-                        {{-- Welcome message --}}
-                        <p class="text-sm text-white/80 leading-relaxed font-outfit">
-                            Selamat datang di aplikasi absensi digital terpadu. Silakan gunakan kredensial Anda pada panel login di sebelah kanan untuk mengakses dasbor.
-                        </p>
-
-                        {{-- Features Grid inside Card --}}
-                        <div class="w-full grid grid-cols-3 gap-3 pt-6 mt-6 border-t border-white/10">
-                            <div class="flex flex-col items-center">
-                                <div class="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center mb-1 text-white">
-                                    <i class="fas fa-shield-alt text-sm"></i>
-                                </div>
-                                <span class="text-xs font-bold text-white">Aman</span>
-                                <span class="text-[9px] text-white/50 mt-0.5 leading-none">Anti-Fraud</span>
-                            </div>
-                            <div class="flex flex-col items-center">
-                                <div class="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center mb-1 text-white">
-                                    <i class="fas fa-bolt text-sm"></i>
-                                </div>
-                                <span class="text-xs font-bold text-white">Cepat</span>
-                                <span class="text-[9px] text-white/50 mt-0.5 leading-none">Real-time</span>
-                            </div>
-                            <div class="flex flex-col items-center">
-                                <div class="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center mb-1 text-white">
-                                    <i class="fas fa-bell text-sm"></i>
-                                </div>
-                                <span class="text-xs font-bold text-white">Notifikasi</span>
-                                <span class="text-[9px] text-white/50 mt-0.5 leading-none">WhatsApp</span>
-                            </div>
-                        </div>
-                    </div>
-                @else
-                    {{-- Default Branding Mode --}}
-                    <div class="mb-6 inline-flex h-28 w-28 items-center justify-center rounded-3xl bg-white/20 backdrop-blur-sm p-4">
+                <div class="relative z-10 text-center">
+                    <div class="mb-6 inline-flex h-24 w-24 items-center justify-center rounded-3xl bg-white/20 backdrop-blur-sm">
                         <i class="fas fa-fingerprint text-5xl text-white"></i>
                     </div>
                     <h2 class="mb-4 text-4xl font-bold text-white leading-tight">
                         Pantau Kehadiran<br>dengan Mudah
                     </h2>
                     <p class="text-lg text-white/70 max-w-sm mx-auto">
-                        Sistem absensi digital berbasis RFID & fingerprint untuk mencatat kehadiran secara otomatis dan real-time.
+                        Sistem absensi digital berbasis RFID &amp; fingerprint untuk mencatat kehadiran secara otomatis dan real-time.
                     </p>
-                @endif
-            </div>
+                </div>
 
-            {{-- Stats (Only for Default Branding) --}}
-            @if(!isset($school))
                 <div class="relative z-10 grid grid-cols-3 gap-4">
                     <div class="rounded-2xl bg-white/10 backdrop-blur-sm p-4 text-center">
                         <p class="text-2xl font-bold text-white">Aman</p>
-                        <p class="text-xs text-white/60 mt-1">Tidak Bisa Dipalusukan</p>
+                        <p class="text-xs text-white/60 mt-1">Anti-Pemalsuan</p>
                     </div>
                     <div class="rounded-2xl bg-white/10 backdrop-blur-sm p-4 text-center">
                         <p class="text-2xl font-bold text-white">Tepat</p>
@@ -240,7 +212,7 @@
                 {{-- Footer --}}
                 <p class="mt-8 text-center text-xs text-gray-400 dark:text-gray-600">
                     <i class="fas fa-shield-alt mr-1 text-brand-400"></i>
-                    Koneksi aman & terenkripsi &mdash; Sistem Absensi v2.0
+                    Koneksi aman &amp; terenkripsi &mdash; Sistem Absensi v2.0
                 </p>
             </div>
         </div>

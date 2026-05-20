@@ -52,31 +52,28 @@
 
             {{-- Center content --}}
             <div class="relative z-10 text-center">
-                <div
-                    class="mb-6 inline-flex h-28 w-28 items-center justify-center rounded-3xl bg-white/20 backdrop-blur-sm p-4">
-                    @if(isset($school) && $school->logo)
-                        <img src="{{ asset('storage/' . $school->logo) }}" alt="{{ $school->name }}" class="max-h-full max-w-full object-contain">
-                    @else
-                        <i class="fas fa-fingerprint text-5xl text-white"></i>
-                    @endif
-                </div>
-                
                 @if(isset($school))
-                    <div class="mb-4 text-xl font-bold text-white tracking-wider uppercase">
-                        {{ $school->name }}
-                    </div>
-                @endif
-
-                <h2 class="mb-4 text-4xl font-bold text-white leading-tight">
-                    Pantau Kehadiran<br>dengan Mudah
-                </h2>
-                <p class="text-lg text-white/70 max-w-sm mx-auto">
-                    @if(isset($school))
-                        Sistem absensi digital terintegrasi untuk mencatat kehadiran {{ $school->employeeLabel() }} & siswa secara otomatis dan real-time.
-                    @else
-                        Sistem absensi digital berbasis RFID & fingerprint untuk mencatat kehadiran secara otomatis dan real-time.
+                    {{-- School Branding Mode --}}
+                    @if($school->logo)
+                        <div class="mb-6 inline-flex h-40 w-40 items-center justify-center rounded-3xl bg-white/10 backdrop-blur-md p-5 border border-white/10 shadow-lg">
+                            <img src="{{ asset('storage/' . $school->logo) }}" alt="{{ $school->name }}" class="max-h-full max-w-full object-contain">
+                        </div>
                     @endif
-                </p>
+                    <h2 class="text-2xl sm:text-3xl font-extrabold text-white tracking-wide uppercase leading-snug max-w-md mx-auto">
+                        {{ $school->name }}
+                    </h2>
+                @else
+                    {{-- Default Branding Mode --}}
+                    <div class="mb-6 inline-flex h-28 w-28 items-center justify-center rounded-3xl bg-white/20 backdrop-blur-sm p-4">
+                        <i class="fas fa-fingerprint text-5xl text-white"></i>
+                    </div>
+                    <h2 class="mb-4 text-4xl font-bold text-white leading-tight">
+                        Pantau Kehadiran<br>dengan Mudah
+                    </h2>
+                    <p class="text-lg text-white/70 max-w-sm mx-auto">
+                        Sistem absensi digital berbasis RFID & fingerprint untuk mencatat kehadiran secara otomatis dan real-time.
+                    </p>
+                @endif
             </div>
 
             {{-- Stats --}}

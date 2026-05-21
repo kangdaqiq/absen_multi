@@ -583,33 +583,12 @@ class RfidController extends Controller
                     ->where('setting_key', 'enable_checkout_attendance')
                     ->value('setting_value') ?? 'true';
 
-                // If checkout is disabled, still record jam_pulang silently (so final report is accurate)
-                // LCD still shows checkout screen ('absen_pulang'), but no bolos will be issued
+                // If checkout is disabled, reject checkout entirely
                 if ($checkoutEnabled === 'false') {
-                    $masuk = Carbon::parse($att->tanggal . ' ' . $att->jam_masuk);
-                    $totalSeconds = abs($masuk->diffInSeconds($now, false));
-                    $att->update([
-                        'jam_pulang' => $now->toTimeString(),
-                        'total_seconds' => $totalSeconds,
-                        'updated_at' => now(),
-                    ]);
-                    DB::commit();
-                    $hours = floor($totalSeconds / 3600);
-                    $mins = floor(($totalSeconds % 3600) / 60);
-
-                    // Kirim notif WA pulang seperti biasa
-                    try {
-                        $this->wa->sendCheckOut($siswa->nama, $siswa->no_wa, $now->format('H:i'), $hours, $mins, 'Sistem Otomatis', $device->school_id, $masuk->format('H:i'), $siswa->wa_ortu, $now->format('d/m/Y'));
-                    } catch (\Exception $e) {
-                        Log::error("WA Checkout (disabled mode) Error: " . $e->getMessage());
-                    }
-
-                    $this->logRequest($apiKey, 'checkout_success', $uid, true, 'Pulang : ' . $siswa->nama);
-                    return $this->response(true, 'success', 'Absen Pulang Berhasil.', 'ok', [
-                        'type' => 'absen_pulang',
+                    DB::rollBack();
+                    return $this->response(true, 'success', 'Sudah Absen', 'ok', [
+                        'type' => 'sudah_absen_masuk',
                         'nama' => $siswa->nama,
-                        'hours' => $hours,
-                        'mins' => $mins,
                     ]);
                 }
 

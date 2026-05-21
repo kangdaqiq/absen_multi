@@ -203,7 +203,7 @@
             text-transform: uppercase;
         }
 
-        /* ── 4 mini cards ─────────────────────────── */
+        /* ── Mini cards ─────────────────────────── */
         .mini-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -224,6 +224,10 @@
 
         .mini-card.green {
             background: linear-gradient(135deg, #22c55e, #16a34a);
+        }
+
+        .mini-card.orange {
+            background: linear-gradient(135deg, #f97316, #ea580c);
         }
 
         .mini-card.red {
@@ -534,6 +538,10 @@
                     <div class="mini-label">Hadir</div>
                     <div class="mini-number" id="stat-hadir">--</div>
                 </div>
+                <div class="mini-card orange">
+                    <div class="mini-label">Terlambat</div>
+                    <div class="mini-number" id="stat-terlambat">--</div>
+                </div>
                 <div class="mini-card red">
                     <div class="mini-label">Alpha</div>
                     <div class="mini-number" id="stat-alpha">--</div>
@@ -599,6 +607,7 @@
                 setText('stat-absen', s.absen);
                 setText('stat-belum', s.belum);
                 setText('stat-hadir', s.hadir);
+                setText('stat-terlambat', s.terlambat);
                 setText('stat-alpha', s.alpha);
                 setText('stat-izin', s.izin);
                 setText('stat-sakit', s.sakit);

@@ -70,8 +70,8 @@
             </div>
         </div>
 
-        {{-- Middle Row: Status Details (4 Cards) --}}
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {{-- Middle Row: Status Details (5 Cards) --}}
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
             {{-- Hadir --}}
             <div
                 class="bg-white dark:bg-boxdark rounded-lg p-4 border border-stroke dark:border-strokedark flex items-center gap-4">
@@ -82,6 +82,18 @@
                 <div>
                     <p class="text-xs text-gray-500 dark:text-gray-400 font-medium">Hadir</p>
                     <p id="stat-hadir" class="text-xl font-bold text-gray-800 dark:text-white">--</p>
+                </div>
+            </div>
+            {{-- Terlambat --}}
+            <div
+                class="bg-white dark:bg-boxdark rounded-lg p-4 border border-stroke dark:border-strokedark flex items-center gap-4">
+                <div
+                    class="h-10 w-10 rounded bg-orange-50 dark:bg-orange-900/20 flex items-center justify-center flex-shrink-0">
+                    <i class="fas fa-clock text-orange-500"></i>
+                </div>
+                <div>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 font-medium">Terlambat</p>
+                    <p id="stat-terlambat" class="text-xl font-bold text-gray-800 dark:text-white">--</p>
                 </div>
             </div>
             {{-- Alpha --}}
@@ -178,6 +190,7 @@
                 document.getElementById('stat-absen').textContent = data.stats.absen;
                 document.getElementById('stat-belum').textContent = data.stats.belum;
                 document.getElementById('stat-hadir').textContent = data.stats.hadir;
+                document.getElementById('stat-terlambat').textContent = data.stats.terlambat;
                 document.getElementById('stat-alpha').textContent = data.stats.alpha;
                 document.getElementById('stat-izin').textContent = data.stats.izin;
                 document.getElementById('stat-sakit').textContent = data.stats.sakit;

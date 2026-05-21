@@ -49,9 +49,19 @@
             </button>
 
             <!-- Logo (mobile only) -->
-            <a href="/" class="xl:hidden">
-                <img class="dark:hidden" src="/images/logo/logo.svg" alt="Logo" width="120" height="32" />
-                <img class="hidden dark:block" src="/images/logo/logo-dark.svg" alt="Logo" width="120" height="32" />
+            <a href="/" class="xl:hidden flex items-center">
+                @php
+                    $logo = !empty($school_logo) ? $school_logo : 'logo.svg';
+                    $isStorage = \Illuminate\Support\Str::startsWith($logo, 'schools/');
+                    $logoUrl = $isStorage ? asset('storage/' . $logo) : asset('images/logo/' . $logo);
+                @endphp
+
+                @if($isStorage)
+                    <img class="h-8 w-auto max-w-[150px] object-contain" src="{{ $logoUrl }}" alt="{{ $school_name ?? 'Logo' }}" />
+                @else
+                    <img class="dark:hidden" src="/images/logo/logo.svg" alt="Logo" width="120" height="32" />
+                    <img class="hidden dark:block" src="/images/logo/logo-dark.svg" alt="Logo" width="120" height="32" />
+                @endif
             </a>
 
             <!-- Application Menu Toggle (mobile only) -->

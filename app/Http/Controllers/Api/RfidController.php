@@ -577,7 +577,7 @@ class RfidController extends Controller
             }
 
             // Case 2: Sudah Masuk, Belum Pulang
-            if ($att && !$att->jam_pulang) {
+            if ($att && $att->jam_masuk && !$att->jam_pulang) {
                 // Check if checkout is enabled in settings SCOPED
                 $checkoutEnabled = \App\Models\Setting::where('school_id', $device->school_id)
                     ->where('setting_key', 'enable_checkout_attendance')
@@ -702,7 +702,7 @@ class RfidController extends Controller
             }
 
             // Case 3: Absen Masuk
-            if (!$att) {
+            if (!$att || !$att->jam_masuk) {
                 if ($now->lt($awalAbsenMasuk)) {
                     DB::rollBack();
                     return $this->response(false, 'gagal', 'Absen Tutup', 'warning', ['type' => 'too_early']);
@@ -730,14 +730,23 @@ class RfidController extends Controller
                     }
                 }
 
-                Attendance::create([
-                    'student_id' => $siswa->id,
-                    'tanggal' => $now->format('Y-m-d'),
-                    'jam_masuk' => $now->toTimeString(),
-                    'status' => $status,
-                    'keterangan' => $keterangan,
-                    'created_at' => now(),
-                ]);
+                if ($att) {
+                    $att->update([
+                        'jam_masuk' => $now->toTimeString(),
+                        'status' => $status,
+                        'keterangan' => $keterangan,
+                        'updated_at' => now(),
+                    ]);
+                } else {
+                    Attendance::create([
+                        'student_id' => $siswa->id,
+                        'tanggal' => $now->format('Y-m-d'),
+                        'jam_masuk' => $now->toTimeString(),
+                        'status' => $status,
+                        'keterangan' => $keterangan,
+                        'created_at' => now(),
+                    ]);
+                }
                 DB::commit();
 
                 $this->wa->sendCheckIn($siswa->nama, $siswa->no_wa, $now->format('H:i'), $status, $device->school_id, $keterangan, $siswa->wa_ortu, $siswa->kelas->nama_kelas ?? '-');

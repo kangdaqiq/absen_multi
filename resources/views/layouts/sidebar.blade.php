@@ -63,14 +63,29 @@
         :class="(!$store.sidebar.isExpanded && !$store.sidebar.isHovered && !$store.sidebar.isMobileOpen) ?
         'xl:justify-center' :
         'justify-start'">
-        <a href="/">
-            <img x-show="$store.sidebar.isExpanded || $store.sidebar.isHovered || $store.sidebar.isMobileOpen"
-                class="dark:hidden" src="/images/logo/logo.svg" alt="Logo" width="150" height="40" />
-            <img x-show="$store.sidebar.isExpanded || $store.sidebar.isHovered || $store.sidebar.isMobileOpen"
-                class="hidden dark:block" src="/images/logo/logo-dark.svg" alt="Logo" width="150"
-                height="40" />
-            <img x-show="!$store.sidebar.isExpanded && !$store.sidebar.isHovered && !$store.sidebar.isMobileOpen"
-                src="/images/logo/logo-icon.svg" alt="Logo" width="32" height="32" />
+        <a href="/" class="flex items-center">
+            @php
+                $logo = !empty($school_logo) ? $school_logo : 'logo.svg';
+                $isStorage = \Illuminate\Support\Str::startsWith($logo, 'schools/');
+                $logoUrl = $isStorage ? asset('storage/' . $logo) : asset('images/logo/' . $logo);
+            @endphp
+
+            @if($isStorage)
+                {{-- If it's a custom school logo, show it for both expanded/collapsed --}}
+                <img x-show="$store.sidebar.isExpanded || $store.sidebar.isHovered || $store.sidebar.isMobileOpen"
+                    class="h-10 w-auto max-w-[170px] object-contain" src="{{ $logoUrl }}" alt="{{ $school_name ?? 'Logo' }}" />
+                <img x-show="!$store.sidebar.isExpanded && !$store.sidebar.isHovered && !$store.sidebar.isMobileOpen"
+                    src="{{ $logoUrl }}" alt="{{ $school_name ?? 'Logo' }}" class="h-8 w-8 object-contain" />
+            @else
+                {{-- Default branding logos --}}
+                <img x-show="$store.sidebar.isExpanded || $store.sidebar.isHovered || $store.sidebar.isMobileOpen"
+                    class="dark:hidden" src="/images/logo/logo.svg" alt="Logo" width="150" height="40" />
+                <img x-show="$store.sidebar.isExpanded || $store.sidebar.isHovered || $store.sidebar.isMobileOpen"
+                    class="hidden dark:block" src="/images/logo/logo-dark.svg" alt="Logo" width="150"
+                    height="40" />
+                <img x-show="!$store.sidebar.isExpanded && !$store.sidebar.isHovered && !$store.sidebar.isMobileOpen"
+                    src="/images/logo/logo-icon.svg" alt="Logo" width="32" height="32" />
+            @endif
         </a>
     </div>
 

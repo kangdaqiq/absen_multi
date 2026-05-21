@@ -26,12 +26,19 @@ class LiveDashboardController extends Controller
         $schoolId = auth()->user()->school_id;
         $today = Carbon::today()->format('Y-m-d');
 
-        // 1. Counters
-        $totalSiswa = Siswa::where('school_id', $schoolId)->count();
-        
+        // 1. Counters — hanya kelas yang aktif absensi (is_active_attendance = true)
+        $totalSiswa = Siswa::where('school_id', $schoolId)
+            ->whereHas('kelas', function($q) {
+                $q->where('is_active_attendance', true);
+            })
+            ->count();
+
         $attendanceToday = Attendance::where('tanggal', $today)
             ->whereHas('student', function($q) use ($schoolId) {
-                $q->where('school_id', $schoolId);
+                $q->where('school_id', $schoolId)
+                  ->whereHas('kelas', function($sub) {
+                      $sub->where('is_active_attendance', true);
+                  });
             })
             ->get();
 
@@ -42,7 +49,7 @@ class LiveDashboardController extends Controller
         $bolosCount     = $attendanceToday->where('status', 'B')->count();
         $terlambatCount = $attendanceToday->where('status', 'T')->count();
 
-        $sudahTap = $attendanceToday->count(); // semua yang sudah tap hari ini
+        $sudahTap = $attendanceToday->count(); // semua yang sudah absen hari ini (kelas aktif)
         $belumTap = max(0, $totalSiswa - $sudahTap);
 
         // 2. Real-time Logs (Latest 15 API Logs for this school)

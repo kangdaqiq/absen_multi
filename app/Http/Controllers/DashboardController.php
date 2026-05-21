@@ -59,21 +59,23 @@ class DashboardController extends Controller
         }
 
         // Admin / Teacher / Wali Kelas / Waka Kurikulum View
-        // 1. Counts SCOPED
+        // 1. Counts SCOPED — hanya kelas yang aktif absensi
         $countSiswa = Siswa::when(!$isSuperAdmin, fn($q) => $q->where('school_id', $schoolId))
             ->when($isWaliKelas, fn($q) => $q->whereIn('kelas_id', $managedKelasIds))
+            ->whereHas('kelas', fn($q) => $q->where('is_active_attendance', true))
             ->count();
         $countGuru = Guru::when(!$isSuperAdmin, fn($q) => $q->where('school_id', $schoolId))->count();
         $countKelas = Kelas::when(!$isSuperAdmin, fn($q) => $q->where('school_id', $schoolId))
             ->when($isWaliKelas, fn($q) => $q->whereIn('id', $managedKelasIds))
             ->count();
 
-        // 2. Attendance Today SCOPED [Via Student]
+        // 2. Attendance Today SCOPED [Via Student] — hanya kelas yang aktif absensi
         $countHadir = Attendance::whereDate('tanggal', $today)
             ->where('status', 'H')
             ->when(!$isSuperAdmin, function ($q) use ($schoolId, $isWaliKelas, $managedKelasIds) {
                 $q->whereHas('student', function ($sub) use ($schoolId, $isWaliKelas, $managedKelasIds) {
-                    $sub->where('school_id', $schoolId);
+                    $sub->where('school_id', $schoolId)
+                        ->whereHas('kelas', fn($k) => $k->where('is_active_attendance', true));
                     if ($isWaliKelas) {
                         $sub->whereIn('kelas_id', $managedKelasIds);
                     }

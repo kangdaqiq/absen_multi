@@ -24,11 +24,27 @@
                 <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Sampai Tanggal:</label>
                 <input type="date" name="end_date" value="{{ $endDate }}" class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
             </div>
-            <div class="w-full md:w-auto min-w-[250px]">
-                <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Cari Kelas:</label>
-                <input type="text" name="search" value="{{ request('search') }}" placeholder="Ketik nama kelas..." 
-                    oninput="clearTimeout(this.delay); this.delay = setTimeout(() => { this.form.submit() }, 500);"
-                    class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+            <div class="w-full md:w-auto min-w-[200px]">
+                <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Pilih Jurusan:</label>
+                <select name="jurusan_id" class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                    <option value="">-- Semua Jurusan --</option>
+                    @foreach($jurusanList as $jurusan)
+                        <option value="{{ $jurusan->id }}" {{ request('jurusan_id') == $jurusan->id ? 'selected' : '' }}>
+                            {{ $jurusan->nama_jurusan }}
+                        </option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="w-full md:w-auto min-w-[200px]">
+                <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Pilih Kelas:</label>
+                <select name="kelas_id" class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                    <option value="">-- Semua Kelas --</option>
+                    @foreach($kelasList as $kelas)
+                        <option value="{{ $kelas->id }}" {{ request('kelas_id') == $kelas->id ? 'selected' : '' }}>
+                            {{ $kelas->nama_kelas }}
+                        </option>
+                    @endforeach
+                </select>
             </div>
             
             <div class="w-full md:w-auto flex flex-wrap gap-2 mt-2 md:mt-0">

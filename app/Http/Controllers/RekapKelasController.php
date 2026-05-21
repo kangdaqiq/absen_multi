@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Attendance;
 use App\Models\Kelas;
+use App\Models\Jurusan;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
@@ -33,12 +34,38 @@ class RekapKelasController extends Controller
             }
         }
 
-        if ($request->has('search') && !empty($request->search)) {
-            $search = $request->search;
-            $kelasQuery->where('nama_kelas', 'like', "%{$search}%");
+        if ($request->has('kelas_id') && !empty($request->kelas_id)) {
+            $kelasQuery->where('id', $request->kelas_id);
+        }
+
+        if ($request->has('jurusan_id') && !empty($request->jurusan_id)) {
+            $kelasQuery->where('jurusan_id', $request->jurusan_id);
         }
 
         $allKelas = $kelasQuery->paginate(50)->withQueryString();
+
+        // Untuk dropdown filter
+        $kelasListQuery = Kelas::orderBy('nama_kelas');
+        if (auth()->user() && !auth()->user()->isSuperAdmin()) {
+            $kelasListQuery->where('school_id', auth()->user()->school_id);
+        }
+        if (auth()->user() && auth()->user()->role === 'wali_kelas') {
+            $guru = auth()->user()->guru;
+            if ($guru) {
+                $managedKelasIds = Kelas::where('wali_kelas_id', $guru->id)->pluck('id');
+                $kelasListQuery->whereIn('id', $managedKelasIds);
+            } else {
+                $kelasListQuery->where('id', -1);
+            }
+        }
+        $kelasList = $kelasListQuery->get(['id', 'nama_kelas']);
+
+        // Dropdown jurusan
+        $jurusanList = Jurusan::orderBy('nama_jurusan')
+            ->when(auth()->user() && !auth()->user()->isSuperAdmin(), function($q) {
+                $q->where('school_id', auth()->user()->school_id);
+            })
+            ->get(['id', 'nama_jurusan']);
 
         $summary = [];
         foreach ($allKelas as $k) {
@@ -70,7 +97,7 @@ class RekapKelasController extends Controller
             }
         }
 
-        return view('rekap-kelas.index', compact('allKelas', 'summary', 'startDate', 'endDate'));
+        return view('rekap-kelas.index', compact('allKelas', 'summary', 'startDate', 'endDate', 'kelasList', 'jurusanList'));
     }
 
     public function export(Request $request)

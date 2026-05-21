@@ -38,6 +38,21 @@ class AppServiceProvider extends ServiceProvider
                 $schoolLogo = 'logo.png';
                 $settings = [];
 
+                // Deteksi apakah akses via custom domain sekolah
+                $requestHost    = request()->getHost();
+                $globalHost     = parse_url(config('app.url'), PHP_URL_HOST) ?? 'localhost';
+                $isCustomDomain = ($requestHost !== $globalHost && $requestHost !== 'localhost');
+
+                // Jika custom domain, cari school yang punya domain tersebut
+                $schoolByDomain = null;
+                if ($isCustomDomain) {
+                    $schoolByDomain = \App\Models\School::where('domain', $requestHost)->first();
+                    // Jika domain tidak cocok dengan sekolah manapun, anggap bukan custom domain
+                    if (!$schoolByDomain) {
+                        $isCustomDomain = false;
+                    }
+                }
+
                 if (\Illuminate\Support\Facades\Auth::check()) {
                     $user = \Illuminate\Support\Facades\Auth::user();
                     if ($user->school_id) {
@@ -82,15 +97,25 @@ class AppServiceProvider extends ServiceProvider
                 }
 
                 $schoolName = $settings['nama_sekolah'] ?? $schoolName;
-                $schoolLogo = $settings['logo_filename'] ?? $schoolLogo;
+
+                // Logo: hanya pakai logo sekolah jika akses via custom domain.
+                // Jika dari domain global → pakai logo SVG bawaan aplikasi (logo.svg)
+                if ($isCustomDomain) {
+                    $schoolLogo = $settings['logo_filename'] ?? 'logo.svg';
+                } else {
+                    // null / string kosong → sidebar akan jatuh ke else branch (logo SVG bawaan)
+                    $schoolLogo = null;
+                }
 
                 $view->with('school_name', $schoolName);
                 $view->with('school_logo', $schoolLogo);
+                $view->with('is_custom_domain', $isCustomDomain);
                 $view->with('global_settings', $settings);
 
             } catch (\Exception $e) {
                 $view->with('school_name', 'Sistem Absensi');
                 $view->with('school_logo', 'logo.png');
+                $view->with('is_custom_domain', false);
                 $view->with('global_settings', []);
             }
         });

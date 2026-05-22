@@ -560,7 +560,6 @@
                     <span class="stat-number" id="stat-tidak-hadir">--</span>
                     <span class="stat-unit">Orang</span>
                 </div>
-                <div class="stat-sub">Alpha + Izin + Sakit</div>
             </div>
             <div class="mini-grid">
                 <div class="mini-card green">

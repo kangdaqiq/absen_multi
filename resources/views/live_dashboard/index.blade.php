@@ -31,8 +31,8 @@
             </div>
         </div>
 
-        {{-- Top Row: Main Stats (3 Cards) --}}
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {{-- Top Row: Main Stats (4 Cards) --}}
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
             {{-- Total Siswa --}}
             <div
                 class="bg-white dark:bg-boxdark rounded-xl shadow-sm border-l-4 border-blue-500 p-6 flex items-center justify-between transition-all hover:shadow-md">
@@ -45,7 +45,7 @@
                 </div>
             </div>
 
-            {{-- Sudah Tap --}}
+            {{-- Sudah Absen --}}
             <div
                 class="bg-white dark:bg-boxdark rounded-xl shadow-sm border-l-4 border-green-500 p-6 flex items-center justify-between transition-all hover:shadow-md">
                 <div>
@@ -57,7 +57,7 @@
                 </div>
             </div>
 
-            {{-- Belum Tap --}}
+            {{-- Belum Absen --}}
             <div
                 class="bg-white dark:bg-boxdark rounded-xl shadow-sm border-l-4 border-orange-500 p-6 flex items-center justify-between transition-all hover:shadow-md">
                 <div>
@@ -66,6 +66,18 @@
                 </div>
                 <div class="h-12 w-12 rounded-full bg-orange-50 dark:bg-orange-900/20 flex items-center justify-center">
                     <i class="fas fa-hourglass-half text-orange-500 text-xl"></i>
+                </div>
+            </div>
+
+            {{-- Tidak Hadir (Alpha + Izin + Sakit) --}}
+            <div
+                class="bg-white dark:bg-boxdark rounded-xl shadow-sm border-l-4 border-red-500 p-6 flex items-center justify-between transition-all hover:shadow-md">
+                <div>
+                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Tidak Hadir</p>
+                    <h3 id="stat-tidak-hadir" class="text-3xl font-bold text-red-600 dark:text-red-400 mt-1">--</h3>
+                </div>
+                <div class="h-12 w-12 rounded-full bg-red-50 dark:bg-red-900/20 flex items-center justify-center">
+                    <i class="fas fa-user-slash text-red-500 text-xl"></i>
                 </div>
             </div>
         </div>
@@ -189,6 +201,7 @@
                 document.getElementById('stat-total').textContent = data.stats.total;
                 document.getElementById('stat-absen').textContent = data.stats.absen;
                 document.getElementById('stat-belum').textContent = data.stats.belum;
+                document.getElementById('stat-tidak-hadir').textContent = data.stats.tidak_hadir;
                 document.getElementById('stat-hadir').textContent = data.stats.hadir;
                 document.getElementById('stat-terlambat').textContent = data.stats.terlambat;
                 document.getElementById('stat-alpha').textContent = data.stats.alpha;

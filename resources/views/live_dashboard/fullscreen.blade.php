@@ -158,6 +158,27 @@
             border-color: #f97316;
         }
 
+        .stat-card.crimson {
+            border-color: #dc2626;
+        }
+
+        .stat-card.crimson .stat-label {
+            color: #f87171;
+        }
+
+        .stat-card.crimson .stat-number {
+            color: #dc2626;
+        }
+
+        .stat-card.crimson .stat-sub {
+            font-size: 10px;
+            color: #f87171;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-top: 2px;
+        }
+
         .stat-label {
             font-size: 11px;
             font-weight: 800;
@@ -533,6 +554,14 @@
                     <span class="stat-unit">Orang</span>
                 </div>
             </div>
+            <div class="stat-card crimson">
+                <div class="stat-label">Tidak Hadir</div>
+                <div class="stat-value">
+                    <span class="stat-number" id="stat-tidak-hadir">--</span>
+                    <span class="stat-unit">Orang</span>
+                </div>
+                <div class="stat-sub">Alpha + Izin + Sakit</div>
+            </div>
             <div class="mini-grid">
                 <div class="mini-card green">
                     <div class="mini-label">Hadir</div>
@@ -606,6 +635,7 @@
                 setText('stat-total', s.total);
                 setText('stat-absen', s.absen);
                 setText('stat-belum', s.belum);
+                setText('stat-tidak-hadir', s.tidak_hadir);
                 setText('stat-hadir', s.hadir);
                 setText('stat-terlambat', s.terlambat);
                 setText('stat-alpha', s.alpha);

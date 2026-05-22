@@ -48,6 +48,7 @@ class LiveDashboardController extends Controller
         $sakitCount     = $attendanceToday->where('status', 'S')->count();
         $bolosCount     = $attendanceToday->where('status', 'B')->count();
         $terlambatCount = $attendanceToday->where('status', 'T')->count();
+        $tidakHadirCount = $alphaCount + $izinCount + $sakitCount;
 
         $sudahTap = $attendanceToday->count(); // semua yang sudah absen hari ini (kelas aktif)
         $belumTap = max(0, $totalSiswa - $sudahTap);
@@ -72,15 +73,16 @@ class LiveDashboardController extends Controller
 
         return response()->json([
             'stats' => [
-                'total'     => $totalSiswa,
-                'absen'     => $sudahTap,
-                'belum'     => $belumTap,
-                'hadir'     => $hadirCount,
-                'alpha'     => $alphaCount,
-                'izin'      => $izinCount,
-                'sakit'     => $sakitCount,
-                'bolos'     => $bolosCount,
-                'terlambat' => $terlambatCount,
+                'total'        => $totalSiswa,
+                'absen'        => $sudahTap,
+                'belum'        => $belumTap,
+                'hadir'        => $hadirCount,
+                'alpha'        => $alphaCount,
+                'izin'         => $izinCount,
+                'sakit'        => $sakitCount,
+                'bolos'        => $bolosCount,
+                'terlambat'    => $terlambatCount,
+                'tidak_hadir'  => $tidakHadirCount,
             ],
             'logs' => $logs
         ]);

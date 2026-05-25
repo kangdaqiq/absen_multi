@@ -166,6 +166,43 @@ class WhatsAppService
         }
     }
 
+    /**
+     * Kirim notifikasi kehadiran kegiatan ke siswa dan/atau ortu.
+     */
+    public function sendKegiatanCheckIn(
+        string $namaSiswa,
+        string $namaKegiatan,
+        string $jam,
+        string $tanggal,
+        int $schoolId,
+        ?string $phoneSiswa = null,
+        ?string $phoneOrtu = null
+    ): void {
+        if (!$phoneSiswa && !$phoneOrtu) return;
+
+        if ($phoneSiswa) {
+            $msg = WhatsAppMessageTemplates::kegiatanCheckIn(
+                nama: $namaSiswa,
+                namaKegiatan: $namaKegiatan,
+                jam: $jam,
+                tanggal: $tanggal,
+                isOrtu: false
+            );
+            $this->queueMessage($phoneSiswa, $msg, $schoolId);
+        }
+
+        if ($phoneOrtu) {
+            $msgOrtu = WhatsAppMessageTemplates::kegiatanCheckIn(
+                nama: $namaSiswa,
+                namaKegiatan: $namaKegiatan,
+                jam: $jam,
+                tanggal: $tanggal,
+                isOrtu: true
+            );
+            $this->queueMessage($phoneOrtu, $msgOrtu, $schoolId);
+        }
+    }
+
     public function sendTestMessage($phone, $message, $schoolId = null)
     {
         if (!$phone || empty(trim($message))) return;

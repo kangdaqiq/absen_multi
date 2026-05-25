@@ -12,6 +12,7 @@ class MenuHelper
         $role = $user->role;
         $school = $user->school ?? null;
         $isOffice = $school?->isOffice() ?? false;
+        $isPesantren = $school?->isPesantren() ?? false;
         $labelKaryawan = $school?->employeeLabel() ?? 'Guru';
 
         $menu = [];
@@ -70,7 +71,9 @@ class MenuHelper
                 $schoolItems[] = ['icon' => 'chat', 'name' => 'Broadcast WA', 'path' => route('broadcast.index', [], false)];
             }
 
-            $schoolItems[] = ['icon' => 'user-profile', 'name' => 'Kartu Gerbang', 'path' => route('gate-cards.index', [], false)];
+            if (!$isPesantren) {
+                $schoolItems[] = ['icon' => 'user-profile', 'name' => 'Kartu Gerbang', 'path' => route('gate-cards.index', [], false)];
+            }
 
             $menu[] = [
                 'title' => 'Data Utama',
@@ -81,41 +84,65 @@ class MenuHelper
         // ABSENSI
         if (in_array($role, ['admin', 'teacher', 'wali_kelas', 'waka_kurikulum'])) {
             $absensiSubItems = [];
-            if (!$isOffice) {
+            if (!$isOffice && !$isPesantren) {
                 $absensiSubItems[] = ['name' => 'Absensi Siswa', 'path' => route('absensi.index', [], false)];
             }
-            if (in_array($role, ['admin', 'teacher'])) {
+            if (in_array($role, ['admin', 'teacher']) && !$isPesantren) {
                 $absensiSubItems[] = ['name' => "Absensi $labelKaryawan", 'path' => route('absensi-guru.index', [], false)];
             }
-            if (!$isOffice) {
+            if (!$isOffice && !$isPesantren) {
                 $absensiSubItems[] = ['name' => 'Rekap Siswa', 'path' => route('rekap.index', [], false)];
                 $absensiSubItems[] = ['name' => 'Rekap Kelas', 'path' => route('rekap-kelas.index', [], false)];
             }
-            if (in_array($role, ['admin', 'teacher'])) {
+            if (in_array($role, ['admin', 'teacher']) && !$isPesantren) {
                 $absensiSubItems[] = ['name' => "Rekap $labelKaryawan", 'path' => route('rekap-guru.index', [], false)];
+            }
+
+            $kehadiranItems = [
+                [
+                    'name' => 'Monitoring Real-time',
+                    'icon' => 'charts',
+                    'path' => route('live.index', [], false),
+                ]
+            ];
+
+            if (!empty($absensiSubItems)) {
+                $kehadiranItems[] = [
+                    'name' => 'Absensi',
+                    'icon' => 'calendar',
+                    'subItems' => $absensiSubItems
+                ];
             }
 
             $menu[] = [
                 'title' => 'Kehadiran',
-                'items' => [
-                    [
-                        'name' => 'Monitoring Real-time',
-                        'icon' => 'charts',
-                        'path' => route('live.index', [], false),
-                    ],
-                    [
-                        'name' => 'Absensi',
-                        'icon' => 'calendar',
-                        'subItems' => $absensiSubItems
-                    ]
-                ]
+                'items' => $kehadiranItems
             ];
-        }
+
+            // Kegiatan — hanya untuk admin tenant pesantren
+            if ($role === 'admin' && $school?->isPesantren()) {
+                $menu[] = [
+                    'title' => 'Kegiatan',
+                    'items' => [
+                        [
+                            'name'     => 'Kegiatan',
+                            'icon'     => 'calendar',
+                            'subItems' => [
+                                ['name' => 'Kelola Kegiatan', 'path' => route('kegiatan.index', [], false)],
+                                ['name' => 'Absen Kegiatan', 'path' => route('kegiatan.absen', [], false)],
+                                ['name' => 'Rekap Kegiatan', 'path' => route('kegiatan.rekap', [], false)],
+                            ]
+                        ]
+                    ]
+                ];
+            }
+        } // end: in_array(role, [admin,teacher,wali_kelas,waka_kurikulum])
 
         // 4. MASTER DATA & KONFIGURASI
         if ($role === 'admin') {
+
             $konfigItems = [];
-            if (!$isOffice) {
+            if (!$isOffice && !$isPesantren) {
                 $konfigItems[] = [
                     'name' => 'Master Data',
                     'icon' => 'tables',
@@ -126,11 +153,12 @@ class MenuHelper
                 ];
             }
 
-            $pengaturanSubItems = [
-                ['name' => 'Jam Masuk/Pulang', 'path' => route('jadwal.index', [], false)],
-                ['name' => 'Device / Mesin', 'path' => route('devices.index', [], false)],
-                ['name' => 'Pengaturan Umum', 'path' => route('settings.index', [], false)],
-            ];
+            $pengaturanSubItems = [];
+            if (!$isPesantren) {
+                $pengaturanSubItems[] = ['name' => 'Jam Masuk/Pulang', 'path' => route('jadwal.index', [], false)];
+            }
+            $pengaturanSubItems[] = ['name' => 'Device / Mesin', 'path' => route('devices.index', [], false)];
+            $pengaturanSubItems[] = ['name' => 'Pengaturan Umum', 'path' => route('settings.index', [], false)];
             if ($school && $school->wa_enabled) {
                 $pengaturanSubItems[] = ['name' => 'WhatsApp Device', 'path' => route('whatsapp.device.index', [], false)];
             }

@@ -153,6 +153,12 @@ class School extends Model
         return $this->type === 'office';
     }
 
+    /** Returns true if this is a pesantren tenant. */
+    public function isPesantren(): bool
+    {
+        return $this->type === 'pesantren';
+    }
+
     /**
      * Dynamic label for "Guru" depending on type.
      * Usage: $school->employeeLabel()  → 'Guru' or 'Karyawan'

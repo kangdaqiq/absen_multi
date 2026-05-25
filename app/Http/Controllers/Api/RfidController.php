@@ -17,6 +17,8 @@ use App\Models\Attendance;
 use App\Models\TeacherCheckoutSession;
 use App\Models\MessageQueue;
 use App\Models\GateCard;
+use App\Models\Kegiatan;
+use App\Models\KegiatanAttendance;
 
 class RfidController extends Controller
 {
@@ -269,6 +271,27 @@ class RfidController extends Controller
             ->first();
         if ($gateCard) {
             return $this->handleGateScan($uid, $gateCard, $apiKey, $device, $now);
+        }
+
+        // Cek kegiatan aktif berdasarkan jadwal waktu — SCOPED
+        $todayStr  = $now->format('Y-m-d');
+        $timeStr   = $now->format('H:i:s');
+        $activeKegiatan = Kegiatan::where('school_id', $device->school_id)
+            ->where('is_active', true)
+            ->where('jam_mulai', '<=', $timeStr)
+            ->where('jam_selesai', '>=', $timeStr)
+            ->where('tanggal_mulai', '<=', $todayStr)
+            ->get()
+            ->first(function($kegiatan) use ($now) {
+                if ($kegiatan->frekuensi === 'mingguan') {
+                    return $now->dayOfWeek === $kegiatan->tanggal_mulai->dayOfWeek;
+                } elseif ($kegiatan->frekuensi === 'bulanan') {
+                    return $now->day === $kegiatan->tanggal_mulai->day;
+                }
+                return true; // harian
+            });
+        if ($activeKegiatan) {
+            return $this->handleKegiatanStudentScan($uid, $activeKegiatan, $apiKey, $device, $now);
         }
 
         // Check Teacher - SCOPED
@@ -742,6 +765,85 @@ class RfidController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error("Scan error: " . $e->getMessage());
+            return $this->response(false, 'gagal', 'Terjadi kesalahan sistem', 'error');
+        }
+    }
+
+    /**
+     * Siswa scan RFID saat jadwal kegiatan aktif → catat kehadiran kegiatan.
+     */
+    private function handleKegiatanStudentScan($uid, Kegiatan $kegiatan, $apiKey, $device, $now = null)
+    {
+        try {
+            DB::beginTransaction();
+            $now = $now ?? now();
+            $today = $now->format('Y-m-d');
+
+            $siswa = Siswa::with('kelas')
+                ->whereRaw('UPPER(uid_rfid) = ?', [$uid])
+                ->where('school_id', $device->school_id)
+                ->first();
+
+            if (!$siswa) {
+                DB::rollBack();
+                $this->logRequest($apiKey, 'unknown_card', $uid, false, 'Kartu tidak terdaftar (kegiatan mode)');
+                return $this->response(false, 'unknown', 'Kartu tdk dikenal', 'error', ['type' => 'unknown_card', 'uid' => $uid]);
+            }
+
+            // Cek apakah sudah hadir hari ini untuk kegiatan ini
+            $already = KegiatanAttendance::where('kegiatan_id', $kegiatan->id)
+                ->where('student_id', $siswa->id)
+                ->where('tanggal', $today)
+                ->lockForUpdate()
+                ->first();
+
+            if ($already) {
+                DB::rollBack();
+                $this->logRequest($apiKey, 'kegiatan_sudah_absen', $uid, true, 'Sudah absen kegiatan: ' . $siswa->nama);
+                return $this->response(true, 'success', 'Sudah Absen', 'ok', [
+                    'type' => 'kegiatan_sudah_absen',
+                    'nama' => $siswa->nama,
+                    'kegiatan' => $kegiatan->nama_kegiatan,
+                ]);
+            }
+
+            // Catat kehadiran
+            KegiatanAttendance::create([
+                'school_id'   => $device->school_id,
+                'kegiatan_id' => $kegiatan->id,
+                'student_id'  => $siswa->id,
+                'tanggal'     => $today,
+                'jam_masuk'   => $now->toTimeString(),
+                'status'      => 'H',
+            ]);
+            DB::commit();
+
+            // Kirim notifikasi WA ke siswa dan ortu
+            try {
+                $tanggalFormatted = $now->translatedFormat('l, d F Y');
+                $this->wa->sendKegiatanCheckIn(
+                    namaSiswa: $siswa->nama,
+                    namaKegiatan: $kegiatan->nama_kegiatan,
+                    jam: $now->format('H:i'),
+                    tanggal: $tanggalFormatted,
+                    schoolId: $device->school_id,
+                    phoneSiswa: $siswa->no_wa ?: null,
+                    phoneOrtu: $siswa->wa_ortu ?: null,
+                );
+            } catch (\Exception $e) {
+                Log::error("WA Kegiatan CheckIn Error: " . $e->getMessage());
+            }
+
+            $this->logRequest($apiKey, 'kegiatan_checkin_success', $uid, true, 'Hadir Kegiatan: ' . $siswa->nama . ' → ' . $kegiatan->nama_kegiatan);
+            return $this->response(true, 'success', 'Absen Kegiatan OK', 'ok', [
+                'type'     => 'kegiatan_absen_masuk',
+                'nama'     => $siswa->nama,
+                'kegiatan' => $kegiatan->nama_kegiatan,
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error("Kegiatan student scan error: " . $e->getMessage());
             return $this->response(false, 'gagal', 'Terjadi kesalahan sistem', 'error');
         }
     }

@@ -541,4 +541,34 @@ class WhatsAppMessageTemplates
 
         return $msg;
     }
+
+    /**
+     * Kegiatan check-in notification (siswa atau ortu)
+     */
+    public static function kegiatanCheckIn(
+        string $nama,
+        string $namaKegiatan,
+        string $jam,
+        string $tanggal,
+        bool $isOrtu = false
+    ): string {
+        if ($isOrtu) {
+            return "📋 *Notifikasi Kehadiran Kegiatan*\n\n" .
+                "Halo, Orang Tua/Wali dari *{$nama}*,\n\n" .
+                "Anak Anda telah hadir dalam kegiatan sekolah.\n\n" .
+                "🎯 Kegiatan : *{$namaKegiatan}*\n" .
+                "👤 Siswa   : {$nama}\n" .
+                "📅 Tanggal  : {$tanggal}\n" .
+                "🕐 Jam Masuk: {$jam}\n\n" .
+                "_Notifikasi otomatis dari sistem absensi sekolah._";
+        }
+
+        return "📋 *Notifikasi Kehadiran Kegiatan*\n\n" .
+            "Halo, *{$nama}*,\n\n" .
+            "Kehadiran Anda dalam kegiatan telah tercatat.\n\n" .
+            "🎯 Kegiatan : *{$namaKegiatan}*\n" .
+            "📅 Tanggal  : {$tanggal}\n" .
+            "🕐 Jam Masuk: {$jam}\n\n" .
+            "_Notifikasi otomatis dari sistem absensi sekolah._";
+    }
 }

@@ -174,6 +174,14 @@ Route::middleware('auth')->group(function () {
         Route::post('/jadwal/update-all', [App\Http\Controllers\JadwalController::class, 'updateAll'])->name('jadwal.update-all');
         Route::resource('jadwal', App\Http\Controllers\JadwalController::class)->except(['create', 'show', 'edit']);
 
+        // Kegiatan (Absensi Per Kegiatan)
+        Route::get('kegiatan/absen', [App\Http\Controllers\KegiatanController::class, 'absen'])->name('kegiatan.absen');
+        Route::post('kegiatan/absen/update', [App\Http\Controllers\KegiatanController::class, 'updateAttendance'])->name('kegiatan.absen.update');
+        Route::get('kegiatan/rekap', [App\Http\Controllers\KegiatanController::class, 'rekap'])->name('kegiatan.rekap');
+        Route::get('kegiatan/{id}/attendance', [App\Http\Controllers\KegiatanController::class, 'attendance'])->name('kegiatan.attendance');
+        Route::resource('kegiatan', App\Http\Controllers\KegiatanController::class)->except(['create', 'show', 'edit']);
+
+
         // Setting
         Route::get('settings', [App\Http\Controllers\SettingsController::class, 'index'])->name('settings.index');
         Route::put('settings', [App\Http\Controllers\SettingsController::class, 'update'])->name('settings.update');

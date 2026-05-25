@@ -50,6 +50,11 @@ class Siswa extends Model
         return $this->hasMany(Attendance::class, 'student_id');
     }
 
+    public function kegiatanAttendances()
+    {
+        return $this->hasMany(KegiatanAttendance::class, 'student_id');
+    }
+
     public function fingerprints()
     {
         return $this->hasMany(SiswaFingerprint::class, 'student_id');

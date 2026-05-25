@@ -48,6 +48,8 @@
                             <div class="mt-2">
                                 @if($school->isOffice())
                                     <span class="inline-flex rounded-full bg-brand-500/10 px-3 py-1 text-xs font-medium text-brand-500"><i class="fas fa-building mr-1 mt-0.5"></i> Perkantoran</span>
+                                @elseif($school->isPesantren())
+                                    <span class="inline-flex rounded-full bg-success-500/10 px-3 py-1 text-xs font-medium text-success-500"><i class="fas fa-mosque mr-1 mt-0.5"></i> Pesantren</span>
                                 @else
                                     <span class="inline-flex rounded-full bg-info/10 px-3 py-1 text-xs font-medium text-info"><i class="fas fa-school mr-1 mt-0.5"></i> Sekolah</span>
                                 @endif

@@ -121,6 +121,14 @@ class RekapKelasController extends Controller
             }
         }
 
+        if ($request->has('kelas_id') && !empty($request->kelas_id)) {
+            $kelasQuery->where('id', $request->kelas_id);
+        }
+
+        if ($request->has('jurusan_id') && !empty($request->jurusan_id)) {
+            $kelasQuery->where('jurusan_id', $request->jurusan_id);
+        }
+
         $allKelas = $kelasQuery->get();
 
         $summary = [];
@@ -235,6 +243,14 @@ class RekapKelasController extends Controller
             } else {
                 $kelasQuery->where('id', -1);
             }
+        }
+
+        if ($request->has('kelas_id') && !empty($request->kelas_id)) {
+            $kelasQuery->where('id', $request->kelas_id);
+        }
+
+        if ($request->has('jurusan_id') && !empty($request->jurusan_id)) {
+            $kelasQuery->where('jurusan_id', $request->jurusan_id);
         }
 
         $allKelas = $kelasQuery->get();

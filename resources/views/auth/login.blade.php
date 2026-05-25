@@ -232,7 +232,7 @@
                             @else
                                 <div class="w-full h-full rounded-2xl flex items-center justify-center"
                                      style="background: linear-gradient(135deg, rgba(79,70,229,0.1), rgba(124,58,237,0.1));">
-                                    <i class="fas {{ $school->isOffice() ? 'fa-building' : 'fa-graduation-cap' }} text-4xl text-indigo-600 dark:text-indigo-400"></i>
+                                    <i class="fas {{ $school->isOffice() ? 'fa-building' : ($school->isPesantren() ? 'fa-mosque' : 'fa-graduation-cap') }} text-4xl text-indigo-600 dark:text-indigo-400"></i>
                                 </div>
                             @endif
                         </div>
@@ -242,7 +242,7 @@
                     <div class="space-y-3">
                         <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold tracking-[0.2em] uppercase bg-indigo-500/10 dark:bg-indigo-400/10 text-indigo-700 dark:text-indigo-300">
                             <i class="fas fa-shield-alt text-[9px]"></i>
-                            {{ $school->isOffice() ? 'Portal Karyawan' : 'Portal Resmi Sekolah' }}
+                            {{ $school->isOffice() ? 'Portal Karyawan' : ($school->isPesantren() ? 'Portal Resmi Pesantren' : 'Portal Resmi Sekolah') }}
                         </span>
                         <h2 class="text-2xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 dark:from-white dark:via-indigo-100 dark:to-slate-300 leading-tight">
                             {{ $school->name }}
@@ -270,7 +270,7 @@
                     </div>
 
                     <p class="text-[11px] text-slate-400 dark:text-slate-500 max-w-[280px] mt-4 leading-relaxed font-medium">
-                        {{ $school->isOffice() ? 'Sistem manajemen & pencatatan kehadiran karyawan cerdas.' : 'Sistem pencatatan absensi otomatis berbasis identitas digital & biometrik.' }}
+                        {{ $school->isOffice() ? 'Sistem manajemen & pencatatan kehadiran karyawan cerdas.' : ($school->isPesantren() ? 'Sistem pencatatan absensi & kegiatan pesantren berbasis biometrik.' : 'Sistem pencatatan absensi otomatis berbasis identitas digital & biometrik.') }}
                     </p>
                 </div>
             @else
@@ -339,13 +339,13 @@
                                 <img src="{{ asset('storage/' . $school->logo) }}" alt="{{ $school->name }}"
                                      class="w-full h-full object-contain">
                             @else
-                                <i class="fas {{ $school->isOffice() ? 'fa-building' : 'fa-graduation-cap' }} text-2xl text-indigo-600 dark:text-indigo-400"></i>
+                                <i class="fas {{ $school->isOffice() ? 'fa-building' : ($school->isPesantren() ? 'fa-mosque' : 'fa-graduation-cap') }} text-2xl text-indigo-600 dark:text-indigo-400"></i>
                             @endif
                         </div>
                     </div>
                     <div class="space-y-1">
                         <span class="inline-block text-[9px] font-extrabold tracking-[0.25em] uppercase text-indigo-600 dark:text-indigo-400 bg-indigo-500/10 dark:bg-indigo-400/10 px-2.5 py-0.5 rounded-full">
-                            {{ $school->isOffice() ? 'Portal Karyawan' : 'Portal Resmi Sekolah' }}
+                            {{ $school->isOffice() ? 'Portal Karyawan' : ($school->isPesantren() ? 'Portal Resmi Pesantren' : 'Portal Resmi Sekolah') }}
                         </span>
                         <h2 class="text-xl font-black text-slate-800 dark:text-white leading-tight">
                             {{ $school->name }}

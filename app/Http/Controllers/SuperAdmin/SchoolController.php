@@ -37,7 +37,7 @@ class SchoolController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'type' => 'nullable|in:school,office',
+            'type' => 'nullable|in:school,office,pesantren',
             'address' => 'nullable|string',
             'phone' => 'nullable|string|max:20',
             'operator_phone' => 'nullable|string|max:20',
@@ -170,7 +170,7 @@ class SchoolController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'type' => 'nullable|in:school,office',
+            'type' => 'nullable|in:school,office,pesantren',
             'address' => 'nullable|string',
             'phone' => 'nullable|string|max:20',
             'operator_phone' => 'nullable|string|max:20',

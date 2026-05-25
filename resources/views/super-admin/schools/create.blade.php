@@ -43,6 +43,7 @@
                             <select name="type" required class="relative z-20 w-full appearance-none rounded border border-stroke bg-transparent py-3 px-5 outline-none transition focus:border-brand-500 active:border-brand-500 dark:border-form-strokedark dark:bg-form-input dark:focus:border-brand-500 @error('type') border-danger @enderror">
                                 <option value="school" {{ old('type') == 'school' ? 'selected' : '' }}>Sekolah (Siswa, Kelas, Jadwal)</option>
                                 <option value="office" {{ old('type') == 'office' ? 'selected' : '' }}>Perkantoran (Hanya Karyawan)</option>
+                                <option value="pesantren" {{ old('type') == 'pesantren' ? 'selected' : '' }}>Pesantren (Boarding School & Kegiatan)</option>
                             </select>
                             <span class="absolute top-1/2 right-4 z-30 -translate-y-1/2">
                                 <i class="fas fa-chevron-down text-sm"></i>

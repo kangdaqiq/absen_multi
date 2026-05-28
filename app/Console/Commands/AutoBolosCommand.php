@@ -140,23 +140,40 @@ class AutoBolosCommand extends Command
             ->get();
 
         $countA = 0;
+        $countKhusus = 0;
         foreach ($studentsWithoutAttendance as $s) {
-            \App\Models\Attendance::create([
-                'student_id' => $s->id,
-                'tanggal' => $today,
-                'jam_masuk' => null,
-                'jam_pulang' => null,
-                'jam_kerja' => null,
-                'status' => 'A',
-                'keterangan' => 'Alpha (Tidak Hadir)',
-                'lokasi_masuk' => 'System',
-                'created_at' => now(),
-                'updated_at' => now()
-            ]);
-            $countA++;
+            if ($s->is_khusus) {
+                \App\Models\Attendance::create([
+                    'student_id' => $s->id,
+                    'tanggal' => $today,
+                    'jam_masuk' => '07:00',
+                    'jam_pulang' => null,
+                    'jam_kerja' => null,
+                    'status' => 'H',
+                    'keterangan' => 'Siswa Khusus (Masuk Otomatis)',
+                    'lokasi_masuk' => 'System',
+                    'created_at' => now(),
+                    'updated_at' => now()
+                ]);
+                $countKhusus++;
+            } else {
+                \App\Models\Attendance::create([
+                    'student_id' => $s->id,
+                    'tanggal' => $today,
+                    'jam_masuk' => null,
+                    'jam_pulang' => null,
+                    'jam_kerja' => null,
+                    'status' => 'A',
+                    'keterangan' => 'Alpha (Tidak Hadir)',
+                    'lokasi_masuk' => 'System',
+                    'created_at' => now(),
+                    'updated_at' => now()
+                ]);
+                $countA++;
+            }
         }
 
-        $this->info("Marked $countA students as Alpha (A) for school ID $schoolId.");
+        $this->info("Marked $countA students as Alpha (A) and $countKhusus special students as Hadir (H) for school ID $schoolId.");
 
         // Update Setting for this school
         Setting::updateOrCreate(

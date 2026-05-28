@@ -239,26 +239,45 @@ class DailyReportCommand extends Command
                     }
                 }
             } else {
-                // No record = Alpha — count it in report AND persist to DB
-                $statsByJurusan[$jurusanName][$kelasName]['A']++;
-                $absentByStatus['A'][] = "{$s->nama} ({$kelasName})";
+                if ($s->is_khusus) {
+                    $totalMasuk++;
+                    $statsByJurusan[$jurusanName][$kelasName]['H']++;
 
-                // Persist Alpha record so live monitoring shows it correctly
-                // Flag is_auto_alpha = true so offline sync can override it later
-                Attendance::firstOrCreate(
-                    ['student_id' => $s->id, 'tanggal' => $today],
-                    [
-                        'jam_masuk' => null,
-                        'jam_pulang' => null,
-                        'jam_kerja' => null,
-                        'status' => 'A',
-                        'keterangan' => 'Alpha',
-                        'is_auto_alpha' => true,
-                        'lokasi_masuk' => 'System',
-                        'created_at' => now(),
-                        'updated_at' => now(),
-                    ]
-                );
+                    Attendance::firstOrCreate(
+                        ['student_id' => $s->id, 'tanggal' => $today],
+                        [
+                            'jam_masuk' => '07:00',
+                            'jam_pulang' => null,
+                            'jam_kerja' => null,
+                            'status' => 'H',
+                            'keterangan' => 'Siswa Khusus (Masuk Otomatis)',
+                            'lokasi_masuk' => 'System',
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ]
+                    );
+                } else {
+                    // No record = Alpha — count it in report AND persist to DB
+                    $statsByJurusan[$jurusanName][$kelasName]['A']++;
+                    $absentByStatus['A'][] = "{$s->nama} ({$kelasName})";
+
+                    // Persist Alpha record so live monitoring shows it correctly
+                    // Flag is_auto_alpha = true so offline sync can override it later
+                    Attendance::firstOrCreate(
+                        ['student_id' => $s->id, 'tanggal' => $today],
+                        [
+                            'jam_masuk' => null,
+                            'jam_pulang' => null,
+                            'jam_kerja' => null,
+                            'status' => 'A',
+                            'keterangan' => 'Alpha',
+                            'is_auto_alpha' => true,
+                            'lokasi_masuk' => 'System',
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ]
+                    );
+                }
             }
         }
 
@@ -311,6 +330,8 @@ class DailyReportCommand extends Command
                             $absentByStatusClass[$status][] = $s->nama;
                         }
                     }
+                } elseif ($s->is_khusus) {
+                    $masuk++;
                 } else {
                     $tidakMasuk++;
                     $absentByStatusClass['A'][] = $s->nama;
@@ -416,6 +437,8 @@ class DailyReportCommand extends Command
                         };
                         $listAbsen[] = "{$s->nama} ({$statusKet})";
                     }
+                } elseif ($s->is_khusus) {
+                    $masuk++;
                 } else {
                     $tidakMasuk++;
                     $listAbsen[] = "{$s->nama} (Alpha)";
@@ -445,7 +468,7 @@ class DailyReportCommand extends Command
         // Filter alphaStudentIds for THIS SCHOOL
         $alphaStudentIds = [];
         foreach ($siswaAll as $s) {
-            if (!$attendance->has($s->id)) {
+            if (!$attendance->has($s->id) && !$s->is_khusus) {
                 $alphaStudentIds[] = $s->id;
             }
         }

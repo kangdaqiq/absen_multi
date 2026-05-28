@@ -88,15 +88,37 @@ class AttendanceController extends Controller
         $data = [];
         foreach ($allSiswa as $s) {
             $att = $attendance[$s->id] ?? null;
+            
+            $status = 'A';
+            $keterangan = '-';
+            $jamMasuk = '-';
+            
+            if ($att) {
+                $status = $att->status;
+                $keterangan = $att->keterangan ?: '-';
+                $jamMasuk = $att->jam_masuk ?: '-';
+            } else if ($s->is_khusus) {
+                $dayIndex = \Carbon\Carbon::parse($tanggal)->dayOfWeekIso;
+                $isSchoolDay = \App\Models\Jadwal::where('school_id', $s->school_id)
+                    ->where('index_hari', $dayIndex)
+                    ->where('is_active', true)
+                    ->exists();
+                if ($isSchoolDay) {
+                    $status = 'H';
+                    $keterangan = 'Siswa Khusus (Masuk Otomatis)';
+                    $jamMasuk = '07:00';
+                }
+            }
+
             $data[] = (object) [
                 'id' => $s->id, // Siswa ID
                 'nama' => $s->nama,
                 'kelas' => $s->kelas->nama_kelas ?? '-',
                 'absen_id' => $att ? $att->id : null,
-                'jam_masuk' => ($att && $att->jam_masuk) ? $att->jam_masuk : '-',
+                'jam_masuk' => $jamMasuk,
                 'jam_pulang' => ($att && $att->jam_pulang) ? $att->jam_pulang : '-',
-                'status' => $att ? $att->status : 'A', // Default Alpha if no record
-                'keterangan' => $att ? $att->keterangan : '-',
+                'status' => $status,
+                'keterangan' => $keterangan,
             ];
         }
 

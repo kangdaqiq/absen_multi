@@ -36,7 +36,7 @@ const char *CURRENT_VERSION = "4.0.1";
 #define CONFIG_MAGIC 0xA9
 #define SS_PIN 16    // D0
 #define RST_PIN 0    // D3
-#define BUZZER_PIN 15 // D8
+#define BUZZER_PIN 2 // D4
 #define I2C_SDA 4    // D2
 #define I2C_SCL 5    // D1
 #define RESPONSE_DISPLAY_TIME 3000
@@ -349,6 +349,10 @@ void syncOfflineQueue() {
 
   int synced = 0, failed = 0, idx = 0;
 
+  // Declare client and http once outside the loop to prevent memory fragmentation and socket exhaustion
+  WiFiClient client;
+  HTTPClient http;
+
   while (src.available()) {
     feedWatchdog();
     String line = src.readStringUntil('\n');
@@ -366,11 +370,9 @@ void syncOfflineQueue() {
       continue;
 
     idx++;
-    WiFiClient client;
-    HTTPClient http;
     http.begin(client, apiUrl);
     http.addHeader("Content-Type", "application/json");
-    http.setTimeout(6000);
+    http.setTimeout(5000); // 5 seconds is plenty
 
     StaticJsonDocument<200> req;
     req["api_key"] = cfg.apiKey;
@@ -1027,7 +1029,7 @@ void setup() {
   lcd.setCursor(0, 0);
   lcd.print("SISTEM ABSENSI");
   lcd.setCursor(0, 1);
-  lcd.print("Booting v4.0...");
+  lcd.print("Booting v4.1...");
   delay(1000);
 
   rtcReady = initRTC();

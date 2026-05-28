@@ -293,6 +293,10 @@ void syncOfflineQueue() {
 
   int synced = 0, failed = 0, idx = 0;
 
+  // Declare client and http once outside the loop to prevent memory fragmentation and socket exhaustion
+  WiFiClient client;
+  HTTPClient http;
+
   while (src.available()) {
     feedWatchdog();
     String line = src.readStringUntil('\n');
@@ -310,11 +314,9 @@ void syncOfflineQueue() {
       continue;
 
     idx++;
-    WiFiClient client;
-    HTTPClient http;
     http.begin(client, apiUrl);
     http.addHeader("Content-Type", "application/json");
-    http.setTimeout(6000);
+    http.setTimeout(5000); // 5 seconds is plenty
 
     StaticJsonDocument<200> req;
     req["api_key"] = cfg.apiKey;

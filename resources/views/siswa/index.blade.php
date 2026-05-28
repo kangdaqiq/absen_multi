@@ -107,7 +107,12 @@
                             <p class="text-gray-500 dark:text-gray-400">{{ $loop->iteration + $siswa->firstItem() - 1 }}</p>
                         </td>
                         <td class="border-b border-gray-100 px-4 py-4 dark:border-gray-800">
-                            <p class="font-medium text-gray-800 dark:text-white/90">{{ $s->nama }}</p>
+                            <div class="flex items-center gap-2">
+                                <p class="font-medium text-gray-800 dark:text-white/90">{{ $s->nama }}</p>
+                                @if($s->is_khusus)
+                                    <span class="inline-flex rounded-full bg-purple-50 px-2 py-0.5 text-xs font-semibold text-purple-600 dark:bg-purple-500/15 dark:text-purple-500">Khusus</span>
+                                @endif
+                            </div>
                         </td>
                         <td class="border-b border-gray-100 px-4 py-4 dark:border-gray-800">
                             <p class="text-gray-500 dark:text-gray-400">{{ $s->nis }}</p>
@@ -156,6 +161,7 @@
                                 <button class="btnEdit text-orange-500 hover:text-orange-700 hover:bg-orange-50 p-2 rounded-lg transition" 
                                     data-id="{{ $s->id }}" data-nama="{{ $s->nama }}" data-nis="{{ $s->nis }}" data-tgl_lahir="{{ $s->tgl_lahir }}"
                                     data-kelas="{{ $s->kelas_id }}" data-wa="{{ $s->no_wa }}" data-wa_ortu="{{ $s->wa_ortu }}" data-uid="{{ $s->uid_rfid }}"
+                                    data-is_khusus="{{ $s->is_khusus }}"
                                     @click="$dispatch('open-modal', 'modalEditSiswa')" title="Edit">
                                     <i class="fas fa-edit"></i>
                                 </button>
@@ -268,6 +274,10 @@
                     <input type="text" name="wa_ortu" placeholder="08xxx atau 628xxx" pattern="^(08|628)[0-9]{8,13}$" class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
                     <p class="mt-1 text-xs text-gray-500">Format: 08xxx atau 628xxx (8-13 digit)</p>
                 </div>
+                <div class="flex items-center gap-2 mt-2">
+                    <input type="checkbox" name="is_khusus" id="is_khusus" value="1" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800">
+                    <label for="is_khusus" class="text-sm font-medium text-gray-700 dark:text-gray-300">Siswa Khusus (Selalu dianggap masuk saat hari sekolah)</label>
+                </div>
             </div>
             <div class="mt-6 flex justify-end gap-3">
                 <button type="button" @click="open = false" class="rounded-lg border border-gray-200 px-4 py-2 text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-gray-800">Batal</button>
@@ -320,6 +330,10 @@
                 <div>
                     <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">UID RFID (readonly)</label>
                     <input type="text" name="uid_rfid" id="edit_uid_rfid" readonly class="w-full rounded-lg border border-gray-200 bg-gray-100 px-4 py-2 outline-none dark:border-gray-800 dark:bg-gray-800 dark:text-gray-400">
+                </div>
+                <div class="flex items-center gap-2 mt-2">
+                    <input type="checkbox" name="is_khusus" id="edit_is_khusus" value="1" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800">
+                    <label for="edit_is_khusus" class="text-sm font-medium text-gray-700 dark:text-gray-300">Siswa Khusus (Selalu dianggap masuk saat hari sekolah)</label>
                 </div>
             </div>
             <div class="mt-6 flex justify-end gap-3">
@@ -488,6 +502,7 @@
                 var wa = $(this).data('wa');
                 var wa_ortu = $(this).data('wa_ortu');
                 var uid = $(this).data('uid');
+                var is_khusus = $(this).data('is_khusus');
 
                 $('#edit_nama').val(nama);
                 $('#edit_nis').val(nis);
@@ -496,6 +511,7 @@
                 $('#edit_no_wa').val(wa);
                 $('#edit_wa_ortu').val(wa_ortu);
                 $('#edit_uid_rfid').val(uid);
+                $('#edit_is_khusus').prop('checked', is_khusus == 1);
 
                 $('#formEditSiswa').attr('action', '{{ url('siswa') }}/' + id);
             });

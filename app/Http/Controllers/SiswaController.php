@@ -79,9 +79,11 @@ class SiswaController extends Controller
             ],
             'wa_ortu' => ['nullable', 'string', 'max:20', 'regex:/^(08|628)[0-9]{8,13}$/'],
             'user_id' => 'nullable|exists:users,id',
+            'is_khusus' => 'nullable|boolean',
         ]);
 
         $input = $request->all();
+        $input['is_khusus'] = $request->has('is_khusus') ? 1 : 0;
         // Force null if empty string to avoid unique constraint issues on empty strings
         if (empty($input['no_wa']))
             $input['no_wa'] = null;
@@ -143,9 +145,11 @@ class SiswaController extends Controller
             'wa_ortu' => ['nullable', 'string', 'max:20', 'regex:/^(08|628)[0-9]{8,13}$/'],
             'uid_rfid' => 'nullable|string|max:50',
             'user_id' => 'nullable|exists:users,id',
+            'is_khusus' => 'nullable|boolean',
         ]);
 
         $input = $request->all();
+        $input['is_khusus'] = $request->has('is_khusus') ? 1 : 0;
         if (empty($input['no_wa']))
             $input['no_wa'] = null;
         if (empty($input['wa_ortu']))

@@ -276,7 +276,7 @@
                 </div>
                 <div class="flex items-center gap-2 mt-2">
                     <input type="checkbox" name="is_khusus" id="is_khusus" value="1" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800">
-                    <label for="is_khusus" class="text-sm font-medium text-gray-700 dark:text-gray-300">Siswa Khusus (Selalu dianggap masuk saat hari sekolah)</label>
+                    <label for="is_khusus" class="text-sm font-medium text-gray-700 dark:text-gray-300">Siswa PKL</label>
                 </div>
             </div>
             <div class="mt-6 flex justify-end gap-3">
@@ -333,7 +333,7 @@
                 </div>
                 <div class="flex items-center gap-2 mt-2">
                     <input type="checkbox" name="is_khusus" id="edit_is_khusus" value="1" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800">
-                    <label for="edit_is_khusus" class="text-sm font-medium text-gray-700 dark:text-gray-300">Siswa Khusus (Selalu dianggap masuk saat hari sekolah)</label>
+                    <label for="edit_is_khusus" class="text-sm font-medium text-gray-700 dark:text-gray-300">Siswa PKL</label>
                 </div>
             </div>
             <div class="mt-6 flex justify-end gap-3">

@@ -250,7 +250,7 @@ class DailyReportCommand extends Command
                             'jam_pulang' => null,
                             'jam_kerja' => null,
                             'status' => 'H',
-                            'keterangan' => 'Siswa Khusus (Masuk Otomatis)',
+                            'keterangan' => 'Siswa PKL',
                             'lokasi_masuk' => 'System',
                             'created_at' => now(),
                             'updated_at' => now(),

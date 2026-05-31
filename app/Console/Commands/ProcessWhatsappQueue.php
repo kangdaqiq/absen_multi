@@ -16,6 +16,16 @@ class ProcessWhatsappQueue extends Command
     {
         $limit = $this->option('limit');
 
+        // Mark all pending messages from previous days as failed (expired)
+        MessageQueue::where('status', 'pending')
+            ->where('created_at', '<', today())
+            ->update([
+                'status'      => 'failed',
+                'retry_count' => 3,
+                'last_error'  => 'Expired - Message from previous day',
+                'updated_at'  => now(),
+            ]);
+
         // 1. ATOMIC LOCK & UPDATE
         // Prevent multiple workers from picking the same messages
         $messages = [];
@@ -45,7 +55,9 @@ class ProcessWhatsappQueue extends Command
         });
 
         // Auto-retry: Reset failed messages (retry_count < 3) back to pending
+        // Only retry messages created today to avoid sending old notifications
         MessageQueue::where('status', 'failed')
+            ->whereDate('created_at', today())
             ->where(function ($q) {
                 $q->whereNull('retry_count')->orWhere('retry_count', '<', 3);
             })
@@ -59,8 +71,17 @@ class ProcessWhatsappQueue extends Command
         $this->info("Found " . count($messages) . " messages. Processing...");
 
         foreach ($messages as $msg) {
-            // Use fresh instance or just use data (status is already 'processing')
-            // $msg->status = 'processing'; 
+            // Guard against processing messages from previous days
+            if ($msg->created_at->lt(today())) {
+                $msg->update([
+                    'status'      => 'failed',
+                    'updated_at'  => now(),
+                    'retry_count' => 3,
+                    'last_error'  => 'Expired - Message from previous day',
+                ]);
+                $this->info("Message ID {$msg->id} -> EXPIRED (MARKED FAILED)");
+                continue;
+            }
 
             $success = $this->sendMessage($msg->phone_number, $msg->message, $msg->school_id);
 

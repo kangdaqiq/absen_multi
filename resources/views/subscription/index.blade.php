@@ -13,7 +13,7 @@
         },
         getWaLink() {
             if (!this.selectedPackage) return '#';
-            let phone = '{{ env('DEVELOPER_WA', '6281234567890') }}';
+            let phone = '{{ env('DEVELOPER_WA', '6281327735093') }}';
             let text = `Halo, saya admin dari sekolah *{{ $school->name }}*.%0A%0ASaya ingin memperpanjang paket *${this.selectedPackage.name}*.%0ABerikut bukti transfer saya:`;
             return `https://wa.me/${phone}?text=${text}`;
         },

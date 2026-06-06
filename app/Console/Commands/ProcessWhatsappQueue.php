@@ -83,14 +83,15 @@ class ProcessWhatsappQueue extends Command
                 continue;
             }
 
-            $success = $this->sendMessage($msg->phone_number, $msg->message, $msg->school_id);
+            $result = $this->sendMessage($msg->phone_number, $msg->message, $msg->school_id);
+            $success = $result['success'];
 
             // Final Update
             $msg->update([
                 'status'      => $success ? 'sent' : 'failed',
                 'updated_at'  => now(),
                 'retry_count' => $success ? $msg->retry_count : (($msg->retry_count ?? 0) + 1),
-                'last_error'  => $success ? null : 'API Request Failed',
+                'last_error'  => $success ? null : $result['error'],
             ]);
 
             $this->info("Message ID {$msg->id} -> " . ($success ? 'SENT' : 'FAILED'));
@@ -121,14 +122,18 @@ class ProcessWhatsappQueue extends Command
 
             if ($response->successful()) {
                 $body = $response->json();
-                return isset($body['code']) && $body['code'] === 'SUCCESS';
+                if (isset($body['code']) && $body['code'] === 'SUCCESS') {
+                    return ['success' => true, 'error' => null];
+                }
+                return ['success' => false, 'error' => $body['message'] ?? 'API Code is not SUCCESS'];
             }
 
-            Log::error("WA API Error: " . $response->body());
-            return false;
+            $errorMsg = 'HTTP ' . $response->status() . ': ' . ($response->json()['message'] ?? $response->body());
+            Log::error("WA API Error: " . $errorMsg);
+            return ['success' => false, 'error' => $errorMsg];
         } catch (\Exception $e) {
             Log::error("WA Exception: " . $e->getMessage());
-            return false;
+            return ['success' => false, 'error' => $e->getMessage()];
         }
     }
 }

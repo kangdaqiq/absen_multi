@@ -978,7 +978,7 @@ void setup() {
   lcd.setCursor(0, 0);
   lcd.print("SISTEM ABSENSI");
   lcd.setCursor(0, 1);
-  lcd.print("Booting v4.1...");
+  lcd.print("Booting v4.1.");
   delay(1000);
 
   rtcReady = initRTC();

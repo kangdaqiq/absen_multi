@@ -54,7 +54,10 @@
                             @elseif($log->status == 'pending')
                                 <span class="inline-flex rounded-full bg-warning-50 px-2.5 py-1 text-xs font-medium text-warning-600 dark:bg-warning-500/15 dark:text-warning-500">Pending</span>
                             @elseif($log->status == 'failed')
-                                <span class="inline-flex rounded-full bg-error-50 px-2.5 py-1 text-xs font-medium text-error-600 dark:bg-error-500/15 dark:text-error-500">Gagal</span>
+                                <span class="inline-flex rounded-full bg-error-50 px-2.5 py-1 text-xs font-medium text-error-600 dark:bg-error-500/15 dark:text-error-500" title="{{ $log->last_error }}">Gagal</span>
+                                @if($log->last_error)
+                                    <div class="text-[10px] text-error-500 mt-1 max-w-[120px] mx-auto truncate" title="{{ $log->last_error }}">{{ $log->last_error }}</div>
+                                @endif
                             @else
                                 <span class="inline-flex rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-400">{{ $log->status }}</span>
                             @endif

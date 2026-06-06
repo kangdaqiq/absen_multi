@@ -106,7 +106,8 @@ class SettingsController extends Controller
         $checkboxSettings = [
             'enable_checkout_attendance',
             'enable_checkout_teacher',
-            'absence_notification_enabled'
+            'absence_notification_enabled',
+            'enable_birthday_greeting',
         ];
 
         foreach ($checkboxSettings as $checkbox) {

@@ -54,6 +54,7 @@ class GuruController extends Controller
         $request->validate([
             'nama' => 'required|string|max:100',
             'nip' => 'nullable|string|max:50',
+            'tgl_lahir' => 'nullable|date',
             'no_wa' => [
                 'required',
                 'string',
@@ -93,6 +94,7 @@ class GuruController extends Controller
         $request->validate([
             'nama' => 'required|string|max:100',
             'nip' => 'nullable|string|max:50',
+            'tgl_lahir' => 'nullable|date',
             'no_wa' => [
                 'required',
                 'string',

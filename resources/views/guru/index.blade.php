@@ -68,6 +68,7 @@
                     <th class="px-4 py-4">Nama</th>
                     <th class="px-4 py-4">{{ $labelNIP }}</th>
                     <th class="px-4 py-4">No WhatsApp</th>
+                    <th class="px-4 py-4 text-center">Tgl. Lahir</th>
                     <th class="px-4 py-4 text-center">UID RFID</th>
                     <th class="px-4 py-4 text-center">ID Finger</th>
                     @if($showBotCol)
@@ -90,6 +91,15 @@
                         </td>
                         <td class="border-b border-gray-100 px-4 py-4 dark:border-gray-800">
                             <p class="text-gray-500 dark:text-gray-400">{{ $g->no_wa ?: '-' }}</p>
+                        </td>
+                        <td class="border-b border-gray-100 px-4 py-4 dark:border-gray-800 text-center">
+                            @if($g->tgl_lahir)
+                                <span class="text-gray-600 dark:text-gray-400 text-sm">
+                                    {{ \Carbon\Carbon::parse($g->tgl_lahir)->format('d/m/Y') }}
+                                </span>
+                            @else
+                                <span class="text-gray-400">-</span>
+                            @endif
                         </td>
                         <td class="border-b border-gray-100 px-4 py-4 dark:border-gray-800 text-center">
                             @if($g->uid_rfid)
@@ -150,7 +160,7 @@
                                 
                                 <!-- Edit -->
                                 <button class="btnEdit text-warning-500 hover:text-warning-700 hover:bg-warning-50 p-2 rounded-lg transition" 
-                                    data-id="{{ $g->id }}" data-nama="{{ $g->nama }}" data-nip="{{ $g->nip }}" data-wa="{{ $g->no_wa }}" data-rfid="{{ $g->uid_rfid }}" data-is-global="{{ $g->is_global_report ? 1 : 0 }}"
+                                    data-id="{{ $g->id }}" data-nama="{{ $g->nama }}" data-nip="{{ $g->nip }}" data-wa="{{ $g->no_wa }}" data-rfid="{{ $g->uid_rfid }}" data-is-global="{{ $g->is_global_report ? 1 : 0 }}" data-tgl_lahir="{{ $g->tgl_lahir }}"
                                     @click="$dispatch('open-modal', 'modalEditGuru')" title="Edit">
                                     <i class="fas fa-edit"></i>
                                 </button>
@@ -166,7 +176,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="{{ $showBotCol ? 8 : 7 }}" class="border-b border-gray-100 px-4 py-8 dark:border-gray-800 text-center text-gray-500 dark:text-gray-400">
+                        <td colspan="{{ $showBotCol ? 9 : 8 }}" class="border-b border-gray-100 px-4 py-8 dark:border-gray-800 text-center text-gray-500 dark:text-gray-400">
                             Tidak ada data {{ strtolower($labelKaryawan) }} ditemukan.
                         </td>
                     </tr>
@@ -200,6 +210,10 @@
                 <div>
                     <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ $labelNIP }}</label>
                     <input type="text" name="nip" placeholder="{{ $school && $school->isOffice() ? 'ID Pegawai (opsional)' : 'NIP' }}" class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                </div>
+                <div>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Tanggal Lahir <span class="text-gray-400 font-normal">(opsional, untuk ucapan HUT)</span></label>
+                    <input type="date" name="tgl_lahir" class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
                 </div>
                 <div>
                     <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">No WhatsApp</label>
@@ -239,6 +253,10 @@
                 <div>
                     <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ $labelNIP }}</label>
                     <input type="text" name="nip" id="edit_nip" placeholder="{{ $school && $school->isOffice() ? 'ID Pegawai (opsional)' : 'NIP' }}" class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                </div>
+                <div>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Tanggal Lahir <span class="text-gray-400 font-normal">(opsional, untuk ucapan HUT)</span></label>
+                    <input type="date" name="tgl_lahir" id="edit_tgl_lahir" class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
                 </div>
                 <div>
                     <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">No WhatsApp</label>
@@ -419,9 +437,11 @@
                 var wa = $(this).data('wa');
                 var rfid = $(this).data('rfid');
                 var isGlobal = $(this).data('is-global');
+                var tglLahir = $(this).data('tgl_lahir');
 
                 $('#edit_nama').val(nama);
                 $('#edit_nip').val(nip);
+                $('#edit_tgl_lahir').val(tglLahir);
                 $('#edit_wa').val(wa);
                 $('#edit_rfid').val(rfid);
                 $('#edit_global_report').prop('checked', isGlobal == 1);

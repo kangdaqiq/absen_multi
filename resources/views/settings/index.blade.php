@@ -240,6 +240,43 @@
                         </div>
                     </div>
 
+                    <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90 border-b border-gray-200 dark:border-gray-800 pb-2 mt-8">
+                        🎂 Ucapan Selamat Ulang Tahun (Otomatis Pukul 00.01)
+                    </h3>
+
+                    <div class="rounded-lg border border-gray-200 p-4 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
+                        <div class="mb-5">
+                            <label class="flex items-center cursor-pointer select-none">
+                                <div class="relative">
+                                    <input type="checkbox" id="enable_birthday_greeting"
+                                        name="enable_birthday_greeting" value="true" class="sr-only" {{ ($settings['enable_birthday_greeting'] ?? 'false') === 'true' ? 'checked' : '' }}>
+                                    <div class="block h-6 w-10 rounded-full bg-gray-300 dark:bg-gray-600 toggle-bg transition"></div>
+                                    <div class="dot absolute left-1 top-1 h-4 w-4 rounded-full bg-white transition toggle-dot"></div>
+                                </div>
+                                <div class="ml-3 font-medium text-gray-800 dark:text-white/90 text-sm">Aktifkan Ucapan Selamat Ulang Tahun via WhatsApp</div>
+                            </label>
+                            <p class="mt-1 ml-13 text-xs text-gray-500">Jika diaktifkan, sistem akan mengirimkan ucapan selamat ulang tahun ke Guru dan Siswa setiap pukul 00.01 berdasarkan tanggal lahir yang terdaftar.</p>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Template Ucapan Ulang Tahun Siswa</label>
+                                <textarea name="birthday_greeting_siswa" rows="5"
+                                    class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white text-sm"
+                                    placeholder="🎂 Selamat Ulang Tahun, {nama}!&#10;&#10;Semoga panjang umur, sehat selalu, dan semakin berprestasi di sekolah. Teruslah semangat belajar ya! 🎉&#10;&#10;Salam hangat,&#10;{sekolah}">{{ $settings['birthday_greeting_siswa'] ?? '' }}</textarea>
+                                <p class="mt-1 text-xs text-gray-500">Variabel: <code class="bg-gray-100 dark:bg-gray-700 px-1 rounded">{nama}</code>, <code class="bg-gray-100 dark:bg-gray-700 px-1 rounded">{sekolah}</code>, <code class="bg-gray-100 dark:bg-gray-700 px-1 rounded">{kelas}</code></p>
+                            </div>
+
+                            <div>
+                                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Template Ucapan Ulang Tahun Guru/Karyawan</label>
+                                <textarea name="birthday_greeting_guru" rows="5"
+                                    class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white text-sm"
+                                    placeholder="🎂 Selamat Ulang Tahun, Bapak/Ibu {nama}!&#10;&#10;Semoga panjang umur, sehat selalu, dan semakin sukses dalam mendidik generasi penerus bangsa. 🎉&#10;&#10;Salam hormat,&#10;{sekolah}">{{ $settings['birthday_greeting_guru'] ?? '' }}</textarea>
+                                <p class="mt-1 text-xs text-gray-500">Variabel: <code class="bg-gray-100 dark:bg-gray-700 px-1 rounded">{nama}</code>, <code class="bg-gray-100 dark:bg-gray-700 px-1 rounded">{sekolah}</code>, <code class="bg-gray-100 dark:bg-gray-700 px-1 rounded">{nip}</code></p>
+                            </div>
+                        </div>
+                    </div>
+
                 </div>
 
                 <!-- Tab Lisensi Aplikasi -->

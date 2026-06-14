@@ -209,19 +209,26 @@ class WhatsAppService
         $this->queueMessage($phone, $message, $schoolId);
     }
 
-    private function queueMessage($phone, $message, $schoolId = null)
+    private function queueMessage($phone, $message, $schoolId = null, ?int $delaySeconds = null)
     {
         $originalPhone = $phone;
         $phone = $this->formatPhone($phone);
 
         if ($phone) {
             try {
+                // Tunda pengiriman secara acak 1–5 menit untuk meniru perilaku manusia
+                // dan menghindari burst sending yang terdeteksi sebagai bot oleh WhatsApp.
+                if ($delaySeconds === null) {
+                    $delaySeconds = rand(60, 300); // 1–5 menit random
+                }
+
                 MessageQueue::create([
-                    'school_id' => $schoolId,
+                    'school_id'    => $schoolId,
                     'phone_number' => $phone,
-                    'message' => $message,
-                    'status' => 'pending',
-                    'created_at' => now()
+                    'message'      => $message,
+                    'status'       => 'pending',
+                    'scheduled_at' => now()->addSeconds($delaySeconds),
+                    'created_at'   => now(),
                 ]);
             } catch (\Exception $e) {
                 // Log failure to API Log so user can see it

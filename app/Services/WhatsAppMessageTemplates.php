@@ -7,17 +7,67 @@ use Carbon\Carbon;
 class WhatsAppMessageTemplates
 {
     /**
+     * Salam pembuka yang bervariasi — deterministik per nama+tanggal,
+     * sehingga orang yang sama mendapat salam berbeda setiap hari.
+     */
+    private static function randomGreeting(string $nama, bool $isParent = false): string
+    {
+        $seed = crc32($nama . date('Y-m-d')) % 5;
+
+        if ($isParent) {
+            $greetings = [
+                "Halo, Orang Tua/Wali dari *{$nama}*,",
+                "Yth. Orang Tua/Wali *{$nama}*,",
+                "Salam hormat, Orang Tua/Wali dari *{$nama}*,",
+                "Kepada Orang Tua/Wali *{$nama}*,",
+                "Halo, Bapak/Ibu wali dari *{$nama}*,",
+            ];
+        } else {
+            $greetings = [
+                "Halo, *{$nama}* 👋,",
+                "Hai, *{$nama}*!",
+                "Assalamu'alaikum, *{$nama}* 🌟,",
+                "Selamat datang, *{$nama}*!",
+                "Halo *{$nama}*, semangat hari ini! 💪",
+            ];
+        }
+
+        return $greetings[abs($seed)];
+    }
+
+    /**
+     * Kalimat penutup yang bervariasi — deterministik per nama+tanggal.
+     */
+    private static function randomClosing(string $nama): string
+    {
+        $seed = crc32('closing_' . $nama . date('Y-m-d')) % 5;
+
+        $closings = [
+            "_Notifikasi otomatis dari sistem absensi sekolah._",
+            "_Pesan ini dikirim otomatis oleh sistem absensi._",
+            "_Informasi ini dikirim secara otomatis. Mohon tidak membalas pesan ini._",
+            "_Sistem absensi sekolah — pesan otomatis._",
+            "_Notifikasi resmi dari sistem kehadiran sekolah._",
+        ];
+
+        return $closings[abs($seed)];
+    }
+
+    /**
      * Check-in notification
      */
     public static function checkIn(string $nama, string $jamMasuk, string $kelas, string $status = 'Hadir'): string
     {
+        $greeting = self::randomGreeting($nama);
+        $closing  = self::randomClosing($nama);
+
         return "✅ *Notifikasi Absen Masuk*\n\n" .
-            "Halo, *{$nama}*,\n\n" .
-            "📅 Tanggal: " . now()->format('d/m/Y') . "\n" .
+            "{$greeting}\n\n" .
+            "📅 Tanggal  : " . now()->format('d/m/Y') . "\n" .
             "🕐 Jam Masuk: {$jamMasuk}\n" .
-            "📊 Status: {$status}\n" .
-            "🏫 Kelas: {$kelas}\n\n" .
-            "_Notifikasi otomatis dari sistem absensi sekolah._";
+            "📊 Status   : {$status}\n" .
+            "🏫 Kelas    : {$kelas}\n\n" .
+            "{$closing}";
     }
 
     /**
@@ -32,15 +82,18 @@ class WhatsAppMessageTemplates
         string $authorizedBy,
         ?string $tanggal = null
     ): string {
-        $tgl = $tanggal ?? now()->format('d/m/Y');
+        $tgl      = $tanggal ?? now()->format('d/m/Y');
+        $greeting = self::randomGreeting($nama);
+        $closing  = self::randomClosing($nama);
+
         return "🏠 *Notifikasi Absen Pulang*\n\n" .
-            "Halo, *{$nama}*,\n\n" .
-            "📅 Tanggal: " . $tgl . "\n" .
-            "🕐 Jam Masuk: {$jamMasuk}\n" .
-            "🕐 Jam Pulang: {$jamPulang}\n" .
-            "⏱️ Durasi: {$hours} jam {$minutes} menit\n" .
-            "👤 Diotorisasi oleh: {$authorizedBy}\n\n" .
-            "_Notifikasi otomatis dari sistem absensi sekolah._";
+            "{$greeting}\n\n" .
+            "📅 Tanggal     : {$tgl}\n" .
+            "🕐 Jam Masuk   : {$jamMasuk}\n" .
+            "🕐 Jam Pulang  : {$jamPulang}\n" .
+            "⏱️ Durasi      : {$hours} jam {$minutes} menit\n" .
+            "👤 Diotorisasi : {$authorizedBy}\n\n" .
+            "{$closing}";
     }
 
     /**
@@ -62,15 +115,18 @@ class WhatsAppMessageTemplates
             $lateDuration = "{$lateMinutes} menit";
         }
 
+        $greeting = self::randomGreeting($nama);
+        $closing  = self::randomClosing($nama);
+
         return "⚠️ *Notifikasi Terlambat*\n\n" .
-            "Halo, *{$nama}*,\n\n" .
-            "📅 Tanggal: " . now()->format('d/m/Y') . "\n" .
-            "🕐 Jam Masuk: {$jamMasuk}\n" .
-            "⏰ Keterlambatan: {$lateDuration}\n" .
-            "📊 Status: Terlambat\n" .
-            "🏫 Kelas: {$kelas}\n\n" .
-            "Mohon lebih disiplin waktu kedepannya.\n\n" .
-            "_Notifikasi otomatis dari sistem absensi sekolah._";
+            "{$greeting}\n\n" .
+            "📅 Tanggal       : " . now()->format('d/m/Y') . "\n" .
+            "🕐 Jam Masuk     : {$jamMasuk}\n" .
+            "⏰ Keterlambatan : {$lateDuration}\n" .
+            "📊 Status        : Terlambat\n" .
+            "🏫 Kelas         : {$kelas}\n\n" .
+            "Mohon lebih disiplin waktu kedepannya ya. 🙏\n\n" .
+            "{$closing}";
     }
 
     /**
@@ -78,14 +134,17 @@ class WhatsAppMessageTemplates
      */
     public static function checkInParent(string $nama, string $jamMasuk, string $kelas, string $status = 'Hadir'): string
     {
+        $greeting = self::randomGreeting($nama, isParent: true);
+        $closing  = self::randomClosing($nama);
+
         return "✅ *Notifikasi Absen Masuk Anak*\n\n" .
-            "Halo, Orang Tua/Wali dari *{$nama}*,\n\n" .
+            "{$greeting}\n\n" .
             "Anak Anda telah tercatat hadir di sekolah.\n\n" .
-            "📅 Tanggal: " . now()->format('d/m/Y') . "\n" .
+            "📅 Tanggal  : " . now()->format('d/m/Y') . "\n" .
             "🕐 Jam Masuk: {$jamMasuk}\n" .
-            "📊 Status: {$status}\n" .
-            "🏫 Kelas: {$kelas}\n\n" .
-            "_Notifikasi otomatis dari sistem absensi sekolah._";
+            "📊 Status   : {$status}\n" .
+            "🏫 Kelas    : {$kelas}\n\n" .
+            "{$closing}";
     }
 
     /**
@@ -106,16 +165,19 @@ class WhatsAppMessageTemplates
             $lateDuration = "{$lateMinutes} menit";
         }
 
+        $greeting = self::randomGreeting($nama, isParent: true);
+        $closing  = self::randomClosing($nama);
+
         return "⚠️ *Notifikasi Terlambat Anak*\n\n" .
-            "Halo, Orang Tua/Wali dari *{$nama}*,\n\n" .
+            "{$greeting}\n\n" .
             "Anak Anda telah tercatat hadir di sekolah, namun *terlambat*.\n\n" .
-            "📅 Tanggal: " . now()->format('d/m/Y') . "\n" .
-            "🕐 Jam Masuk: {$jamMasuk}\n" .
-            "⏰ Keterlambatan: {$lateDuration}\n" .
-            "📊 Status: Terlambat\n" .
-            "🏫 Kelas: {$kelas}\n\n" .
-            "Mohon bantuannya untuk mengingatkan anak agar lebih disiplin.\n\n" .
-            "_Notifikasi otomatis dari sistem absensi sekolah._";
+            "📅 Tanggal       : " . now()->format('d/m/Y') . "\n" .
+            "🕐 Jam Masuk     : {$jamMasuk}\n" .
+            "⏰ Keterlambatan : {$lateDuration}\n" .
+            "📊 Status        : Terlambat\n" .
+            "🏫 Kelas         : {$kelas}\n\n" .
+            "Mohon bantuannya untuk mengingatkan anak agar lebih disiplin. 🙏\n\n" .
+            "{$closing}";
     }
 
     /**
@@ -130,16 +192,19 @@ class WhatsAppMessageTemplates
         string $authorizedBy,
         ?string $tanggal = null
     ): string {
-        $tgl = $tanggal ?? now()->format('d/m/Y');
+        $tgl      = $tanggal ?? now()->format('d/m/Y');
+        $greeting = self::randomGreeting($nama, isParent: true);
+        $closing  = self::randomClosing($nama);
+
         return "🏠 *Notifikasi Absen Pulang Anak*\n\n" .
-            "Halo, Orang Tua/Wali dari *{$nama}*,\n\n" .
+            "{$greeting}\n\n" .
             "Anak Anda telah tercatat pulang dari sekolah.\n\n" .
-            "📅 Tanggal: " . $tgl . "\n" .
-            "🕐 Jam Masuk: {$jamMasuk}\n" .
-            "🕐 Jam Pulang: {$jamPulang}\n" .
-            "⏱️ Durasi: {$hours} jam {$minutes} menit\n" .
-            "👤 Diotorisasi oleh: {$authorizedBy}\n\n" .
-            "_Notifikasi otomatis dari sistem absensi sekolah._";
+            "📅 Tanggal     : {$tgl}\n" .
+            "🕐 Jam Masuk   : {$jamMasuk}\n" .
+            "🕐 Jam Pulang  : {$jamPulang}\n" .
+            "⏱️ Durasi      : {$hours} jam {$minutes} menit\n" .
+            "👤 Diotorisasi : {$authorizedBy}\n\n" .
+            "{$closing}";
     }
 
     /**

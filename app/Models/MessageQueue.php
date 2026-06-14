@@ -8,7 +8,11 @@ class MessageQueue extends Model
 {
     protected $table = 'message_queues';
     public $timestamps = true;
-    protected $fillable = ['school_id', 'phone_number', 'message', 'status', 'attempts', 'last_error', 'created_at', 'updated_at'];
+    protected $fillable = ['school_id', 'phone_number', 'message', 'status', 'scheduled_at', 'attempts', 'last_error', 'retry_count', 'created_at', 'updated_at'];
+
+    protected $casts = [
+        'scheduled_at' => 'datetime',
+    ];
     
     protected static function booted()
     {

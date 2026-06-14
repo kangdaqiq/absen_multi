@@ -6,17 +6,24 @@ use Illuminate\Console\Command;
 use App\Models\MessageQueue;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 
 class ProcessWhatsappQueue extends Command
 {
     protected $signature = 'wa:process {--limit=10}';
-    protected $description = 'Process pending WhatsApp messages from the queue';
+    protected $description = 'Process pending WhatsApp messages from the queue (with anti-ban protection)';
+
+    /**
+     * Batas maksimal pesan yang dikirim per sekolah per jam.
+     * Melebihi batas ini rawan memicu ban dari WhatsApp.
+     */
+    private const RATE_LIMIT_PER_HOUR = 50;
 
     public function handle()
     {
         $limit = $this->option('limit');
 
-        // Mark all pending messages from previous days as failed (expired)
+        // Expire: tandai semua pesan pending dari hari sebelumnya sebagai failed
         MessageQueue::where('status', 'pending')
             ->where('created_at', '<', today())
             ->update([
@@ -26,15 +33,20 @@ class ProcessWhatsappQueue extends Command
                 'updated_at'  => now(),
             ]);
 
-        // 1. ATOMIC LOCK & UPDATE
-        // Prevent multiple workers from picking the same messages
+        // Atomic lock & update — cegah worker ganda ambil pesan yang sama.
+        // Hanya ambil pesan yang scheduled_at sudah lewat atau NULL (kirim segera).
         $messages = [];
 
-        \Illuminate\Support\Facades\DB::transaction(function () use ($limit, &$messages) {
+        DB::transaction(function () use ($limit, &$messages) {
             $candidates = MessageQueue::query()
                 ->select('message_queues.*')
                 ->leftJoin('schools', 'message_queues.school_id', '=', 'schools.id')
                 ->where('message_queues.status', 'pending')
+                // Hanya pesan yang sudah waktunya dikirim
+                ->where(function ($q) {
+                    $q->whereNull('message_queues.scheduled_at')
+                      ->orWhere('message_queues.scheduled_at', '<=', now());
+                })
                 ->when(config('app.mode', 'hosted') !== 'self_hosted', function ($query) {
                     $query->where(function ($q) {
                         $q->whereNull('message_queues.school_id')
@@ -48,14 +60,13 @@ class ProcessWhatsappQueue extends Command
 
             if ($candidates->isNotEmpty()) {
                 $ids = $candidates->pluck('id');
-                // Mark as processing immediately so other workers skip them
+                // Tandai sebagai 'processing' agar worker lain melewatinya
                 MessageQueue::whereIn('id', $ids)->update(['status' => 'processing', 'updated_at' => now()]);
                 $messages = $candidates;
             }
         });
 
-        // Auto-retry: Reset failed messages (retry_count < 3) back to pending
-        // Only retry messages created today to avoid sending old notifications
+        // Auto-retry: kembalikan pesan 'failed' hari ini (retry_count < 3) ke 'pending'
         MessageQueue::where('status', 'failed')
             ->whereDate('created_at', today())
             ->where(function ($q) {
@@ -64,14 +75,13 @@ class ProcessWhatsappQueue extends Command
             ->update(['status' => 'pending', 'updated_at' => now()]);
 
         if (empty($messages)) {
-            // $this->info('No pending messages.'); // Reduce noise
             return;
         }
 
         $this->info("Found " . count($messages) . " messages. Processing...");
 
         foreach ($messages as $msg) {
-            // Guard against processing messages from previous days
+            // Guard: lewati pesan dari hari sebelumnya
             if ($msg->created_at->lt(today())) {
                 $msg->update([
                     'status'      => 'failed',
@@ -83,10 +93,18 @@ class ProcessWhatsappQueue extends Command
                 continue;
             }
 
-            $result = $this->sendMessage($msg->phone_number, $msg->message, $msg->school_id);
+            // === RATE LIMITING PER SEKOLAH ===
+            // Cek berapa pesan sudah terkirim jam ini untuk sekolah ini.
+            // Jika sudah mencapai batas, kembalikan ke 'pending' dan skip.
+            if ($msg->school_id !== null && $this->isRateLimited($msg->school_id)) {
+                $msg->update(['status' => 'pending', 'updated_at' => now()]);
+                $this->warn("Message ID {$msg->id} -> RATE LIMITED (school_id: {$msg->school_id}), will retry next run.");
+                continue;
+            }
+
+            $result  = $this->sendMessage($msg->phone_number, $msg->message, $msg->school_id);
             $success = $result['success'];
 
-            // Final Update
             $msg->update([
                 'status'      => $success ? 'sent' : 'failed',
                 'updated_at'  => now(),
@@ -96,25 +114,42 @@ class ProcessWhatsappQueue extends Command
 
             $this->info("Message ID {$msg->id} -> " . ($success ? 'SENT' : 'FAILED'));
 
-            // Delay to prevent WA Ban
-            sleep(2);
+            // === RANDOM JITTER DELAY (3–8 detik) ===
+            // Delay tidak konsisten meniru pola manusia dan menghindari
+            // deteksi bot oleh WhatsApp yang mengenali pola interval tetap.
+            $jitter = rand(3_000_000, 8_000_000); // microseconds
+            usleep($jitter);
         }
     }
 
+    /**
+     * Cek apakah sekolah ini sudah mencapai batas rate limit per jam.
+     */
+    private function isRateLimited(int $schoolId): bool
+    {
+        $sentThisHour = MessageQueue::where('school_id', $schoolId)
+            ->where('status', 'sent')
+            ->where('updated_at', '>=', now()->startOfHour())
+            ->count();
+
+        return $sentThisHour >= self::RATE_LIMIT_PER_HOUR;
+    }
+
+    /**
+     * Kirim pesan via GOWA API.
+     */
     private function sendMessage($phone, $message, $schoolId = null)
     {
-        $baseUrl = rtrim(env('GOWA_API_BASE_URL', 'http://localhost:3000'), '/');
-        $url     = $baseUrl . '/send/message';
-        $user    = env('GOWA_API_USER', 'admin');
-        $pass    = env('GOWA_API_PASS', 'jagattech');
-
+        $baseUrl  = rtrim(env('GOWA_API_BASE_URL', 'http://localhost:3000'), '/');
+        $url      = $baseUrl . '/send/message';
+        $user     = env('GOWA_API_USER', 'admin');
+        $pass     = env('GOWA_API_PASS', 'jagattech');
         $deviceId = $schoolId ? (string)$schoolId : 'superadmin';
-        $headers = ['X-Device-Id' => $deviceId];
 
         try {
             $response = Http::timeout(20)
                 ->withBasicAuth($user, $pass)
-                ->withHeaders($headers)
+                ->withHeaders(['X-Device-Id' => $deviceId])
                 ->post($url, [
                     'phone'   => $phone,
                     'message' => $message,

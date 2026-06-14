@@ -350,6 +350,7 @@ class DailyReportCommand extends Command
                 'phone_number' => $kelas->wa_group_id,
                 'message' => $msgClass,
                 'status' => 'pending',
+                'priority' => 10,
                 'created_at' => now()
             ]);
             $this->info("Queued class report: {$kelas->nama_kelas}");
@@ -376,6 +377,7 @@ class DailyReportCommand extends Command
                     'phone_number' => $targetJid,
                     'message' => $msg,
                     'status' => 'pending',
+                    'priority' => 10,
                     'created_at' => now()
                 ]);
                 $this->info("Queued global report to legacy admin ($targetJid)");
@@ -393,6 +395,7 @@ class DailyReportCommand extends Command
                     'phone_number' => $noWa,
                     'message' => $msg,
                     'status' => 'pending',
+                    'priority' => 10,
                     'created_at' => now()
                 ]);
                 $this->info("Queued global report to Guru: {$guru->nama}");
@@ -459,6 +462,7 @@ class DailyReportCommand extends Command
                 'phone_number' => $wali->no_wa,
                 'message' => $msgWali,
                 'status' => 'pending',
+                'priority' => 10,
                 'created_at' => now()
             ]);
         }

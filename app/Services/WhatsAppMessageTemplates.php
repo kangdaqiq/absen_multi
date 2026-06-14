@@ -27,7 +27,6 @@ class WhatsAppMessageTemplates
                 "Halo, *{$nama}* 👋,",
                 "Hai, *{$nama}*!",
                 "Assalamu'alaikum, *{$nama}* 🌟,",
-                "Selamat datang, *{$nama}*!",
                 "Halo *{$nama}*, semangat hari ini! 💪",
             ];
         }

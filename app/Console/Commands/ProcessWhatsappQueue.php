@@ -53,6 +53,7 @@ class ProcessWhatsappQueue extends Command
                           ->orWhere('schools.wa_enabled', true);
                     });
                 })
+                ->orderBy('message_queues.priority', 'desc')
                 ->orderBy('message_queues.created_at', 'asc')
                 ->limit($limit)
                 ->lockForUpdate()

@@ -185,6 +185,35 @@ private function finalizeEnrollment($fingerId, $device)
 {
 DB::beginTransaction();
 try {
+        // PRE-CHECK DUPLIKASI FINGER ID
+        $conflictName = null;
+        $conflictId = null;
+        $conflictType = null;
+        
+        $usedBySiswa = SiswaFingerprint::where('device_id', $device->id)->where('finger_id', $fingerId)->with('student')->first();
+        if ($usedBySiswa) {
+            $conflictName = $usedBySiswa->student->nama ?? 'Siswa Lain';
+            $conflictId = $usedBySiswa->student_id;
+            $conflictType = 'siswa';
+        }
+
+        if (!$conflictName) {
+            $usedByGuru = GuruFingerprint::where('device_id', $device->id)->where('finger_id', $fingerId)->with('guru')->first();
+            if ($usedByGuru) {
+                $conflictName = $usedByGuru->guru->nama ?? 'Guru Lain';
+                $conflictId = $usedByGuru->guru_id;
+                $conflictType = 'guru';
+            }
+        }
+        if (!$conflictName) {
+            $usedByGate = GateCard::where('school_id', $device->school_id)->where('uid_rfid', $fingerId)->first();
+            if ($usedByGate) {
+                $conflictName = $usedByGate->name ?? 'Gerbang Lain';
+                $conflictId = $usedByGate->id;
+                $conflictType = 'gate';
+            }
+        }
+
 // Check Guru first SCOPED
 $guru = Guru::where('enroll_finger_status', 'requested')
 ->where('school_id', $device->school_id)
@@ -194,6 +223,12 @@ $guru = Guru::where('enroll_finger_status', 'requested')
 ->first();
 
 if ($guru) {
+            if ($conflictName && ($conflictType !== 'guru' || $conflictId != $guru->id)) {
+                $guru->update(['enroll_finger_status' => null]);
+                DB::commit();
+                return $this->response(false, 'gagal', "Ditolak: ID telah dipakai oleh $conflictName");
+            }
+
 GuruFingerprint::updateOrCreate(
 ['guru_id' => $guru->id, 'device_id' => $device->id, 'finger_id' => $fingerId],
 ['created_at' => now()]
@@ -226,6 +261,12 @@ $siswa = Siswa::where('enroll_finger_status', 'requested')
 ->first();
 
 if ($siswa) {
+            if ($conflictName && ($conflictType !== 'siswa' || $conflictId != $siswa->id)) {
+                $siswa->update(['enroll_finger_status' => null]);
+                DB::commit();
+                return $this->response(false, 'gagal', "Ditolak: ID telah dipakai oleh $conflictName");
+            }
+
 SiswaFingerprint::updateOrCreate(
 ['student_id' => $siswa->id, 'device_id' => $device->id, 'finger_id' => $fingerId],
 ['created_at' => now()]
@@ -258,6 +299,12 @@ return $this->response(true, 'success', 'Enroll Berhasil (Siswa): ' . $siswa->na
             ->first();
 
         if ($gate) {
+            if ($conflictName && ($conflictType !== 'gate' || $conflictId != $gate->id)) {
+                $gate->update(['enroll_status' => null]);
+                DB::commit();
+                return $this->response(false, 'gagal', "Ditolak: ID telah dipakai oleh $conflictName");
+            }
+
             // Note: gate_cards doesn't have id_finger specifically, we reuse uid_rfid field for simplicity or just save it.
             $gate->update([
                 'enroll_status' => 'done',

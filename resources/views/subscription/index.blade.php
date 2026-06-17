@@ -50,37 +50,70 @@
                 <i class="fas fa-box-open text-brand-500 mr-2"></i> Paket Langganan
             </h2>
             <div class="flex flex-wrap items-center gap-3">
-                @if($school->expired_at)
-                    @php $expiredAt = $school->expired_at; @endphp
-                    @if($expiredAt->isPast())
-                        <span
-                            class="inline-flex items-center gap-1.5 rounded-full bg-red-100 px-3 py-1 text-sm font-medium text-red-700 dark:bg-red-900/30 dark:text-red-400">
-                            <span class="w-2 h-2 rounded-full bg-red-500 animate-pulse inline-block"></span>
-                            Langganan Kedaluwarsa {{ $expiredAt->diffForHumans() }}
-                        </span>
-                    @elseif(now()->addDays(7)->greaterThanOrEqualTo($expiredAt))
-                        <span
-                            class="inline-flex items-center gap-1.5 rounded-full bg-yellow-100 px-3 py-1 text-sm font-medium text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">
-                            <span class="w-2 h-2 rounded-full bg-yellow-500 animate-pulse inline-block"></span>
-                            Kedaluwarsa {{ $expiredAt->diffForHumans() }}
-                        </span>
+                @if($isSelfHosted)
+                    @if(!empty($licenseInfo['expired_at']) && $licenseInfo['expired_at'] !== 'Selamanya')
+                        @php 
+                            $licExpiredAt = \Carbon\Carbon::parse($licenseInfo['expired_at']); 
+                        @endphp
+                        @if($licExpiredAt->isPast())
+                            <span
+                                class="inline-flex items-center gap-1.5 rounded-full bg-red-100 px-3 py-1 text-sm font-medium text-red-700 dark:bg-red-900/30 dark:text-red-400">
+                                <span class="w-2 h-2 rounded-full bg-red-500 animate-pulse inline-block"></span>
+                                Lisensi Kedaluwarsa {{ $licExpiredAt->diffForHumans() }}
+                            </span>
+                        @elseif(now()->addDays(7)->greaterThanOrEqualTo($licExpiredAt))
+                            <span
+                                class="inline-flex items-center gap-1.5 rounded-full bg-yellow-100 px-3 py-1 text-sm font-medium text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">
+                                <span class="w-2 h-2 rounded-full bg-yellow-500 animate-pulse inline-block"></span>
+                                Lisensi Kedaluwarsa {{ $licExpiredAt->diffForHumans() }}
+                            </span>
+                        @else
+                            <span
+                                class="inline-flex items-center gap-1.5 rounded-full bg-green-100 px-3 py-1 text-sm font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                                <span class="w-2 h-2 rounded-full bg-green-500 inline-block"></span>
+                                Lisensi Aktif sampai {{ $licExpiredAt->format('d M Y') }}
+                            </span>
+                        @endif
                     @else
                         <span
                             class="inline-flex items-center gap-1.5 rounded-full bg-green-100 px-3 py-1 text-sm font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
                             <span class="w-2 h-2 rounded-full bg-green-500 inline-block"></span>
-                            Aktif sampai {{ $expiredAt->format('d M Y') }}
+                            Lisensi Aktif (Selamanya)
                         </span>
                     @endif
                 @else
-                    <span
-                        class="inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-3 py-1 text-sm font-medium text-gray-500 dark:bg-gray-800 dark:text-gray-400">
-                        Tidak ada masa aktif
-                    </span>
+                    @if($school->expired_at)
+                        @php $expiredAt = $school->expired_at; @endphp
+                        @if($expiredAt->isPast())
+                            <span
+                                class="inline-flex items-center gap-1.5 rounded-full bg-red-100 px-3 py-1 text-sm font-medium text-red-700 dark:bg-red-900/30 dark:text-red-400">
+                                <span class="w-2 h-2 rounded-full bg-red-500 animate-pulse inline-block"></span>
+                                Langganan Kedaluwarsa {{ $expiredAt->diffForHumans() }}
+                            </span>
+                        @elseif(now()->addDays(7)->greaterThanOrEqualTo($expiredAt))
+                            <span
+                                class="inline-flex items-center gap-1.5 rounded-full bg-yellow-100 px-3 py-1 text-sm font-medium text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">
+                                <span class="w-2 h-2 rounded-full bg-yellow-500 animate-pulse inline-block"></span>
+                                Kedaluwarsa {{ $expiredAt->diffForHumans() }}
+                            </span>
+                        @else
+                            <span
+                                class="inline-flex items-center gap-1.5 rounded-full bg-green-100 px-3 py-1 text-sm font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                                <span class="w-2 h-2 rounded-full bg-green-500 inline-block"></span>
+                                Aktif sampai {{ $expiredAt->format('d M Y') }}
+                            </span>
+                        @endif
+                    @else
+                        <span
+                            class="inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-3 py-1 text-sm font-medium text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+                            Tidak ada masa aktif
+                        </span>
+                    @endif
                 @endif
 
                 <button @click="showModal = true"
                     class="inline-flex items-center gap-2 rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 transition">
-                    <i class="fas fa-sync-alt"></i> Perpanjang
+                    <i class="fas fa-sync-alt"></i> Hubungi Provider
                 </button>
             </div>
         </div>
@@ -88,35 +121,49 @@
         {{-- ── Status Aktif & Penggunaan ────────────────────────────────────────── --}}
         <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 mb-6">
 
-            {{-- Paket Aktif --}}
+            {{-- Paket Aktif / Lisensi --}}
             <div
                 class="rounded-2xl border border-stroke bg-white p-5 shadow-sm dark:border-strokedark dark:bg-boxdark col-span-1 sm:col-span-2">
                 <div class="flex items-start gap-4">
                     <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-brand-500/10">
-                        <i class="fas fa-box text-2xl text-brand-500"></i>
+                        <i class="fas fa-key text-2xl text-brand-500"></i>
                     </div>
                     <div class="flex-1 min-w-0">
-                        <p class="text-sm text-gray-500 dark:text-gray-400 mb-0.5">Paket Aktif</p>
-                        <h3 class="text-xl font-bold text-black dark:text-white truncate">
-                            {{ $activeSubscription?->package?->name ?? 'Tanpa Paket / Kustom' }}
-                        </h3>
-                        @if($activeSubscription)
+                        <p class="text-sm text-gray-500 dark:text-gray-400 mb-0.5">Paket / Lisensi Aktif</p>
+                        @if($isSelfHosted)
+                            <h3 class="text-xl font-bold text-black dark:text-white truncate">
+                                Lisensi Self-Hosted
+                            </h3>
                             <div class="mt-2 flex flex-wrap items-center gap-2 text-xs">
-                                <span class="rounded-full bg-brand-500/10 text-brand-500 px-2 py-0.5 font-medium">
-                                    {{ $activeSubscription->billing_cycle === 'yearly' ? 'Tahunan' : 'Bulanan' }}
+                                <span class="rounded-full bg-green-500/10 text-green-600 px-2 py-0.5 font-medium">
+                                    Klien: {{ $licenseInfo['client_name'] ?? 'SEKOLAH' }}
                                 </span>
                                 <span class="text-gray-500 dark:text-gray-400">
-                                    Sejak {{ $activeSubscription->started_at?->format('d M Y') ?? '-' }}
+                                    Masa Berlaku: {{ $licenseInfo['expired_at'] ?? 'Selamanya' }}
                                 </span>
-                                @if($activeSubscription->expired_at)
-                                    <span class="text-gray-500 dark:text-gray-400">
-                                        — Hingga {{ $activeSubscription->expired_at->format('d M Y') }}
-                                    </span>
-                                @endif
                             </div>
                         @else
-                            <p class="mt-1 text-xs text-gray-400">Belum ada langganan aktif. Hubungi Admin untuk aktivasi paket.
-                            </p>
+                            <h3 class="text-xl font-bold text-black dark:text-white truncate">
+                                {{ $activeSubscription?->package?->name ?? 'Tanpa Paket / Kustom' }}
+                            </h3>
+                            @if($activeSubscription)
+                                <div class="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                                    <span class="rounded-full bg-brand-500/10 text-brand-500 px-2 py-0.5 font-medium">
+                                        {{ $activeSubscription->billing_cycle === 'yearly' ? 'Tahunan' : 'Bulanan' }}
+                                    </span>
+                                    <span class="text-gray-500 dark:text-gray-400">
+                                        Sejak {{ $activeSubscription->started_at?->format('d M Y') ?? '-' }}
+                                    </span>
+                                    @if($activeSubscription->expired_at)
+                                        <span class="text-gray-500 dark:text-gray-400">
+                                            — Hingga {{ $activeSubscription->expired_at->format('d M Y') }}
+                                        </span>
+                                    @endif
+                                </div>
+                            @else
+                                <p class="mt-1 text-xs text-gray-400">Belum ada langganan aktif. Hubungi Admin untuk aktivasi paket.
+                                </p>
+                            @endif
                         @endif
                     </div>
                 </div>

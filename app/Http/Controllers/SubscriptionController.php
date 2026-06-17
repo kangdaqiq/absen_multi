@@ -32,19 +32,25 @@ class SubscriptionController extends Controller
             ->orderByDesc('created_at')
             ->paginate(10);
 
+        $isSelfHosted = config('app.mode') === 'self_hosted';
+        $licenseInfo = null;
+        if ($isSelfHosted) {
+            $licenseInfo = app(\App\Services\LicenseService::class)->validate();
+        }
+
         // Usage stats
         $usage = [
             'students' => [
                 'current' => $school->siswa()->count(),
-                'limit'   => $school->student_limit,
+                'limit'   => $isSelfHosted ? ($licenseInfo['max_students'] ?? 0) : $school->student_limit,
             ],
             'teachers' => [
                 'current' => $school->guru()->count(),
-                'limit'   => $school->teacher_limit,
+                'limit'   => $isSelfHosted ? ($licenseInfo['max_teachers'] ?? 0) : $school->teacher_limit,
             ],
             'bot_users' => [
                 'current' => $school->botAccessCount(),
-                'limit'   => $school->bot_user_limit,
+                'limit'   => $isSelfHosted ? ($licenseInfo['max_bot_users'] ?? 0) : $school->bot_user_limit,
             ],
         ];
 
@@ -53,7 +59,9 @@ class SubscriptionController extends Controller
             'activeSubscription',
             'packages',
             'history',
-            'usage'
+            'usage',
+            'isSelfHosted',
+            'licenseInfo'
         ));
     }
 

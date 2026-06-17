@@ -79,11 +79,9 @@ class SiswaController extends Controller
             ],
             'wa_ortu' => ['nullable', 'string', 'max:20', 'regex:/^(08|628)[0-9]{8,13}$/'],
             'user_id' => 'nullable|exists:users,id',
-            'is_khusus' => 'nullable|boolean',
         ]);
 
         $input = $request->all();
-        $input['is_khusus'] = $request->has('is_khusus') ? 1 : 0;
         // Force null if empty string to avoid unique constraint issues on empty strings
         if (empty($input['no_wa']))
             $input['no_wa'] = null;
@@ -111,6 +109,12 @@ class SiswaController extends Controller
             if (!$school->hasStudentQuota()) {
                 return back()->with('error', 'Gagal: Kuota siswa untuk sekolah ini sudah penuh (' . $school->student_limit . ' siswa). Hubungi Super Admin untuk upgrade quota.')->withInput();
             }
+        }
+
+        // Check global license quota for self_hosted
+        $licenseService = app(\App\Services\LicenseService::class);
+        if (!$licenseService->hasGlobalStudentQuota()) {
+            return back()->with('error', 'Gagal: Kuota global Siswa dari Lisensi Anda telah penuh. Silakan upgrade lisensi Anda.')->withInput();
         }
 
         $siswa = Siswa::create($input);
@@ -145,11 +149,9 @@ class SiswaController extends Controller
             'wa_ortu' => ['nullable', 'string', 'max:20', 'regex:/^(08|628)[0-9]{8,13}$/'],
             'uid_rfid' => 'nullable|string|max:50',
             'user_id' => 'nullable|exists:users,id',
-            'is_khusus' => 'nullable|boolean',
         ]);
 
         $input = $request->all();
-        $input['is_khusus'] = $request->has('is_khusus') ? 1 : 0;
         if (empty($input['no_wa']))
             $input['no_wa'] = null;
         if (empty($input['wa_ortu']))
@@ -192,6 +194,7 @@ class SiswaController extends Controller
 
             // Fetch school once for quota checking
             $school = $schoolId ? \App\Models\School::find($schoolId) : null;
+            $licenseService = app(\App\Services\LicenseService::class);
 
             // Scope Kelas Map by School
             $kelasMapQuery = Kelas::query();
@@ -280,6 +283,15 @@ class SiswaController extends Controller
                         }
                         return redirect()->route('siswa.index')
                             ->with('error', "Import dihentikan: Kuota siswa penuh ({$school->student_limit} siswa). Berhasil diimpor: {$countSuccess} siswa.");
+                    }
+
+                    // Check global license quota for self_hosted
+                    if ($licenseService && !$licenseService->hasGlobalStudentQuota()) {
+                        if ($request->wantsJson()) {
+                            return response()->json(['success' => false, 'message' => "Import dihentikan: Kuota global siswa lisensi penuh. Berhasil diimpor: {$countSuccess} siswa."]);
+                        }
+                        return redirect()->route('siswa.index')
+                            ->with('error', "Import dihentikan: Kuota global siswa lisensi penuh. Berhasil diimpor: {$countSuccess} siswa.");
                     }
 
                     $siswa = Siswa::create([
@@ -573,3 +585,4 @@ class SiswaController extends Controller
         ]);
     }
 }
+                                                                                                                                                                                                                                  

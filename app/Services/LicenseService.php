@@ -335,4 +335,24 @@ class LicenseService
         $currentCount = \App\Models\Guru::where('bot_access', true)->count();
         return $currentCount < $limit;
     }
+
+    /**
+     * Check if global student quota is available (for self_hosted mode)
+     */
+    public function hasGlobalStudentQuota(): bool
+    {
+        if (config('app.mode', 'hosted') !== 'self_hosted') {
+            return true; // only enforced in self_hosted
+        }
+
+        $license = $this->validate();
+        $limit = $license['max_students'] ?? 0;
+
+        if ($limit === 0) {
+            return true; // unlimited
+        }
+
+        $currentCount = \App\Models\Siswa::count();
+        return $currentCount < $limit;
+    }
 }

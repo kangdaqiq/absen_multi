@@ -23,6 +23,11 @@ class AuthController extends Controller
             })
             ->first();
 
+        // Fallback untuk self-hosted mode: gunakan sekolah pertama yang aktif
+        if (!$school && config('app.mode') === 'self_hosted') {
+            $school = \App\Models\School::where('is_active', true)->first();
+        }
+
         return view('auth.login', compact('school'));
     }
 

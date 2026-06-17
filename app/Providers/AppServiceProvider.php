@@ -74,33 +74,39 @@ class AppServiceProvider extends ServiceProvider
                             ->toArray();
                     }
                 } else {
-
-                    // Guest / Login Page
-                    // 1. Try Global Settings (school_id = 0)
-                    $settings = \App\Models\Setting::where('school_id', 0)
-                        ->pluck('setting_value', 'setting_key')
-                        ->toArray();
-
-                    // 2. Fallback to Default School (ID 3) if Global empty (or strictly empty logo)
-                    if (empty($settings['logo_filename'])) {
-                        $fallbackSettings = \App\Models\Setting::where('school_id', 3)
+                    $isSelfHosted = (config('app.mode') === 'self_hosted');
+                    if ($isSelfHosted) {
+                        // Guest / Login Page untuk Self-Hosted: gunakan sekolah pertama yang aktif
+                        $firstSchool = \App\Models\School::where('is_active', true)->first();
+                        $schoolId = $firstSchool ? $firstSchool->id : 0;
+                        $settings = \App\Models\Setting::where('school_id', $schoolId)
                             ->pluck('setting_value', 'setting_key')
                             ->toArray();
-                        $settings = array_merge($fallbackSettings, $settings); // Global overrides fallback, but we want fallback if missing
-                        // Actually array_merge key overwrites.
-                        // $settings = $fallbackSettings + $settings; // Union, left preserved.
-                        // Let's just use simple logic.
-                        if (empty($settings)) {
-                            $settings = $fallbackSettings;
+                    } else {
+                        // Guest / Login Page untuk SaaS
+                        // 1. Try Global Settings (school_id = 0)
+                        $settings = \App\Models\Setting::where('school_id', 0)
+                            ->pluck('setting_value', 'setting_key')
+                            ->toArray();
+
+                        // 2. Fallback to Default School (ID 3) if Global empty (or strictly empty logo)
+                        if (empty($settings['logo_filename'])) {
+                            $fallbackSettings = \App\Models\Setting::where('school_id', 3)
+                                ->pluck('setting_value', 'setting_key')
+                                ->toArray();
+                            if (empty($settings)) {
+                                $settings = $fallbackSettings;
+                            }
                         }
                     }
                 }
 
                 $schoolName = $settings['nama_sekolah'] ?? $schoolName;
 
-                // Logo: hanya pakai logo sekolah jika akses via custom domain.
-                // Jika dari domain global → pakai logo SVG bawaan aplikasi (logo.svg)
-                if ($isCustomDomain) {
+                // Logo: pakai logo sekolah jika akses via custom domain ATAU mode self-hosted.
+                // Jika dari domain global (SaaS) → pakai logo SVG bawaan aplikasi (logo.svg)
+                $isSelfHosted = (config('app.mode') === 'self_hosted');
+                if ($isCustomDomain || $isSelfHosted) {
                     $schoolLogo = $settings['logo_filename'] ?? 'logo.svg';
                 } else {
                     // null / string kosong → sidebar akan jatuh ke else branch (logo SVG bawaan)

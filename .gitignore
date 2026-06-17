@@ -30,3 +30,6 @@ Thumbs.db
 /release-client/
 /release-client.zip
 /dist/
+
+# Abaikan kode perangkat keras (ESP)
+/esp8266_code/

@@ -23,10 +23,10 @@ class AppServiceProvider extends ServiceProvider
         \Illuminate\Pagination\Paginator::useTailwind();
         \Carbon\Carbon::setLocale('id');
 
-        // Force HTTPS if accessed via secure proxy, explicitly secure, or in production env
+        // Force HTTPS if accessed via secure proxy, explicitly secure, or if FORCE_HTTPS is true in .env
+        // Removed app()->environment('production') so it doesn't force HTTPS on local LAN servers
         if (request()->header('x-forwarded-proto') === 'https' ||
             request()->isSecure() ||
-            app()->environment('production') ||
             env('FORCE_HTTPS', false)) {
             URL::forceScheme('https');
         }

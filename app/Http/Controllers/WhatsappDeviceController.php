@@ -220,6 +220,24 @@ class WhatsappDeviceController extends Controller
         }
     }
 
+    public function reset(Request $request)
+    {
+        $base     = $this->baseUrl();
+        $deviceId = $this->deviceId();
+        [$user, $pass] = $this->auth();
+
+        try {
+            $res = Http::timeout(10)
+                ->withBasicAuth($user, $pass)
+                ->delete("{$base}/devices/{$deviceId}");
+
+            return response()->json(['success' => true, 'message' => 'Sesi WhatsApp berhasil di-reset. Silakan Refresh untuk memuat ulang QR.']);
+        } catch (\Exception $e) {
+            Log::error('WhatsApp Device Reset Error: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Gagal mereset sesi: ' . $e->getMessage()], 500);
+        }
+    }
+
     public function testMessage(Request $request, \App\Services\WhatsAppService $wa)
     {
         $request->validate([

@@ -131,10 +131,16 @@
                             </div>
                         </div>
 
-                        <button onclick="checkStatus()"
-                            class="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-500 text-brand-500 px-6 py-2.5 text-center font-medium hover:bg-brand-50 dark:hover:bg-brand-500/15 transition">
-                            <i class="fas fa-redo"></i> Coba Lagi
-                        </button>
+                        <div class="flex justify-center gap-3">
+                            <button onclick="checkStatus()"
+                                class="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-500 text-brand-500 px-6 py-2.5 text-center font-medium hover:bg-brand-50 dark:hover:bg-brand-500/15 transition">
+                                <i class="fas fa-redo"></i> Coba Lagi
+                            </button>
+                            <button id="btnReset" onclick="doReset()"
+                                class="inline-flex items-center justify-center gap-2 rounded-lg bg-error-500 px-6 py-2.5 text-center font-medium text-white hover:bg-error-600 transition">
+                                <i class="fas fa-trash-alt"></i> Reset Sesi API
+                            </button>
+                        </div>
                     </div>
 
                 </div>
@@ -309,6 +315,41 @@
                     btn.disabled = false;
                     btn.classList.remove('opacity-50', 'cursor-not-allowed');
                     btn.innerHTML = '<i class="fas fa-sign-out-alt mr-1"></i> Putuskan Koneksi (Logout)';
+                });
+        }
+
+        function doReset() {
+            if (!confirm('Yakin ingin mereset sesi WhatsApp API? Ini akan menghapus data koneksi yang tersangkut (error) di API server agar Anda bisa scan ulang.')) return;
+
+            const btn = document.getElementById('btnReset');
+            btn.disabled = true;
+            btn.classList.add('opacity-50', 'cursor-not-allowed');
+            btn.innerHTML = '<div class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-solid border-white border-r-transparent align-[-0.125em] mr-2"></div> Memproses...';
+
+            fetch('{{ route("whatsapp.device.reset") }}', {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Content-Type': 'application/json',
+                }
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        setTimeout(() => checkStatus(), 1500);
+                    } else {
+                        alert('Reset gagal: ' + (data.message ?? 'Unknown error'));
+                        btn.disabled = false;
+                        btn.classList.remove('opacity-50', 'cursor-not-allowed');
+                        btn.innerHTML = '<i class="fas fa-trash-alt mr-1"></i> Reset Sesi API';
+                    }
+                })
+                .catch(() => {
+                    alert('Terjadi kesalahan saat reset.');
+                    btn.disabled = false;
+                    btn.classList.remove('opacity-50', 'cursor-not-allowed');
+                    btn.innerHTML = '<i class="fas fa-trash-alt mr-1"></i> Reset Sesi API';
                 });
         }
 

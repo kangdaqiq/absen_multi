@@ -282,6 +282,41 @@ sudo chmod -R 775 /var/www/absen/storage
 
 ---
 
+sudo nano /etc/systemd/system/whatsapp.service
+[Unit]
+Description=WhatsApp API Service
+After=network.target
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/var/wa-api/src
+ExecStart=/var/wa-api/src/whatsapp rest \
+  --port=3000 \
+  --webhook=http://127.0.0.1:5000/webhook \
+  --basic-auth=admin:jagattech
+Restart=always
+RestartSec=3
+[Install]
+
+sudo nano /etc/systemd/system/bot-go.service
+
+[Unit]
+Description=WhatsApp Bot Absensi Go Service
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/var/bot-go
+ExecStart=/var/bot-go/bot_wa
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+
+
+WantedBy=multi-user.target
 ## 📞 Kontak Provider
 
 Hubungi provider jika mengalami kendala instalasi atau membutuhkan **LICENSE_KEY**:

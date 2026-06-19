@@ -283,6 +283,7 @@ sudo chmod -R 775 /var/www/absen/storage
 ---
 
 sudo nano /etc/systemd/system/whatsapp.service
+```bash
 [Unit]
 Description=WhatsApp API Service
 After=network.target
@@ -297,7 +298,7 @@ ExecStart=/var/wa-api/src/whatsapp rest \
 Restart=always
 RestartSec=3
 [Install]
-
+```
 sudo nano /etc/systemd/system/bot-go.service
 
 [Unit]

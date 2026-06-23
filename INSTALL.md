@@ -281,9 +281,9 @@ sudo chmod -R 775 /var/www/absen/storage
 ```
 
 ---
-
-sudo nano /etc/systemd/system/whatsapp.service
 ```bash
+sudo nano /etc/systemd/system/whatsapp.service
+
 [Unit]
 Description=WhatsApp API Service
 After=network.target
@@ -298,7 +298,7 @@ ExecStart=/var/wa-api/src/whatsapp rest \
 Restart=always
 RestartSec=3
 [Install]
-```
+
 sudo nano /etc/systemd/system/bot-go.service
 
 [Unit]
@@ -315,9 +315,7 @@ RestartSec=10
 
 [Install]
 WantedBy=multi-user.target
-
-
-WantedBy=multi-user.target
+```
 ## 📞 Kontak Provider
 
 Hubungi provider jika mengalami kendala instalasi atau membutuhkan **LICENSE_KEY**:

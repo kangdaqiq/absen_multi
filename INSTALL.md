@@ -56,9 +56,9 @@ sudo mysql
 ```
 
 ```sql
-CREATE DATABASE absen_sell CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE absen_jagat CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE USER 'absen_user'@'localhost' IDENTIFIED BY 'passwordKuat123';
-GRANT ALL PRIVILEGES ON absen_sell.* TO 'absen_user'@'localhost';
+GRANT ALL PRIVILEGES ON absen_jagat.* TO 'absen_user'@'localhost';
 FLUSH PRIVILEGES;
 EXIT;
 ```

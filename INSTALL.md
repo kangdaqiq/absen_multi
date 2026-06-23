@@ -56,9 +56,9 @@ sudo mysql
 ```
 
 ```sql
-CREATE DATABASE absen_sell CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE absen_jagat CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE USER 'absen_user'@'localhost' IDENTIFIED BY 'passwordKuat123';
-GRANT ALL PRIVILEGES ON absen_sell.* TO 'absen_user'@'localhost';
+GRANT ALL PRIVILEGES ON absen_jagat.* TO 'absen_user'@'localhost';
 FLUSH PRIVILEGES;
 EXIT;
 ```
@@ -281,7 +281,41 @@ sudo chmod -R 775 /var/www/absen/storage
 ```
 
 ---
+```bash
+sudo nano /etc/systemd/system/whatsapp.service
 
+[Unit]
+Description=WhatsApp API Service
+After=network.target
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/var/wa-api/src
+ExecStart=/var/wa-api/src/whatsapp rest \
+  --port=3000 \
+  --webhook=http://127.0.0.1:5000/webhook \
+  --basic-auth=admin:jagattech
+Restart=always
+RestartSec=3
+[Install]
+
+sudo nano /etc/systemd/system/bot-go.service
+
+[Unit]
+Description=WhatsApp Bot Absensi Go Service
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/var/bot-go
+ExecStart=/var/bot-go/bot_wa
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+```
 ## 📞 Kontak Provider
 
 Hubungi provider jika mengalami kendala instalasi atau membutuhkan **LICENSE_KEY**:

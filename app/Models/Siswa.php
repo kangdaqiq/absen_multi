@@ -33,8 +33,35 @@ class Siswa extends Model
         'created_at',
         'updated_at',
         'school_id',
-        'is_khusus'
+        'is_khusus',
+        'is_siswa_khusus',
+        'hari_masuk'
     ];
+
+    protected $casts = [
+        'hari_masuk' => 'array',
+    ];
+
+    public function isEntryDay($date = null)
+    {
+        if (!$this->is_siswa_khusus) {
+            return true;
+        }
+
+        $date = $date ? \Carbon\Carbon::parse($date) : now();
+        $dayIndex = $date->dayOfWeekIso; // 1-7 (1=Senin, 7=Minggu)
+
+        $hariMasuk = $this->hari_masuk;
+
+        if (!is_array($hariMasuk)) {
+            $hariMasuk = json_decode($hariMasuk, true) ?: [];
+        }
+
+        // Convert all elements to int to avoid type comparison issues
+        $hariMasuk = array_map('intval', $hariMasuk);
+
+        return in_array($dayIndex, $hariMasuk);
+    }
 
     public function kelas()
     {

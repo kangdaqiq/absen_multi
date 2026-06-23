@@ -218,6 +218,14 @@ class DailyReportCommand extends Command
                 ];
             }
 
+            // Skip student if they are on PKL and did not attend, OR if they are Siswa Khusus, today is not their entry day and they did not attend
+            $isPklExempt = $s->is_khusus && !$attendance->has($s->id);
+            $isKhususExempt = $s->is_siswa_khusus && !$s->isEntryDay($today) && !$attendance->has($s->id);
+
+            if ($isPklExempt || $isKhususExempt) {
+                continue;
+            }
+
             $statsByJurusan[$jurusanName][$kelasName]['total']++;
 
             if ($attendance->has($s->id)) {
@@ -239,45 +247,27 @@ class DailyReportCommand extends Command
                     }
                 }
             } else {
-                if ($s->is_khusus) {
-                    $totalMasuk++;
-                    $statsByJurusan[$jurusanName][$kelasName]['H']++;
+                // If they reach here, it's either a normal student, or a special student on their entry day.
+                // Both must be marked as Alpha because they did not attend.
+                $statsByJurusan[$jurusanName][$kelasName]['A']++;
+                $absentByStatus['A'][] = "{$s->nama} ({$kelasName})";
 
-                    Attendance::firstOrCreate(
-                        ['student_id' => $s->id, 'tanggal' => $today],
-                        [
-                            'jam_masuk' => '07:00',
-                            'jam_pulang' => null,
-                            'jam_kerja' => null,
-                            'status' => 'H',
-                            'keterangan' => 'Siswa PKL',
-                            'lokasi_masuk' => 'System',
-                            'created_at' => now(),
-                            'updated_at' => now(),
-                        ]
-                    );
-                } else {
-                    // No record = Alpha — count it in report AND persist to DB
-                    $statsByJurusan[$jurusanName][$kelasName]['A']++;
-                    $absentByStatus['A'][] = "{$s->nama} ({$kelasName})";
+                $keterangan = $s->is_siswa_khusus ? 'Alpha (Tidak Hadir - Hari Masuk Khusus)' : 'Alpha';
 
-                    // Persist Alpha record so live monitoring shows it correctly
-                    // Flag is_auto_alpha = true so offline sync can override it later
-                    Attendance::firstOrCreate(
-                        ['student_id' => $s->id, 'tanggal' => $today],
-                        [
-                            'jam_masuk' => null,
-                            'jam_pulang' => null,
-                            'jam_kerja' => null,
-                            'status' => 'A',
-                            'keterangan' => 'Alpha',
-                            'is_auto_alpha' => true,
-                            'lokasi_masuk' => 'System',
-                            'created_at' => now(),
-                            'updated_at' => now(),
-                        ]
-                    );
-                }
+                Attendance::firstOrCreate(
+                    ['student_id' => $s->id, 'tanggal' => $today],
+                    [
+                        'jam_masuk' => null,
+                        'jam_pulang' => null,
+                        'jam_kerja' => null,
+                        'status' => 'A',
+                        'keterangan' => $keterangan,
+                        'is_auto_alpha' => true,
+                        'lokasi_masuk' => 'System',
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]
+                );
             }
         }
 
@@ -330,8 +320,13 @@ class DailyReportCommand extends Command
                             $absentByStatusClass[$status][] = $s->nama;
                         }
                     }
-                } elseif ($s->is_khusus) {
-                    $masuk++;
+                } elseif ($s->is_khusus || $s->is_siswa_khusus) {
+                    if ($s->is_siswa_khusus && $s->isEntryDay($today)) {
+                        $tidakMasuk++;
+                        $absentByStatusClass['A'][] = $s->nama;
+                    } else {
+                        // Siswa PKL or Siswa Khusus outside entry day -> Exempt, leave empty.
+                    }
                 } else {
                     $tidakMasuk++;
                     $absentByStatusClass['A'][] = $s->nama;
@@ -440,8 +435,13 @@ class DailyReportCommand extends Command
                         };
                         $listAbsen[] = "{$s->nama} ({$statusKet})";
                     }
-                } elseif ($s->is_khusus) {
-                    $masuk++;
+                } elseif ($s->is_khusus || $s->is_siswa_khusus) {
+                    if ($s->is_siswa_khusus && $s->isEntryDay($today)) {
+                        $tidakMasuk++;
+                        $listAbsen[] = "{$s->nama} (Alpha)";
+                    } else {
+                        // Siswa PKL or Siswa Khusus outside entry day -> Exempt, leave empty.
+                    }
                 } else {
                     $tidakMasuk++;
                     $listAbsen[] = "{$s->nama} (Alpha)";
@@ -472,8 +472,16 @@ class DailyReportCommand extends Command
         // Filter alphaStudentIds for THIS SCHOOL
         $alphaStudentIds = [];
         foreach ($siswaAll as $s) {
-            if (!$attendance->has($s->id) && !$s->is_khusus) {
-                $alphaStudentIds[] = $s->id;
+            if (!$attendance->has($s->id)) {
+                if ($s->is_khusus) {
+                    // Siswa PKL is always exempt (left empty)
+                } elseif ($s->is_siswa_khusus) {
+                    if ($s->isEntryDay($today)) {
+                        $alphaStudentIds[] = $s->id;
+                    }
+                } else {
+                    $alphaStudentIds[] = $s->id;
+                }
             }
         }
 

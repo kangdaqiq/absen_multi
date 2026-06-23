@@ -140,23 +140,16 @@ class AutoBolosCommand extends Command
             ->get();
 
         $countA = 0;
-        $countKhusus = 0;
+        $countExempt = 0;
         foreach ($studentsWithoutAttendance as $s) {
-            if ($s->is_khusus) {
-                \App\Models\Attendance::create([
-                    'student_id' => $s->id,
-                    'tanggal' => $today,
-                    'jam_masuk' => '07:00',
-                    'jam_pulang' => null,
-                    'jam_kerja' => null,
-                    'status' => 'H',
-                    'keterangan' => 'Siswa PKL',
-                    'lokasi_masuk' => 'System',
-                    'created_at' => now(),
-                    'updated_at' => now()
-                ]);
-                $countKhusus++;
+            $isPkl = $s->is_khusus;
+            $isKhususNotEntry = $s->is_siswa_khusus && !$s->isEntryDay($today);
+
+            if ($isPkl || $isKhususNotEntry) {
+                // Left empty (no record created)
+                $countExempt++;
             } else {
+                // Either normal student, or Siswa Khusus on entry day. Must be marked Alpha!
                 \App\Models\Attendance::create([
                     'student_id' => $s->id,
                     'tanggal' => $today,
@@ -164,7 +157,7 @@ class AutoBolosCommand extends Command
                     'jam_pulang' => null,
                     'jam_kerja' => null,
                     'status' => 'A',
-                    'keterangan' => 'Alpha (Tidak Hadir)',
+                    'keterangan' => $s->is_siswa_khusus ? 'Alpha (Tidak Hadir - Hari Masuk Khusus)' : 'Alpha (Tidak Hadir)',
                     'lokasi_masuk' => 'System',
                     'created_at' => now(),
                     'updated_at' => now()
@@ -173,7 +166,7 @@ class AutoBolosCommand extends Command
             }
         }
 
-        $this->info("Marked $countA students as Alpha (A) and $countKhusus special students as Hadir (H) for school ID $schoolId.");
+        $this->info("Marked $countA students as Alpha (A) and left $countExempt special/PKL students empty for school ID $schoolId.");
 
         // Update Setting for this school
         Setting::updateOrCreate(

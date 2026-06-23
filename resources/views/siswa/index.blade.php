@@ -110,6 +110,9 @@
                             <div class="flex items-center gap-2">
                                 <p class="font-medium text-gray-800 dark:text-white/90">{{ $s->nama }}</p>
                                 @if($s->is_khusus)
+                                    <span class="inline-flex rounded-full bg-success-50 px-2 py-0.5 text-xs font-semibold text-success-600 dark:bg-success-500/15 dark:text-success-500">PKL</span>
+                                @endif
+                                @if($s->is_siswa_khusus)
                                     <span class="inline-flex rounded-full bg-purple-50 px-2 py-0.5 text-xs font-semibold text-purple-600 dark:bg-purple-500/15 dark:text-purple-500">Khusus</span>
                                 @endif
                             </div>
@@ -162,6 +165,8 @@
                                     data-id="{{ $s->id }}" data-nama="{{ $s->nama }}" data-nis="{{ $s->nis }}" data-tgl_lahir="{{ $s->tgl_lahir }}"
                                     data-kelas="{{ $s->kelas_id }}" data-wa="{{ $s->no_wa }}" data-wa_ortu="{{ $s->wa_ortu }}" data-uid="{{ $s->uid_rfid }}"
                                     data-is_khusus="{{ $s->is_khusus }}"
+                                    data-is_siswa_khusus="{{ $s->is_siswa_khusus }}"
+                                    data-hari_masuk="{{ json_encode($s->hari_masuk) }}"
                                     @click="$dispatch('open-modal', 'modalEditSiswa')" title="Edit">
                                     <i class="fas fa-edit"></i>
                                 </button>
@@ -278,6 +283,45 @@
                     <input type="checkbox" name="is_khusus" id="is_khusus" value="1" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800">
                     <label for="is_khusus" class="text-sm font-medium text-gray-700 dark:text-gray-300">Siswa PKL</label>
                 </div>
+                <div x-data="{ isSiswaKhusus: false }">
+                    <div class="flex items-center gap-2 mt-2">
+                        <input type="checkbox" name="is_siswa_khusus" id="is_siswa_khusus" value="1" x-model="isSiswaKhusus" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800">
+                        <label for="is_siswa_khusus" class="text-sm font-medium text-gray-700 dark:text-gray-300">Siswa Khusus</label>
+                    </div>
+                    <div x-show="isSiswaKhusus" x-transition class="mt-3 space-y-2">
+                        <label class="block text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Hari Masuk Tertentu</label>
+                        <div class="grid grid-cols-4 gap-2">
+                            <label class="flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                                <input type="checkbox" name="hari_masuk[]" value="1" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800">
+                                <span>Senin</span>
+                            </label>
+                            <label class="flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                                <input type="checkbox" name="hari_masuk[]" value="2" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800">
+                                <span>Selasa</span>
+                            </label>
+                            <label class="flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                                <input type="checkbox" name="hari_masuk[]" value="3" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800">
+                                <span>Rabu</span>
+                            </label>
+                            <label class="flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                                <input type="checkbox" name="hari_masuk[]" value="4" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800">
+                                <span>Kamis</span>
+                            </label>
+                            <label class="flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                                <input type="checkbox" name="hari_masuk[]" value="5" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800">
+                                <span>Jumat</span>
+                            </label>
+                            <label class="flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                                <input type="checkbox" name="hari_masuk[]" value="6" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800">
+                                <span>Sabtu</span>
+                            </label>
+                            <label class="flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                                <input type="checkbox" name="hari_masuk[]" value="7" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800">
+                                <span>Minggu</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
             </div>
             <div class="mt-6 flex justify-end gap-3">
                 <button type="button" @click="open = false" class="rounded-lg border border-gray-200 px-4 py-2 text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-gray-800">Batal</button>
@@ -334,6 +378,46 @@
                 <div class="flex items-center gap-2 mt-2">
                     <input type="checkbox" name="is_khusus" id="edit_is_khusus" value="1" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800">
                     <label for="edit_is_khusus" class="text-sm font-medium text-gray-700 dark:text-gray-300">Siswa PKL</label>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2 mt-2">
+                        <input type="checkbox" name="is_siswa_khusus" id="edit_is_siswa_khusus" value="1" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800">
+                        <label for="edit_is_siswa_khusus" class="text-sm font-medium text-gray-700 dark:text-gray-300">Siswa Khusus</label>
+                    </div>
+                    
+                    <div id="edit_hari_masuk_container" class="mt-3 space-y-2" style="display: none;">
+                        <label class="block text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Hari Masuk Tertentu</label>
+                        <div class="grid grid-cols-4 gap-2">
+                            <label class="flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                                <input type="checkbox" name="hari_masuk[]" id="edit_hari_masuk_1" value="1" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800">
+                                <span>Senin</span>
+                            </label>
+                            <label class="flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                                <input type="checkbox" name="hari_masuk[]" id="edit_hari_masuk_2" value="2" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800">
+                                <span>Selasa</span>
+                            </label>
+                            <label class="flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                                <input type="checkbox" name="hari_masuk[]" id="edit_hari_masuk_3" value="3" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800">
+                                <span>Rabu</span>
+                            </label>
+                            <label class="flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                                <input type="checkbox" name="hari_masuk[]" id="edit_hari_masuk_4" value="4" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800">
+                                <span>Kamis</span>
+                            </label>
+                            <label class="flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                                <input type="checkbox" name="hari_masuk[]" id="edit_hari_masuk_5" value="5" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800">
+                                <span>Jumat</span>
+                            </label>
+                            <label class="flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                                <input type="checkbox" name="hari_masuk[]" id="edit_hari_masuk_6" value="6" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800">
+                                <span>Sabtu</span>
+                            </label>
+                            <label class="flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                                <input type="checkbox" name="hari_masuk[]" id="edit_hari_masuk_7" value="7" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800">
+                                <span>Minggu</span>
+                            </label>
+                        </div>
+                    </div>
                 </div>
             </div>
             <div class="mt-6 flex justify-end gap-3">
@@ -503,6 +587,8 @@
                 var wa_ortu = $(this).data('wa_ortu');
                 var uid = $(this).data('uid');
                 var is_khusus = $(this).data('is_khusus');
+                var is_siswa_khusus = $(this).data('is_siswa_khusus');
+                var hari_masuk = $(this).data('hari_masuk');
 
                 $('#edit_nama').val(nama);
                 $('#edit_nis').val(nis);
@@ -512,8 +598,34 @@
                 $('#edit_wa_ortu').val(wa_ortu);
                 $('#edit_uid_rfid').val(uid);
                 $('#edit_is_khusus').prop('checked', is_khusus == 1);
+                $('#edit_is_siswa_khusus').prop('checked', is_siswa_khusus == 1);
+
+                // Reset and populate edit checkboxes
+                $('#edit_hari_masuk_container input[type="checkbox"]').prop('checked', false);
+                if (is_siswa_khusus == 1) {
+                    $('#edit_hari_masuk_container').show();
+                    if (hari_masuk) {
+                        var days = typeof hari_masuk === 'string' ? JSON.parse(hari_masuk) : hari_masuk;
+                        if (Array.isArray(days)) {
+                            days.forEach(function(day) {
+                                $('#edit_hari_masuk_' + day).prop('checked', true);
+                            });
+                        }
+                    }
+                } else {
+                    $('#edit_hari_masuk_container').hide();
+                }
 
                 $('#formEditSiswa').attr('action', '{{ url('siswa') }}/' + id);
+            });
+
+            // Toggle edit days container when edit_is_siswa_khusus changes
+            $('#edit_is_siswa_khusus').on('change', function() {
+                if ($(this).is(':checked')) {
+                    $('#edit_hari_masuk_container').show();
+                } else {
+                    $('#edit_hari_masuk_container').hide();
+                }
             });
 
             // Hapus

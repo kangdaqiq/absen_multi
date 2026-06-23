@@ -79,6 +79,10 @@ class SiswaController extends Controller
             ],
             'wa_ortu' => ['nullable', 'string', 'max:20', 'regex:/^(08|628)[0-9]{8,13}$/'],
             'user_id' => 'nullable|exists:users,id',
+            'is_khusus' => 'nullable|boolean',
+            'is_siswa_khusus' => 'nullable|boolean',
+            'hari_masuk' => 'nullable|array',
+            'hari_masuk.*' => 'integer|min:1|max:7',
         ]);
 
         $input = $request->all();
@@ -87,6 +91,10 @@ class SiswaController extends Controller
             $input['no_wa'] = null;
         if (empty($input['wa_ortu']))
             $input['wa_ortu'] = null;
+
+        $input['is_khusus'] = $request->has('is_khusus') ? 1 : 0;
+        $input['is_siswa_khusus'] = $request->has('is_siswa_khusus') ? 1 : 0;
+        $input['hari_masuk'] = $request->has('is_siswa_khusus') ? ($request->input('hari_masuk') ?? []) : null;
 
         if (auth()->user() && !auth()->user()->isSuperAdmin()) {
             $input['school_id'] = auth()->user()->school_id;
@@ -149,6 +157,10 @@ class SiswaController extends Controller
             'wa_ortu' => ['nullable', 'string', 'max:20', 'regex:/^(08|628)[0-9]{8,13}$/'],
             'uid_rfid' => 'nullable|string|max:50',
             'user_id' => 'nullable|exists:users,id',
+            'is_khusus' => 'nullable|boolean',
+            'is_siswa_khusus' => 'nullable|boolean',
+            'hari_masuk' => 'nullable|array',
+            'hari_masuk.*' => 'integer|min:1|max:7',
         ]);
 
         $input = $request->all();
@@ -156,6 +168,10 @@ class SiswaController extends Controller
             $input['no_wa'] = null;
         if (empty($input['wa_ortu']))
             $input['wa_ortu'] = null;
+
+        $input['is_khusus'] = $request->has('is_khusus') ? 1 : 0;
+        $input['is_siswa_khusus'] = $request->has('is_siswa_khusus') ? 1 : 0;
+        $input['hari_masuk'] = $request->has('is_siswa_khusus') ? ($request->input('hari_masuk') ?? []) : null;
 
         $siswa->update($input);
 

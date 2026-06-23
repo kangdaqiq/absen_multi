@@ -24,10 +24,24 @@ class AutoDeleteHistoryCommand extends Command
         $this->info('Waktu: ' . now()->format('Y-m-d H:i:s'));
         $this->info('');
 
-        $schools = School::where('is_active', true)
-            ->whereNotNull('history_quota_months')
-            ->where('history_quota_months', '>', 0)
-            ->get();
+        $isSelfHosted = config('app.mode') === 'self_hosted';
+        $licenseQuota = null;
+
+        if ($isSelfHosted) {
+            $license = app(\App\Services\LicenseService::class)->validate();
+            if ($license['valid'] && isset($license['history_quota_months']) && $license['history_quota_months'] > 0) {
+                $licenseQuota = (int) $license['history_quota_months'];
+            }
+        }
+
+        if ($isSelfHosted && $licenseQuota !== null) {
+            $schools = School::where('is_active', true)->get();
+        } else {
+            $schools = School::where('is_active', true)
+                ->whereNotNull('history_quota_months')
+                ->where('history_quota_months', '>', 0)
+                ->get();
+        }
 
         if ($schools->isEmpty()) {
             $this->info('Tidak ada sekolah dengan kuota history yang dikonfigurasi. Selesai.');
@@ -38,7 +52,7 @@ class AutoDeleteHistoryCommand extends Command
         $totalDeletedGuruAbsensi = 0;
 
         foreach ($schools as $school) {
-            $this->processSchool($school, $isDryRun, $totalDeletedAttendance, $totalDeletedGuruAbsensi);
+            $this->processSchool($school, $isDryRun, $totalDeletedAttendance, $totalDeletedGuruAbsensi, $licenseQuota);
         }
 
         $this->info('');
@@ -55,9 +69,12 @@ class AutoDeleteHistoryCommand extends Command
         return 0;
     }
 
-    private function processSchool(School $school, bool $isDryRun, int &$totalAttendance, int &$totalGuru): void
+    private function processSchool(School $school, bool $isDryRun, int &$totalAttendance, int &$totalGuru, ?int $licenseQuota = null): void
     {
-        $months    = $school->history_quota_months;
+        $months    = $licenseQuota !== null ? $licenseQuota : $school->history_quota_months;
+        if (!$months || $months <= 0) {
+            return;
+        }
         $cutoff    = Carbon::now()->subMonths($months)->format('Y-m-d');
         $schoolId  = $school->id;
 

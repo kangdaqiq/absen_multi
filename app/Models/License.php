@@ -14,6 +14,7 @@ class License extends Model
         'max_students',
         'max_teachers',
         'max_bot_users',
+        'history_quota_months',
         'expired_at',
         'is_active',
         'allowed_hostname',
@@ -29,6 +30,7 @@ class License extends Model
         'max_students' => 'integer',
         'max_teachers' => 'integer',
         'max_bot_users' => 'integer',
+        'history_quota_months' => 'integer',
     ];
 
     /**

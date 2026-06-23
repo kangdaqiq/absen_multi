@@ -17,18 +17,20 @@ class LicenseController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'client_name'      => 'required|string|max:255',
-            'max_schools'      => 'required|integer|min:0',
-            'max_students'     => 'required|integer|min:0',
-            'max_teachers'     => 'required|integer|min:0',
-            'max_bot_users'    => 'required|integer|min:0',
-            'expired_at'       => 'nullable|date|after:today',
-            'allowed_hostname' => 'nullable|string|max:255',
-            'notes'            => 'nullable|string',
+            'client_name'          => 'required|string|max:255',
+            'max_schools'          => 'required|integer|min:0',
+            'max_students'         => 'required|integer|min:0',
+            'max_teachers'         => 'required|integer|min:0',
+            'max_bot_users'        => 'required|integer|min:0',
+            'history_quota_months' => 'nullable|integer|min:0',
+            'expired_at'           => 'nullable|date|after:today',
+            'allowed_hostname'     => 'nullable|string|max:255',
+            'notes'                => 'nullable|string',
         ]);
 
-        $validated['license_key'] = License::generateKey();
-        $validated['is_active']   = $request->has('is_active');
+        $validated['license_key']          = License::generateKey();
+        $validated['is_active']            = $request->has('is_active');
+        $validated['history_quota_months'] = empty($request->history_quota_months) ? null : (int) $request->history_quota_months;
 
         License::create($validated);
 
@@ -39,17 +41,19 @@ class LicenseController extends Controller
     public function update(Request $request, License $license)
     {
         $validated = $request->validate([
-            'client_name'      => 'required|string|max:255',
-            'max_schools'      => 'required|integer|min:0',
-            'max_students'     => 'required|integer|min:0',
-            'max_teachers'     => 'required|integer|min:0',
-            'max_bot_users'    => 'required|integer|min:0',
-            'expired_at'       => 'nullable|date',
-            'allowed_hostname' => 'nullable|string|max:255',
-            'notes'            => 'nullable|string',
+            'client_name'          => 'required|string|max:255',
+            'max_schools'          => 'required|integer|min:0',
+            'max_students'         => 'required|integer|min:0',
+            'max_teachers'         => 'required|integer|min:0',
+            'max_bot_users'        => 'required|integer|min:0',
+            'history_quota_months' => 'nullable|integer|min:0',
+            'expired_at'           => 'nullable|date',
+            'allowed_hostname'     => 'nullable|string|max:255',
+            'notes'                => 'nullable|string',
         ]);
 
-        $validated['is_active'] = $request->has('is_active');
+        $validated['is_active']            = $request->has('is_active');
+        $validated['history_quota_months'] = empty($request->history_quota_months) ? null : (int) $request->history_quota_months;
 
         $license->update($validated);
 

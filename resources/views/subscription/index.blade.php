@@ -279,10 +279,18 @@
                             <div>
                                 <p class="text-sm font-medium text-black dark:text-white">Retensi Histori Absen</p>
                                 <p class="text-xs text-gray-400">
-                                    @if($school->history_quota_months)
-                                        {{ $school->history_quota_months }} bulan terakhir
+                                    @if($isSelfHosted)
+                                        @if(isset($licenseInfo['history_quota_months']) && $licenseInfo['history_quota_months'] > 0)
+                                            {{ $licenseInfo['history_quota_months'] }} bulan terakhir
+                                        @else
+                                            Tidak Terbatas (Simpan Selamanya)
+                                        @endif
                                     @else
-                                        Tidak Terbatas (Simpan Selamanya)
+                                        @if($school->history_quota_months)
+                                            {{ $school->history_quota_months }} bulan terakhir
+                                        @else
+                                            Tidak Terbatas (Simpan Selamanya)
+                                        @endif
                                     @endif
                                 </p>
                             </div>

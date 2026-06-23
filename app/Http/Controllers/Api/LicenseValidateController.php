@@ -61,27 +61,29 @@ class LicenseValidateController extends Controller
         // Check expiry
         if ($license->isExpired()) {
             return response()->json([
-                'valid'        => false,
-                'expired'      => true,
-                'client_name'  => $license->client_name,
-                'expired_at'   => $license->expired_at->format('Y-m-d'),
-                'max_schools'  => $license->max_schools,
-                'max_students' => $license->max_students,
-                'max_teachers' => $license->max_teachers,
-                'max_bot_users'=> $license->max_bot_users,
-                'message'      => 'Lisensi telah expired pada ' . $license->expired_at->format('d M Y') . '. Hubungi KangDaQiQ untuk perpanjangan.',
+                'valid'                => false,
+                'expired'              => true,
+                'client_name'          => $license->client_name,
+                'expired_at'           => $license->expired_at->format('Y-m-d'),
+                'max_schools'          => $license->max_schools,
+                'max_students'         => $license->max_students,
+                'max_teachers'         => $license->max_teachers,
+                'max_bot_users'        => $license->max_bot_users,
+                'history_quota_months' => $license->history_quota_months,
+                'message'              => 'Lisensi telah expired pada ' . $license->expired_at->format('d M Y') . '. Hubungi KangDaQiQ untuk perpanjangan.',
             ]);
         }
 
         return response()->json([
-            'valid'        => true,
-            'client_name'  => $license->client_name,
-            'max_schools'  => $license->max_schools,
-            'max_students' => $license->max_students,
-            'max_teachers' => $license->max_teachers,
-            'max_bot_users'=> $license->max_bot_users,
-            'expired_at'   => $license->expired_at?->format('Y-m-d'),
-            'message'      => 'Lisensi aktif.',
+            'valid'                => true,
+            'client_name'          => $license->client_name,
+            'max_schools'          => $license->max_schools,
+            'max_students'         => $license->max_students,
+            'max_teachers'         => $license->max_teachers,
+            'max_bot_users'        => $license->max_bot_users,
+            'history_quota_months' => $license->history_quota_months,
+            'expired_at'           => $license->expired_at?->format('Y-m-d'),
+            'message'              => 'Lisensi aktif.',
         ]);
     }
 }

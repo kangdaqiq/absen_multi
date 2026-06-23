@@ -138,29 +138,31 @@ class LicenseService
             $expiredAt = isset($data['expired_at']) ? Carbon::parse($data['expired_at']) : null;
             if ($expiredAt && $expiredAt->isPast()) {
                 return [
-                    'valid'            => false,
-                    'expired'          => true,
-                    'client_name'      => $data['client_name'] ?? '',
-                    'expired_at'       => $expiredAt->format('d M Y'),
-                    'max_schools'      => $data['max_schools'] ?? 1,
-                    'max_students'     => $data['max_students'] ?? 0,
-                    'max_teachers'     => $data['max_teachers'] ?? 0,
-                    'max_bot_users'    => $data['max_bot_users'] ?? 0,
-                    'message'          => 'Lisensi telah expired pada ' . $expiredAt->format('d M Y') . '. Hubungi provider untuk perpanjangan.',
+                    'valid'                => false,
+                    'expired'              => true,
+                    'client_name'          => $data['client_name'] ?? '',
+                    'expired_at'           => $expiredAt->format('d M Y'),
+                    'max_schools'          => $data['max_schools'] ?? 1,
+                    'max_students'         => $data['max_students'] ?? 0,
+                    'max_teachers'         => $data['max_teachers'] ?? 0,
+                    'max_bot_users'        => $data['max_bot_users'] ?? 0,
+                    'history_quota_months' => $data['history_quota_months'] ?? null,
+                    'message'              => 'Lisensi telah expired pada ' . $expiredAt->format('d M Y') . '. Hubungi provider untuk perpanjangan.',
                     'grace_remaining_days' => 0,
                 ];
             }
 
             return [
-                'valid'            => true,
-                'expired'          => false,
-                'client_name'      => $data['client_name'] ?? '',
-                'expired_at'       => $expiredAt?->format('d M Y') ?? 'Selamanya',
-                'max_schools'      => $data['max_schools'] ?? 1,
-                'max_students'     => $data['max_students'] ?? 0,
-                'max_teachers'     => $data['max_teachers'] ?? 0,
-                'max_bot_users'    => $data['max_bot_users'] ?? 0,
-                'message'          => 'Lisensi aktif.',
+                'valid'                => true,
+                'expired'              => false,
+                'client_name'          => $data['client_name'] ?? '',
+                'expired_at'           => $expiredAt?->format('d M Y') ?? 'Selamanya',
+                'max_schools'          => $data['max_schools'] ?? 1,
+                'max_students'         => $data['max_students'] ?? 0,
+                'max_teachers'         => $data['max_teachers'] ?? 0,
+                'max_bot_users'        => $data['max_bot_users'] ?? 0,
+                'history_quota_months' => $data['history_quota_months'] ?? null,
+                'message'              => 'Lisensi aktif.',
                 'grace_remaining_days' => 0,
             ];
         } catch (\Exception $e) {
@@ -172,15 +174,16 @@ class LicenseService
     private function ok(string $message): array
     {
         return [
-            'valid'            => true,
-            'expired'          => false,
-            'client_name'      => 'Hosted',
-            'expired_at'       => 'Selamanya',
-            'max_schools'      => 0,   // 0 = unlimited
-            'max_students'     => 0,   // 0 = unlimited
-            'max_teachers'     => 0,   // 0 = unlimited
-            'max_bot_users'    => 0,   // 0 = unlimited
-            'message'          => $message,
+            'valid'                => true,
+            'expired'              => false,
+            'client_name'          => 'Hosted',
+            'expired_at'           => 'Selamanya',
+            'max_schools'          => 0,   // 0 = unlimited
+            'max_students'         => 0,   // 0 = unlimited
+            'max_teachers'         => 0,   // 0 = unlimited
+            'max_bot_users'        => 0,   // 0 = unlimited
+            'history_quota_months' => null,
+            'message'              => $message,
             'grace_remaining_days' => 0,
         ];
     }
@@ -193,15 +196,16 @@ class LicenseService
     private function failResult(string $message): array
     {
         return [
-            'valid'            => false,
-            'expired'          => false,
-            'client_name'      => '',
-            'expired_at'       => null,
-            'max_schools'      => 0,
-            'max_students'     => 0,
-            'max_teachers'     => 0,
-            'max_bot_users'    => 0,
-            'message'          => $message,
+            'valid'                => false,
+            'expired'              => false,
+            'client_name'          => '',
+            'expired_at'           => null,
+            'max_schools'          => 0,
+            'max_students'         => 0,
+            'max_teachers'         => 0,
+            'max_bot_users'        => 0,
+            'history_quota_months' => null,
+            'message'              => $message,
             'grace_remaining_days' => 0,
         ];
     }

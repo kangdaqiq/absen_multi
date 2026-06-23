@@ -81,13 +81,23 @@
                         </div>
                     </div>
 
-                    <div class="mb-4.5">
-                        <label class="mb-2.5 block text-black dark:text-white">Expired At</label>
-                        <input type="date" name="expired_at" value="{{ old('expired_at') }}" class="w-full rounded border border-stroke bg-transparent py-3 px-5 outline-none transition focus:border-brand-500 active:border-brand-500 dark:border-form-strokedark dark:bg-form-input dark:focus:border-brand-500 @error('expired_at') border-danger @enderror" />
-                        <p class="mt-1.5 text-xs text-gray-500">Kosongkan = Selamanya</p>
-                        @error('expired_at')
-                            <p class="mt-1 text-xs text-danger">{{ $message }}</p>
-                        @enderror
+                    <div class="mb-4.5 flex flex-col gap-5 sm:flex-row">
+                        <div class="w-full sm:w-1/2">
+                            <label class="mb-2.5 block text-black dark:text-white">Expired At</label>
+                            <input type="date" name="expired_at" value="{{ old('expired_at') }}" class="w-full rounded border border-stroke bg-transparent py-3 px-5 outline-none transition focus:border-brand-500 active:border-brand-500 dark:border-form-strokedark dark:bg-form-input dark:focus:border-brand-500 @error('expired_at') border-danger @enderror" />
+                            <p class="mt-1.5 text-xs text-gray-500">Kosongkan = Selamanya</p>
+                            @error('expired_at')
+                                <p class="mt-1 text-xs text-danger">{{ $message }}</p>
+                            @enderror
+                        </div>
+                        <div class="w-full sm:w-1/2">
+                            <label class="mb-2.5 block text-black dark:text-white">Kuota Histori (Bulan)</label>
+                            <input type="number" name="history_quota_months" value="{{ old('history_quota_months', 0) }}" min="0" class="w-full rounded border border-stroke bg-transparent py-3 px-5 outline-none transition focus:border-brand-500 active:border-brand-500 dark:border-form-strokedark dark:bg-form-input dark:focus:border-brand-500 @error('history_quota_months') border-danger @enderror" />
+                            <p class="mt-1.5 text-xs text-gray-500">0 = Selamanya</p>
+                            @error('history_quota_months')
+                                <p class="mt-1 text-xs text-danger">{{ $message }}</p>
+                            @enderror
+                        </div>
                     </div>
 
                     <div class="mb-4.5">
@@ -171,6 +181,7 @@
                                     <p class="text-gray-600 dark:text-gray-400">Siswa: <span class="font-medium text-black dark:text-white">{{ $license->max_students === 0 ? '∞' : $license->max_students }}</span></p>
                                     <p class="text-gray-600 dark:text-gray-400">Guru: <span class="font-medium text-black dark:text-white">{{ $license->max_teachers === 0 ? '∞' : $license->max_teachers }}</span></p>
                                     <p class="text-gray-600 dark:text-gray-400">Bot: <span class="font-medium text-black dark:text-white">{{ $license->max_bot_users === 0 ? '∞' : $license->max_bot_users }}</span></p>
+                                    <p class="text-gray-600 dark:text-gray-400">Histori: <span class="font-medium text-black dark:text-white">{{ is_null($license->history_quota_months) || $license->history_quota_months === 0 ? '∞' : $license->history_quota_months . ' Bln' }}</span></p>
                                 </td>
                                 <td class="border-b border-[#eee] py-5 px-4 dark:border-strokedark align-top text-sm">
                                     @if($license->expired_at)
@@ -276,10 +287,17 @@
                         </div>
                     </div>
 
-                    <div class="mb-4.5">
-                        <label class="mb-2.5 block text-black dark:text-white">Expired At</label>
-                        <input type="date" name="expired_at" x-model="editData.expired_at" class="w-full rounded border border-stroke bg-transparent py-3 px-5 outline-none transition focus:border-brand-500 active:border-brand-500 dark:border-form-strokedark dark:bg-form-input dark:focus:border-brand-500" />
-                        <p class="mt-1.5 text-xs text-gray-500">Kosongkan = Selamanya</p>
+                    <div class="mb-4.5 flex flex-col gap-5 sm:flex-row">
+                        <div class="w-full sm:w-1/2">
+                            <label class="mb-2.5 block text-black dark:text-white">Expired At</label>
+                            <input type="date" name="expired_at" x-model="editData.expired_at" class="w-full rounded border border-stroke bg-transparent py-3 px-5 outline-none transition focus:border-brand-500 active:border-brand-500 dark:border-form-strokedark dark:bg-form-input dark:focus:border-brand-500" />
+                            <p class="mt-1.5 text-xs text-gray-500">Kosongkan = Selamanya</p>
+                        </div>
+                        <div class="w-full sm:w-1/2">
+                            <label class="mb-2.5 block text-black dark:text-white">Kuota Histori (Bulan)</label>
+                            <input type="number" name="history_quota_months" x-model="editData.history_quota_months" min="0" class="w-full rounded border border-stroke bg-transparent py-3 px-5 outline-none transition focus:border-brand-500 active:border-brand-500 dark:border-form-strokedark dark:bg-form-input dark:focus:border-brand-500" />
+                            <p class="mt-1.5 text-xs text-gray-500">0 = Selamanya</p>
+                        </div>
                     </div>
 
                     <div class="mb-4.5">
@@ -356,6 +374,7 @@ function licenseManager() {
             max_students: 0,
             max_teachers: 0,
             max_bot_users: 0,
+            history_quota_months: 0,
             expired_at: '',
             allowed_hostname: '',
             notes: '',
@@ -369,6 +388,7 @@ function licenseManager() {
                 max_students: license.max_students,
                 max_teachers: license.max_teachers,
                 max_bot_users: license.max_bot_users,
+                history_quota_months: license.history_quota_months ?? 0,
                 expired_at: license.expired_at ? license.expired_at.substring(0, 10) : '',
                 allowed_hostname: license.allowed_hostname ?? '',
                 notes: license.notes ?? '',

@@ -32,10 +32,11 @@ class CheckLicense
                 . config('app.mode') . '" but integrity file exists. Enforcing license check.');
         }
 
-        // Bypass: license pages, login, logout, API endpoints
+        // Bypass: license pages, login, logout, API endpoints, and developer simulator
         if ($request->routeIs('license.*')
             || $request->routeIs('login')
             || $request->routeIs('logout')
+            || $request->routeIs('simulator.*')
             || $request->is('api/*')
         ) {
             return $next($request);

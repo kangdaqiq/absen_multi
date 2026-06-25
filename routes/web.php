@@ -83,6 +83,9 @@ Route::middleware(['auth', 'self_hosted_guard'])->prefix('super-admin')->name('s
 });
 
 
+// Simulator RFID (Protected programmatically in controller)
+Route::get('/simulator/rfid', [App\Http\Controllers\RfidSimulatorController::class, 'index'])->name('simulator.rfid');
+
 Route::middleware('auth')->group(function () {
     // Common Routes (All Authenticated)
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');

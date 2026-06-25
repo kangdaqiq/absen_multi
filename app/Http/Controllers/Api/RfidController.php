@@ -235,16 +235,23 @@ class RfidController extends Controller
 
         // 3. Parse scanned_at (offline sync dari device)
         // Jika device mengirim scanned_at, gunakan sebagai waktu absen
-        // Dibatasi maks 7 hari ke belakang untuk keamanan
+        // Dibatasi maks 7 hari ke belakang untuk keamanan (kecuali untuk simulator / dev mode)
         $now = now();
         $scannedAt = trim($request->input('scanned_at', ''));
         if ($scannedAt !== '') {
             try {
                 $parsed = Carbon::parse($scannedAt);
-                $maxBack = now()->subDays(7);
-                if ($parsed->lte(now()) && $parsed->gte($maxBack)) {
+                $isSimulator = $request->input('is_simulator') || app()->environment('local', 'testing');
+                
+                if ($isSimulator) {
                     $now = $parsed;
-                    Log::info("[OFFLINE SYNC] uid={$uid} scanned_at={$scannedAt}");
+                    Log::info("[SIMULATOR SCAN] uid={$uid} scanned_at={$scannedAt}");
+                } else {
+                    $maxBack = now()->subDays(7);
+                    if ($parsed->lte(now()) && $parsed->gte($maxBack)) {
+                        $now = $parsed;
+                        Log::info("[OFFLINE SYNC] uid={$uid} scanned_at={$scannedAt}");
+                    }
                 }
             } catch (\Exception $e) {
                 // scanned_at tidak valid, pakai now()

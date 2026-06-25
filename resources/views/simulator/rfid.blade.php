@@ -595,7 +595,8 @@
                 // Prepare request parameters
                 const params = {
                     api_key: this.apiKey,
-                    uid: this.rfidUid
+                    uid: this.rfidUid,
+                    is_simulator: true
                 };
 
                 if (this.useCustomTime && this.customTime) {

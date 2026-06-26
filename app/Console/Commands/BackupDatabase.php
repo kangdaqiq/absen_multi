@@ -83,6 +83,9 @@ class BackupDatabase extends Command
                 try {
                     Storage::disk('r2')->put("backups/$filename", file_get_contents($filePath));
                     $this->info("Backup successfully uploaded to Cloudflare R2.");
+                    
+                    // Clean old backups in Cloudflare R2 (Keep last 7 days)
+                    $this->cleanOldCloudBackups();
                 } catch (\Exception $e) {
                     $this->error("Failed to upload to Cloudflare R2: " . $e->getMessage());
                 }
@@ -109,6 +112,39 @@ class BackupDatabase extends Command
                     $this->info("Deleted old backup: " . basename($file));
                 }
             }
+        }
+    }
+
+    /**
+     * Clean old backups from Cloudflare R2 storage (Keep last 7 days).
+     */
+    private function cleanOldCloudBackups()
+    {
+        $this->info("Cleaning old backups from Cloudflare R2 (older than 7 days)...");
+        try {
+            $disk = Storage::disk('r2');
+            $files = $disk->files('backups');
+            $now = time();
+            $keepDays = 7;
+
+            foreach ($files as $file) {
+                // Skip if it doesn't match our backup naming pattern (e.g. backups/backup-*.sql)
+                if (!preg_match('/^backups\/backup-.*\.sql$/', $file)) {
+                    continue;
+                }
+
+                try {
+                    $lastModified = $disk->lastModified($file);
+                    if ($now - $lastModified >= 60 * 60 * 24 * $keepDays) {
+                        $disk->delete($file);
+                        $this->info("Deleted old cloud backup: " . basename($file));
+                    }
+                } catch (\Exception $e) {
+                    $this->error("Failed to process cloud file " . basename($file) . ": " . $e->getMessage());
+                }
+            }
+        } catch (\Exception $e) {
+            $this->error("Failed to clean old cloud backups: " . $e->getMessage());
         }
     }
 }

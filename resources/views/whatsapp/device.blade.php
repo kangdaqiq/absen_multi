@@ -72,31 +72,81 @@
                         </button>
                     </div>
 
-                    {{-- QR State --}}
+                    {{-- QR / Pairing Code State --}}
                     <div id="stateQr" class="hidden">
-                        <h4 class="mb-2 text-xl font-bold text-gray-800 dark:text-white/90">Scan QR Code dengan WhatsApp
-                        </h4>
-                        <p class="mb-6 text-sm text-gray-500 dark:text-gray-400">Buka WhatsApp di HP → Perangkat Tertaut →
-                            Tautkan Perangkat → Scan QR di bawah ini.</p>
+                        {{-- Tabs --}}
+                        <div class="flex justify-center border-b border-gray-200 dark:border-gray-800 mb-6">
+                            <button onclick="switchTab('qr')" id="tabQr" class="border-b-2 border-brand-500 px-4 py-2 text-sm font-semibold text-brand-500 focus:outline-none flex items-center gap-2 transition-all">
+                                <i class="fas fa-qrcode"></i> Scan QR Code
+                            </button>
+                            <button onclick="switchTab('code')" id="tabCode" class="border-b-2 border-transparent px-4 py-2 text-sm font-semibold text-gray-500 hover:text-gray-800 dark:hover:text-white dark:text-gray-400 focus:outline-none flex items-center gap-2 transition-all">
+                                <i class="fas fa-key"></i> Kode Pairing (Nomor HP)
+                            </button>
+                        </div>
 
-                        <div class="mb-6 flex justify-center">
-                            <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700">
-                                <img id="qrImage" src="" alt="QR Code WhatsApp" class="h-64 w-64 object-contain">
+                        {{-- Tab QR Content --}}
+                        <div id="tabContentQr">
+                            <h4 class="mb-2 text-xl font-bold text-gray-800 dark:text-white/90">Scan QR Code dengan WhatsApp</h4>
+                            <p class="mb-6 text-sm text-gray-500 dark:text-gray-400">Buka WhatsApp di HP → Perangkat Tertaut → Tautkan Perangkat → Scan QR di bawah ini.</p>
+
+                            <div class="mb-6 flex justify-center">
+                                <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700">
+                                    <img id="qrImage" src="" alt="QR Code WhatsApp" class="h-64 w-64 object-contain">
+                                </div>
+                            </div>
+
+                            <div class="mb-6 inline-flex items-center gap-2 rounded-lg bg-info-50 px-5 py-3 text-sm text-info-700 dark:bg-info-500/15 dark:text-info-500">
+                                <i class="fas fa-clock text-info-500"></i>
+                                <span>QR Code berlaku selama <strong id="qrCountdown" class="font-bold text-info-600 dark:text-info-400 text-base">30</strong> detik.</span>
+                            </div>
+
+                            <div>
+                                <button onclick="checkStatus()" class="inline-flex items-center justify-center gap-2 rounded-lg bg-gray-100 px-5 py-2 text-center text-sm font-medium text-gray-700 hover:bg-gray-200 transition dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700">
+                                    <i class="fas fa-sync-alt"></i> Sudah scan? Cek status
+                                </button>
                             </div>
                         </div>
 
-                        <div
-                            class="mb-6 inline-flex items-center gap-2 rounded-lg bg-info-50 px-5 py-3 text-sm text-info-700 dark:bg-info-500/15 dark:text-info-500">
-                            <i class="fas fa-clock text-info-500"></i>
-                            <span>QR Code berlaku selama <strong id="qrCountdown"
-                                    class="font-bold text-info-600 dark:text-info-400 text-base">30</strong> detik.</span>
-                        </div>
+                        {{-- Tab Pairing Code Content --}}
+                        <div id="tabContentCode" class="hidden">
+                            <h4 class="mb-2 text-xl font-bold text-gray-800 dark:text-white/90">Hubungkan dengan Kode Pairing</h4>
+                            <p class="mb-6 text-sm text-gray-500 dark:text-gray-400">Masukkan nomor telepon WhatsApp Anda untuk mendapatkan kode pairing.</p>
+                            
+                            <div class="max-w-md mx-auto p-6 bg-gray-50 border border-gray-100 dark:border-gray-700 dark:bg-gray-800 rounded-xl text-left mb-6">
+                                <div class="flex flex-col gap-4">
+                                    <div>
+                                        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Nomor WhatsApp Anda</label>
+                                        <input type="text" id="pairingPhone" placeholder="Contoh: 081234567890 atau 628123456789" class="w-full rounded border border-stroke bg-white py-2 px-3 text-sm outline-none transition focus:border-brand-500 active:border-brand-500 dark:border-form-strokedark dark:bg-form-input dark:text-white dark:focus:border-brand-500">
+                                        <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">Gunakan format kode negara (misal: 628... atau 08...)</p>
+                                    </div>
+                                    <button id="btnGetPairingCode" onclick="getPairingCode()" class="inline-flex justify-center items-center gap-2 rounded bg-brand-500 py-2 px-4 text-sm font-medium text-white hover:bg-opacity-90 transition">
+                                        <i class="fas fa-key"></i> Dapatkan Kode Pairing
+                                    </button>
+                                </div>
+                            </div>
 
-                        <div>
-                            <button onclick="checkStatus()"
-                                class="inline-flex items-center justify-center gap-2 rounded-lg bg-gray-100 px-5 py-2 text-center text-sm font-medium text-gray-700 hover:bg-gray-200 transition dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700">
-                                <i class="fas fa-sync-alt"></i> Sudah scan? Cek status
-                            </button>
+                            <!-- Pairing Code Display -->
+                            <div id="pairingCodeWrapper" class="hidden max-w-md mx-auto p-6 border-2 border-dashed border-success-300 dark:border-success-500 bg-success-50/30 dark:bg-success-500/5 rounded-xl mb-6">
+                                <p class="text-xs font-semibold text-success-700 dark:text-success-500 uppercase tracking-wider mb-2">Kode Pairing Anda</p>
+                                <div class="flex items-center justify-center gap-2 mb-4">
+                                    <span id="pairingCodeDisplay" class="text-3xl font-extrabold font-mono tracking-widest text-success-600 dark:text-success-500 bg-white dark:bg-gray-900 border border-success-200 dark:border-success-800 px-5 py-2.5 rounded-lg shadow-sm">
+                                        -
+                                    </span>
+                                    <button onclick="copyPairingCode()" class="p-2.5 rounded-lg border border-success-200 dark:border-success-800 bg-white dark:bg-gray-900 hover:bg-success-50 dark:hover:bg-success-500/10 text-success-600 dark:text-success-500 transition" title="Salin Kode">
+                                        <i class="far fa-copy text-lg"></i>
+                                    </button>
+                                </div>
+                                <div class="text-left text-xs text-gray-600 dark:text-gray-400 space-y-2">
+                                    <p class="font-semibold text-gray-700 dark:text-gray-300">Cara memasukkan kode di handphone Anda:</p>
+                                    <ol class="list-decimal pl-4 space-y-1">
+                                        <li>Buka WhatsApp di HP Anda.</li>
+                                        <li>Tap menu (titik tiga di kanan atas) lalu pilih <strong>Perangkat Tertaut</strong>.</li>
+                                        <li>Tap tombol <strong>Tautkan Perangkat</strong>.</li>
+                                        <li>Di layar pemindai QR, tap <strong>Tautkan dengan nomor telepon saja</strong> di bagian bawah.</li>
+                                        <li>Masukkan kode pairing di atas.</li>
+                                    </ol>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -391,6 +441,81 @@
                 btn.disabled = false;
                 btn.classList.remove('opacity-50', 'cursor-not-allowed');
                 btn.innerHTML = originalHtml;
+            });
+        }
+
+        function switchTab(tab) {
+            const tabQr = document.getElementById('tabQr');
+            const tabCode = document.getElementById('tabCode');
+            const contentQr = document.getElementById('tabContentQr');
+            const contentCode = document.getElementById('tabContentCode');
+
+            if (tab === 'qr') {
+                tabQr.classList.add('border-brand-500', 'text-brand-500');
+                tabQr.classList.remove('border-transparent', 'text-gray-500', 'dark:text-gray-400');
+                tabCode.classList.remove('border-brand-500', 'text-brand-500');
+                tabCode.classList.add('border-transparent', 'text-gray-500', 'dark:text-gray-400');
+
+                contentQr.classList.remove('hidden');
+                contentCode.classList.add('hidden');
+            } else {
+                tabCode.classList.add('border-brand-500', 'text-brand-500');
+                tabCode.classList.remove('border-transparent', 'text-gray-500', 'dark:text-gray-400');
+                tabQr.classList.remove('border-brand-500', 'text-brand-500');
+                tabQr.classList.add('border-transparent', 'text-gray-500', 'dark:text-gray-400');
+
+                contentCode.classList.remove('hidden');
+                contentQr.classList.add('hidden');
+            }
+        }
+
+        function getPairingCode() {
+            const phone = document.getElementById('pairingPhone').value.trim();
+            if (!phone) {
+                alert('Silakan masukkan nomor WhatsApp Anda.');
+                return;
+            }
+
+            const btn = document.getElementById('btnGetPairingCode');
+            const originalHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.classList.add('opacity-50', 'cursor-not-allowed');
+            btn.innerHTML = '<div class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-solid border-white border-r-transparent align-[-0.125em] mr-2"></div> Memproses...';
+
+            fetch('{{ route("whatsapp.device.login-with-code") }}', {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ phone: phone })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('pairingCodeDisplay').textContent = data.pair_code;
+                    document.getElementById('pairingCodeWrapper').classList.remove('hidden');
+                    // Automatically start polling to detect when the device pairs successfully
+                    startPolling();
+                } else {
+                    alert('Gagal: ' + (data.message ?? 'Unknown error'));
+                }
+            })
+            .catch(() => alert('Terjadi kesalahan saat menghubungi server.'))
+            .finally(() => {
+                btn.disabled = false;
+                btn.classList.remove('opacity-50', 'cursor-not-allowed');
+                btn.innerHTML = originalHtml;
+            });
+        }
+
+        function copyPairingCode() {
+            const code = document.getElementById('pairingCodeDisplay').textContent.trim();
+            navigator.clipboard.writeText(code).then(() => {
+                alert('Kode pairing berhasil disalin ke clipboard!');
+            }).catch(() => {
+                alert('Gagal menyalin kode. Silakan salin secara manual.');
             });
         }
 

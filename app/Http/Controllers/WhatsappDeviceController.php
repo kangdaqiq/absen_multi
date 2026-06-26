@@ -227,6 +227,92 @@ class WhatsappDeviceController extends Controller
     }
 
     /**
+     * Get pairing code for the WhatsApp device login.
+     */
+    public function loginWithCode(Request $request)
+    {
+        $request->validate([
+            'phone' => 'required|string',
+        ]);
+
+        $phone = $request->input('phone');
+        // Clean phone number (keep only digits)
+        $phone = preg_replace('/[^0-9]/', '', $phone);
+        if (str_starts_with($phone, '0')) {
+            $phone = '62' . substr($phone, 1);
+        }
+
+        $base     = $this->baseUrl();
+        $deviceId = $this->deviceId();
+        [$user, $pass] = $this->auth();
+
+        try {
+            $res = Http::timeout(25)
+                ->withBasicAuth($user, $pass)
+                ->withHeaders(['X-Device-Id' => $deviceId])
+                ->get("{$base}/app/login-with-code", [
+                    'phone' => $phone,
+                ]);
+
+            // Auto-create device if it was deleted / not found
+            if ($res->status() === 404 && str_contains($res->body(), 'DEVICE_NOT_FOUND')) {
+                $createRes = Http::timeout(10)
+                    ->withBasicAuth($user, $pass)
+                    ->post("{$base}/devices", [
+                        'device_id' => $deviceId
+                    ]);
+
+                if (!$createRes->successful()) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Gagal membuat device otomatis. WA API error (HTTP ' . $createRes->status() . ')',
+                        'debug'   => $createRes->body(),
+                    ], 500);
+                }
+
+                // Retry login
+                $res = Http::timeout(25)
+                    ->withBasicAuth($user, $pass)
+                    ->withHeaders(['X-Device-Id' => $deviceId])
+                    ->get("{$base}/app/login-with-code", [
+                        'phone' => $phone,
+                    ]);
+            }
+
+            if ($res->successful()) {
+                $data = $res->json();
+                $pairCode = $data['results']['pair_code'] ?? null;
+
+                if ($pairCode) {
+                    return response()->json([
+                        'success'   => true,
+                        'pair_code' => $pairCode,
+                    ]);
+                }
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Gagal mendapatkan kode pairing dari server WhatsApp.',
+                    'debug'   => $res->body(),
+                ], 500);
+            }
+
+            return response()->json([
+                'success' => false,
+                'message' => 'WA API error (HTTP ' . $res->status() . '). Cek bahwa restapi-wa berjalan di ' . $base,
+                'debug'   => $res->body(),
+            ], 500);
+
+        } catch (\Exception $e) {
+            Log::error('WhatsApp Device Login With Code Error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Tidak dapat terhubung ke WA API di ' . $base . '. Error: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
      * Logout current device.
      */
     public function logout(Request $request)

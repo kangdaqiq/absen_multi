@@ -62,6 +62,11 @@ class SettingsController extends Controller
 
             if ($schoolId && $schoolId > 0) {
                 \App\Models\School::where('id', $schoolId)->update(['logo' => $path]);
+            } elseif (config('app.mode') === 'self_hosted') {
+                $school = \App\Models\School::first();
+                if ($school) {
+                    $school->update(['logo' => $path]);
+                }
             }
         }
 
@@ -132,6 +137,18 @@ class SettingsController extends Controller
                 ],
                 ['setting_value' => $value]
             );
+
+            // Sync with School name if key is nama_sekolah
+            if ($key === 'nama_sekolah') {
+                if ($schoolId && $schoolId > 0) {
+                    \App\Models\School::where('id', $schoolId)->update(['name' => $value]);
+                } elseif (config('app.mode') === 'self_hosted') {
+                    $school = \App\Models\School::first();
+                    if ($school) {
+                        $school->update(['name' => $value]);
+                    }
+                }
+            }
         }
 
         return back()->with('success', 'Pengaturan berhasil disimpan.');

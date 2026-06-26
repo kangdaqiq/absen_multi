@@ -1,3 +1,13 @@
+@php
+    $displayName = $school_name ?? ($school->name ?? 'Sistem Absensi');
+
+    // Resolve logo
+    $resolvedLogoUrl = null;
+    $logoSource = !empty($school_logo) ? $school_logo : ($school->logo ?? null);
+    if ($logoSource && \Illuminate\Support\Str::startsWith($logoSource, 'schools/')) {
+        $resolvedLogoUrl = asset('storage/' . $logoSource);
+    }
+@endphp
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="h-full">
 
@@ -5,7 +15,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>{{ isset($school) ? $school->name . ' — Sistem Absensi' : 'Login — Sistem Absensi' }}</title>
+    <title>{{ $displayName }} — Sistem Absensi</title>
     <link rel="icon" type="image/x-icon" href="{{ asset('images/logo/logo-icon.ico') }}">
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
@@ -225,9 +235,9 @@
                     <div class="relative flex-shrink-0 group">
                         <div class="absolute inset-0 rounded-[2.25rem] blur-2xl opacity-50 bg-indigo-500/30 scale-110 group-hover:scale-125 transition duration-500"></div>
                         <div class="w-36 h-36 rounded-[2rem] squircle-frame flex items-center justify-center p-5">
-                            @if($school->logo)
-                                <img src="{{ asset('storage/' . $school->logo) }}"
-                                     alt="{{ $school->name }}"
+                            @if($resolvedLogoUrl)
+                                <img src="{{ $resolvedLogoUrl }}"
+                                     alt="{{ $displayName }}"
                                      class="w-full h-full object-contain filter drop-shadow-[0_4px_10px_rgba(0,0,0,0.08)]">
                             @else
                                 <div class="w-full h-full rounded-2xl flex items-center justify-center"
@@ -245,7 +255,7 @@
                             {{ $school->isOffice() ? 'Portal Karyawan' : ($school->isPesantren() ? 'Portal Resmi Pesantren' : 'Portal Resmi Sekolah') }}
                         </span>
                         <h2 class="text-2xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 dark:from-white dark:via-indigo-100 dark:to-slate-300 leading-tight">
-                            {{ $school->name }}
+                            {{ $displayName }}
                         </h2>
                     </div>
 
@@ -335,8 +345,8 @@
                     <div class="relative group">
                         <div class="absolute inset-0 rounded-[1.5rem] blur-xl opacity-40 bg-indigo-500/30 scale-110"></div>
                         <div class="w-20 h-20 rounded-[1.5rem] squircle-frame flex items-center justify-center p-3">
-                            @if($school->logo)
-                                <img src="{{ asset('storage/' . $school->logo) }}" alt="{{ $school->name }}"
+                            @if($resolvedLogoUrl)
+                                <img src="{{ $resolvedLogoUrl }}" alt="{{ $displayName }}"
                                      class="w-full h-full object-contain">
                             @else
                                 <i class="fas {{ $school->isOffice() ? 'fa-building' : ($school->isPesantren() ? 'fa-mosque' : 'fa-graduation-cap') }} text-2xl text-indigo-600 dark:text-indigo-400"></i>
@@ -348,7 +358,7 @@
                             {{ $school->isOffice() ? 'Portal Karyawan' : ($school->isPesantren() ? 'Portal Resmi Pesantren' : 'Portal Resmi Sekolah') }}
                         </span>
                         <h2 class="text-xl font-black text-slate-800 dark:text-white leading-tight">
-                            {{ $school->name }}
+                            {{ $displayName }}
                         </h2>
                     </div>
                 @else

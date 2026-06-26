@@ -82,11 +82,43 @@ class WhatsappDeviceController extends Controller
                 $isLoggedIn  = $data['results']['is_logged_in']  ?? false;
                 $isConnected = $data['results']['is_connected']   ?? false;
 
-                if ($isLoggedIn && $isConnected) {
-                    return response()->json([
-                        'status'    => 'connected',
-                        'device_id' => $deviceId,
-                    ]);
+                if ($isLoggedIn) {
+                    if ($isConnected) {
+                        return response()->json([
+                            'status'    => 'connected',
+                            'device_id' => $deviceId,
+                        ]);
+                    }
+
+                    // Logged in but not connected -> attempt auto-reconnect
+                    try {
+                        Log::info("WhatsApp Device {$deviceId} logged in but disconnected. Attempting auto-reconnect...");
+                        $reconnectRes = Http::timeout(15)
+                            ->withBasicAuth($user, $pass)
+                            ->withHeaders(['X-Device-Id' => $deviceId])
+                            ->get("{$base}/app/reconnect");
+
+                        if ($reconnectRes->successful()) {
+                            // Check status again
+                            $statusResAfter = Http::timeout(10)
+                                ->withBasicAuth($user, $pass)
+                                ->withHeaders(['X-Device-Id' => $deviceId])
+                                ->get("{$base}/app/status");
+
+                            if ($statusResAfter->successful()) {
+                                $dataAfter = $statusResAfter->json();
+                                if (($dataAfter['results']['is_logged_in'] ?? false) && ($dataAfter['results']['is_connected'] ?? false)) {
+                                    Log::info("WhatsApp Device {$deviceId} successfully reconnected.");
+                                    return response()->json([
+                                        'status'    => 'connected',
+                                        'device_id' => $deviceId,
+                                    ]);
+                                }
+                            }
+                        }
+                    } catch (\Exception $reconnectEx) {
+                        Log::warning("WhatsApp Device {$deviceId} auto-reconnect failed: " . $reconnectEx->getMessage());
+                    }
                 }
             }
 

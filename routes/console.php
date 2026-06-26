@@ -24,6 +24,7 @@ Schedule::command('absen:process-daily')->everyMinute()->withoutOverlapping();
 Schedule::command('absen:daily-report')->everyMinute()->withoutOverlapping();
 
 Schedule::command('wa:process')->everyMinute()->withoutOverlapping();
+Schedule::command('wa:reconnect')->everyFiveMinutes()->withoutOverlapping();
 
 // Daily Abnormal Attendance Check
 Schedule::command('absen:check-abnormal')->everyMinute()->withoutOverlapping()

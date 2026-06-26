@@ -164,6 +164,49 @@ class ProcessWhatsappQueue extends Command
                 return ['success' => false, 'error' => $body['message'] ?? 'API Code is not SUCCESS'];
             }
 
+            // Check if failure is due to disconnection
+            $isDisconnected = ($response->status() === 401) ||
+                              (str_contains(strtolower($response->body()), 'please reconnect')) ||
+                              (str_contains(strtolower($response->body()), 'not connect'));
+
+            if ($isDisconnected) {
+                Log::warning("WA API returned disconnect error for device {$deviceId}. Attempting auto-reconnect before retry...");
+                
+                try {
+                    $reconnectUrl = $baseUrl . '/app/reconnect';
+                    $reconnectRes = Http::timeout(15)
+                        ->withBasicAuth($user, $pass)
+                        ->withHeaders(['X-Device-Id' => $deviceId])
+                        ->get($reconnectUrl);
+
+                    if ($reconnectRes->successful()) {
+                        // Wait 2 seconds for connection to stabilize
+                        sleep(2);
+
+                        // Retry sending the message
+                        Log::info("WA API: Retrying message send for device {$deviceId} after successful reconnect...");
+                        $retryResponse = Http::timeout(20)
+                            ->withBasicAuth($user, $pass)
+                            ->withHeaders(['X-Device-Id' => $deviceId])
+                            ->post($url, [
+                                'phone'   => $phone,
+                                'message' => $message,
+                            ]);
+
+                        if ($retryResponse->successful()) {
+                            $retryBody = $retryResponse->json();
+                            if (isset($retryBody['code']) && $retryBody['code'] === 'SUCCESS') {
+                                return ['success' => true, 'error' => null];
+                            }
+                            return ['success' => false, 'error' => $retryBody['message'] ?? 'API Code is not SUCCESS after retry'];
+                        }
+                        $response = $retryResponse; // Use retry response for error logging
+                    }
+                } catch (\Exception $retryEx) {
+                    Log::error("WA API Retry Exception for device {$deviceId}: " . $retryEx->getMessage());
+                }
+            }
+
             $errorMsg = 'HTTP ' . $response->status() . ': ' . ($response->json()['message'] ?? $response->body());
             Log::error("WA API Error: " . $errorMsg);
             return ['success' => false, 'error' => $errorMsg];

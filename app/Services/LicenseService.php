@@ -94,7 +94,7 @@ class LicenseService
         }
 
         if ($remaining > 0) {
-            $lastResult = $cache['result'] ?? [];
+            $lastResult = $cache['result'] ?? $this->failResult('Tidak dapat menghubungi server lisensi.');
             $lastResult['message'] = "Server lisensi tidak dapat dihubungi. Grace period: {$remaining} hari tersisa.";
             $lastResult['grace_remaining_days'] = $remaining;
             return $lastResult;

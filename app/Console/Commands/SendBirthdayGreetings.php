@@ -100,6 +100,7 @@ class SendBirthdayGreetings extends Command
                 'phone_number' => $guru->no_wa,
                 'message'      => $message,
                 'status'       => 'pending',
+                'scheduled_at' => now()->addSeconds(rand(60, 300)),
                 'created_at'   => now(),
             ]);
 
@@ -132,6 +133,7 @@ class SendBirthdayGreetings extends Command
                     'phone_number' => $noWaSiswa,
                     'message'      => $message,
                     'status'       => 'pending',
+                    'scheduled_at' => now()->addSeconds(rand(60, 300)),
                     'created_at'   => now(),
                 ]);
 
@@ -152,6 +154,7 @@ class SendBirthdayGreetings extends Command
                     'phone_number' => $noWaOrtu,
                     'message'      => $messageOrtu,
                     'status'       => 'pending',
+                    'scheduled_at' => now()->addSeconds(rand(60, 300)),
                     'created_at'   => now(),
                 ]);
 
@@ -171,6 +174,7 @@ class SendBirthdayGreetings extends Command
                     'phone_number' => $noWaOrtu,
                     'message'      => $messageOrtu,
                     'status'       => 'pending',
+                    'scheduled_at' => now()->addSeconds(rand(60, 300)),
                     'created_at'   => now(),
                 ]);
 

@@ -20,11 +20,11 @@ $getTime = function ($key, $default) {
 };
 
 // Run every minute to allow per-school scheduling logic in Commands
-Schedule::command('absen:process-daily')->everyMinute()->withoutOverlapping();
-Schedule::command('absen:daily-report')->everyMinute()->withoutOverlapping();
+Schedule::command('absen:process-daily')->everyMinute()->withoutOverlapping(10);
+Schedule::command('absen:daily-report')->everyMinute()->withoutOverlapping(10);
 
-Schedule::command('wa:process')->everyMinute()->withoutOverlapping();
-Schedule::command('wa:reconnect')->everyFiveMinutes()->withoutOverlapping();
+Schedule::command('wa:process')->everyMinute()->withoutOverlapping(5);
+Schedule::command('wa:reconnect')->everyFiveMinutes()->withoutOverlapping(10);
 
 // Daily Abnormal Attendance Check
 Schedule::command('absen:check-abnormal')->everyMinute()->withoutOverlapping()

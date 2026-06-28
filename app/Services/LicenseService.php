@@ -105,7 +105,6 @@ class LicenseService
     }
 
     // ── Private Helpers ────────────────────────────────────────────────────
-SMPN 4 KUSAN HILI
     private function fetchFromServer(string $licenseKey): ?array
     {
         // LICENSE_SERVER_URL = URL app utama kamu, misal: https://absen.kangdaqiq.com

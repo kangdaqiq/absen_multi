@@ -62,8 +62,25 @@
                                 <span class="inline-flex rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-400">{{ $log->status }}</span>
                             @endif
                         </td>
-                        <td class="px-4 py-4 align-top">
-                            <p class="text-gray-500 dark:text-gray-400 text-xs">{{ \Carbon\Carbon::parse($log->created_at)->format('d/m/Y H:i:s') }}</p>
+                        <td class="px-4 py-4 align-top text-xs">
+                            <div class="flex flex-col gap-1 text-gray-500 dark:text-gray-400">
+                                <div class="flex items-center gap-1" title="Waktu dimasukkan ke antrean">
+                                    <span class="font-semibold text-gray-600 dark:text-gray-300 w-14 inline-block">Antrean:</span>
+                                    <span>{{ $log->created_at->format('d/m/Y H:i:s') }}</span>
+                                </div>
+                                <div class="flex items-center gap-1" title="Waktu dijadwalkan untuk dikirim">
+                                    <span class="font-semibold text-gray-600 dark:text-gray-300 w-14 inline-block">Jadwal:</span>
+                                    <span>{{ $log->scheduled_at ? $log->scheduled_at->format('d/m/Y H:i:s') : 'Segera' }}</span>
+                                </div>
+                                @if($log->status === 'sent' || $log->status === 'failed')
+                                    <div class="flex items-center gap-1" title="Waktu selesai diproses">
+                                        <span class="font-semibold text-gray-600 dark:text-gray-300 w-14 inline-block">{{ $log->status === 'sent' ? 'Terkirim:' : 'Proses:' }}</span>
+                                        <span class="{{ $log->status === 'sent' ? 'text-success-600 dark:text-success-400' : 'text-error-600 dark:text-error-400' }} font-medium">
+                                            {{ $log->updated_at->format('d/m/Y H:i:s') }}
+                                        </span>
+                                    </div>
+                                @endif
+                            </div>
                         </td>
                     </tr>
                 @empty

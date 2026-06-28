@@ -155,13 +155,22 @@ if (file_exists($zipFile)) {
     unlink($zipFile);
 }
 
-$zip = new ZipArchive();
-if ($zip->open($zipFile, ZipArchive::CREATE) !== true) {
-    die("❌ ERROR: Tidak bisa membuat ZIP file.\n");
-}
+if (class_exists('ZipArchive')) {
+    $zip = new ZipArchive();
+    if ($zip->open($zipFile, ZipArchive::CREATE) !== true) {
+        die("❌ ERROR: Tidak bisa membuat ZIP file.\n");
+    }
 
-addDirToZip($zip, $releaseDir, 'release-client');
-$zip->close();
+    addDirToZip($zip, $releaseDir, 'release-client');
+    $zip->close();
+} else {
+    echo "      ℹ ZipArchive tidak aktif. Menggunakan PowerShell Compress-Archive...\n";
+    $cmd = 'powershell -Command "Compress-Archive -Path release-client -DestinationPath release-client.zip -Force"';
+    shell_exec($cmd);
+    if (!file_exists($zipFile)) {
+        die("❌ ERROR: Gagal membuat ZIP file via PowerShell.\n");
+    }
+}
 
 $sizeMb = round(filesize($zipFile) / 1024 / 1024, 1);
 echo "      ✓ ZIP dibuat: release-client.zip ({$sizeMb} MB)\n\n";

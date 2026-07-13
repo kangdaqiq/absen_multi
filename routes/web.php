@@ -188,6 +188,8 @@ Route::middleware('auth')->group(function () {
         // Setting
         Route::get('settings', [App\Http\Controllers\SettingsController::class, 'index'])->name('settings.index');
         Route::put('settings', [App\Http\Controllers\SettingsController::class, 'update'])->name('settings.update');
+        Route::get('settings/telegram', [App\Http\Controllers\SettingsController::class, 'telegramIndex'])->name('settings.telegram');
+        Route::put('settings/telegram', [App\Http\Controllers\SettingsController::class, 'telegramUpdate'])->name('settings.telegram.update');
 
         // Subscription / Paket Langganan
         Route::get('subscription', [App\Http\Controllers\SubscriptionController::class, 'index'])->name('subscription.index');

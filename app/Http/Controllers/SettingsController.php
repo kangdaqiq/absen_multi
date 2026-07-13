@@ -164,4 +164,87 @@ class SettingsController extends Controller
 
         return back()->with('success', 'Pengaturan berhasil disimpan.');
     }
+
+    public function telegramIndex()
+    {
+        if (auth()->user() && !auth()->user()->isSuperAdmin()) {
+            $schoolId = auth()->user()->school_id;
+
+            // Only get settings for this specific school
+            $settings = Setting::where('school_id', $schoolId)
+                ->get()
+                ->pluck('setting_value', 'setting_key')
+                ->toArray();
+
+            // Merge with Global Settings for display
+            $globalSettings = Setting::where('school_id', 0)
+                ->get()
+                ->pluck('setting_value', 'setting_key')
+                ->toArray();
+
+            // Union: School settings take precedence
+            $settings = collect($settings + $globalSettings);
+        } else {
+            // Super admin sees global settings (school_id = 0)
+            $settings = Setting::where('school_id', 0)
+                ->get()
+                ->pluck('setting_value', 'setting_key');
+        }
+
+        return view('settings.telegram', compact('settings'));
+    }
+
+    public function telegramUpdate(Request $request)
+    {
+        $data = $request->except(['_token', '_method']);
+
+        // Handle checkboxes (they don't send data when unchecked)
+        $checkboxSettings = [
+            'telegram_enabled',
+        ];
+
+        foreach ($checkboxSettings as $checkbox) {
+            if (!isset($data[$checkbox])) {
+                $data[$checkbox] = 'false';
+            }
+        }
+
+        // Get and validate school_id
+        $schoolId = auth()->user()->school_id ?? 0;
+
+        // Ensure school_id is valid (allow 0 for Super Admin)
+        if ((!$schoolId && $schoolId !== 0) && !auth()->user()->isSuperAdmin()) {
+            return back()->with('error', 'User tidak memiliki school_id yang valid. Hubungi Super Admin.');
+        }
+
+        foreach ($data as $key => $value) {
+            \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(
+                [
+                    'setting_key' => $key,
+                    'school_id' => $schoolId
+                ],
+                ['setting_value' => $value]
+            );
+
+            // Sync with School fields if school_id is set
+            if ($schoolId && $schoolId > 0) {
+                if ($key === 'telegram_bot_token') {
+                    \App\Models\School::where('id', $schoolId)->update(['telegram_bot_token' => $value]);
+                } elseif ($key === 'telegram_enabled') {
+                    \App\Models\School::where('id', $schoolId)->update(['telegram_enabled' => $value === 'true']);
+                }
+            } elseif (config('app.mode') === 'self_hosted') {
+                $school = \App\Models\School::first();
+                if ($school) {
+                    if ($key === 'telegram_bot_token') {
+                        $school->update(['telegram_bot_token' => $value]);
+                    } elseif ($key === 'telegram_enabled') {
+                        $school->update(['telegram_enabled' => $value === 'true']);
+                    }
+                }
+            }
+        }
+
+        return redirect()->route('settings.telegram')->with('success', 'Pengaturan Telegram berhasil disimpan.');
+    }
 }

@@ -162,6 +162,7 @@ class MenuHelper
             if ($school && $school->wa_enabled) {
                 $pengaturanSubItems[] = ['name' => 'WhatsApp Device', 'path' => route('whatsapp.device.index', [], false)];
             }
+            $pengaturanSubItems[] = ['name' => 'Telegram Bot', 'path' => route('settings.telegram', [], false)];
 
             $konfigItems[] = [
                 'name' => 'Konfigurasi',

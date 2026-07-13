@@ -277,36 +277,6 @@
                         </div>
                     </div>
 
-                    <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90 border-b border-gray-200 dark:border-gray-800 pb-2 mt-8">
-                        ✈️ Notifikasi Telegram
-                    </h3>
-
-                    <div class="rounded-lg border border-gray-200 p-4 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
-                        <div class="mb-5">
-                            <label class="flex items-center cursor-pointer select-none">
-                                <div class="relative">
-                                    <input type="checkbox" id="telegram_enabled"
-                                        name="telegram_enabled" value="true" class="sr-only" {{ ($settings['telegram_enabled'] ?? 'false') === 'true' ? 'checked' : '' }}>
-                                    <div class="block h-6 w-10 rounded-full bg-gray-300 dark:bg-gray-600 toggle-bg transition"></div>
-                                    <div class="dot absolute left-1 top-1 h-4 w-4 rounded-full bg-white transition toggle-dot"></div>
-                                </div>
-                                <div class="ml-3 font-medium text-gray-800 dark:text-white/90 text-sm">Aktifkan Notifikasi Telegram</div>
-                            </label>
-                            <p class="mt-1 ml-13 text-xs text-gray-500">Jika diaktifkan, sistem akan mengirimkan notifikasi kehadiran/absen juga melalui Telegram kepada Siswa, Orang Tua, dan Guru yang memiliki Chat ID Telegram terdaftar.</p>
-                        </div>
-
-                        <div class="grid grid-cols-1 gap-6">
-                            <div>
-                                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Token Bot Telegram</label>
-                                <input type="text" name="telegram_bot_token"
-                                    value="{{ $settings['telegram_bot_token'] ?? '' }}"
-                                    placeholder="Contoh: 123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ"
-                                    class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
-                                <p class="mt-1 text-xs text-gray-500">Buat bot menggunakan <a href="https://t.me/BotFather" target="_blank" class="text-brand-500 hover:underline">@BotFather</a> di Telegram untuk mendapatkan Token.</p>
-                            </div>
-                        </div>
-                    </div>
-
                 </div>
 
                 <!-- Tab Lisensi Aplikasi -->

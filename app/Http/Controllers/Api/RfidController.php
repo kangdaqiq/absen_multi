@@ -348,6 +348,11 @@ class RfidController extends Controller
 
     private function logFailedAuth(string $apiKey, string $reason, $request = null)
     {
+        $req = $request ?? request();
+        if ($req && !$req->isMethod('post')) {
+            return;
+        }
+
         $ip = $request ? $request->ip() : request()->ip();
 
         ApiLog::create([

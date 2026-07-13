@@ -444,6 +444,11 @@ return $this->response(false, 'gagal', 'Enroll Timeout / No Request');
 
     private function logFailedAuth(string $apiKey, string $reason, $request = null)
     {
+        $req = $request ?? request();
+        if ($req && !$req->isMethod('post')) {
+            return;
+        }
+
         $ip = $request ? $request->ip() : request()->ip();
 
         ApiLog::create([

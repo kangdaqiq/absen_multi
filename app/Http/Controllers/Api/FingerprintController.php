@@ -33,8 +33,25 @@ $this->wa = $wa;
 
 public function handle(Request $request)
 {
-$apiKey = trim($request->input('api_key', ''));
-$this->currentApiKey = $apiKey;
+    $ip = $request->ip();
+    $isBlocked = \Illuminate\Support\Facades\Cache::remember("ip_blocked_" . $ip, 300, function () use ($ip) {
+        $failedCount = \App\Models\ApiLog::where('ip_address', $ip)
+            ->where('action', 'auth_failed')
+            ->where('created_at', '>=', now()->subHours(24))
+            ->count();
+        return $failedCount >= 10;
+    });
+
+    if ($isBlocked) {
+        return response()->json([
+            'ok' => false,
+            'status' => 'error',
+            'message' => 'IP Blocked'
+        ], 403);
+    }
+
+    $apiKey = trim($request->input('api_key', ''));
+    $this->currentApiKey = $apiKey;
 
 // Parse scanned_at (offline sync)
 $now = now();
@@ -411,6 +428,8 @@ return $this->response(false, 'gagal', 'Enroll Timeout / No Request');
 
     private function logFailedAuth(string $apiKey, string $reason, $request = null)
     {
+        $ip = $request ? $request->ip() : request()->ip();
+
         ApiLog::create([
             'school_id'  => null,
             'api_key'    => $apiKey,
@@ -418,10 +437,12 @@ return $this->response(false, 'gagal', 'Enroll Timeout / No Request');
             'uid'        => null,
             'success'    => false,
             'message'    => $reason,
-            'ip_address' => $request ? $request->ip() : request()->ip(),
+            'ip_address' => $ip,
             'user_agent' => $request ? $request->userAgent() : request()->userAgent(),
             'created_at' => now(),
         ]);
+
+        \Illuminate\Support\Facades\Cache::forget("ip_blocked_" . $ip);
     }
 
     private function authenticate($apiKey, $request = null)

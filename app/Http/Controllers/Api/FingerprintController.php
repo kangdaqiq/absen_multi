@@ -80,7 +80,69 @@ return $this->response(true, 'ok', 'Pong');
 
 // Check if this is an Enroll Confirmation
 if ($request->has('enroll_success') && $request->input('enroll_success') == true) {
-return $this->finalizeEnrollment($fingerId, $device);
+    return $this->finalizeEnrollment($fingerId, $device);
+}
+
+// Check if this is an Enroll Error Notification
+if ($request->has('enroll_error') && $request->input('enroll_error') == true) {
+    $schoolId = $device->school_id;
+    $message = $request->input('message', 'Enroll Gagal');
+
+    // Guru
+    $guru = Guru::where('enroll_finger_status', 'requested')
+        ->where('school_id', $schoolId)
+        ->first();
+    if ($guru) {
+        $guru->update(['enroll_finger_status' => null]);
+        ApiLog::create([
+            'school_id' => $schoolId,
+            'api_key' => $apiKey,
+            'action' => 'enroll_failed',
+            'uid' => $fingerId,
+            'success' => false,
+            'message' => 'Enroll Gagal (Guru) ' . $guru->nama . ': ' . $message,
+            'created_at' => now()
+        ]);
+        return $this->response(true, 'ok', 'Status Guru Reset');
+    }
+
+    // Siswa
+    $siswa = Siswa::where('enroll_finger_status', 'requested')
+        ->where('school_id', $schoolId)
+        ->first();
+    if ($siswa) {
+        $siswa->update(['enroll_finger_status' => null]);
+        ApiLog::create([
+            'school_id' => $schoolId,
+            'api_key' => $apiKey,
+            'action' => 'enroll_failed',
+            'uid' => $fingerId,
+            'success' => false,
+            'message' => 'Enroll Gagal (Siswa) ' . $siswa->nama . ': ' . $message,
+            'created_at' => now()
+        ]);
+        return $this->response(true, 'ok', 'Status Siswa Reset');
+    }
+
+    // GateCard
+    $gate = GateCard::where('enroll_finger_status', 'requested')
+        ->where('school_id', $schoolId)
+        ->first();
+    if ($gate) {
+        $gate->update(['enroll_finger_status' => null]);
+        ApiLog::create([
+            'school_id' => $schoolId,
+            'api_key' => $apiKey,
+            'action' => 'enroll_failed',
+            'uid' => $fingerId,
+            'success' => false,
+            'message' => 'Enroll Gagal (Gerbang) ' . $gate->name . ': ' . $message,
+            'created_at' => now()
+        ]);
+        return $this->response(true, 'ok', 'Status Gerbang Reset');
+    }
+
+    return $this->response(true, 'ok', 'No active enroll request found');
 }
 
 // 3. Scan Logic
@@ -332,9 +394,18 @@ return $this->response(true, 'success', 'Enroll Berhasil (Siswa): ' . $siswa->na
 return $this->response(false, 'gagal', 'Enroll Timeout / No Request');
 
 } catch (\Exception $e) {
-DB::rollBack();
-Log::error("Finalize Enroll Error: " . $e->getMessage());
-return $this->response(false, 'error', 'Enroll Gagal');
+    DB::rollBack();
+    Log::error("Finalize Enroll Error: " . $e->getMessage());
+    ApiLog::create([
+        'school_id' => $device->school_id,
+        'api_key' => $device->api_key,
+        'action' => 'enroll_failed',
+        'uid' => $fingerId,
+        'success' => false,
+        'message' => 'Exception Finalize Enroll: ' . $e->getMessage(),
+        'created_at' => now()
+    ]);
+    return $this->response(false, 'error', 'Enroll Gagal');
 }
 }
 
@@ -443,6 +514,15 @@ return $this->response(false, 'error', 'Enroll Gagal');
             } catch (\Exception $e) {
                 DB::rollBack();
                 Log::error("Gate finger scan error: " . $e->getMessage());
+                ApiLog::create([
+                    'school_id' => $device->school_id,
+                    'api_key' => $device->api_key,
+                    'action' => 'scan_failed',
+                    'uid' => $fingerId,
+                    'success' => false,
+                    'message' => 'System Error (Gate Finger): ' . $e->getMessage(),
+                    'created_at' => now()
+                ]);
                 return $this->response(false, 'error', 'System Error');
             }
         }
@@ -538,6 +618,15 @@ return $this->response(false, 'error', 'Enroll Gagal');
 
                     if (!$gateSession) {
                         DB::rollBack();
+                        ApiLog::create([
+                            'school_id' => $device->school_id,
+                            'api_key' => $device->api_key,
+                            'action' => 'scan_failed',
+                            'uid' => $fingerId,
+                            'success' => false,
+                            'message' => 'Belum ada izin gerbang: ' . $guru->nama,
+                            'created_at' => now()
+                        ]);
                         return $this->response(false, 'gagal', 'Belum ada izin gerbang.', 'warning', ['type' => 'no_authorization', 'nama' => $guru->nama]);
                     }
 
@@ -580,6 +669,15 @@ return $this->response(false, 'error', 'Enroll Gagal');
             } catch (\Exception $e) {
                 DB::rollBack();
                 Log::error("Teacher finger scan error: " . $e->getMessage());
+                ApiLog::create([
+                    'school_id' => $device->school_id,
+                    'api_key' => $device->api_key,
+                    'action' => 'scan_failed',
+                    'uid' => $fingerId,
+                    'success' => false,
+                    'message' => 'System Error (Guru Finger): ' . $e->getMessage(),
+                    'created_at' => now()
+                ]);
                 return $this->response(false, 'error', 'System Error');
             }
         }
@@ -597,6 +695,15 @@ return $this->response(false, 'error', 'Enroll Gagal');
                 return $this->handleStudentAttendance($siswa, $fingerId, $device, $now);
             } catch (\Exception $e) {
                 Log::error("Student finger scan error: " . $e->getMessage());
+                ApiLog::create([
+                    'school_id' => $device->school_id,
+                    'api_key' => $device->api_key,
+                    'action' => 'scan_failed',
+                    'uid' => $fingerId,
+                    'success' => false,
+                    'message' => 'System Error (Siswa Finger): ' . $e->getMessage(),
+                    'created_at' => now()
+                ]);
                 return $this->response(false, 'error', 'System Error');
             }
         }

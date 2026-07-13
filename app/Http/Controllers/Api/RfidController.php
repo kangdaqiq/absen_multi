@@ -630,12 +630,27 @@ class RfidController extends Controller
                 // Currently it only has teacher_id. We can join with guru table or just rely on teacher_id.
                 // For now, let's assume if a teacher opened a gate, it's for their school.
 
-                // Optimized: Check sessions where teacher belongs to this school
-                $teacherSession = TeacherCheckoutSession::select('teacher_checkout_sessions.*')
-                    ->join('guru', 'teacher_checkout_sessions.teacher_id', '=', 'guru.id')
-                    ->where('guru.school_id', $device->school_id)
-                    ->where('teacher_checkout_sessions.expires_at', '>', now())
+                // Check if there is an active session opened by a teacher of this school,
+                // or by a Gate Card belonging to this school
+                $teacherSession = TeacherCheckoutSession::where('teacher_checkout_sessions.expires_at', '>', $now)
                     ->where('teacher_checkout_sessions.status', 'open')
+                    ->where(function ($query) use ($device) {
+                        $query->whereExists(function ($q) use ($device) {
+                            $q->select(DB::raw(1))
+                                ->from('guru')
+                                ->whereColumn('guru.id', 'teacher_checkout_sessions.teacher_id')
+                                ->where('guru.school_id', $device->school_id);
+                        })
+                        ->orWhereExists(function ($q) use ($device) {
+                            $q->select(DB::raw(1))
+                                ->from('gate_cards')
+                                ->where(function ($q2) {
+                                    $q2->whereColumn('gate_cards.uid_rfid', 'teacher_checkout_sessions.uid_rfid')
+                                        ->orWhere(DB::raw("CONCAT('gate_card_', gate_cards.id)"), '=', DB::raw('teacher_checkout_sessions.uid_rfid'));
+                                })
+                                ->where('gate_cards.school_id', $device->school_id);
+                        });
+                    })
                     ->orderBy('teacher_checkout_sessions.created_at', 'desc')
                     ->first();
 

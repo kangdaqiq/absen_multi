@@ -27,6 +27,7 @@ class RfidController extends Controller
     const SCAN_COOLDOWN_SECONDS = 0;
 
     protected $wa;
+    protected $telegram;
 
     // Logging context
     private $currentApiKey = null;
@@ -34,9 +35,10 @@ class RfidController extends Controller
     private $currentSchoolId = null;
     private $hasLogged = false;
 
-    public function __construct(\App\Services\WhatsAppService $wa)
+    public function __construct(\App\Services\WhatsAppService $wa, \App\Services\TelegramService $telegram)
     {
         $this->wa = $wa;
+        $this->telegram = $telegram;
     }
 
     private function handleGateScan($uid, $gateCard, $apiKey, $device, $now = null)
@@ -130,6 +132,13 @@ class RfidController extends Controller
                     Log::error("WA Guru Checkin Error: " . $e->getMessage());
                 }
 
+                // Send Telegram Check-in
+                try {
+                    $this->telegram->sendCheckIn($teacher->nama, $teacher->telegram_chat_id, $now->format('H:i'), 'Hadir', $device->school_id, '-', null, '-');
+                } catch (\Exception $e) {
+                    Log::error("Telegram Guru Checkin Error: " . $e->getMessage());
+                }
+
                 $this->logRequest($apiKey, 'checkin_success', $uid, true, 'Guru Masuk: ' . $teacher->nama);
                 return $this->response(true, 'success', "Selamat Pagi, {$teacher->nama}.", 'ok', [
                     'type' => 'absen_masuk_guru',
@@ -189,6 +198,13 @@ class RfidController extends Controller
                     $this->wa->sendCheckOut($teacher->nama, $teacher->no_wa, $now->format('H:i'), $hours, $mins, $gateSession->teacher_name, $device->school_id, $masuk->format('H:i'), null, $now->format('d/m/Y'));
                 } catch (\Exception $e) {
                     Log::error("WA Guru Checkout Error: " . $e->getMessage());
+                }
+
+                // Send Telegram Checkout
+                try {
+                    $this->telegram->sendCheckOut($teacher->nama, $teacher->telegram_chat_id, $now->format('H:i'), $hours, $mins, $gateSession->teacher_name, $device->school_id, $masuk->format('H:i'), null, $now->format('d/m/Y'));
+                } catch (\Exception $e) {
+                    Log::error("Telegram Guru Checkout Error: " . $e->getMessage());
                 }
 
                 $this->logRequest($apiKey, 'checkout_success', $uid, true, 'Guru Pulang: ' . $teacher->nama);
@@ -494,6 +510,13 @@ class RfidController extends Controller
                     Log::error("WA Enroll Error: " . $e->getMessage());
                 }
 
+                // Telegram Notification
+                try {
+                    $this->telegram->sendEnrollSuccess($siswa->nama, $siswa->telegram_chat_id, $uid, $device->school_id, 'Kartu Siswa', $siswa->telegram_ortu_chat_id);
+                } catch (\Exception $e) {
+                    Log::error("Telegram Enroll Error: " . $e->getMessage());
+                }
+
                 $this->logRequest($apiKey, 'enroll_success', $uid, true, 'Enroll Siswa berhasil: ' . $siswa->nama);
                 return $this->response(true, 'success', 'Enroll Siswa berhasil', 'ok', [
                     'type' => 'enroll_rfid',
@@ -522,6 +545,13 @@ class RfidController extends Controller
                     $this->wa->sendEnrollSuccess($guru->nama, $guru->no_wa, $uid, $device->school_id, 'Kartu Guru');
                 } catch (\Exception $e) {
                     Log::error("WA Enroll Error: " . $e->getMessage());
+                }
+
+                // Telegram Notification
+                try {
+                    $this->telegram->sendEnrollSuccess($guru->nama, $guru->telegram_chat_id, $uid, $device->school_id, 'Kartu Guru');
+                } catch (\Exception $e) {
+                    Log::error("Telegram Enroll Error: " . $e->getMessage());
                 }
 
                 $this->logRequest($apiKey, 'enroll_success', $uid, true, 'Enroll Guru berhasil: ' . $guru->nama);
@@ -738,6 +768,13 @@ class RfidController extends Controller
                 $authorizedBy = $teacherSession ? $teacherSession->teacher_name : 'Sistem Otomatis';
                 $this->wa->sendCheckOut($siswa->nama, $siswa->no_wa, $now->format('H:i'), $hours, $mins, $authorizedBy, $device->school_id, $masuk->format('H:i'), $siswa->wa_ortu, $now->format('d/m/Y'));
 
+                // Telegram
+                try {
+                    $this->telegram->sendCheckOut($siswa->nama, $siswa->telegram_chat_id, $now->format('H:i'), $hours, $mins, $authorizedBy, $device->school_id, $masuk->format('H:i'), $siswa->telegram_ortu_chat_id, $now->format('d/m/Y'));
+                } catch (\Exception $e) {
+                    Log::error("Telegram Checkout Error: " . $e->getMessage());
+                }
+
                 $this->logRequest($apiKey, 'checkout_success', $uid, true, 'Pulang: ' . $siswa->nama);
                 return $this->response(true, 'success', 'Absen Berhasil', 'ok', [
                     'type' => 'absen_pulang',
@@ -795,6 +832,13 @@ class RfidController extends Controller
                 DB::commit();
 
                 $this->wa->sendCheckIn($siswa->nama, $siswa->no_wa, $now->format('H:i'), $status, $device->school_id, $keterangan, $siswa->wa_ortu, $siswa->kelas->nama_kelas ?? '-');
+
+                // Telegram
+                try {
+                    $this->telegram->sendCheckIn($siswa->nama, $siswa->telegram_chat_id, $now->format('H:i'), $status, $device->school_id, $keterangan, $siswa->telegram_ortu_chat_id, $siswa->kelas->nama_kelas ?? '-');
+                } catch (\Exception $e) {
+                    Log::error("Telegram CheckIn Error: " . $e->getMessage());
+                }
 
 
                 $this->logRequest($apiKey, 'checkin_success', $uid, true, 'Masuk: ' . $siswa->nama);
@@ -875,6 +919,21 @@ class RfidController extends Controller
                 );
             } catch (\Exception $e) {
                 Log::error("WA Kegiatan CheckIn Error: " . $e->getMessage());
+            }
+
+            // Telegram
+            try {
+                $this->telegram->sendKegiatanCheckIn(
+                    namaSiswa: $siswa->nama,
+                    namaKegiatan: $kegiatan->nama_kegiatan,
+                    jam: $now->format('H:i'),
+                    tanggal: $tanggalFormatted,
+                    schoolId: $device->school_id,
+                    chatIdSiswa: $siswa->telegram_chat_id ?: null,
+                    chatIdOrtu: $siswa->telegram_ortu_chat_id ?: null,
+                );
+            } catch (\Exception $e) {
+                Log::error("Telegram Kegiatan CheckIn Error: " . $e->getMessage());
             }
 
             $this->logRequest($apiKey, 'kegiatan_checkin_success', $uid, true, 'Hadir Kegiatan: ' . $siswa->nama . ' → ' . $kegiatan->nama_kegiatan);

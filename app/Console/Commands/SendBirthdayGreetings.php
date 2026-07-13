@@ -73,6 +73,9 @@ class SendBirthdayGreetings extends Command
 
         $this->info("  [{$schoolName}] Memproses ucapan HUT...");
 
+        $telegramEnabled = $school->telegram_enabled;
+        $telegramToken = $school->telegram_bot_token;
+
         // 2. Ambil template dari setting (dengan fallback ke default)
         $templateSiswa = $this->getTemplate($schoolId, 'birthday_greeting_siswa', self::DEFAULT_SISWA);
         $templateGuru  = $this->getTemplate($schoolId, 'birthday_greeting_guru', self::DEFAULT_GURU);
@@ -82,8 +85,9 @@ class SendBirthdayGreetings extends Command
         // 3. Proses Guru yang berulang tahun hari ini
         $guruBirthdays = Guru::where('school_id', $schoolId)
             ->whereNotNull('tgl_lahir')
-            ->whereNotNull('no_wa')
-            ->where('no_wa', '!=', '')
+            ->where(function($q) {
+                $q->whereNotNull('no_wa')->orWhereNotNull('telegram_chat_id');
+            })
             ->whereMonth('tgl_lahir', $month)
             ->whereDay('tgl_lahir', $day)
             ->get();
@@ -95,17 +99,28 @@ class SendBirthdayGreetings extends Command
                 '{nip}'     => $guru->nip ?? '-',
             ]);
 
-            MessageQueue::create([
-                'school_id'    => $schoolId,
-                'phone_number' => $guru->no_wa,
-                'message'      => $message,
-                'status'       => 'pending',
-                'scheduled_at' => now()->addSeconds(rand(60, 300)),
-                'created_at'   => now(),
-            ]);
+            if (!empty($guru->no_wa)) {
+                MessageQueue::create([
+                    'school_id'    => $schoolId,
+                    'phone_number' => $guru->no_wa,
+                    'message'      => $message,
+                    'status'       => 'pending',
+                    'scheduled_at' => now()->addSeconds(rand(60, 300)),
+                    'created_at'   => now(),
+                ]);
+                $totalSent++;
+                $this->info("    🎂 Guru: {$guru->nama} → {$guru->no_wa}");
+            }
 
-            $totalSent++;
-            $this->info("    🎂 Guru: {$guru->nama} → {$guru->no_wa}");
+            // Telegram Birthday Greeting to Teacher
+            if ($telegramEnabled && $telegramToken && !empty($guru->telegram_chat_id)) {
+                $telegramMsg = $message;
+                $telegramMsg = preg_replace('/\*([^*]+)\*/', '<b>$1</b>', $telegramMsg);
+                $telegramMsg = preg_replace('/\_([^_]+)\_/', '<i>$1</i>', $telegramMsg);
+                
+                \App\Jobs\SendTelegramMessageJob::dispatch($telegramToken, $guru->telegram_chat_id, $telegramMsg, $schoolId);
+                $this->info("    🎂 Guru Telegram: {$guru->nama} → {$guru->telegram_chat_id}");
+            }
         }
 
         // 4. Proses Siswa yang berulang tahun hari ini
@@ -141,6 +156,16 @@ class SendBirthdayGreetings extends Command
                 $this->info("    🎂 Siswa: {$siswa->nama} ({$namaKelas}) → {$noWaSiswa}");
             }
 
+            // Telegram Birthday Greeting to Student
+            if ($telegramEnabled && $telegramToken && !empty($siswa->telegram_chat_id)) {
+                $telegramMsg = $message;
+                $telegramMsg = preg_replace('/\*([^*]+)\*/', '<b>$1</b>', $telegramMsg);
+                $telegramMsg = preg_replace('/\_([^_]+)\_/', '<i>$1</i>', $telegramMsg);
+
+                \App\Jobs\SendTelegramMessageJob::dispatch($telegramToken, $siswa->telegram_chat_id, $telegramMsg, $schoolId);
+                $this->info("    🎂 Siswa Telegram: {$siswa->nama} → {$siswa->telegram_chat_id}");
+            }
+
             // Kirim juga ke nomor orang tua jika ada dan berbeda dengan nomor siswa
             $noWaOrtu = $siswa->wa_ortu ?? null;
             if ($noWaOrtu && $noWaOrtu !== $noWaSiswa) {
@@ -160,6 +185,22 @@ class SendBirthdayGreetings extends Command
 
                 $totalSent++;
                 $this->info("    🎂 Ortu: {$siswa->nama} → {$noWaOrtu}");
+            }
+
+            // Telegram Birthday Greeting to Parent
+            if ($telegramEnabled && $telegramToken && !empty($siswa->telegram_ortu_chat_id)) {
+                $telegramMsgOrtu = isset($messageOrtu) ? $messageOrtu : (
+                    "🎂 <b>Selamat Ulang Tahun untuk putra/putri Anda!</b>\n\n"
+                    . "Halo Orang Tua/Wali dari <b>{$siswa->nama}</b>,\n\n"
+                    . "Hari ini adalah hari ulang tahun {$siswa->nama}. Semoga selalu sehat, ceria, dan semakin berprestasi! 🎉\n\n"
+                    . "Salam hangat,\n<b>{$schoolName}</b>"
+                );
+                
+                $telegramMsgOrtu = preg_replace('/\*([^*]+)\*/', '<b>$1</b>', $telegramMsgOrtu);
+                $telegramMsgOrtu = preg_replace('/\_([^_]+)\_/', '<i>$1</i>', $telegramMsgOrtu);
+
+                \App\Jobs\SendTelegramMessageJob::dispatch($telegramToken, $siswa->telegram_ortu_chat_id, $telegramMsgOrtu, $schoolId);
+                $this->info("    🎂 Ortu Telegram: {$siswa->nama} → {$siswa->telegram_ortu_chat_id}");
             }
 
             // Jika tidak ada nomor siswa, kirim hanya ke ortu

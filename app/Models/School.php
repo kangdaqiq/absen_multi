@@ -25,6 +25,8 @@ class School extends Model
         'history_quota_months',
         'settings',
         'expired_at',
+        'telegram_bot_token',
+        'telegram_enabled',
     ];
 
     protected $casts = [
@@ -37,6 +39,7 @@ class School extends Model
         'history_quota_months' => 'integer',
         'settings'             => 'array',
         'expired_at'           => 'datetime',
+        'telegram_enabled'     => 'boolean',
     ];
 
     /**

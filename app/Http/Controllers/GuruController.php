@@ -68,12 +68,16 @@ class GuruController extends Controller
                 'max:20',
                 Rule::unique('guru')->where(fn($q) => $q->where('school_id', $schoolId))
             ],
+            'telegram_chat_id' => 'nullable|string|max:50',
         ]);
 
         $data = $request->all();
         $data['is_global_report'] = $request->has('is_global_report');
         if (isset($data['no_wa'])) {
             $data['no_wa'] = $this->normalizeWa($data['no_wa']);
+        }
+        if (empty($data['telegram_chat_id'])) {
+            $data['telegram_chat_id'] = null;
         }
 
         // Add school_id from authenticated user
@@ -108,12 +112,16 @@ class GuruController extends Controller
                 'max:20',
                 Rule::unique('guru')->ignore($guruModel->id)->where(fn($q) => $q->where('school_id', $schoolId))
             ],
+            'telegram_chat_id' => 'nullable|string|max:50',
         ]);
 
         $data = $request->all();
         $data['is_global_report'] = $request->has('is_global_report');
         if (isset($data['no_wa'])) {
             $data['no_wa'] = $this->normalizeWa($data['no_wa']);
+        }
+        if (empty($data['telegram_chat_id'])) {
+            $data['telegram_chat_id'] = null;
         }
         $guruModel->update($data);
 

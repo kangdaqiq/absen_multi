@@ -164,6 +164,7 @@
                                 <button class="btnEdit text-orange-500 hover:text-orange-700 hover:bg-orange-50 p-2 rounded-lg transition" 
                                     data-id="{{ $s->id }}" data-nama="{{ $s->nama }}" data-nis="{{ $s->nis }}" data-tgl_lahir="{{ $s->tgl_lahir }}"
                                     data-kelas="{{ $s->kelas_id }}" data-wa="{{ $s->no_wa }}" data-wa_ortu="{{ $s->wa_ortu }}" data-uid="{{ $s->uid_rfid }}"
+                                    data-telegram="{{ $s->telegram_chat_id }}" data-telegram_ortu="{{ $s->telegram_ortu_chat_id }}"
                                     data-is_khusus="{{ $s->is_khusus }}"
                                     data-is_siswa_khusus="{{ $s->is_siswa_khusus }}"
                                     data-hari_masuk="{{ json_encode($s->hari_masuk) }}"
@@ -279,6 +280,14 @@
                     <input type="text" name="wa_ortu" placeholder="08xxx atau 628xxx" pattern="^(08|628)[0-9]{8,13}$" class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
                     <p class="mt-1 text-xs text-gray-500">Format: 08xxx atau 628xxx (8-13 digit)</p>
                 </div>
+                <div>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Telegram Chat ID Siswa <span class="text-gray-400 font-normal">(opsional)</span></label>
+                    <input type="text" name="telegram_chat_id" placeholder="Contoh: 123456789" class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                </div>
+                <div>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Telegram Chat ID Ortu <span class="text-gray-400 font-normal">(opsional)</span></label>
+                    <input type="text" name="telegram_ortu_chat_id" placeholder="Contoh: 987654321" class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                </div>
                 <div class="flex items-center gap-2 mt-2">
                     <input type="checkbox" name="is_khusus" id="is_khusus" value="1" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800">
                     <label for="is_khusus" class="text-sm font-medium text-gray-700 dark:text-gray-300">Siswa PKL</label>
@@ -370,6 +379,14 @@
                 <div>
                     <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">No WhatsApp Ortu</label>
                     <input type="text" name="wa_ortu" id="edit_wa_ortu" placeholder="08xxx atau 628xxx" pattern="^(08|628)[0-9]{8,13}$" class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                </div>
+                <div>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Telegram Chat ID Siswa <span class="text-gray-400 font-normal">(opsional)</span></label>
+                    <input type="text" name="telegram_chat_id" id="edit_telegram_chat_id" placeholder="Contoh: 123456789" class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                </div>
+                <div>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Telegram Chat ID Ortu <span class="text-gray-400 font-normal">(opsional)</span></label>
+                    <input type="text" name="telegram_ortu_chat_id" id="edit_telegram_ortu_chat_id" placeholder="Contoh: 987654321" class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
                 </div>
                 <div>
                     <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">UID RFID (readonly)</label>
@@ -585,6 +602,8 @@
                 var kelas = $(this).data('kelas');
                 var wa = $(this).data('wa');
                 var wa_ortu = $(this).data('wa_ortu');
+                var telegram = $(this).data('telegram');
+                var telegram_ortu = $(this).data('telegram_ortu');
                 var uid = $(this).data('uid');
                 var is_khusus = $(this).data('is_khusus');
                 var is_siswa_khusus = $(this).data('is_siswa_khusus');
@@ -596,6 +615,8 @@
                 $('#edit_kelas_id').val(kelas);
                 $('#edit_no_wa').val(wa);
                 $('#edit_wa_ortu').val(wa_ortu);
+                $('#edit_telegram_chat_id').val(telegram);
+                $('#edit_telegram_ortu_chat_id').val(telegram_ortu);
                 $('#edit_uid_rfid').val(uid);
                 $('#edit_is_khusus').prop('checked', is_khusus == 1);
                 $('#edit_is_siswa_khusus').prop('checked', is_siswa_khusus == 1);

@@ -35,7 +35,9 @@ class Siswa extends Model
         'school_id',
         'is_khusus',
         'is_siswa_khusus',
-        'hari_masuk'
+        'hari_masuk',
+        'telegram_chat_id',
+        'telegram_ortu_chat_id',
     ];
 
     protected $casts = [

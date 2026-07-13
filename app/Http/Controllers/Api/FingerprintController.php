@@ -23,10 +23,12 @@ private $currentApiKey = null;
 private $currentId = null;
 private $currentSchoolId = null;
 protected $wa;
+protected $telegram;
 
-public function __construct(\App\Services\WhatsAppService $wa)
+public function __construct(\App\Services\WhatsAppService $wa, \App\Services\TelegramService $telegram)
 {
 $this->wa = $wa;
+$this->telegram = $telegram;
 }
 
 // ... (handle and checkEnrollRequest methods omitted for brevity as they are unchanged) ...
@@ -317,6 +319,13 @@ $guru->update([
 'id_finger' => $fingerId,
 ]);
 
+            // Telegram Notification
+            try {
+                $this->telegram->sendEnrollSuccess($guru->nama, $guru->telegram_chat_id, $fingerId, $device->school_id, 'Sidik Jari Guru');
+            } catch (\Exception $e) {
+                Log::error("Telegram Enroll Error: " . $e->getMessage());
+            }
+
 DB::commit();
 ApiLog::create([
     'school_id' => $this->currentSchoolId,
@@ -354,6 +363,13 @@ $siswa->update([
 'enroll_finger_status' => 'done',
 'id_finger' => $fingerId,
 ]);
+
+            // Telegram Notification
+            try {
+                $this->telegram->sendEnrollSuccess($siswa->nama, $siswa->telegram_chat_id, $fingerId, $device->school_id, 'Sidik Jari Siswa', $siswa->telegram_ortu_chat_id);
+            } catch (\Exception $e) {
+                Log::error("Telegram Enroll Error: " . $e->getMessage());
+            }
 
 DB::commit();
 ApiLog::create([
@@ -592,6 +608,13 @@ return $this->response(false, 'gagal', 'Enroll Timeout / No Request');
                         Log::error("WA Guru Checkin Error: " . $e->getMessage());
                     }
 
+                    // Send Telegram Check-in
+                    try {
+                        $this->telegram->sendCheckIn($guru->nama, $guru->telegram_chat_id, $now->format('H:i'), 'Hadir', $device->school_id, '-', null, '-');
+                    } catch (\Exception $e) {
+                        Log::error("Telegram Guru Checkin Error: " . $e->getMessage());
+                    }
+
                     ApiLog::create([
                         'school_id' => $this->currentSchoolId,
                         'api_key' => $this->currentApiKey,
@@ -668,6 +691,13 @@ return $this->response(false, 'gagal', 'Enroll Timeout / No Request');
                         $this->wa->sendCheckOut($guru->nama, $guru->no_wa, $now->format('H:i'), $hours, $mins, $gateSession->teacher_name, $device->school_id, $masuk->format('H:i'), null, $now->format('d/m/Y'));
                     } catch (\Exception $e) {
                         Log::error("WA Guru Checkout Error: " . $e->getMessage());
+                    }
+
+                    // Send Telegram Checkout
+                    try {
+                        $this->telegram->sendCheckOut($guru->nama, $guru->telegram_chat_id, $now->format('H:i'), $hours, $mins, $gateSession->teacher_name, $device->school_id, $masuk->format('H:i'), null, $now->format('d/m/Y'));
+                    } catch (\Exception $e) {
+                        Log::error("Telegram Guru Checkout Error: " . $e->getMessage());
                     }
 
                     ApiLog::create([
@@ -878,6 +908,13 @@ return $this->response(false, 'gagal', 'Enroll Timeout / No Request');
             
             $this->wa->sendCheckOut($siswa->nama, $siswa->no_wa, $now->format('H:i'), $hours, $mins, $authorizedBy, $device->school_id, $masuk->format('H:i'), $siswa->wa_ortu, $now->format('d/m/Y'));
 
+            // Telegram
+            try {
+                $this->telegram->sendCheckOut($siswa->nama, $siswa->telegram_chat_id, $now->format('H:i'), $hours, $mins, $authorizedBy, $device->school_id, $masuk->format('H:i'), $siswa->telegram_ortu_chat_id, $now->format('d/m/Y'));
+            } catch (\Exception $e) {
+                Log::error("Telegram Checkout Error: " . $e->getMessage());
+            }
+
             ApiLog::create([
                 'school_id' => $this->currentSchoolId,
                 'api_key' => $this->currentApiKey,
@@ -943,6 +980,13 @@ return $this->response(false, 'gagal', 'Enroll Timeout / No Request');
             DB::commit();
 
             $this->wa->sendCheckIn($siswa->nama, $siswa->no_wa, $now->format('H:i'), $status, $device->school_id, $keterangan, $siswa->wa_ortu, $siswa->kelas->nama_kelas ?? '-');
+
+            // Telegram
+            try {
+                $this->telegram->sendCheckIn($siswa->nama, $siswa->telegram_chat_id, $now->format('H:i'), $status, $device->school_id, $keterangan, $siswa->telegram_ortu_chat_id, $siswa->kelas->nama_kelas ?? '-');
+            } catch (\Exception $e) {
+                Log::error("Telegram CheckIn Error: " . $e->getMessage());
+            }
 
             ApiLog::create([
                 'school_id' => $this->currentSchoolId,

@@ -91,7 +91,7 @@ class AutoBolosCommand extends Command
                 ->whereNotIn('attendance.status', ['I', 'S'])
                 ->where('kelas.is_active_attendance', true);
 
-            $bolosStudents = $bolosStudentsQuery->select('siswa.nama', 'siswa.no_wa', 'siswa.wa_ortu', 'kelas.nama_kelas')->get();
+            $bolosStudents = $bolosStudentsQuery->select('siswa.nama', 'siswa.no_wa', 'siswa.wa_ortu', 'siswa.telegram_chat_id', 'siswa.telegram_ortu_chat_id', 'kelas.nama_kelas')->get();
 
             // Perform bulk update to mark as Bolos
             $countB = $bolosStudentsQuery->update([
@@ -101,6 +101,9 @@ class AutoBolosCommand extends Command
             ]);
 
             // Queue personal notifications for Bolos students
+            $telegramEnabled = $school->telegram_enabled;
+            $telegramToken = $school->telegram_bot_token;
+
             foreach ($bolosStudents as $bs) {
                 if (!empty($bs->no_wa)) {
                     MessageQueue::create([
@@ -119,6 +122,33 @@ class AutoBolosCommand extends Command
                         'status' => 'pending',
                         'created_at' => now()
                     ]);
+                }
+
+                // Telegram Notification
+                if ($telegramEnabled && $telegramToken) {
+                    if (!empty($bs->telegram_chat_id)) {
+                        $msgTelegram = "⚠️ <b>PERINGATAN BOLOS</b> ⚠️\n\n" .
+                            "Halo, <b>{$bs->nama}</b> 👋,\n\n" .
+                            "Anda terdeteksi belum melakukan absen pulang (check-out) hingga waktu yang ditentukan hari ini.\n" .
+                            "Status kehadiran Anda hari ini telah diubah menjadi <b>Bolos</b>.";
+                        
+                        if (!empty($school->name)) {
+                            $msgTelegram .= "\n\n<b>" . trim($school->name) . "</b>";
+                        }
+                        
+                        \App\Jobs\SendTelegramMessageJob::dispatch($telegramToken, $bs->telegram_chat_id, $msgTelegram, $schoolId);
+                    }
+                    if (!empty($bs->telegram_ortu_chat_id)) {
+                        $msgTelegramOrtu = "⚠️ <b>Pemberitahuan Bolos</b> ⚠️\n\n" .
+                            "Bapak/Ibu Orang Tua/Wali dari <b>{$bs->nama}</b> (Kelas: {$bs->nama_kelas}),\n\n" .
+                            "Menginfokan bahwa putra/putri Anda terdeteksi belum melakukan absen pulang hingga waktu yang ditentukan hari ini, sehingga status kehadirannya diubah menjadi <b>Bolos (B)</b>.";
+                        
+                        if (!empty($school->name)) {
+                            $msgTelegramOrtu .= "\n\n<b>" . trim($school->name) . "</b>";
+                        }
+
+                        \App\Jobs\SendTelegramMessageJob::dispatch($telegramToken, $bs->telegram_ortu_chat_id, $msgTelegramOrtu, $schoolId);
+                    }
                 }
             }
 
@@ -181,6 +211,10 @@ class AutoBolosCommand extends Command
 
     private function sendAbsenceReport($today, $schoolId)
     {
+        $school = \App\Models\School::find($schoolId);
+        $telegramEnabled = $school ? $school->telegram_enabled : false;
+        $telegramToken = $school ? $school->telegram_bot_token : null;
+
         $legacyTarget = Setting::where('school_id', $schoolId)->where('setting_key', 'report_target_jid')->value('setting_value');
 
         // Cek apakah ada penerima laporan: grup kelas, legacyTarget, wali kelas, atau guru global
@@ -296,6 +330,19 @@ class AutoBolosCommand extends Command
                     'created_at'   => now()
                 ]);
             }
+
+            // 3. Kirim ke Telegram Pribadi Wali Kelas (jika ada)
+            if ($telegramEnabled && $telegramToken && $wali && !empty($wali->telegram_chat_id)) {
+                $msgKelasTelegram = $msgKelas;
+                $msgKelasTelegram = preg_replace('/\*([^*]+)\*/', '<b>$1</b>', $msgKelasTelegram);
+                $msgKelasTelegram = preg_replace('/\_([^_]+)\_/', '<i>$1</i>', $msgKelasTelegram);
+                
+                if (!empty($school->name)) {
+                    $msgKelasTelegram = rtrim($msgKelasTelegram) . "\n\n<b>" . trim($school->name) . "</b>";
+                }
+
+                \App\Jobs\SendTelegramMessageJob::dispatch($telegramToken, $wali->telegram_chat_id, $msgKelasTelegram, $schoolId);
+            }
         }
 
         // Persiapkan laporan global jika diperlukan (untuk legacy target atau Guru Global)
@@ -380,6 +427,23 @@ class AutoBolosCommand extends Command
                     'status'       => 'pending',
                     'created_at'   => now()
                 ]);
+            }
+
+            // Telegram Laporan Global
+            if ($telegramEnabled && $telegramToken) {
+                foreach ($guruGlobal as $guru) {
+                    if (!empty($guru->telegram_chat_id)) {
+                        $msgGlobalTelegram = $messageGlobal;
+                        $msgGlobalTelegram = preg_replace('/\*([^*]+)\*/', '<b>$1</b>', $msgGlobalTelegram);
+                        $msgGlobalTelegram = preg_replace('/\_([^_]+)\_/', '<i>$1</i>', $msgGlobalTelegram);
+                        
+                        if (!empty($school->name)) {
+                            $msgGlobalTelegram = rtrim($msgGlobalTelegram) . "\n\n<b>" . trim($school->name) . "</b>";
+                        }
+
+                        \App\Jobs\SendTelegramMessageJob::dispatch($telegramToken, $guru->telegram_chat_id, $msgGlobalTelegram, $schoolId);
+                    }
+                }
             }
         }
 

@@ -78,6 +78,8 @@ class SiswaController extends Controller
                 Rule::unique('siswa')->where(fn($q) => $q->where('school_id', $schoolId))
             ],
             'wa_ortu' => ['nullable', 'string', 'max:20', 'regex:/^(08|628)[0-9]{8,13}$/'],
+            'telegram_chat_id' => 'nullable|string|max:50',
+            'telegram_ortu_chat_id' => 'nullable|string|max:50',
             'user_id' => 'nullable|exists:users,id',
             'is_khusus' => 'nullable|boolean',
             'is_siswa_khusus' => 'nullable|boolean',
@@ -91,6 +93,10 @@ class SiswaController extends Controller
             $input['no_wa'] = null;
         if (empty($input['wa_ortu']))
             $input['wa_ortu'] = null;
+        if (empty($input['telegram_chat_id']))
+            $input['telegram_chat_id'] = null;
+        if (empty($input['telegram_ortu_chat_id']))
+            $input['telegram_ortu_chat_id'] = null;
 
         $input['is_khusus'] = $request->has('is_khusus') ? 1 : 0;
         $input['is_siswa_khusus'] = $request->has('is_siswa_khusus') ? 1 : 0;
@@ -155,6 +161,8 @@ class SiswaController extends Controller
                 Rule::unique('siswa')->ignore($siswa->id)->where(fn($q) => $q->where('school_id', $schoolId))
             ],
             'wa_ortu' => ['nullable', 'string', 'max:20', 'regex:/^(08|628)[0-9]{8,13}$/'],
+            'telegram_chat_id' => 'nullable|string|max:50',
+            'telegram_ortu_chat_id' => 'nullable|string|max:50',
             'uid_rfid' => 'nullable|string|max:50',
             'user_id' => 'nullable|exists:users,id',
             'is_khusus' => 'nullable|boolean',
@@ -168,6 +176,10 @@ class SiswaController extends Controller
             $input['no_wa'] = null;
         if (empty($input['wa_ortu']))
             $input['wa_ortu'] = null;
+        if (empty($input['telegram_chat_id']))
+            $input['telegram_chat_id'] = null;
+        if (empty($input['telegram_ortu_chat_id']))
+            $input['telegram_ortu_chat_id'] = null;
 
         $input['is_khusus'] = $request->has('is_khusus') ? 1 : 0;
         $input['is_siswa_khusus'] = $request->has('is_siswa_khusus') ? 1 : 0;

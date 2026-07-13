@@ -39,6 +39,9 @@ class DailyReportCommand extends Command
         $this->info("------------------------------------------------");
         $this->info("Processing Daily Report for School: {$school->name} (ID: $schoolId)");
 
+        $telegramEnabled = $school->telegram_enabled;
+        $telegramToken = $school->telegram_bot_token;
+
         // 1. Check for Holiday (Dynamic: if no student attendance exists today, assume holiday)
         $hasAttendance = \App\Models\Attendance::where('tanggal', $today)
             ->whereHas('student', function ($q) use ($schoolId) {
@@ -395,6 +398,23 @@ class DailyReportCommand extends Command
                 ]);
                 $this->info("Queued global report to Guru: {$guru->nama}");
             }
+
+            // Telegram Global Report
+            if ($telegramEnabled && $telegramToken) {
+                foreach ($guruGlobal as $guru) {
+                    if (!empty($guru->telegram_chat_id)) {
+                        $msgGlobalTelegram = $msg;
+                        $msgGlobalTelegram = preg_replace('/\*([^*]+)\*/', '<b>$1</b>', $msgGlobalTelegram);
+                        $msgGlobalTelegram = preg_replace('/\_([^_]+)\_/', '<i>$1</i>', $msgGlobalTelegram);
+                        
+                        if (!empty($school->name)) {
+                            $msgGlobalTelegram = rtrim($msgGlobalTelegram) . "\n\n<b>" . trim($school->name) . "</b>";
+                        }
+
+                        \App\Jobs\SendTelegramMessageJob::dispatch($telegramToken, $guru->telegram_chat_id, $msgGlobalTelegram, $schoolId);
+                    }
+                }
+            }
         }
 
         // --- LAPORAN PER WALI KELAS ---
@@ -465,6 +485,19 @@ class DailyReportCommand extends Command
                 'priority' => 10,
                 'created_at' => now()
             ]);
+
+            // Telegram Wali Kelas Report
+            if ($telegramEnabled && $telegramToken && $wali && !empty($wali->telegram_chat_id)) {
+                $msgWaliTelegram = $msgWali;
+                $msgWaliTelegram = preg_replace('/\*([^*]+)\*/', '<b>$1</b>', $msgWaliTelegram);
+                $msgWaliTelegram = preg_replace('/\_([^_]+)\_/', '<i>$1</i>', $msgWaliTelegram);
+                
+                if (!empty($school->name)) {
+                    $msgWaliTelegram = rtrim($msgWaliTelegram) . "\n\n<b>" . trim($school->name) . "</b>";
+                }
+
+                \App\Jobs\SendTelegramMessageJob::dispatch($telegramToken, $wali->telegram_chat_id, $msgWaliTelegram, $schoolId);
+            }
         }
 
         // --- ALPHA NOTIFICATIONS ---
@@ -544,6 +577,36 @@ class DailyReportCommand extends Command
                 'status' => 'pending',
                 'created_at' => now()
             ]);
+        }
+
+        // Telegram Alpha Notification
+        $school = \App\Models\School::find($schoolId);
+        $telegramEnabled = $school ? $school->telegram_enabled : false;
+        $telegramToken = $school ? $school->telegram_bot_token : null;
+
+        if ($telegramEnabled && $telegramToken) {
+            if (!empty($student->telegram_chat_id)) {
+                $msgStudentTelegram = $msgStudent;
+                $msgStudentTelegram = preg_replace('/\*([^*]+)\*/', '<b>$1</b>', $msgStudentTelegram);
+                $msgStudentTelegram = preg_replace('/\_([^_]+)\_/', '<i>$1</i>', $msgStudentTelegram);
+                
+                if ($school && !empty($school->name)) {
+                    $msgStudentTelegram = rtrim($msgStudentTelegram) . "\n\n<b>" . trim($school->name) . "</b>";
+                }
+                
+                \App\Jobs\SendTelegramMessageJob::dispatch($telegramToken, $student->telegram_chat_id, $msgStudentTelegram, $schoolId);
+            }
+            if (!empty($student->telegram_ortu_chat_id)) {
+                $msgParentTelegram = $msgParent;
+                $msgParentTelegram = preg_replace('/\*([^*]+)\*/', '<b>$1</b>', $msgParentTelegram);
+                $msgParentTelegram = preg_replace('/\_([^_]+)\_/', '<i>$1</i>', $msgParentTelegram);
+                
+                if ($school && !empty($school->name)) {
+                    $msgParentTelegram = rtrim($msgParentTelegram) . "\n\n<b>" . trim($school->name) . "</b>";
+                }
+
+                \App\Jobs\SendTelegramMessageJob::dispatch($telegramToken, $student->telegram_ortu_chat_id, $msgParentTelegram, $schoolId);
+            }
         }
     }
 }

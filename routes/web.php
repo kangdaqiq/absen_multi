@@ -211,6 +211,11 @@ Route::middleware('auth')->group(function () {
         Route::get('/gate-cards/{id}/enroll-check', [App\Http\Controllers\GateCardController::class, 'enrollCheck']);
         Route::post('/gate-cards/{id}/delete-uid', [App\Http\Controllers\GateCardController::class, 'deleteUid']);
 
+        Route::post('/gate-cards/{id}/enroll-finger', [App\Http\Controllers\GateCardController::class, 'enrollFingerRequest']);
+        Route::post('/gate-cards/{id}/enroll-finger-cancel', [App\Http\Controllers\GateCardController::class, 'cancelFingerEnroll']);
+        Route::get('/gate-cards/{id}/enroll-finger-check', [App\Http\Controllers\GateCardController::class, 'enrollFingerCheck']);
+        Route::post('/gate-cards/{id}/delete-finger', [App\Http\Controllers\GateCardController::class, 'deleteFingerId']);
+
         // Backups
         Route::get('/backups', [App\Http\Controllers\BackupController::class, 'index'])->name('backups.index');
         Route::post('/backups', [App\Http\Controllers\BackupController::class, 'create'])->name('backups.create');

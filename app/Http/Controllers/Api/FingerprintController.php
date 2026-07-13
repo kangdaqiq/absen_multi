@@ -15,6 +15,7 @@ use App\Models\SiswaFingerprint;
 use App\Models\Attendance;
 use App\Models\TeacherCheckoutSession;
 use App\Models\GateCard;
+use App\Models\GateCardFingerprint;
 
 class FingerprintController extends Controller
 {
@@ -142,8 +143,8 @@ if ($siswa) {
     ]);
 }
 
-        // Check Gate Card Enroll Request SCOPED
-        $gate = GateCard::where('enroll_status', 'requested')
+// Check Gate Card Enroll Request SCOPED
+        $gate = GateCard::where('enroll_finger_status', 'requested')
             ->where('school_id', $device->school_id)
             ->where('updated_at', '>=', now()->subMinutes(15))
             ->orderBy('updated_at', 'desc')
@@ -165,10 +166,7 @@ if ($siswa) {
 private function getNextFreeFingerId($deviceId) {
     $usedSiswa = SiswaFingerprint::where('device_id', $deviceId)->pluck('finger_id')->toArray();
     $usedGuru = GuruFingerprint::where('device_id', $deviceId)->pluck('finger_id')->toArray();
-    
-    // GateCards are usually scoped by school
-    $device = Device::find($deviceId);
-    $usedGate = GateCard::where('school_id', $device->school_id)->pluck('uid_rfid')->toArray();
+    $usedGate = GateCardFingerprint::where('device_id', $deviceId)->pluck('finger_id')->toArray();
     
     $allUsed = array_merge($usedSiswa, $usedGuru, $usedGate);
     $allUsed = array_map('intval', $allUsed);
@@ -206,13 +204,14 @@ try {
             }
         }
         if (!$conflictName) {
-            $usedByGate = GateCard::where('school_id', $device->school_id)->where('uid_rfid', $fingerId)->first();
+            $usedByGate = GateCardFingerprint::where('device_id', $device->id)->where('finger_id', $fingerId)->with('gateCard')->first();
             if ($usedByGate) {
-                $conflictName = $usedByGate->name ?? 'Gerbang Lain';
-                $conflictId = $usedByGate->id;
+                $conflictName = $usedByGate->gateCard->name ?? 'Gerbang Lain';
+                $conflictId = $usedByGate->gate_card_id;
                 $conflictType = 'gate';
             }
         }
+
 
 // Check Guru first SCOPED
 $guru = Guru::where('enroll_finger_status', 'requested')
@@ -291,7 +290,7 @@ return $this->response(true, 'success', 'Enroll Berhasil (Siswa): ' . $siswa->na
 }
 
         // Check Gate Card SCOPED
-        $gate = GateCard::where('enroll_status', 'requested')
+        $gate = GateCard::where('enroll_finger_status', 'requested')
             ->where('school_id', $device->school_id)
             ->where('updated_at', '>=', now()->subMinutes(15))
             ->orderBy('updated_at', 'desc')
@@ -300,15 +299,19 @@ return $this->response(true, 'success', 'Enroll Berhasil (Siswa): ' . $siswa->na
 
         if ($gate) {
             if ($conflictName && ($conflictType !== 'gate' || $conflictId != $gate->id)) {
-                $gate->update(['enroll_status' => null]);
+                $gate->update(['enroll_finger_status' => null]);
                 DB::commit();
                 return $this->response(false, 'gagal', "Ditolak: ID telah dipakai oleh $conflictName");
             }
 
-            // Note: gate_cards doesn't have id_finger specifically, we reuse uid_rfid field for simplicity or just save it.
+            GateCardFingerprint::updateOrCreate(
+                ['gate_card_id' => $gate->id, 'device_id' => $device->id, 'finger_id' => $fingerId],
+                ['created_at' => now()]
+            );
+
             $gate->update([
-                'enroll_status' => 'done',
-                'uid_rfid' => $fingerId,
+                'enroll_finger_status' => 'done',
+                'id_finger' => $fingerId,
             ]);
 
             DB::commit();
@@ -369,24 +372,53 @@ return $this->response(false, 'error', 'Enroll Gagal');
     {
         $now = $now ?? now();
         
+
+
         // Check Gate Card first
-        $gateCard = GateCard::with('guru')
-            ->where('school_id', $device->school_id)
-            ->where('uid_rfid', $fingerId)
+        $gateCardFingerprint = GateCardFingerprint::where('device_id', $device->id)
+            ->where('finger_id', $fingerId)
+            ->with('gateCard.guru')
             ->first();
 
-        if ($gateCard) {
+        if ($gateCardFingerprint && $gateCardFingerprint->gateCard) {
+            $gateCard = $gateCardFingerprint->gateCard;
             try {
                 DB::beginTransaction();
                 
                 $gateName = $gateCard->guru_id ? ($gateCard->guru->nama ?? $gateCard->name) : $gateCard->name;
+                $sessionUid = $gateCard->uid_rfid ?: "gate_card_{$gateCard->id}";
                 
                 TeacherCheckoutSession::where('expires_at', '<', $now)->delete();
+
+                // Cek apakah gerbang sedang terbuka oleh kartu ini
+                $activeSession = TeacherCheckoutSession::where('uid_rfid', $sessionUid)
+                    ->where('expires_at', '>=', $now)
+                    ->first();
+
+                if ($activeSession) {
+                    $activeSession->delete();
+                    DB::commit();
+
+                    ApiLog::create([
+                        'school_id' => $this->currentSchoolId,
+                        'api_key' => $this->currentApiKey,
+                        'action' => 'gate_closed',
+                        'uid' => $fingerId,
+                        'success' => true,
+                        'message' => 'Sesi Kepulangan Ditutup: ' . $gateName,
+                        'created_at' => $now
+                    ]);
+
+                    return $this->response(true, 'success', "Gerbang Ditutup.", 'ok', [
+                        'type' => 'gate_closed',
+                        'nama' => $gateName
+                    ]);
+                }
 
                 TeacherCheckoutSession::create([
                     'teacher_id' => $gateCard->guru_id,
                     'teacher_name' => $gateName,
-                    'uid_rfid' => $fingerId,
+                    'uid_rfid' => $sessionUid,
                     'status' => 'open',
                     'expires_at' => $now->copy()->addMinutes(30),
                     'created_at' => $now

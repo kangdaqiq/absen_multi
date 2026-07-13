@@ -17,6 +17,8 @@ class GateCard extends Model
         'uid_rfid',
         'name',
         'enroll_status',
+        'id_finger',
+        'enroll_finger_status',
     ];
 
     public function school()
@@ -27,5 +29,10 @@ class GateCard extends Model
     public function guru()
     {
         return $this->belongsTo(Guru::class);
+    }
+
+    public function fingerprints()
+    {
+        return $this->hasMany(GateCardFingerprint::class, 'gate_card_id');
     }
 }

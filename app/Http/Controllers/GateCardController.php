@@ -6,6 +6,9 @@ use Illuminate\Http\Request;
 use App\Models\GateCard;
 use App\Models\Guru;
 use App\Models\Siswa;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Cache;
 
 class GateCardController extends Controller
 {
@@ -14,7 +17,12 @@ class GateCardController extends Controller
         $schoolId = auth()->user()->school_id;
         $gateCards = GateCard::where('school_id', $schoolId)->get();
         $gurus = Guru::where('school_id', $schoolId)->orderBy('nama')->get();
-        return view('gate-cards.index', compact('gateCards', 'gurus'));
+        $devices = \App\Models\Device::where('school_id', $schoolId)
+            ->where('active', true)
+            ->whereIn('type', ['fingerprint', 'rfid_fingerprint'])
+            ->orderBy('name')
+            ->get();
+        return view('gate-cards.index', compact('gateCards', 'gurus', 'devices'));
     }
 
     public function create()
@@ -199,6 +207,101 @@ class GateCardController extends Controller
             'uid_rfid' => null,
             'enroll_status' => 'done'
         ]);
+        return response()->json(['ok' => true]);
+    }
+
+    public function enrollFingerRequest($id, Request $request)
+    {
+        $gateCard = GateCard::where('school_id', auth()->user()->school_id)->findOrFail($id);
+        $schoolId = $gateCard->school_id;
+
+        // Reset others
+        Siswa::where('enroll_finger_status', 'requested')
+            ->where('school_id', $schoolId)
+            ->update(['enroll_finger_status' => 'none']);
+
+        Guru::where('enroll_finger_status', 'requested')
+            ->where('school_id', $schoolId)
+            ->update(['enroll_finger_status' => 'none']);
+
+        GateCard::where('enroll_finger_status', 'requested')
+            ->where('school_id', $schoolId)
+            ->update(['enroll_finger_status' => 'none']);
+
+        $gateCard->update(['enroll_finger_status' => 'requested']);
+
+        // Get device IP and send push notification
+        $device = \App\Models\Device::find($request->device_id);
+        $latestLog = \App\Models\ApiLog::where('api_key', $device->api_key)
+            ->whereNotNull('ip_address')
+            ->orderBy('created_at', 'desc')
+            ->first();
+
+        if ($latestLog && $latestLog->ip_address) {
+            try {
+                $url = "http://{$latestLog->ip_address}/enroll-finger?id={$gateCard->id}";
+                Http::timeout(3)->get($url);
+                Log::info("Fingerprint enrollment push sent to {$latestLog->ip_address} for gate card {$gateCard->id}");
+            } catch (\Exception $e) {
+                Log::error("Failed to send enrollment push for gate card: " . $e->getMessage());
+            }
+        }
+
+        return response()->json(['ok' => true]);
+    }
+
+    public function cancelFingerEnroll($id)
+    {
+        $gateCard = GateCard::where('school_id', auth()->user()->school_id)->findOrFail($id);
+        if ($gateCard->enroll_finger_status === 'requested') {
+            $gateCard->update(['enroll_finger_status' => 'none']);
+        }
+        return response()->json(['ok' => true]);
+    }
+
+    public function enrollFingerCheck($id)
+    {
+        $gateCard = GateCard::where('school_id', auth()->user()->school_id)->findOrFail($id);
+
+        if ($gateCard->enroll_finger_status === 'done' && $gateCard->id_finger) {
+            return response()->json(['ok' => true, 'id_finger' => $gateCard->id_finger, 'status' => 'done']);
+        }
+
+        return response()->json(['ok' => true, 'id_finger' => null, 'status' => 'requested']);
+    }
+
+    public function deleteFingerId($id)
+    {
+        $gateCard = GateCard::where('school_id', auth()->user()->school_id)->findOrFail($id);
+
+        // Get all fingerprints for this gate card
+        $fingerprints = \App\Models\GateCardFingerprint::where('gate_card_id', $gateCard->id)->get();
+
+        foreach ($fingerprints as $fingerprint) {
+            $device = \App\Models\Device::find($fingerprint->device_id);
+            if ($device) {
+                // Get device IP
+                $latestLog = \App\Models\ApiLog::where('api_key', $device->api_key)
+                    ->whereNotNull('ip_address')
+                    ->orderBy('created_at', 'desc')
+                    ->first();
+
+                if ($latestLog && $latestLog->ip_address) {
+                    try {
+                        $url = "http://{$latestLog->ip_address}/delete-finger?id={$fingerprint->finger_id}";
+                        Http::timeout(3)->get($url);
+                    } catch (\Exception $e) {}
+                }
+                
+                // Backup delete via cache polling
+                Cache::put('delete_finger_' . $device->id, $fingerprint->finger_id, now()->addMinutes(5));
+            }
+        }
+
+        // Delete from database
+        \App\Models\GateCardFingerprint::where('gate_card_id', $gateCard->id)->delete();
+        $gateCard->update(['id_finger' => null, 'enroll_finger_status' => 'none']);
+
         return response()->json(['ok' => true]);
     }
 }

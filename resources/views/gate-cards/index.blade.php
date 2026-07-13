@@ -39,7 +39,8 @@
                     <tr class="bg-gray-2 text-left dark:bg-meta-4">
                         <th class="py-4 px-4 font-medium text-black dark:text-white xl:pl-11">No</th>
                         <th class="py-4 px-4 font-medium text-black dark:text-white">Nama Kartu</th>
-                        <th class="py-4 px-4 font-medium text-black dark:text-white">UID RFID</th>
+                        <th class="py-4 px-4 font-medium text-black dark:text-white text-center">UID RFID</th>
+                        <th class="py-4 px-4 font-medium text-black dark:text-white text-center">ID Finger</th>
                         <th class="py-4 px-4 font-medium text-black dark:text-white text-center">Aksi</th>
                     </tr>
                 </thead>
@@ -59,7 +60,7 @@
                                     <p class="text-black dark:text-white">{{ $card->name }}</p>
                                 @endif
                             </td>
-                            <td class="border-b border-[#eee] py-5 px-4 dark:border-strokedark">
+                            <td class="border-b border-[#eee] py-5 px-4 dark:border-strokedark text-center">
                                 @if ($card->uid_rfid)
                                     <span class="inline-flex rounded-full bg-success/10 px-3 py-1 text-sm font-medium text-success">
                                         {{ $card->uid_rfid }}
@@ -71,7 +72,18 @@
                                     </span>
                                 @endif
                             </td>
-
+                            <td class="border-b border-[#eee] py-5 px-4 dark:border-strokedark text-center">
+                                @if ($card->id_finger)
+                                    <span class="inline-flex rounded-full bg-success/10 px-3 py-1 text-sm font-medium text-success">
+                                        {{ $card->id_finger }}
+                                    </span>
+                                @else
+                                    <span
+                                        class="inline-flex rounded-full bg-gray-100 px-3 py-1 text-sm font-medium text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+                                        Belum terdaftar
+                                    </span>
+                                @endif
+                            </td>
                             <td class="border-b border-[#eee] py-5 px-4 dark:border-strokedark">
                                 <div class="flex items-center justify-center gap-2">
                                     {{-- Enroll RFID --}}
@@ -80,6 +92,14 @@
                                         data-id="{{ $card->id }}" data-nama="{{ $card->name }}" data-uid="{{ $card->uid_rfid }}"
                                         @click="$dispatch('open-modal', 'modalEnrollRFID')" title="Registrasi RFID">
                                         <i class="fas fa-rss"></i>
+                                    </button>
+
+                                    {{-- Enroll Fingerprint --}}
+                                    <button
+                                        class="btnEnrollFinger text-green-500 hover:text-green-700 hover:bg-green-50 p-2 rounded-lg transition"
+                                        data-id="{{ $card->id }}" data-nama="{{ $card->name }}" data-finger="{{ $card->id_finger }}"
+                                        @click="$dispatch('open-modal', 'modalEnrollFinger')" title="Registrasi Sidik Jari">
+                                        <i class="fas fa-fingerprint"></i>
                                     </button>
 
                                     {{-- Edit --}}
@@ -283,6 +303,54 @@
         </div>
     </x-ui.modal>
 
+    {{-- Modal Enroll Fingerprint --}}
+    <x-ui.modal id="modalEnrollFinger" :is-open="false">
+        <div class="p-6 text-center">
+            <div class="flex justify-end mb-2">
+                <button @click="open = false"
+                    class="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white"><i
+                        class="fas fa-times"></i></button>
+            </div>
+            <div
+                class="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-success-50 text-success-500 dark:bg-success-500/15">
+                <i class="fas fa-fingerprint fa-2x"></i>
+            </div>
+            <h3 class="mb-2 text-2xl font-bold text-gray-800 dark:text-white/90">Registrasi Sidik Jari</h3>
+            <h5 id="enroll_finger_nama" class="font-medium text-gray-600 dark:text-gray-400 mb-6"></h5>
+
+            <div id="finger_id_wrapper"
+                class="hidden mb-4 rounded-lg bg-success-50 p-3 text-success-700 dark:bg-success-500/15 dark:text-success-500">
+                ID Sidik Jari: <strong id="enroll_finger_id" class="text-lg"></strong>
+            </div>
+
+            <div id="enroll_finger_status" class="mb-6 min-h-10 flex items-center justify-center text-sm text-center"></div>
+
+            <div class="mb-6 text-left">
+                <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Pilih Device</label>
+                <select id="finger_device_id"
+                    class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                    <option value="">-- Pilih Device --</option>
+                    @foreach ($devices as $dev)
+                        <option value="{{ $dev->id }}">{{ $dev->name }} ({{ ucfirst($dev->type) }})</option>
+                    @endforeach
+                </select>
+            </div>
+
+            <div class="flex flex-col gap-3">
+                <button type="button"
+                    class="rounded-lg bg-success-500 p-3 font-medium text-white hover:bg-success-600 transition"
+                    id="btnMulaiEnrollFinger">
+                    <i class="fas fa-fingerprint mr-1"></i> Mulai Scan Sidik Jari
+                </button>
+                <button type="button"
+                    class="rounded-lg bg-error-500 p-3 font-medium text-white hover:bg-error-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    id="btnHapusFinger" disabled>
+                    <i class="fas fa-trash mr-1"></i> Hapus Sidik Jari
+                </button>
+            </div>
+        </div>
+    </x-ui.modal>
+
 @endsection
 
 @push('scripts')
@@ -315,6 +383,8 @@
             // ===== ENROLL LOGIC =====
             let enrollCardId = null;
             let enrollInterval = null;
+            let enrollFingerCardId = null;
+            let enrollFingerInterval = null;
 
             $('.btnEnroll').on('click', function () {
                 enrollCardId = $(this).data('id');
@@ -383,6 +453,114 @@
                                 });
                             }
                         }
+                    }
+                    if (e.detail === 'modalEnrollFinger') {
+                        if (enrollFingerInterval) {
+                            clearInterval(enrollFingerInterval);
+                            if (enrollFingerCardId) {
+                                $.post('{{ url('gate-cards') }}/' + enrollFingerCardId + '/enroll-finger-cancel', {
+                                    _token: '{{ csrf_token() }}'
+                                });
+                            }
+                        }
+                    }
+                });
+            });
+
+            $('.btnEnrollFinger').on('click', function () {
+                enrollFingerCardId = $(this).data('id');
+                $('#enroll_finger_nama').text($(this).data('nama'));
+
+                // Reset UI
+                $('#enroll_finger_status').html('');
+                $('#finger_id_wrapper').addClass('hidden');
+                $('#enroll_finger_id').text('');
+                $('#btnHapusFinger').prop('disabled', true);
+                $('#finger_device_id').val('');
+
+                // Check existing Finger ID
+                var fingerId = $(this).data('finger');
+                if (fingerId) {
+                    $('#enroll_finger_id').text(fingerId);
+                    $('#finger_id_wrapper').removeClass('hidden');
+                    $('#btnHapusFinger').prop('disabled', false);
+                }
+            });
+
+            $('#btnMulaiEnrollFinger').on('click', function () {
+                if (!enrollFingerCardId) return;
+
+                var deviceId = $('#finger_device_id').val();
+                if (!deviceId) {
+                    alert('Pilih device terlebih dahulu!');
+                    return;
+                }
+
+                $('#enroll_finger_status').html('<span class="text-success-500 animate-pulse"><i class="fas fa-hand-point-up fa-spin mr-2"></i>Tempelkan jari ke sensor...</span>');
+
+                $.post('{{ url('gate-cards') }}/' + enrollFingerCardId + '/enroll-finger', {
+                    _token: '{{ csrf_token() }}',
+                    device_id: deviceId
+                }, function (res) {
+                    if (res.ok) {
+                        startFingerEnrollPolling(enrollFingerCardId);
+                    } else {
+                        $('#enroll_finger_status').html('<span class="text-error-500"><i class="fas fa-times-circle mr-1"></i>Gagal request enrollment.</span>');
+                    }
+                });
+            });
+
+            function startFingerEnrollPolling(id) {
+                if (enrollFingerInterval) clearInterval(enrollFingerInterval);
+                let counter = 0;
+
+                function updateStepMessage(c) {
+                    if (c <= 3) {
+                        $('#enroll_finger_status').html('<span class="text-success-500 animate-pulse"><i class="fas fa-hand-point-up mr-2"></i><b>Langkah 1/2:</b> Tempelkan jari ke sensor...</span>');
+                    } else if (c <= 6) {
+                        $('#enroll_finger_status').html('<span class="text-warning-500 animate-pulse"><i class="fas fa-arrow-up mr-2"></i><b>Langkah 1 selesai!</b> Sekarang <u>angkat jari</u>...</span>');
+                    } else {
+                        $('#enroll_finger_status').html('<span class="text-brand-500 animate-pulse"><i class="fas fa-hand-point-up mr-2"></i><b>Langkah 2/2:</b> Tempelkan jari <b>sekali lagi</b>...</span>');
+                    }
+                }
+
+                enrollFingerInterval = setInterval(function () {
+                    counter++;
+                    if (counter > 40) {
+                        clearInterval(enrollFingerInterval);
+                        $('#enroll_finger_status').html('<span class="text-warning-500"><i class="fas fa-exclamation-triangle mr-1"></i>Waktu habis. Coba lagi.</span>');
+                        return;
+                    }
+
+                    updateStepMessage(counter);
+
+                    $.get('{{ url('gate-cards') }}/' + id + '/enroll-finger-check', function (res) {
+                        if (res.ok && res.id_finger && res.status === 'done') {
+                            clearInterval(enrollFingerInterval);
+                            $('#enroll_finger_id').text(res.id_finger);
+                            $('#finger_id_wrapper').removeClass('hidden');
+                            $('#btnHapusFinger').prop('disabled', false);
+                            $('#enroll_finger_status').html('<span class="text-success-500 font-bold"><i class="fas fa-check-circle mr-1"></i> Berhasil! Menyegarkan...</span>');
+
+                            setTimeout(function () { location.reload(); }, 1500);
+                        }
+                    });
+                }, 1500);
+            }
+
+            $('#btnHapusFinger').on('click', function () {
+                if (!enrollFingerCardId) return;
+                if (!confirm('Hapus sidik jari kartu gerbang ini dari semua device?')) return;
+
+                $.post('{{ url('gate-cards') }}/' + enrollFingerCardId + '/delete-finger', {
+                    _token: '{{ csrf_token() }}'
+                }, function (res) {
+                    if (res.ok) {
+                        $('#finger_id_wrapper').addClass('hidden');
+                        $('#enroll_finger_id').text('');
+                        $('#btnHapusFinger').prop('disabled', true);
+                        $('#enroll_finger_status').html('<span class="text-warning-500">Sidik jari dihapus.</span>');
+                        setTimeout(function () { location.reload(); }, 1000);
                     }
                 });
             });

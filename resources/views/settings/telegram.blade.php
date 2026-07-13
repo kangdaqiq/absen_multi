@@ -159,4 +159,4 @@
             background-color: #3b82f6;
         }
     </style>
-@endsection
+@endpush

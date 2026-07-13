@@ -685,8 +685,8 @@ return $this->response(false, 'error', 'Enroll Gagal');
                         $q->select(DB::raw(1))
                             ->from('gate_cards')
                             ->where(function ($q2) {
-                                $q2->whereColumn('gate_cards.uid_rfid', 'teacher_checkout_sessions.uid_rfid')
-                                    ->orWhereRaw("CONCAT('gate_card_', gate_cards.id) = teacher_checkout_sessions.uid_rfid");
+                                $q2->whereRaw("gate_cards.uid_rfid COLLATE utf8mb4_unicode_ci = teacher_checkout_sessions.uid_rfid COLLATE utf8mb4_unicode_ci")
+                                    ->orWhereRaw("CONCAT('gate_card_', gate_cards.id) COLLATE utf8mb4_unicode_ci = teacher_checkout_sessions.uid_rfid COLLATE utf8mb4_unicode_ci");
                             })
                             ->where('gate_cards.school_id', $device->school_id);
                     });

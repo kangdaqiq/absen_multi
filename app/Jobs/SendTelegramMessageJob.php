@@ -43,12 +43,27 @@ class SendTelegramMessageJob implements ShouldQueue
             ]);
 
             if ($response->successful()) {
+                \App\Models\TelegramLog::create([
+                    'school_id' => $this->schoolId,
+                    'chat_id' => $this->chatId,
+                    'message' => $this->text,
+                    'status' => 'sent',
+                    'error' => null,
+                ]);
                 return;
             }
 
             $errorMsg = 'Telegram API Error: HTTP ' . $response->status() . ' - ' . $response->body();
             Log::error($errorMsg);
             
+            \App\Models\TelegramLog::create([
+                'school_id' => $this->schoolId,
+                'chat_id' => $this->chatId,
+                'message' => $this->text,
+                'status' => 'failed',
+                'error' => $errorMsg,
+            ]);
+
             // Log to ApiLog for admin visibility
             \App\Models\ApiLog::create([
                 'school_id' => $this->schoolId,
@@ -63,6 +78,14 @@ class SendTelegramMessageJob implements ShouldQueue
         } catch (\Exception $e) {
             $errorMsg = 'Telegram Job Exception: ' . $e->getMessage();
             Log::error($errorMsg);
+
+            \App\Models\TelegramLog::create([
+                'school_id' => $this->schoolId,
+                'chat_id' => $this->chatId,
+                'message' => $this->text,
+                'status' => 'failed',
+                'error' => $errorMsg,
+            ]);
 
             \App\Models\ApiLog::create([
                 'school_id' => $this->schoolId,

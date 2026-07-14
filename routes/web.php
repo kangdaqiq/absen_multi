@@ -231,6 +231,9 @@ Route::middleware('auth')->group(function () {
         // WhatsApp Logs
         Route::get('/whatsapp-logs', [App\Http\Controllers\WhatsappLogController::class, 'index'])->name('whatsapp-logs.index');
 
+        // Telegram Logs
+        Route::get('/telegram-logs', [App\Http\Controllers\TelegramLogController::class, 'index'])->name('telegram-logs.index');
+
         // API Logs
         Route::get('/api-logs', [App\Http\Controllers\ApiLogController::class, 'index'])->name('api-logs.index');
 

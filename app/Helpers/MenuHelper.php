@@ -186,6 +186,7 @@ class MenuHelper
                 $sistemSubItems[] = ['name' => 'Backup Sistem (SQL)', 'path' => route('backups.index', [], false)];
             }
             $sistemSubItems[] = ['name' => 'Log WhatsApp', 'path' => route('whatsapp-logs.index', [], false)];
+            $sistemSubItems[] = ['name' => 'Log Telegram', 'path' => route('telegram-logs.index', [], false)];
             $sistemSubItems[] = ['name' => 'Log API', 'path' => route('api-logs.index', [], false)];
 
             $menu[] = [

@@ -23,6 +23,11 @@ class ProcessWhatsappQueue extends Command
     {
         $limit = $this->option('limit');
 
+        // Self-healing: Reset stuck 'processing' messages (older than 10 minutes) back to 'pending'
+        MessageQueue::where('status', 'processing')
+            ->where('updated_at', '<', now()->subMinutes(10))
+            ->update(['status' => 'pending', 'updated_at' => now()]);
+
         // Expire: tandai semua pesan pending dari hari sebelumnya sebagai failed
         MessageQueue::where('status', 'pending')
             ->where('created_at', '<', today())

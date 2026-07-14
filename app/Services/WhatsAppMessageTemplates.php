@@ -37,18 +37,29 @@ class WhatsAppMessageTemplates
 
     /**
      * Kalimat penutup yang bervariasi — deterministik per nama+tanggal.
+     * Mengarahkan penerima agar membalas pesan untuk meningkatkan reputasi nomor pengirim di server WA.
      */
-    private static function randomClosing(string $nama): string
+    private static function randomClosing(string $nama, bool $isParent = false): string
     {
         $seed = crc32('closing_' . $nama . date('Y-m-d')) % 5;
 
-        $closings = [
-            "_Notifikasi otomatis dari sistem absensi sekolah._",
-            "_Pesan ini dikirim otomatis oleh sistem absensi._",
-            "_Informasi ini dikirim secara otomatis. Mohon tidak membalas pesan ini._",
-            "_Sistem absensi sekolah — pesan otomatis._",
-            "_Notifikasi resmi dari sistem kehadiran sekolah._",
-        ];
+        if ($isParent) {
+            $closings = [
+                "_\n\nSilakan balas pesan ini dengan kata *OK* atau *Diterima* sebagai konfirmasi Anda._",
+                "_\n\nMohon berkenan membalas chat ini singkat saja (contoh: *Diterima*) sebagai tanda laporan telah dibaca._",
+                "_\n\nHarap balas pesan otomatis ini untuk memastikan laporan absensi anak Anda terkirim dengan baik._",
+                "_\n\nSilakan ketik balas *OK* pada chat ini agar sistem mencatat tanda terima orang tua._",
+                "_\n\nMohon balas pesan ini singkat saja untuk menjaga kelancaran saluran komunikasi absensi sekolah._",
+            ];
+        } else {
+            $closings = [
+                "_\n\nSilakan balas pesan ini singkat saja (contoh: *OK*) untuk konfirmasi Anda._",
+                "_\n\nMohon balas chat ini sebagai tanda bahwa pemberitahuan ini telah dibaca._",
+                "_\n\nHarap ketik balas *Diterima/OK* untuk memastikan pesan absensi Anda telah sampai._",
+                "_\n\nSilakan balas pesan otomatis ini dengan ketikan singkat._",
+                "_\n\nMohon berkenan membalas chat ini untuk verifikasi penerimaan pesan._",
+            ];
+        }
 
         return $closings[abs($seed)];
     }
@@ -60,7 +71,7 @@ class WhatsAppMessageTemplates
     {
         $tgl = now()->format('d/m/Y');
         $greeting = self::randomGreeting($nama);
-        $closing  = self::randomClosing($nama);
+        $closing  = self::randomClosing($nama, isParent: false);
         $seed = crc32($nama . date('Y-m-d')) % 3;
 
         // Sakit template variations
@@ -106,7 +117,7 @@ class WhatsAppMessageTemplates
     ): string {
         $tgl      = $tanggal ?? now()->format('d/m/Y');
         $greeting = self::randomGreeting($nama);
-        $closing  = self::randomClosing($nama);
+        $closing  = self::randomClosing($nama, isParent: false);
         $seed = crc32('checkout_' . $nama . $tgl) % 3;
 
         $options = [
@@ -139,7 +150,7 @@ class WhatsAppMessageTemplates
         }
 
         $greeting = self::randomGreeting($nama);
-        $closing  = self::randomClosing($nama);
+        $closing  = self::randomClosing($nama, isParent: false);
         $seed = crc32('late_' . $nama . $tgl) % 3;
 
         $options = [
@@ -158,7 +169,7 @@ class WhatsAppMessageTemplates
     {
         $tgl = now()->format('d/m/Y');
         $greeting = self::randomGreeting($nama, isParent: true);
-        $closing  = self::randomClosing($nama);
+        $closing  = self::randomClosing($nama, isParent: true);
         $seed = crc32('parent_in_' . $nama . $tgl) % 3;
 
         // Sakit template variations to parent
@@ -211,7 +222,7 @@ class WhatsAppMessageTemplates
         }
 
         $greeting = self::randomGreeting($nama, isParent: true);
-        $closing  = self::randomClosing($nama);
+        $closing  = self::randomClosing($nama, isParent: true);
         $seed = crc32('parent_late_' . $nama . $tgl) % 3;
 
         $options = [
@@ -237,7 +248,7 @@ class WhatsAppMessageTemplates
     ): string {
         $tgl      = $tanggal ?? now()->format('d/m/Y');
         $greeting = self::randomGreeting($nama, isParent: true);
-        $closing  = self::randomClosing($nama);
+        $closing  = self::randomClosing($nama, isParent: true);
         $seed = crc32('parent_out_' . $nama . $tgl) % 3;
 
         $options = [
@@ -256,7 +267,7 @@ class WhatsAppMessageTemplates
     {
         $tgl = now()->format('d/m/Y');
         $greeting = self::randomGreeting($nama);
-        $closing  = self::randomClosing($nama);
+        $closing  = self::randomClosing($nama, isParent: false);
         $seed = crc32('alpha_' . $nama . $tgl) % 3;
 
         $options = [
@@ -275,7 +286,7 @@ class WhatsAppMessageTemplates
     {
         $tgl = now()->format('d/m/Y');
         $greeting = self::randomGreeting($nama, isParent: true);
-        $closing  = self::randomClosing($nama);
+        $closing  = self::randomClosing($nama, isParent: true);
         $seed = crc32('parent_alpha_' . $nama . $tgl) % 3;
 
         $options = [
@@ -294,7 +305,7 @@ class WhatsAppMessageTemplates
     {
         $tgl = now()->format('d/m/Y');
         $greeting = self::randomGreeting($nama);
-        $closing  = self::randomClosing($nama);
+        $closing  = self::randomClosing($nama, isParent: false);
         $seed = crc32('bolos_' . $nama . $tgl) % 3;
 
         $options = [
@@ -313,7 +324,7 @@ class WhatsAppMessageTemplates
     {
         $tgl = now()->format('d/m/Y');
         $greeting = self::randomGreeting($nama, isParent: true);
-        $closing  = self::randomClosing($nama);
+        $closing  = self::randomClosing($nama, isParent: true);
         $seed = crc32('parent_bolos_' . $nama . $tgl) % 3;
 
         $options = [
@@ -674,6 +685,7 @@ class WhatsAppMessageTemplates
         string $tanggal,
         bool $isOrtu = false
     ): string {
+        $closing = self::randomClosing($nama, $isOrtu);
         if ($isOrtu) {
             return "📋 *Notifikasi Kehadiran Kegiatan*\n\n" .
                 "Halo, Orang Tua/Wali dari *{$nama}*,\n\n" .
@@ -682,7 +694,7 @@ class WhatsAppMessageTemplates
                 "👤 Siswa   : {$nama}\n" .
                 "📅 Tanggal  : {$tanggal}\n" .
                 "🕐 Jam Masuk: {$jam}\n\n" .
-                "_Notifikasi otomatis dari sistem absensi sekolah._";
+                "{$closing}";
         }
 
         return "📋 *Notifikasi Kehadiran Kegiatan*\n\n" .
@@ -691,6 +703,6 @@ class WhatsAppMessageTemplates
             "🎯 Kegiatan : *{$namaKegiatan}*\n" .
             "📅 Tanggal  : {$tanggal}\n" .
             "🕐 Jam Masuk: {$jam}\n\n" .
-            "_Notifikasi otomatis dari sistem absensi sekolah._";
+            "{$closing}";
     }
 }

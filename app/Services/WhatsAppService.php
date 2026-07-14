@@ -13,8 +13,11 @@ class WhatsAppService
         if (!$phone && !$phoneOrtu)
             return;
 
+        $siswaEnabled = $schoolId ? (\App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'notification_wa_siswa')->value('setting_value') !== 'false') : true;
+        $ortuEnabled = $schoolId ? (\App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'notification_wa_ortu')->value('setting_value') !== 'false') : true;
+
         // Send to student if phone exists
-        if ($phone) {
+        if ($phone && $siswaEnabled) {
             $msg = "✨ *PENDAFTARAN BERHASIL* ✨\n\n" .
                 "Halo, *{$name}* 👋,\n\n" .
                 "Kartu/Perangkat *{$type}* Anda telah berhasil didaftarkan ke sistem absensi sekolah.\n\n" .
@@ -25,7 +28,7 @@ class WhatsAppService
         }
 
         // Send to parent if phone number exists
-        if ($phoneOrtu) {
+        if ($phoneOrtu && $ortuEnabled) {
             $msgOrtu = "✨ *PENDAFTARAN BERHASIL* ✨\n\n" .
                 "Halo, Anak Anda, *{$name}* 👋,\n\n" .
                 "Kartu/Perangkat *{$type}* telah berhasil didaftarkan ke sistem absensi sekolah.\n\n" .
@@ -44,6 +47,9 @@ class WhatsAppService
         if (!$phone && !$phoneOrtu)
             return;
 
+        $siswaEnabled = $schoolId ? (\App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'notification_wa_siswa')->value('setting_value') !== 'false') : true;
+        $ortuEnabled = $schoolId ? (\App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'notification_wa_ortu')->value('setting_value') !== 'false') : true;
+
         // Map short status to readable status
         $statusMap = [
             'H' => 'Hadir',
@@ -59,47 +65,47 @@ class WhatsAppService
         $isLate = !empty($keterangan);
 
         // Send to student if phone exists
-        if ($phone) {
+        if ($phone && $siswaEnabled) {
             if ($isLate) {
                 // Parse durasi dari keterangan: "Telat 1 jam 30 menit" atau "Telat 30 menit"
                 [$lateHours, $lateMinutes] = $this->parseLateDuration($keterangan);
 
                 $msg = WhatsAppMessageTemplates::checkInLate(
-                    nama: $name,
-                    jamMasuk: $time,
-                    kelas: $kelas,
-                    lateHours: $lateHours,
-                    lateMinutes: $lateMinutes
+                     nama: $name,
+                     jamMasuk: $time,
+                     kelas: $kelas,
+                     lateHours: $lateHours,
+                     lateMinutes: $lateMinutes
                 );
             } else {
                 $msg = WhatsAppMessageTemplates::checkIn(
-                    nama: $name,
-                    jamMasuk: $time,
-                    kelas: $kelas,
-                    status: $readableStatus
+                     nama: $name,
+                     jamMasuk: $time,
+                     kelas: $kelas,
+                     status: $readableStatus
                 );
             }
             $this->queueMessage($phone, $msg, $schoolId);
         }
 
         // Send to parent if phone number exists
-        if ($phoneOrtu) {
+        if ($phoneOrtu && $ortuEnabled) {
             if ($isLate) {
                 [$lateHours, $lateMinutes] = $this->parseLateDuration($keterangan);
 
                 $msgOrtu = WhatsAppMessageTemplates::checkInLateParent(
-                    nama: $name,
-                    jamMasuk: $time,
-                    kelas: $kelas,
-                    lateHours: $lateHours,
-                    lateMinutes: $lateMinutes
+                     nama: $name,
+                     jamMasuk: $time,
+                     kelas: $kelas,
+                     lateHours: $lateHours,
+                     lateMinutes: $lateMinutes
                 );
             } else {
                 $msgOrtu = WhatsAppMessageTemplates::checkInParent(
-                    nama: $name,
-                    jamMasuk: $time,
-                    kelas: $kelas,
-                    status: $readableStatus
+                     nama: $name,
+                     jamMasuk: $time,
+                     kelas: $kelas,
+                     status: $readableStatus
                 );
             }
             $this->queueMessage($phoneOrtu, $msgOrtu, $schoolId);
@@ -137,8 +143,11 @@ class WhatsAppService
         if (!$phone && !$phoneOrtu)
             return;
 
+        $siswaEnabled = $schoolId ? (\App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'notification_wa_siswa')->value('setting_value') !== 'false') : true;
+        $ortuEnabled = $schoolId ? (\App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'notification_wa_ortu')->value('setting_value') !== 'false') : true;
+
         // Send to student if phone exists
-        if ($phone) {
+        if ($phone && $siswaEnabled) {
             $msg = WhatsAppMessageTemplates::checkOut(
                 nama: $name,
                 jamMasuk: $jamMasuk,
@@ -152,7 +161,7 @@ class WhatsAppService
         }
 
         // Send to parent if phone number exists
-        if ($phoneOrtu) {
+        if ($phoneOrtu && $ortuEnabled) {
             $msgOrtu = WhatsAppMessageTemplates::checkOutParent(
                 nama: $name,
                 jamMasuk: $jamMasuk,
@@ -180,7 +189,10 @@ class WhatsAppService
     ): void {
         if (!$phoneSiswa && !$phoneOrtu) return;
 
-        if ($phoneSiswa) {
+        $siswaEnabled = $schoolId ? (\App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'notification_wa_siswa')->value('setting_value') !== 'false') : true;
+        $ortuEnabled = $schoolId ? (\App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'notification_wa_ortu')->value('setting_value') !== 'false') : true;
+
+        if ($phoneSiswa && $siswaEnabled) {
             $msg = WhatsAppMessageTemplates::kegiatanCheckIn(
                 nama: $namaSiswa,
                 namaKegiatan: $namaKegiatan,
@@ -191,7 +203,7 @@ class WhatsAppService
             $this->queueMessage($phoneSiswa, $msg, $schoolId);
         }
 
-        if ($phoneOrtu) {
+        if ($phoneOrtu && $ortuEnabled) {
             $msgOrtu = WhatsAppMessageTemplates::kegiatanCheckIn(
                 nama: $namaSiswa,
                 namaKegiatan: $namaKegiatan,

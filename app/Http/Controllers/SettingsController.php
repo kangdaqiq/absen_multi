@@ -114,6 +114,10 @@ class SettingsController extends Controller
             'absence_notification_enabled',
             'enable_birthday_greeting',
             'telegram_enabled',
+            'notification_wa_siswa',
+            'notification_wa_ortu',
+            'notification_tele_siswa',
+            'notification_tele_ortu',
         ];
 
         foreach ($checkboxSettings as $checkbox) {

@@ -104,8 +104,13 @@ class AutoBolosCommand extends Command
             $telegramEnabled = $school->telegram_enabled;
             $telegramToken = $school->telegram_bot_token;
 
+            $waSiswaEnabled = \App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'notification_wa_siswa')->value('setting_value') !== 'false';
+            $waOrtuEnabled = \App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'notification_wa_ortu')->value('setting_value') !== 'false';
+            $teleSiswaEnabled = \App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'notification_tele_siswa')->value('setting_value') !== 'false';
+            $teleOrtuEnabled = \App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'notification_tele_ortu')->value('setting_value') !== 'false';
+
             foreach ($bolosStudents as $bs) {
-                if (!empty($bs->no_wa)) {
+                if (!empty($bs->no_wa) && $waSiswaEnabled) {
                     MessageQueue::create([
                         'school_id' => $schoolId,
                         'phone_number' => $bs->no_wa,
@@ -114,7 +119,7 @@ class AutoBolosCommand extends Command
                         'created_at' => now()
                     ]);
                 }
-                if (!empty($bs->wa_ortu)) {
+                if (!empty($bs->wa_ortu) && $waOrtuEnabled) {
                     MessageQueue::create([
                         'school_id' => $schoolId,
                         'phone_number' => $bs->wa_ortu,
@@ -126,7 +131,7 @@ class AutoBolosCommand extends Command
 
                 // Telegram Notification
                 if ($telegramEnabled && $telegramToken) {
-                    if (!empty($bs->telegram_chat_id)) {
+                    if (!empty($bs->telegram_chat_id) && $teleSiswaEnabled) {
                         $msgTelegram = "⚠️ <b>PERINGATAN BOLOS</b> ⚠️\n\n" .
                             "Halo, <b>{$bs->nama}</b> 👋,\n\n" .
                             "Anda terdeteksi belum melakukan absen pulang (check-out) hingga waktu yang ditentukan hari ini.\n" .
@@ -138,7 +143,7 @@ class AutoBolosCommand extends Command
                         
                         \App\Jobs\SendTelegramMessageJob::dispatch($telegramToken, $bs->telegram_chat_id, $msgTelegram, $schoolId);
                     }
-                    if (!empty($bs->telegram_ortu_chat_id)) {
+                    if (!empty($bs->telegram_ortu_chat_id) && $teleOrtuEnabled) {
                         $msgTelegramOrtu = "⚠️ <b>Pemberitahuan Bolos</b> ⚠️\n\n" .
                             "Bapak/Ibu Orang Tua/Wali dari <b>{$bs->nama}</b> (Kelas: {$bs->nama_kelas}),\n\n" .
                             "Menginfokan bahwa putra/putri Anda terdeteksi belum melakukan absen pulang hingga waktu yang ditentukan hari ini, sehingga status kehadirannya diubah menjadi <b>Bolos (B)</b>.";

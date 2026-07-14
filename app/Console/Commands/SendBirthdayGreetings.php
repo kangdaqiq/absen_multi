@@ -123,20 +123,17 @@ class SendBirthdayGreetings extends Command
             }
         }
 
-        // 4. Proses Siswa yang berulang tahun hari ini
-        $siswaBirthdays = Siswa::where('school_id', $schoolId)
-            ->whereNotNull('tgl_lahir')
-            ->whereMonth('tgl_lahir', $month)
-            ->whereDay('tgl_lahir', $day)
-            ->with('kelas')
-            ->get();
+        $waSiswaEnabled = \App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'notification_wa_siswa')->value('setting_value') !== 'false';
+        $waOrtuEnabled = \App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'notification_wa_ortu')->value('setting_value') !== 'false';
+        $teleSiswaEnabled = \App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'notification_tele_siswa')->value('setting_value') !== 'false';
+        $teleOrtuEnabled = \App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'notification_tele_ortu')->value('setting_value') !== 'false';
 
         foreach ($siswaBirthdays as $siswa) {
             $namaKelas = $siswa->kelas->nama_kelas ?? '-';
 
             // Kirim ke nomor siswa jika ada
             $noWaSiswa = $siswa->no_wa ?? null;
-            if ($noWaSiswa) {
+            if ($noWaSiswa && $waSiswaEnabled) {
                 $message = $this->buildMessage($templateSiswa, [
                     '{nama}'    => $siswa->nama,
                     '{sekolah}' => $schoolName,
@@ -157,8 +154,14 @@ class SendBirthdayGreetings extends Command
             }
 
             // Telegram Birthday Greeting to Student
-            if ($telegramEnabled && $telegramToken && !empty($siswa->telegram_chat_id)) {
-                $telegramMsg = $message;
+            if ($telegramEnabled && $telegramToken && !empty($siswa->telegram_chat_id) && $teleSiswaEnabled) {
+                $messageText = isset($message) ? $message : $this->buildMessage($templateSiswa, [
+                    '{nama}'    => $siswa->nama,
+                    '{sekolah}' => $schoolName,
+                    '{kelas}'   => $namaKelas,
+                ]);
+
+                $telegramMsg = $messageText;
                 $telegramMsg = preg_replace('/\*([^*]+)\*/', '<b>$1</b>', $telegramMsg);
                 $telegramMsg = preg_replace('/\_([^_]+)\_/', '<i>$1</i>', $telegramMsg);
 
@@ -168,7 +171,7 @@ class SendBirthdayGreetings extends Command
 
             // Kirim juga ke nomor orang tua jika ada dan berbeda dengan nomor siswa
             $noWaOrtu = $siswa->wa_ortu ?? null;
-            if ($noWaOrtu && $noWaOrtu !== $noWaSiswa) {
+            if ($noWaOrtu && $noWaOrtu !== $noWaSiswa && $waOrtuEnabled) {
                 $messageOrtu = "🎂 *Selamat Ulang Tahun untuk putra/putri Anda!*\n\n"
                     . "Halo Orang Tua/Wali dari *{$siswa->nama}*,\n\n"
                     . "Hari ini adalah hari ulang tahun {$siswa->nama}. Semoga selalu sehat, ceria, dan semakin berprestasi! 🎉\n\n"
@@ -188,7 +191,7 @@ class SendBirthdayGreetings extends Command
             }
 
             // Telegram Birthday Greeting to Parent
-            if ($telegramEnabled && $telegramToken && !empty($siswa->telegram_ortu_chat_id)) {
+            if ($telegramEnabled && $telegramToken && !empty($siswa->telegram_ortu_chat_id) && $teleOrtuEnabled) {
                 $telegramMsgOrtu = isset($messageOrtu) ? $messageOrtu : (
                     "🎂 <b>Selamat Ulang Tahun untuk putra/putri Anda!</b>\n\n"
                     . "Halo Orang Tua/Wali dari <b>{$siswa->nama}</b>,\n\n"
@@ -204,7 +207,7 @@ class SendBirthdayGreetings extends Command
             }
 
             // Jika tidak ada nomor siswa, kirim hanya ke ortu
-            if (!$noWaSiswa && $noWaOrtu) {
+            if (!$noWaSiswa && $noWaOrtu && $waOrtuEnabled) {
                 $messageOrtu = "🎂 *Selamat Ulang Tahun untuk putra/putri Anda!*\n\n"
                     . "Halo Orang Tua/Wali dari *{$siswa->nama}*,\n\n"
                     . "Hari ini adalah hari ulang tahun {$siswa->nama}. Semoga selalu sehat, ceria, dan semakin berprestasi! 🎉\n\n"

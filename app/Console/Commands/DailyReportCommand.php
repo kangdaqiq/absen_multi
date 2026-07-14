@@ -542,7 +542,12 @@ class DailyReportCommand extends Command
         $parentPhone = $student->wa_ortu;
         $kelasName = $student->kelas->nama_kelas ?? '-';
 
-        if ($studentPhone) {
+        $waSiswaEnabled = \App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'notification_wa_siswa')->value('setting_value') !== 'false';
+        $waOrtuEnabled = \App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'notification_wa_ortu')->value('setting_value') !== 'false';
+        $teleSiswaEnabled = \App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'notification_tele_siswa')->value('setting_value') !== 'false';
+        $teleOrtuEnabled = \App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'notification_tele_ortu')->value('setting_value') !== 'false';
+
+        if ($studentPhone && $waSiswaEnabled) {
             $msgStudent = "❌ *Pemberitahuan Ketidakhadiran*\n\n" .
                 "Halo, *{$studentName}*,\n\n" .
                 "📅 Tanggal: " . now()->format('d/m/Y') . "\n" .
@@ -560,7 +565,7 @@ class DailyReportCommand extends Command
             ]);
         }
 
-        if ($parentPhone) {
+        if ($parentPhone && $waOrtuEnabled) {
             $msgParent = "❌ *Pemberitahuan Ketidakhadiran Anak*\n\n" .
                 "Halo, Orang Tua/Wali dari *{$studentName}*,\n\n" .
                 "📅 Tanggal: " . now()->format('d/m/Y') . "\n" .
@@ -585,8 +590,17 @@ class DailyReportCommand extends Command
         $telegramToken = $school ? $school->telegram_bot_token : null;
 
         if ($telegramEnabled && $telegramToken) {
-            if (!empty($student->telegram_chat_id)) {
-                $msgStudentTelegram = $msgStudent;
+            if (!empty($student->telegram_chat_id) && $teleSiswaEnabled) {
+                // Ensure msgStudent is compiled even if WA student notification is off
+                $msgStudentText = "❌ *Pemberitahuan Ketidakhadiran*\n\n" .
+                    "Halo, *{$studentName}*,\n\n" .
+                    "📅 Tanggal: " . now()->format('d/m/Y') . "\n" .
+                    "📊 Status: Alpha (Tidak Hadir)\n\n" .
+                    "Anda tercatat tidak hadir hari ini tanpa keterangan.\n" .
+                    "Mohon segera konfirmasi ke wali kelas atau bagian kesiswaan.\n\n" .
+                    "_Notifikasi otomatis dari sistem absensi sekolah._";
+
+                $msgStudentTelegram = $msgStudentText;
                 $msgStudentTelegram = preg_replace('/\*([^*]+)\*/', '<b>$1</b>', $msgStudentTelegram);
                 $msgStudentTelegram = preg_replace('/\_([^_]+)\_/', '<i>$1</i>', $msgStudentTelegram);
                 
@@ -596,8 +610,18 @@ class DailyReportCommand extends Command
                 
                 \App\Jobs\SendTelegramMessageJob::dispatch($telegramToken, $student->telegram_chat_id, $msgStudentTelegram, $schoolId);
             }
-            if (!empty($student->telegram_ortu_chat_id)) {
-                $msgParentTelegram = $msgParent;
+            if (!empty($student->telegram_ortu_chat_id) && $teleOrtuEnabled) {
+                // Ensure msgParent is compiled even if WA parent notification is off
+                $msgParentText = "❌ *Pemberitahuan Ketidakhadiran Anak*\n\n" .
+                    "Halo, Orang Tua/Wali dari *{$studentName}*,\n\n" .
+                    "📅 Tanggal: " . now()->format('d/m/Y') . "\n" .
+                    "📊 Status: Alpha (Tidak Hadir)\n" .
+                    "⚠️ Kelas: {$kelasName}\n\n" .
+                    "Anak Anda tercatat tidak hadir hari ini tanpa keterangan.\n" .
+                    "Mohon konfirmasi kepada wali kelas atau bagian kesiswaan.\n\n" .
+                    "_Notifikasi otomatis dari sistem absensi sekolah._";
+
+                $msgParentTelegram = $msgParentText;
                 $msgParentTelegram = preg_replace('/\*([^*]+)\*/', '<b>$1</b>', $msgParentTelegram);
                 $msgParentTelegram = preg_replace('/\_([^_]+)\_/', '<i>$1</i>', $msgParentTelegram);
                 

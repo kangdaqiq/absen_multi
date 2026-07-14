@@ -20,8 +20,11 @@ class TelegramService
         }
         $token = $school->telegram_bot_token;
 
+        $siswaEnabled = $schoolId ? (\App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'notification_tele_siswa')->value('setting_value') !== 'false') : true;
+        $ortuEnabled = $schoolId ? (\App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'notification_tele_ortu')->value('setting_value') !== 'false') : true;
+
         // Send to student
-        if ($chatId) {
+        if ($chatId && $siswaEnabled) {
             $msg = "✨ <b>PENDAFTARAN BERHASIL</b> ✨\n\n" .
                 "Halo, <b>{$name}</b> 👋,\n\n" .
                 "Kartu/Perangkat <b>{$type}</b> Anda telah berhasil didaftarkan ke sistem absensi sekolah.\n\n" .
@@ -33,7 +36,7 @@ class TelegramService
         }
 
         // Send to parent
-        if ($chatIdOrtu) {
+        if ($chatIdOrtu && $ortuEnabled) {
             $msgOrtu = "✨ <b>PENDAFTARAN BERHASIL</b> ✨\n\n" .
                 "Halo, Anak Anda, <b>{$name}</b> 👋,\n\n" .
                 "Kartu/Perangkat <b>{$type}</b> telah berhasil didaftarkan ke sistem absensi sekolah.\n\n" .
@@ -57,6 +60,9 @@ class TelegramService
         }
         $token = $school->telegram_bot_token;
 
+        $siswaEnabled = $schoolId ? (\App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'notification_tele_siswa')->value('setting_value') !== 'false') : true;
+        $ortuEnabled = $schoolId ? (\App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'notification_tele_ortu')->value('setting_value') !== 'false') : true;
+
         $statusMap = [
             'H' => 'Hadir',
             'A' => 'Alpha',
@@ -69,7 +75,7 @@ class TelegramService
         $isLate = !empty($keterangan);
 
         // Student message
-        if ($chatId) {
+        if ($chatId && $siswaEnabled) {
             if ($isLate) {
                 [$lateHours, $lateMinutes] = $this->parseLateDuration($keterangan);
                 $durationText = $lateHours > 0 ? "{$lateHours} jam {$lateMinutes} menit" : "{$lateMinutes} menit";
@@ -92,7 +98,7 @@ class TelegramService
         }
 
         // Parent message
-        if ($chatIdOrtu) {
+        if ($chatIdOrtu && $ortuEnabled) {
             if ($isLate) {
                 [$lateHours, $lateMinutes] = $this->parseLateDuration($keterangan);
                 $durationText = $lateHours > 0 ? "{$lateHours} jam {$lateMinutes} menit" : "{$lateMinutes} menit";
@@ -123,8 +129,11 @@ class TelegramService
         $token = $school->telegram_bot_token;
         $dateText = $tanggal ?: now()->format('d/m/Y');
 
+        $siswaEnabled = $schoolId ? (\App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'notification_tele_siswa')->value('setting_value') !== 'false') : true;
+        $ortuEnabled = $schoolId ? (\App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'notification_tele_ortu')->value('setting_value') !== 'false') : true;
+
         // Student message
-        if ($chatId) {
+        if ($chatId && $siswaEnabled) {
             $msg = "🚪 <b>ABSEN PULANG BERHASIL</b> 🚪\n\n" .
                 "Halo, <b>{$name}</b> 👋,\n\n" .
                 "Anda telah melakukan absen pulang pada pukul <b>{$time}</b>.\n\n" .
@@ -138,7 +147,7 @@ class TelegramService
         }
 
         // Parent message
-        if ($chatIdOrtu) {
+        if ($chatIdOrtu && $ortuEnabled) {
             $msgOrtu = "🔔 <b>Laporan Absensi Pulang</b> 🔔\n\n" .
                 "Bapak/Ibu Orang Tua/Wali dari <b>{$name}</b>,\n\n" .
                 "Menginfokan bahwa putra/putri Anda telah melakukan absen pulang sekolah pada pukul <b>{$time}</b>.\n\n" .
@@ -170,7 +179,10 @@ class TelegramService
         }
         $token = $school->telegram_bot_token;
 
-        if ($chatIdSiswa) {
+        $siswaEnabled = $schoolId ? (\App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'notification_tele_siswa')->value('setting_value') !== 'false') : true;
+        $ortuEnabled = $schoolId ? (\App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'notification_tele_ortu')->value('setting_value') !== 'false') : true;
+
+        if ($chatIdSiswa && $siswaEnabled) {
             $msg = "✨ <b>KEHADIRAN KEGIATAN BERHASIL</b> ✨\n\n" .
                 "Halo, <b>{$namaSiswa}</b> 👋,\n\n" .
                 "Anda terdaftar hadir dalam kegiatan berikut:\n" .
@@ -181,7 +193,7 @@ class TelegramService
             $this->dispatchJob($token, $chatIdSiswa, $msg, $schoolId);
         }
 
-        if ($chatIdOrtu) {
+        if ($chatIdOrtu && $ortuEnabled) {
             $msgOrtu = "🔔 <b>Laporan Kehadiran Kegiatan</b> 🔔\n\n" .
                 "Bapak/Ibu Orang Tua/Wali dari <b>{$namaSiswa}</b>,\n\n" .
                 "Menginfokan bahwa putra/putri Anda telah terdaftar hadir mengikuti kegiatan sekolah:\n" .

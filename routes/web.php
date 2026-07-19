@@ -36,15 +36,6 @@ Route::get('/license/expired', fn () => view('license.expired', [
 ]))->name('license.expired');
 
 
-Route::get('/autologin', function() {
-    $user = \App\Models\User::where('role', 'admin')->first();
-    if ($user) {
-        auth()->login($user);
-        return redirect()->route('dashboard');
-    }
-    return 'Admin not found';
-});
-
 Route::get('/login', [AuthController::class, 'showLoginForm'])->name('login');
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');

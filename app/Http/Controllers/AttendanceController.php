@@ -34,7 +34,10 @@ class AttendanceController extends Controller
             $guru = auth()->user()->guru;
             if ($guru) {
                 // Get all kelas managed by this guru
-                $managedKelasIds = \App\Models\Kelas::where('wali_kelas_id', $guru->id)->pluck('id');
+                $managedKelasIds = \App\Models\Kelas::where(function($q) use ($guru) {
+                    $q->where('wali_kelas_id', $guru->id)
+                      ->orWhere('wali_kelas_2_id', $guru->id);
+                })->pluck('id');
                 $siswaQuery->whereIn('kelas_id', $managedKelasIds);
                 // Also restrict the class filter dropdown list
                 $kelasQuery = Kelas::whereIn('id', $managedKelasIds)->orderBy('nama_kelas');

@@ -8,11 +8,16 @@ class Kelas extends Model
 {
     protected $table = 'kelas';
     public $timestamps = false;
-    protected $fillable = ['nama_kelas', 'wali_kelas_id', 'wa_group_id', 'is_active_attendance', 'is_active_report', 'school_id', 'jurusan_id'];
+    protected $fillable = ['nama_kelas', 'wali_kelas_id', 'wali_kelas_2_id', 'wa_group_id', 'is_active_attendance', 'is_active_report', 'school_id', 'jurusan_id'];
 
     public function waliKelas()
     {
         return $this->belongsTo(Guru::class, 'wali_kelas_id');
+    }
+
+    public function waliKelas2()
+    {
+        return $this->belongsTo(Guru::class, 'wali_kelas_2_id');
     }
 
     public function jadwalPelajaran()

@@ -37,6 +37,11 @@ class Guru extends Model
         return $this->hasOne(Kelas::class, 'wali_kelas_id');
     }
 
+    public function kelasSecondary()
+    {
+        return $this->hasOne(Kelas::class, 'wali_kelas_2_id');
+    }
+
     public function user()
     {
         return $this->belongsTo(User::class, 'user_id');

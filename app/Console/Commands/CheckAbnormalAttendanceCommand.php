@@ -42,7 +42,7 @@ class CheckAbnormalAttendanceCommand extends Command
             })
             ->groupBy('student_id')
             ->havingRaw('COUNT(*) >= ?', [$threshold])
-            ->with(['student.kelas.waliKelas'])
+            ->with(['student.kelas.waliKelas', 'student.kelas.waliKelas2'])
             ->get();
 
         if ($candidates->isEmpty()) {

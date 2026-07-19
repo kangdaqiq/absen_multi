@@ -27,7 +27,10 @@ class RekapKelasController extends Controller
         if (auth()->user() && auth()->user()->role === 'wali_kelas') {
             $guru = auth()->user()->guru;
             if ($guru) {
-                $managedKelasIds = Kelas::where('wali_kelas_id', $guru->id)->pluck('id');
+                $managedKelasIds = Kelas::where(function($q) use ($guru) {
+                    $q->where('wali_kelas_id', $guru->id)
+                      ->orWhere('wali_kelas_2_id', $guru->id);
+                })->pluck('id');
                 $kelasQuery->whereIn('id', $managedKelasIds);
             } else {
                 $kelasQuery->where('id', -1);
@@ -52,7 +55,10 @@ class RekapKelasController extends Controller
         if (auth()->user() && auth()->user()->role === 'wali_kelas') {
             $guru = auth()->user()->guru;
             if ($guru) {
-                $managedKelasIds = Kelas::where('wali_kelas_id', $guru->id)->pluck('id');
+                $managedKelasIds = Kelas::where(function($q) use ($guru) {
+                    $q->where('wali_kelas_id', $guru->id)
+                      ->orWhere('wali_kelas_2_id', $guru->id);
+                })->pluck('id');
                 $kelasListQuery->whereIn('id', $managedKelasIds);
             } else {
                 $kelasListQuery->where('id', -1);
@@ -114,7 +120,10 @@ class RekapKelasController extends Controller
         if (auth()->user() && auth()->user()->role === 'wali_kelas') {
             $guru = auth()->user()->guru;
             if ($guru) {
-                $managedKelasIds = Kelas::where('wali_kelas_id', $guru->id)->pluck('id');
+                $managedKelasIds = Kelas::where(function($q) use ($guru) {
+                    $q->where('wali_kelas_id', $guru->id)
+                      ->orWhere('wali_kelas_2_id', $guru->id);
+                })->pluck('id');
                 $kelasQuery->whereIn('id', $managedKelasIds);
             } else {
                 $kelasQuery->where('id', -1);
@@ -238,7 +247,10 @@ class RekapKelasController extends Controller
         if (auth()->user() && auth()->user()->role === 'wali_kelas') {
             $guru = auth()->user()->guru;
             if ($guru) {
-                $managedKelasIds = Kelas::where('wali_kelas_id', $guru->id)->pluck('id');
+                $managedKelasIds = Kelas::where(function($q) use ($guru) {
+                    $q->where('wali_kelas_id', $guru->id)
+                      ->orWhere('wali_kelas_2_id', $guru->id);
+                })->pluck('id');
                 $kelasQuery->whereIn('id', $managedKelasIds);
             } else {
                 $kelasQuery->where('id', -1);

@@ -15,7 +15,7 @@ class KelasController extends Controller
 {
     public function index(Request $request)
     {
-        $kelasQuery = Kelas::with(['waliKelas', 'jurusan'])->orderBy('nama_kelas');
+        $kelasQuery = Kelas::with(['waliKelas', 'waliKelas2', 'jurusan'])->orderBy('nama_kelas');
         $gurusQuery = \App\Models\Guru::orderBy('nama');
         $jurusansQuery = \App\Models\Jurusan::orderBy('nama_jurusan');
 
@@ -52,6 +52,7 @@ class KelasController extends Controller
                 })
             ],
             'wali_kelas_id' => 'nullable|exists:guru,id',
+            'wali_kelas_2_id' => 'nullable|exists:guru,id',
             'jurusan_id' => 'nullable|exists:jurusan,id',
             'wa_group_id' => 'nullable|string|max:100',
         ]);
@@ -83,6 +84,7 @@ class KelasController extends Controller
                 })
             ],
             'wali_kelas_id' => 'nullable|exists:guru,id',
+            'wali_kelas_2_id' => 'nullable|exists:guru,id',
             'jurusan_id' => 'nullable|exists:jurusan,id',
             'wa_group_id' => 'nullable|string|max:100',
         ]);
@@ -161,6 +163,7 @@ class KelasController extends Controller
 
                 $namaKelas = trim($row[0] ?? '');
                 $namaWali = trim($row[1] ?? '');
+                $namaWali2 = trim($row[2] ?? '');
 
                 if ($namaKelas === '') {
                     $countSkip++;
@@ -178,9 +181,15 @@ class KelasController extends Controller
                     $waliKelasId = $gurus[strtolower($namaWali)] ?? null;
                 }
 
+                $waliKelas2Id = null;
+                if ($namaWali2 !== '') {
+                    $waliKelas2Id = $gurus[strtolower($namaWali2)] ?? null;
+                }
+
                 Kelas::create([
                     'nama_kelas' => $namaKelas,
                     'wali_kelas_id' => $waliKelasId,
+                    'wali_kelas_2_id' => $waliKelas2Id,
                     'school_id' => $schoolId,
                     'is_active_attendance' => true,
                     'is_active_report' => false,
@@ -205,15 +214,17 @@ class KelasController extends Controller
         // Header
         $sheet->setCellValue('A1', 'Nama Kelas');
         $sheet->setCellValue('B1', 'Wali Kelas');
+        $sheet->setCellValue('C1', 'Wali Kelas 2');
 
         // Style header
-        $sheet->getStyle('A1:B1')->getFont()->setBold(true);
-        $sheet->getStyle('A1:B1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB('FF3C50E0');
-        $sheet->getStyle('A1:B1')->getFont()->getColor()->setARGB('FFFFFFFF');
+        $sheet->getStyle('A1:C1')->getFont()->setBold(true);
+        $sheet->getStyle('A1:C1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB('FF3C50E0');
+        $sheet->getStyle('A1:C1')->getFont()->getColor()->setARGB('FFFFFFFF');
 
         // Set column width
         $sheet->getColumnDimension('A')->setWidth(25);
         $sheet->getColumnDimension('B')->setWidth(30);
+        $sheet->getColumnDimension('C')->setWidth(30);
 
         // Example
         $sheet->setCellValue('A2', 'X TKJ 1');
@@ -234,20 +245,22 @@ class KelasController extends Controller
             
             $guruRange = 'DaftarGuru!$A$1:$A$' . count($gurus);
             
-            // Apply validation to column B (from B2 to B100)
+            // Apply validation to column B and C (from B2 to B100)
             for ($i = 2; $i <= 100; $i++) {
-                $validation = $sheet->getCell('B' . $i)->getDataValidation();
-                $validation->setType(DataValidation::TYPE_LIST);
-                $validation->setErrorStyle(DataValidation::STYLE_STOP);
-                $validation->setAllowBlank(true);
-                $validation->setShowInputMessage(true);
-                $validation->setShowErrorMessage(true);
-                $validation->setShowDropDown(true);
-                $validation->setErrorTitle('Kesalahan Input');
-                $validation->setError('Pilih nama guru yang tersedia di daftar.');
-                $validation->setPromptTitle('Pilih Wali Kelas');
-                $validation->setPrompt('Silakan pilih salah satu guru dari daftar.');
-                $validation->setFormula1($guruRange);
+                foreach (['B', 'C'] as $col) {
+                    $validation = $sheet->getCell($col . $i)->getDataValidation();
+                    $validation->setType(DataValidation::TYPE_LIST);
+                    $validation->setErrorStyle(DataValidation::STYLE_STOP);
+                    $validation->setAllowBlank(true);
+                    $validation->setShowInputMessage(true);
+                    $validation->setShowErrorMessage(true);
+                    $validation->setShowDropDown(true);
+                    $validation->setErrorTitle('Kesalahan Input');
+                    $validation->setError('Pilih nama guru yang tersedia di daftar.');
+                    $validation->setPromptTitle('Pilih Wali Kelas');
+                    $validation->setPrompt('Silakan pilih salah satu guru dari daftar.');
+                    $validation->setFormula1($guruRange);
+                }
             }
         }
 

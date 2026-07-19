@@ -99,7 +99,10 @@ class DailyReportCommand extends Command
 
         // 5. Check if we have anything to report (Groups, Admin, or Wali Kelas)
         $hasWaliKelas = Kelas::where('school_id', $schoolId)
-            ->whereNotNull('wali_kelas_id')
+            ->where(function($q) {
+                $q->whereNotNull('wali_kelas_id')
+                  ->orWhereNotNull('wali_kelas_2_id');
+            })
             ->where('is_active_attendance', true)
             ->exists();
 
@@ -420,13 +423,20 @@ class DailyReportCommand extends Command
         // --- LAPORAN PER WALI KELAS ---
         $this->info("Processing Wali Kelas reports...");
         $kelasWithWali = \App\Models\Kelas::where('school_id', $schoolId)
-            ->whereNotNull('wali_kelas_id')
-            ->with('waliKelas')
+            ->where(function($q) {
+                $q->whereNotNull('wali_kelas_id')
+                  ->orWhereNotNull('wali_kelas_2_id');
+            })
+            ->with(['waliKelas', 'waliKelas2'])
             ->get();
 
         foreach ($kelasWithWali as $kelas) {
-            $wali = $kelas->waliKelas;
-            if (!$wali || !$wali->no_wa || !isset($studentsByClass[$kelas->id])) {
+            if (!isset($studentsByClass[$kelas->id])) {
+                continue;
+            }
+
+            $walis = array_filter([$kelas->waliKelas, $kelas->waliKelas2]);
+            if (empty($walis)) {
                 continue;
             }
 
@@ -468,35 +478,41 @@ class DailyReportCommand extends Command
                 }
             }
 
-            $msgWali = WhatsAppMessageTemplates::dailyReportWaliKelas(
-                namaKelas: $kelas->nama_kelas,
-                namaWali: $wali->nama,
-                masuk: $masuk,
-                tidakMasuk: $tidakMasuk,
-                listAbsen: $listAbsen,
-                listTerlambat: $listTerlambat
-            );
-
-            MessageQueue::create([
-                'school_id' => $schoolId,
-                'phone_number' => $wali->no_wa,
-                'message' => $msgWali,
-                'status' => 'pending',
-                'priority' => 10,
-                'created_at' => now()
-            ]);
-
-            // Telegram Wali Kelas Report
-            if ($telegramEnabled && $telegramToken && $wali && !empty($wali->telegram_chat_id)) {
-                $msgWaliTelegram = $msgWali;
-                $msgWaliTelegram = preg_replace('/\*([^*]+)\*/', '<b>$1</b>', $msgWaliTelegram);
-                $msgWaliTelegram = preg_replace('/\_([^_]+)\_/', '<i>$1</i>', $msgWaliTelegram);
-                
-                if (!empty($school->name)) {
-                    $msgWaliTelegram = rtrim($msgWaliTelegram) . "\n\n<b>" . trim($school->name) . "</b>";
+            foreach ($walis as $wali) {
+                if (!$wali->no_wa) {
+                    continue;
                 }
 
-                \App\Jobs\SendTelegramMessageJob::dispatch($telegramToken, $wali->telegram_chat_id, $msgWaliTelegram, $schoolId);
+                $msgWali = WhatsAppMessageTemplates::dailyReportWaliKelas(
+                    namaKelas: $kelas->nama_kelas,
+                    namaWali: $wali->nama,
+                    masuk: $masuk,
+                    tidakMasuk: $tidakMasuk,
+                    listAbsen: $listAbsen,
+                    listTerlambat: $listTerlambat
+                );
+
+                MessageQueue::create([
+                    'school_id' => $schoolId,
+                    'phone_number' => $wali->no_wa,
+                    'message' => $msgWali,
+                    'status' => 'pending',
+                    'priority' => 10,
+                    'created_at' => now()
+                ]);
+
+                // Telegram Wali Kelas Report
+                if ($telegramEnabled && $telegramToken && !empty($wali->telegram_chat_id)) {
+                    $msgWaliTelegram = $msgWali;
+                    $msgWaliTelegram = preg_replace('/\*([^*]+)\*/', '<b>$1</b>', $msgWaliTelegram);
+                    $msgWaliTelegram = preg_replace('/\_([^_]+)\_/', '<i>$1</i>', $msgWaliTelegram);
+                    
+                    if (!empty($school->name)) {
+                        $msgWaliTelegram = rtrim($msgWaliTelegram) . "\n\n<b>" . trim($school->name) . "</b>";
+                    }
+
+                    \App\Jobs\SendTelegramMessageJob::dispatch($telegramToken, $wali->telegram_chat_id, $msgWaliTelegram, $schoolId);
+                }
             }
         }
 

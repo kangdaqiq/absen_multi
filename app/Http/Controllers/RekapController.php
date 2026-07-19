@@ -41,7 +41,10 @@ class RekapController extends Controller
         if (auth()->user() && auth()->user()->role === 'wali_kelas') {
             $guru = auth()->user()->guru;
             if ($guru) {
-                $managedKelasIds = \App\Models\Kelas::where('wali_kelas_id', $guru->id)->pluck('id');
+                $managedKelasIds = \App\Models\Kelas::where(function($q) use ($guru) {
+                    $q->where('wali_kelas_id', $guru->id)
+                      ->orWhere('wali_kelas_2_id', $guru->id);
+                })->pluck('id');
                 $siswaQuery->whereIn('kelas_id', $managedKelasIds);
                 $kelasQuery = Kelas::whereIn('id', $managedKelasIds)->orderBy('nama_kelas');
             } else {
@@ -127,7 +130,10 @@ class RekapController extends Controller
         if (auth()->user() && auth()->user()->role === 'wali_kelas') {
             $guru = auth()->user()->guru;
             if ($guru) {
-                $managedKelasIds = \App\Models\Kelas::where('wali_kelas_id', $guru->id)->pluck('id');
+                $managedKelasIds = \App\Models\Kelas::where(function($q) use ($guru) {
+                    $q->where('wali_kelas_id', $guru->id)
+                      ->orWhere('wali_kelas_2_id', $guru->id);
+                })->pluck('id');
                 $siswaQuery->whereIn('kelas_id', $managedKelasIds);
             } else {
                 $siswaQuery->where('id', -1);
@@ -293,7 +299,10 @@ class RekapController extends Controller
         if (auth()->user() && auth()->user()->role === 'wali_kelas') {
             $guru = auth()->user()->guru;
             if ($guru) {
-                $managedKelasIds = \App\Models\Kelas::where('wali_kelas_id', $guru->id)->pluck('id');
+                $managedKelasIds = \App\Models\Kelas::where(function($q) use ($guru) {
+                    $q->where('wali_kelas_id', $guru->id)
+                      ->orWhere('wali_kelas_2_id', $guru->id);
+                })->pluck('id');
                 $siswaQuery->whereIn('kelas_id', $managedKelasIds);
             } else {
                 $siswaQuery->where('id', -1);

@@ -229,7 +229,10 @@ class AutoBolosCommand extends Command
             ->exists();
 
         $hasWaliKelas = \App\Models\Kelas::where('school_id', $schoolId)
-            ->whereNotNull('wali_kelas_id')
+            ->where(function($q) {
+                $q->whereNotNull('wali_kelas_id')
+                  ->orWhereNotNull('wali_kelas_2_id');
+            })
             ->where('is_active_attendance', true)->where('is_active_report', true)
             ->exists();
 
@@ -277,7 +280,7 @@ class AutoBolosCommand extends Command
         $allKelas = \App\Models\Kelas::where('school_id', $schoolId)
             ->where('is_active_attendance', true)
             ->where('is_active_report', true)
-            ->with('waliKelas')
+            ->with(['waliKelas', 'waliKelas2'])
             ->get();
 
         foreach ($allKelas as $kelas) {
@@ -295,8 +298,12 @@ class AutoBolosCommand extends Command
                 return $att->student->kelas_id == $kelas->id;
             })->count();
 
-            $wali = $kelas->waliKelas;
-            $namaWali = $wali ? $wali->nama : '-';
+            $walis = array_filter([$kelas->waliKelas, $kelas->waliKelas2]);
+            $namaWaliList = [];
+            foreach ($walis as $w) {
+                $namaWaliList[] = $w->nama;
+            }
+            $namaWali = empty($namaWaliList) ? '-' : implode(' & ', $namaWaliList);
 
             $groupedKelas = $absenKelas->groupBy('status');
             $msgKelas = WhatsAppMessageTemplates::finalAbsenceReport(
@@ -319,34 +326,36 @@ class AutoBolosCommand extends Command
                 ]);
             }
 
-            // 2. Kirim ke Nomor WA Pribadi Wali Kelas (jika ada)
-            if ($wali && !empty($wali->no_wa)) {
-                $noWa = $wali->no_wa;
-                if (!str_contains($noWa, '@')) {
-                    $noWa = preg_replace('/^0/', '62', $noWa);
-                    // $noWa = $noWa . '@s.whatsapp.net';
+            // Kirim ke nomor WA / Telegram pribadi masing-masing Wali Kelas
+            foreach ($walis as $wali) {
+                // 2. Kirim ke Nomor WA Pribadi Wali Kelas (jika ada)
+                if (!empty($wali->no_wa)) {
+                    $noWa = $wali->no_wa;
+                    if (!str_contains($noWa, '@')) {
+                        $noWa = preg_replace('/^0/', '62', $noWa);
+                    }
+
+                    MessageQueue::create([
+                        'school_id'    => $schoolId,
+                        'phone_number' => $noWa,
+                        'message'      => $msgKelas,
+                        'status'       => 'pending',
+                        'created_at'   => now()
+                    ]);
                 }
 
-                MessageQueue::create([
-                    'school_id'    => $schoolId,
-                    'phone_number' => $noWa,
-                    'message'      => $msgKelas,
-                    'status'       => 'pending',
-                    'created_at'   => now()
-                ]);
-            }
+                // 3. Kirim ke Telegram Pribadi Wali Kelas (jika ada)
+                if ($telegramEnabled && $telegramToken && !empty($wali->telegram_chat_id)) {
+                    $msgKelasTelegram = $msgKelas;
+                    $msgKelasTelegram = preg_replace('/\*([^*]+)\*/', '<b>$1</b>', $msgKelasTelegram);
+                    $msgKelasTelegram = preg_replace('/\_([^_]+)\_/', '<i>$1</i>', $msgKelasTelegram);
+                    
+                    if (!empty($school->name)) {
+                        $msgKelasTelegram = rtrim($msgKelasTelegram) . "\n\n<b>" . trim($school->name) . "</b>";
+                    }
 
-            // 3. Kirim ke Telegram Pribadi Wali Kelas (jika ada)
-            if ($telegramEnabled && $telegramToken && $wali && !empty($wali->telegram_chat_id)) {
-                $msgKelasTelegram = $msgKelas;
-                $msgKelasTelegram = preg_replace('/\*([^*]+)\*/', '<b>$1</b>', $msgKelasTelegram);
-                $msgKelasTelegram = preg_replace('/\_([^_]+)\_/', '<i>$1</i>', $msgKelasTelegram);
-                
-                if (!empty($school->name)) {
-                    $msgKelasTelegram = rtrim($msgKelasTelegram) . "\n\n<b>" . trim($school->name) . "</b>";
+                    \App\Jobs\SendTelegramMessageJob::dispatch($telegramToken, $wali->telegram_chat_id, $msgKelasTelegram, $schoolId);
                 }
-
-                \App\Jobs\SendTelegramMessageJob::dispatch($telegramToken, $wali->telegram_chat_id, $msgKelasTelegram, $schoolId);
             }
         }
 

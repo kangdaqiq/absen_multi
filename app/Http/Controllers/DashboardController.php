@@ -25,7 +25,10 @@ class DashboardController extends Controller
         if ($isWaliKelas) {
             $guru = $user->guru;
             if ($guru) {
-                $managedKelasIds = \App\Models\Kelas::where('wali_kelas_id', $guru->id)->pluck('id')->toArray();
+                $managedKelasIds = \App\Models\Kelas::where(function($q) use ($guru) {
+                    $q->where('wali_kelas_id', $guru->id)
+                      ->orWhere('wali_kelas_2_id', $guru->id);
+                })->pluck('id')->toArray();
             } else {
                 $managedKelasIds = [-1]; // No classes
             }

@@ -10,12 +10,21 @@ class Guru extends Model
     public $timestamps = true;
     // timestamps enabled by default
     // const UPDATED_AT = null;  // Column does not exist in DB
-    protected $fillable = ['nama', 'nip', 'tgl_lahir', 'no_wa', 'bot_access', 'is_global_report', 'id_finger', 'uid_rfid', 'enroll_status', 'enroll_finger_status', 'created_at', 'updated_at', 'school_id', 'user_id', 'telegram_chat_id'];
+    protected $fillable = ['nama', 'nip', 'tgl_lahir', 'no_wa', 'bot_access', 'is_global_report', 'id_finger', 'uid_rfid', 'enroll_status', 'enroll_finger_status', 'created_at', 'updated_at', 'school_id', 'user_id', 'telegram_chat_id', 'last_seen'];
 
     protected $casts = [
         'bot_access' => 'boolean',
         'is_global_report' => 'boolean',
+        'last_seen' => 'datetime',
     ];
+
+    public function isWithinLastSeen($hours = 48): bool
+    {
+        if (!$this->last_seen) {
+            return false;
+        }
+        return \Carbon\Carbon::parse($this->last_seen)->gte(now()->subHours($hours));
+    }
 
     public function fingerprints()
     {

@@ -38,11 +38,31 @@ class Siswa extends Model
         'hari_masuk',
         'telegram_chat_id',
         'telegram_ortu_chat_id',
+        'last_seen_siswa',
+        'last_seen_ortu',
     ];
 
     protected $casts = [
         'hari_masuk' => 'array',
+        'last_seen_siswa' => 'datetime',
+        'last_seen_ortu' => 'datetime',
     ];
+
+    public function isSiswaWithinLastSeen($hours = 48): bool
+    {
+        if (!$this->last_seen_siswa) {
+            return false;
+        }
+        return \Carbon\Carbon::parse($this->last_seen_siswa)->gte(now()->subHours($hours));
+    }
+
+    public function isOrtuWithinLastSeen($hours = 48): bool
+    {
+        if (!$this->last_seen_ortu) {
+            return false;
+        }
+        return \Carbon\Carbon::parse($this->last_seen_ortu)->gte(now()->subHours($hours));
+    }
 
     public function isEntryDay($date = null)
     {

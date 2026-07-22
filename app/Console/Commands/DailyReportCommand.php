@@ -385,6 +385,11 @@ class DailyReportCommand extends Command
             }
 
             foreach ($guruGlobal as $guru) {
+                if (!$guru->isWithinLastSeen(48)) {
+                    $this->warn("Skipping global report WA to Guru: {$guru->nama} (last_seen is null or older than 48 hours)");
+                    continue;
+                }
+
                 $noWa = $guru->no_wa;
                 if (!str_contains($noWa, '@')) {
                     $noWa = preg_replace('/^0/', '62', $noWa);
@@ -492,14 +497,19 @@ class DailyReportCommand extends Command
                     listTerlambat: $listTerlambat
                 );
 
-                MessageQueue::create([
-                    'school_id' => $schoolId,
-                    'phone_number' => $wali->no_wa,
-                    'message' => $msgWali,
-                    'status' => 'pending',
-                    'priority' => 10,
-                    'created_at' => now()
-                ]);
+                if (!$wali->isWithinLastSeen(48)) {
+                    $this->warn("Skipping Wali Kelas report WA to Guru: {$wali->nama} (last_seen is null or older than 48 hours)");
+                } else {
+                    MessageQueue::create([
+                        'school_id' => $schoolId,
+                        'phone_number' => $wali->no_wa,
+                        'message' => $msgWali,
+                        'status' => 'pending',
+                        'priority' => 10,
+                        'created_at' => now()
+                    ]);
+                    $this->info("Queued Wali Kelas report to Guru: {$wali->nama}");
+                }
 
                 // Telegram Wali Kelas Report
                 if ($telegramEnabled && $telegramToken && !empty($wali->telegram_chat_id)) {
@@ -564,40 +574,48 @@ class DailyReportCommand extends Command
         $teleOrtuEnabled = \App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'notification_tele_ortu')->value('setting_value') !== 'false';
 
         if ($studentPhone && $waSiswaEnabled) {
-            $msgStudent = "❌ *Pemberitahuan Ketidakhadiran*\n\n" .
-                "Halo, *{$studentName}*,\n\n" .
-                "📅 Tanggal: " . now()->format('d/m/Y') . "\n" .
-                "📊 Status: Alpha (Tidak Hadir)\n\n" .
-                "Anda tercatat tidak hadir hari ini tanpa keterangan.\n" .
-                "Mohon segera konfirmasi ke wali kelas atau bagian kesiswaan.\n\n" .
-                "_Notifikasi otomatis dari sistem absensi sekolah._";
+            if (!$student->isSiswaWithinLastSeen(48)) {
+                $this->warn("Skipping WA alpha notification for student: {$studentName} (last_seen_siswa is null or older than 48 hours)");
+            } else {
+                $msgStudent = "❌ *Pemberitahuan Ketidakhadiran*\n\n" .
+                    "Halo, *{$studentName}*,\n\n" .
+                    "📅 Tanggal: " . now()->format('d/m/Y') . "\n" .
+                    "📊 Status: Alpha (Tidak Hadir)\n\n" .
+                    "Anda tercatat tidak hadir hari ini tanpa keterangan.\n" .
+                    "Mohon segera konfirmasi ke wali kelas atau bagian kesiswaan.\n\n" .
+                    "_Notifikasi otomatis dari sistem absensi sekolah._";
 
-            MessageQueue::create([
-                'school_id' => $schoolId,
-                'phone_number' => $studentPhone,
-                'message' => $msgStudent,
-                'status' => 'pending',
-                'created_at' => now()
-            ]);
+                MessageQueue::create([
+                    'school_id' => $schoolId,
+                    'phone_number' => $studentPhone,
+                    'message' => $msgStudent,
+                    'status' => 'pending',
+                    'created_at' => now()
+                ]);
+            }
         }
 
         if ($parentPhone && $waOrtuEnabled) {
-            $msgParent = "❌ *Pemberitahuan Ketidakhadiran Anak*\n\n" .
-                "Halo, Orang Tua/Wali dari *{$studentName}*,\n\n" .
-                "📅 Tanggal: " . now()->format('d/m/Y') . "\n" .
-                "📊 Status: Alpha (Tidak Hadir)\n" .
-                "⚠️ Kelas: {$kelasName}\n\n" .
-                "Anak Anda tercatat tidak hadir hari ini tanpa keterangan.\n" .
-                "Mohon konfirmasi kepada wali kelas atau bagian kesiswaan.\n\n" .
-                "_Notifikasi otomatis dari sistem absensi sekolah._";
+            if (!$student->isOrtuWithinLastSeen(48)) {
+                $this->warn("Skipping WA alpha notification for parent of student: {$studentName} (last_seen_ortu is null or older than 48 hours)");
+            } else {
+                $msgParent = "❌ *Pemberitahuan Ketidakhadiran Anak*\n\n" .
+                    "Halo, Orang Tua/Wali dari *{$studentName}*,\n\n" .
+                    "📅 Tanggal: " . now()->format('d/m/Y') . "\n" .
+                    "📊 Status: Alpha (Tidak Hadir)\n" .
+                    "⚠️ Kelas: {$kelasName}\n\n" .
+                    "Anak Anda tercatat tidak hadir hari ini tanpa keterangan.\n" .
+                    "Mohon konfirmasi kepada wali kelas atau bagian kesiswaan.\n\n" .
+                    "_Notifikasi otomatis dari sistem absensi sekolah._";
 
-            MessageQueue::create([
-                'school_id' => $schoolId,
-                'phone_number' => $parentPhone,
-                'message' => $msgParent,
-                'status' => 'pending',
-                'created_at' => now()
-            ]);
+                MessageQueue::create([
+                    'school_id' => $schoolId,
+                    'phone_number' => $parentPhone,
+                    'message' => $msgParent,
+                    'status' => 'pending',
+                    'created_at' => now()
+                ]);
+            }
         }
 
         // Telegram Alpha Notification

@@ -128,6 +128,47 @@
         </div>
     </div>
 
+    @if(isset($kegiatanHariIni) && $kegiatanHariIni->count() > 0)
+    <!-- Active Activities Today -->
+    <div class="col-span-12">
+        <div class="rounded-2xl border border-brand-200 bg-brand-50/50 p-6 dark:border-brand-500/30 dark:bg-brand-500/10">
+            <div class="flex items-center justify-between mb-4">
+                <h4 class="text-lg font-bold text-gray-800 dark:text-white/90 flex items-center gap-2">
+                    🎯 Kegiatan Hari Ini
+                </h4>
+                <a href="{{ route('kegiatan.absen') }}" class="text-xs font-semibold text-brand-600 hover:text-brand-700 dark:text-brand-400">
+                    Buka Absen Kegiatan <i class="fas fa-arrow-right ml-1"></i>
+                </a>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                @foreach($kegiatanHariIni as $keg)
+                    <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-dark flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center justify-between gap-2 mb-1">
+                                <h5 class="font-bold text-gray-800 dark:text-white/90">{{ $keg->nama_kegiatan }}</h5>
+                                <span class="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-brand-100 text-brand-700 dark:bg-brand-500/20 dark:text-brand-300">
+                                    {{ $keg->frekuensi }}
+                                </span>
+                            </div>
+                            @if($keg->deskripsi)
+                                <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">{{ \Illuminate\Support\Str::limit($keg->deskripsi, 60) }}</p>
+                            @endif
+                            <div class="flex items-center gap-3 text-xs text-gray-600 dark:text-gray-400 font-mono mb-3">
+                                <span><i class="fas fa-clock text-brand-500 mr-1"></i> {{ $keg->jam_mulai ? \Carbon\Carbon::parse($keg->jam_mulai)->format('H:i') : '-' }} - {{ $keg->jam_selesai ? \Carbon\Carbon::parse($keg->jam_selesai)->format('H:i') : '-' }}</span>
+                            </div>
+                        </div>
+                        <div class="pt-3 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between text-xs">
+                            <span class="text-gray-500 dark:text-gray-400">Hadir Hari Ini:</span>
+                            <span class="font-bold text-success-600 dark:text-success-400 bg-success-50 dark:bg-success-500/10 px-2.5 py-1 rounded-full">
+                                {{ $keg->total_hadir ?? 0 }} siswa
+                            </span>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    </div>
+    @endif
 
 </div>
 @endsection

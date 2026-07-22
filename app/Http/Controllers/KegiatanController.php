@@ -39,7 +39,7 @@ class KegiatanController extends Controller
             'nama_kegiatan'  => 'required|string|max:100',
             'deskripsi'      => 'nullable|string|max:500',
             'tanggal_mulai'  => 'required|date',
-            'frekuensi'      => 'required|string|in:harian,mingguan,bulanan',
+            'frekuensi'      => 'required|string|in:harian,mingguan,bulanan,sekali',
             'jam_mulai'      => 'nullable|date_format:H:i',
             'jam_selesai'    => 'nullable|date_format:H:i|after:jam_mulai',
             'uid_kartu'      => 'nullable|string|max:50',
@@ -73,7 +73,7 @@ class KegiatanController extends Controller
             'nama_kegiatan'  => 'required|string|max:100',
             'deskripsi'      => 'nullable|string|max:500',
             'tanggal_mulai'  => 'required|date',
-            'frekuensi'      => 'required|string|in:harian,mingguan,bulanan',
+            'frekuensi'      => 'required|string|in:harian,mingguan,bulanan,sekali',
             'jam_mulai'      => 'nullable|date_format:H:i',
             'jam_selesai'    => 'nullable|date_format:H:i|after:jam_mulai',
             'uid_kartu'      => 'nullable|string|max:50',
@@ -216,7 +216,7 @@ class KegiatanController extends Controller
             'kegiatan_id' => 'required|exists:kegiatans,id',
             'student_id'  => 'required|exists:siswa,id',
             'tanggal'     => 'required|date',
-            'status'      => 'required|in:H,A', // H = Hadir, A = Alpha (hapus record)
+            'status'      => 'required|in:H,I,S,A', // H = Hadir, I = Izin, S = Sakit, A = Alpha
             'keterangan'  => 'nullable|string|max:255',
         ]);
 
@@ -237,7 +237,7 @@ class KegiatanController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Kehadiran dibatalkan (Alpha).'
+                'message' => 'Status diubah menjadi Alpha.'
             ]);
         } else {
             // Cari atau buat record kehadiran
@@ -258,42 +258,94 @@ class KegiatanController extends Controller
                     'student_id'  => $request->student_id,
                     'tanggal'     => $request->tanggal,
                     'jam_masuk'   => $jam,
-                    'status'      => 'H',
+                    'status'      => $request->status,
                     'keterangan'  => $request->keterangan,
                 ]);
 
-                // Kirim notifikasi WhatsApp jika WA aktif
-                $school = auth()->user()->school;
-                if ($school && $school->wa_enabled) {
+                // Notifikasi WA kegiatan ke siswa/ortu dinonaktifkan (hanya masuk rekap).
+                // Telegram tetap dikirim jika status Hadir.
+                if ($request->status === 'H') {
                     try {
-                        $waService = app(\App\Services\WhatsAppService::class);
+                        $telegramService = app(\App\Services\TelegramService::class);
                         $formattedDate = \Carbon\Carbon::parse($request->tanggal)->translatedFormat('l, d F Y');
-                        $waService->sendKegiatanCheckIn(
+                        $telegramService->sendKegiatanCheckIn(
                             namaSiswa: $student->nama,
                             namaKegiatan: $kegiatan->nama_kegiatan,
                             jam: \Carbon\Carbon::parse($jam)->format('H:i'),
                             tanggal: $formattedDate,
                             schoolId: $schoolId,
-                            phoneSiswa: $student->no_wa,
-                            phoneOrtu: $student->wa_ortu
+                            chatIdSiswa: $student->telegram_chat_id ?: null,
+                            chatIdOrtu: $student->telegram_ortu_chat_id ?: null
                         );
                     } catch (\Exception $e) {
-                        \Log::error("Failed to send WA for manual kegiatan attendance: " . $e->getMessage());
+                        \Log::error("Failed to send Telegram for manual kegiatan attendance: " . $e->getMessage());
                     }
                 }
             } else {
                 $attendance->update([
-                    'status'     => 'H',
+                    'status'     => $request->status,
                     'keterangan' => $request->keterangan,
                 ]);
             }
 
+            $labelStatus = $request->status === 'H' ? 'Hadir' : ($request->status === 'I' ? 'Izin' : 'Sakit');
+
             return response()->json([
-                'success' => true,
-                'message' => 'Kehadiran berhasil dicatat (Hadir).',
+                'success'   => true,
+                'message'   => "Status kehadiran berhasil diubah ({$labelStatus}).",
                 'jam_masuk' => \Carbon\Carbon::parse($attendance->jam_masuk)->format('H:i')
             ]);
         }
+    }
+
+    /**
+     * Absen massal (misal: Tandai Semua Hadir untuk kelas terpilih).
+     */
+    public function bulkUpdateAttendance(Request $request)
+    {
+        $request->validate([
+            'kegiatan_id' => 'required|exists:kegiatans,id',
+            'tanggal'     => 'required|date',
+            'kelas_id'    => 'nullable|exists:kelas,id',
+            'status'      => 'required|in:H,I,S,A',
+        ]);
+
+        $schoolId = auth()->user()->school_id;
+        $kegiatan = Kegiatan::where('school_id', $schoolId)->findOrFail($request->kegiatan_id);
+
+        $studentQuery = Siswa::where('school_id', $schoolId);
+        if ($request->filled('kelas_id')) {
+            $studentQuery->where('kelas_id', $request->kelas_id);
+        }
+
+        $studentIds = $studentQuery->pluck('id');
+        $jam = now()->format('H:i:s');
+
+        if ($request->status === 'A') {
+            KegiatanAttendance::where('school_id', $schoolId)
+                ->where('kegiatan_id', $kegiatan->id)
+                ->where('tanggal', $request->tanggal)
+                ->whereIn('student_id', $studentIds)
+                ->delete();
+        } else {
+            foreach ($studentIds as $sId) {
+                KegiatanAttendance::updateOrCreate(
+                    [
+                        'school_id'   => $schoolId,
+                        'kegiatan_id' => $kegiatan->id,
+                        'student_id'  => $sId,
+                        'tanggal'     => $request->tanggal,
+                    ],
+                    [
+                        'jam_masuk'   => $jam,
+                        'status'      => $request->status,
+                        'keterangan'  => 'Absen Massal (' . $request->status . ')',
+                    ]
+                );
+            }
+        }
+
+        return back()->with('success', 'Berhasil memperbarui absensi massal kegiatan.');
     }
 
     /**
@@ -319,7 +371,7 @@ class KegiatanController extends Controller
             ->orderBy('nama_kelas')
             ->get();
 
-        // 3. Query Siswa dengan withCount kegiatanAttendances
+        // 3. Query Siswa dengan count kehadiran per status
         $studentQuery = Siswa::where('siswa.school_id', $schoolId)
             ->with(['kelas'])
             ->orderBy('nama');
@@ -333,13 +385,20 @@ class KegiatanController extends Controller
             $studentQuery->where('nama', 'like', "%{$search}%");
         }
 
-        $studentQuery->withCount(['kegiatanAttendances as total_kehadiran' => function ($q) use ($startDate, $endDate, $kegiatanId) {
-            $q->whereBetween('tanggal', [$startDate, $endDate])
-              ->where('status', 'H');
-            if ($kegiatanId) {
-                $q->where('kegiatan_id', $kegiatanId);
-            }
-        }]);
+        $studentQuery->withCount([
+            'kegiatanAttendances as count_hadir' => function ($q) use ($startDate, $endDate, $kegiatanId) {
+                $q->whereBetween('tanggal', [$startDate, $endDate])->where('status', 'H');
+                if ($kegiatanId) $q->where('kegiatan_id', $kegiatanId);
+            },
+            'kegiatanAttendances as count_izin' => function ($q) use ($startDate, $endDate, $kegiatanId) {
+                $q->whereBetween('tanggal', [$startDate, $endDate])->where('status', 'I');
+                if ($kegiatanId) $q->where('kegiatan_id', $kegiatanId);
+            },
+            'kegiatanAttendances as count_sakit' => function ($q) use ($startDate, $endDate, $kegiatanId) {
+                $q->whereBetween('tanggal', [$startDate, $endDate])->where('status', 'S');
+                if ($kegiatanId) $q->where('kegiatan_id', $kegiatanId);
+            },
+        ]);
 
         $students = $studentQuery->paginate(20)->withQueryString();
 
@@ -365,5 +424,79 @@ class KegiatanController extends Controller
             'students',
             'totalMeetings'
         ));
+    }
+
+    /**
+     * Ekspor Rekap Kegiatan ke format CSV.
+     */
+    public function exportRekap(Request $request)
+    {
+        $schoolId = auth()->user()->school_id;
+
+        $startDate = $request->input('start_date', now()->startOfMonth()->format('Y-m-d'));
+        $endDate   = $request->input('end_date', now()->format('Y-m-d'));
+        $kegiatanId = $request->input('kegiatan_id');
+        $kelasId    = $request->input('kelas_id');
+
+        $studentQuery = Siswa::where('siswa.school_id', $schoolId)
+            ->with(['kelas'])
+            ->orderBy('nama');
+
+        if ($kelasId) {
+            $studentQuery->where('kelas_id', $kelasId);
+        }
+
+        if ($request->filled('search')) {
+            $studentQuery->where('nama', 'like', '%' . $request->search . '%');
+        }
+
+        $studentQuery->withCount([
+            'kegiatanAttendances as count_hadir' => function ($q) use ($startDate, $endDate, $kegiatanId) {
+                $q->whereBetween('tanggal', [$startDate, $endDate])->where('status', 'H');
+                if ($kegiatanId) $q->where('kegiatan_id', $kegiatanId);
+            },
+            'kegiatanAttendances as count_izin' => function ($q) use ($startDate, $endDate, $kegiatanId) {
+                $q->whereBetween('tanggal', [$startDate, $endDate])->where('status', 'I');
+                if ($kegiatanId) $q->where('kegiatan_id', $kegiatanId);
+            },
+            'kegiatanAttendances as count_sakit' => function ($q) use ($startDate, $endDate, $kegiatanId) {
+                $q->whereBetween('tanggal', [$startDate, $endDate])->where('status', 'S');
+                if ($kegiatanId) $q->where('kegiatan_id', $kegiatanId);
+            },
+        ]);
+
+        $students = $studentQuery->get();
+
+        $filename = "rekap_kegiatan_" . date('Ymd_His') . ".csv";
+
+        $headers = [
+            "Content-type"        => "text/csv; charset=UTF-8",
+            "Content-Disposition" => "attachment; filename={$filename}",
+            "Pragma"              => "no-cache",
+            "Cache-Control"       => "must-revalidate, post-check=0, pre-check=0",
+            "Expires"             => "0"
+        ];
+
+        $callback = function () use ($students) {
+            $file = fopen('php://output', 'w');
+            fputs($file, "\xEF\xBB\xBF");
+            fputcsv($file, ['No', 'NIS/NISN', 'Nama Siswa', 'Kelas', 'Hadir (H)', 'Izin (I)', 'Sakit (S)']);
+
+            foreach ($students as $index => $s) {
+                fputcsv($file, [
+                    $index + 1,
+                    $s->nisn ?? $s->nis ?? '-',
+                    $s->nama,
+                    $s->kelas->nama_kelas ?? '-',
+                    $s->count_hadir ?? 0,
+                    $s->count_izin ?? 0,
+                    $s->count_sakit ?? 0,
+                ]);
+            }
+
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
     }
 }

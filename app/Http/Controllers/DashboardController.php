@@ -151,6 +151,20 @@ class DashboardController extends Controller
             $announcements = Announcement::where('is_active', true)->latest()->get();
         }
 
+        // 5. Kegiatan Hari Ini
+        $kegiatanHariIni = collect();
+        if ($schoolId) {
+            $kegiatanHariIni = \App\Models\Kegiatan::where('school_id', $schoolId)
+                ->where('is_active', true)
+                ->withCount(['attendances as total_hadir' => function ($q) use ($today) {
+                    $q->where('tanggal', $today->format('Y-m-d'))->where('status', 'H');
+                }])
+                ->get()
+                ->filter(function ($k) {
+                    return $k->isScheduledNow() || $k->tanggal_mulai->format('Y-m-d') === now()->format('Y-m-d');
+                });
+        }
+
         return view('dashboard', compact(
             'countSiswa',
             'countGuru',
@@ -160,7 +174,8 @@ class DashboardController extends Controller
             'recentLogs',
             'dates',
             'chartData',
-            'announcements'
+            'announcements',
+            'kegiatanHariIni'
         ));
     }
 }

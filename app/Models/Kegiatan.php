@@ -45,7 +45,11 @@ class Kegiatan extends Model
         }
 
         // Check frekuensi
-        if ($this->frekuensi === 'mingguan') {
+        if ($this->frekuensi === 'sekali') {
+            if ($todayStr !== $startDateStr) {
+                return false;
+            }
+        } elseif ($this->frekuensi === 'mingguan') {
             if ($now->dayOfWeek !== $this->tanggal_mulai->dayOfWeek) {
                 return false;
             }

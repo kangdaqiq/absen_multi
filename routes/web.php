@@ -180,7 +180,9 @@ Route::middleware('auth')->group(function () {
         // Kegiatan (Absensi Per Kegiatan)
         Route::get('kegiatan/absen', [App\Http\Controllers\KegiatanController::class, 'absen'])->name('kegiatan.absen');
         Route::post('kegiatan/absen/update', [App\Http\Controllers\KegiatanController::class, 'updateAttendance'])->name('kegiatan.absen.update');
+        Route::post('kegiatan/absen/bulk', [App\Http\Controllers\KegiatanController::class, 'bulkUpdateAttendance'])->name('kegiatan.absen.bulk');
         Route::get('kegiatan/rekap', [App\Http\Controllers\KegiatanController::class, 'rekap'])->name('kegiatan.rekap');
+        Route::get('kegiatan/rekap/export', [App\Http\Controllers\KegiatanController::class, 'exportRekap'])->name('kegiatan.rekap.export');
         Route::get('kegiatan/{id}/attendance', [App\Http\Controllers\KegiatanController::class, 'attendance'])->name('kegiatan.attendance');
         Route::resource('kegiatan', App\Http\Controllers\KegiatanController::class)->except(['create', 'show', 'edit']);
 

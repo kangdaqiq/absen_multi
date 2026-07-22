@@ -322,8 +322,10 @@ class RfidController extends Controller
             ->where('jam_selesai', '>=', $timeStr)
             ->where('tanggal_mulai', '<=', $todayStr)
             ->get()
-            ->first(function($kegiatan) use ($now) {
-                if ($kegiatan->frekuensi === 'mingguan') {
+            ->first(function($kegiatan) use ($now, $todayStr) {
+                if ($kegiatan->frekuensi === 'sekali') {
+                    return $todayStr === $kegiatan->tanggal_mulai->format('Y-m-d');
+                } elseif ($kegiatan->frekuensi === 'mingguan') {
                     return $now->dayOfWeek === $kegiatan->tanggal_mulai->dayOfWeek;
                 } elseif ($kegiatan->frekuensi === 'bulanan') {
                     return $now->day === $kegiatan->tanggal_mulai->day;
@@ -331,7 +333,47 @@ class RfidController extends Controller
                 return true; // harian
             });
         if ($activeKegiatan) {
-            return $this->handleKegiatanStudentScan($uid, $activeKegiatan, $apiKey, $device, $now);
+            $siswaForKeg = Siswa::whereRaw('UPPER(uid_rfid) = ?', [$uid])
+                ->where('school_id', $device->school_id)
+                ->first();
+
+            if ($siswaForKeg) {
+                $attKbm = Attendance::where('student_id', $siswaForKeg->id)
+                    ->where('tanggal', $todayStr)
+                    ->first();
+
+                $hasCheckedInKbm = $attKbm && $attKbm->jam_masuk !== null;
+
+                if ($hasCheckedInKbm) {
+                    // Siswa SUDAH absen masuk KBM → Boleh catat presensi Kegiatan
+                    return $this->handleKegiatanStudentScan($uid, $activeKegiatan, $apiKey, $device, $now);
+                } else {
+                    // Siswa BELUM absen masuk KBM:
+                    $indexHari = (int) $now->format('N');
+                    $jadwalKbm = Jadwal::where('index_hari', $indexHari)
+                        ->where('is_active', 1)
+                        ->where('school_id', $device->school_id)
+                        ->first();
+
+                    $isKbmWindowOpen = false;
+                    if ($jadwalKbm) {
+                        $awalAbsen = Carbon::parse($todayStr . ' ' . $jadwalKbm->awal_absen_masuk);
+                        $akhirAbsen = Carbon::parse($todayStr . ' ' . $jadwalKbm->akhir_absen_masuk);
+                        $isKbmWindowOpen = $now->between($awalAbsen, $akhirAbsen);
+                    }
+
+                    if ($isKbmWindowOpen) {
+                        // Jika rentang absen masuk KBM masih buka (pagi), alirkan ke handleScan untuk dicatat Absen Masuk KBM terlebih dahulu
+                    } else {
+                        // Jika rentang absen masuk KBM sudah tutup (sore/luar jam masuk), tolak dengan checkin_closed agar firmware scanner kompatibel
+                        $this->logRequest($apiKey, 'checkin_closed', $uid, false, 'Belum absen masuk KBM (Absen Tutup)');
+                        return $this->response(false, 'gagal', 'Absen Tutup', 'warning', [
+                            'type' => 'checkin_closed',
+                            'nama' => $siswaForKeg->nama,
+                        ]);
+                    }
+                }
+            }
         }
 
         // Check Teacher - SCOPED
@@ -882,6 +924,20 @@ class RfidController extends Controller
                 return $this->response(false, 'unknown', 'Kartu tdk dikenal', 'error', ['type' => 'unknown_card', 'uid' => $uid]);
             }
 
+            // SYARAT BERTAHAP: Wajib sudah absen masuk KBM harian terlebih dahulu
+            $attKbm = Attendance::where('student_id', $siswa->id)
+                ->where('tanggal', $today)
+                ->first();
+
+            if (!$attKbm || !$attKbm->jam_masuk) {
+                DB::rollBack();
+                $this->logRequest($apiKey, 'checkin_closed', $uid, false, 'Belum absen masuk KBM (Absen Tutup)');
+                return $this->response(false, 'gagal', 'Absen Tutup', 'warning', [
+                    'type' => 'checkin_closed',
+                    'nama' => $siswa->nama,
+                ]);
+            }
+
             // Cek apakah sudah hadir hari ini untuk kegiatan ini
             $already = KegiatanAttendance::where('kegiatan_id', $kegiatan->id)
                 ->where('student_id', $siswa->id)
@@ -899,7 +955,7 @@ class RfidController extends Controller
                 ]);
             }
 
-            // Catat kehadiran
+            // Catat kehadiran kegiatan
             KegiatanAttendance::create([
                 'school_id'   => $device->school_id,
                 'kegiatan_id' => $kegiatan->id,
@@ -908,26 +964,61 @@ class RfidController extends Controller
                 'jam_masuk'   => $now->toTimeString(),
                 'status'      => 'H',
             ]);
-            DB::commit();
 
-            // Kirim notifikasi WA ke siswa dan ortu
-            try {
-                $tanggalFormatted = $now->translatedFormat('l, d F Y');
-                $this->wa->sendKegiatanCheckIn(
-                    namaSiswa: $siswa->nama,
-                    namaKegiatan: $kegiatan->nama_kegiatan,
-                    jam: $now->format('H:i'),
-                    tanggal: $tanggalFormatted,
-                    schoolId: $device->school_id,
-                    phoneSiswa: $siswa->no_wa ?: null,
-                    phoneOrtu: $siswa->wa_ortu ?: null,
-                );
-            } catch (\Exception $e) {
-                Log::error("WA Kegiatan CheckIn Error: " . $e->getMessage());
+            // AUTO-RECORD KBM: Jika belum absen masuk KBM hari ini dan scan dilakukan saat rentang jam masuk KBM,
+            // otomatis catat juga Absen Masuk KBM harian agar siswa tidak terhitung Alpha.
+            $indexHari = (int) $now->format('N');
+            $jadwalKbm = Jadwal::where('index_hari', $indexHari)
+                ->where('is_active', 1)
+                ->where('school_id', $device->school_id)
+                ->first();
+
+            if ($jadwalKbm) {
+                $awalAbsenMasuk = Carbon::parse($today . ' ' . $jadwalKbm->awal_absen_masuk);
+                $akhirAbsenMasuk = Carbon::parse($today . ' ' . $jadwalKbm->akhir_absen_masuk);
+                $jamMasukDefault = Carbon::parse($today . ' ' . $jadwalKbm->jam_masuk);
+
+                if ($now->between($awalAbsenMasuk, $akhirAbsenMasuk)) {
+                    $attKbm = Attendance::where('student_id', $siswa->id)
+                        ->where('tanggal', $today)
+                        ->first();
+
+                    if (!$attKbm || !$attKbm->jam_masuk) {
+                        $statusKbm = $now->gt($jamMasukDefault) ? 'T' : 'H';
+                        $keteranganKbm = null;
+                        if ($statusKbm === 'T') {
+                            $diff = $now->timestamp - $jamMasukDefault->timestamp;
+                            $menit = floor(($diff % 3600) / 60);
+                            $keteranganKbm = "Telat {$menit} menit";
+                        }
+
+                        if ($attKbm) {
+                            $attKbm->update([
+                                'jam_masuk'  => $now->toTimeString(),
+                                'status'     => $statusKbm,
+                                'keterangan' => $keteranganKbm,
+                                'updated_at' => now(),
+                            ]);
+                        } else {
+                            Attendance::create([
+                                'student_id' => $siswa->id,
+                                'tanggal'    => $today,
+                                'jam_masuk'  => $now->toTimeString(),
+                                'status'     => $statusKbm,
+                                'keterangan' => $keteranganKbm,
+                                'created_at' => now(),
+                            ]);
+                        }
+                    }
+                }
             }
 
-            // Telegram
+            DB::commit();
+
+            // WA kegiatan real-time ke siswa/ortu dinonaktifkan (hanya masuk rekap).
+            // Notifikasi Telegram tetap dikirim jika aktif.
             try {
+                $tanggalFormatted = $now->translatedFormat('l, d F Y');
                 $this->telegram->sendKegiatanCheckIn(
                     namaSiswa: $siswa->nama,
                     namaKegiatan: $kegiatan->nama_kegiatan,

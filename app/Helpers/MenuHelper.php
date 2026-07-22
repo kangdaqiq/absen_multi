@@ -119,8 +119,8 @@ class MenuHelper
                 'items' => $kehadiranItems
             ];
 
-            // Kegiatan — hanya untuk admin tenant pesantren
-            if ($role === 'admin' && $school?->isPesantren()) {
+            // Kegiatan — untuk sekolah & pesantren (non-office)
+            if (in_array($role, ['admin', 'teacher', 'wali_kelas', 'waka_kurikulum']) && !$isOffice) {
                 $menu[] = [
                     'title' => 'Kegiatan',
                     'items' => [

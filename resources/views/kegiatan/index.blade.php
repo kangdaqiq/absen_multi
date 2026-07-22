@@ -42,7 +42,7 @@
                 <li>Buat kegiatan dan atur tanggal serta jadwal jam kegiatan (<strong>Jam Mulai</strong> & <strong>Jam Selesai</strong>).</li>
                 <li>Pastikan status kegiatan diatur ke <strong>Aktif</strong>.</li>
                 <li>Siswa scan kartu RFID masing-masing pada jam kegiatan tersebut berlangsung.</li>
-                <li>Sistem otomatis mencatat kehadiran siswa pada kegiatan tersebut (tidak perlu kartu fisik/sesi manual) dan mengirim notifikasi WhatsApp ke orang tua & siswa secara real-time.</li>
+                <li>Sistem otomatis mencatat kehadiran siswa pada kegiatan tersebut .</li>
             </ol>
         </div>
     </div>
@@ -82,7 +82,7 @@
                             <div class="flex flex-col gap-1">
                                 <span class="font-medium text-gray-800 dark:text-white/90">{{ \Carbon\Carbon::parse($kegiatan->tanggal_mulai)->format('d/m/Y') }}</span>
                                 <span class="inline-flex items-center self-start px-2.5 py-0.5 rounded-full text-xs font-semibold bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400">
-                                    {{ $kegiatan->frekuensi === 'harian' ? 'Harian' : ($kegiatan->frekuensi === 'mingguan' ? 'Mingguan' : 'Bulanan') }}
+                                    {{ $kegiatan->frekuensi === 'harian' ? 'Harian' : ($kegiatan->frekuensi === 'mingguan' ? 'Mingguan' : ($kegiatan->frekuensi === 'bulanan' ? 'Bulanan' : 'Sekali (Insidental)')) }}
                                 </span>
                             </div>
                         </td>
@@ -177,18 +177,22 @@
                                         <div class="flex-1" x-data="{ selected: '{{ $kegiatan->frekuensi ?? 'harian' }}' }">
                                             <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Frekuensi Kegiatan <span class="text-error-500">*</span></label>
                                             <input type="hidden" name="frekuensi" :value="selected">
-                                            <div class="flex items-center gap-4 mt-2">
-                                                <label class="flex items-center gap-2 cursor-pointer">
-                                                    <input type="checkbox" :checked="selected === 'harian'" @change="selected = 'harian'" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900">
-                                                    <span class="text-sm text-gray-700 dark:text-gray-300">Harian</span>
+                                            <div class="flex flex-wrap items-center gap-3 mt-2">
+                                                <label class="flex items-center gap-1.5 cursor-pointer">
+                                                    <input type="radio" name="frekuensi_choice_{{ $kegiatan->id }}" :checked="selected === 'sekali'" @change="selected = 'sekali'" class="text-brand-500 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900">
+                                                    <span class="text-xs text-gray-700 dark:text-gray-300">Sekali (Insidental)</span>
                                                 </label>
-                                                <label class="flex items-center gap-2 cursor-pointer">
-                                                    <input type="checkbox" :checked="selected === 'mingguan'" @change="selected = 'mingguan'" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900">
-                                                    <span class="text-sm text-gray-700 dark:text-gray-300">Mingguan</span>
+                                                <label class="flex items-center gap-1.5 cursor-pointer">
+                                                    <input type="radio" name="frekuensi_choice_{{ $kegiatan->id }}" :checked="selected === 'harian'" @change="selected = 'harian'" class="text-brand-500 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900">
+                                                    <span class="text-xs text-gray-700 dark:text-gray-300">Harian</span>
                                                 </label>
-                                                <label class="flex items-center gap-2 cursor-pointer">
-                                                    <input type="checkbox" :checked="selected === 'bulanan'" @change="selected = 'bulanan'" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900">
-                                                    <span class="text-sm text-gray-700 dark:text-gray-300">Bulanan</span>
+                                                <label class="flex items-center gap-1.5 cursor-pointer">
+                                                    <input type="radio" name="frekuensi_choice_{{ $kegiatan->id }}" :checked="selected === 'mingguan'" @change="selected = 'mingguan'" class="text-brand-500 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900">
+                                                    <span class="text-xs text-gray-700 dark:text-gray-300">Mingguan</span>
+                                                </label>
+                                                <label class="flex items-center gap-1.5 cursor-pointer">
+                                                    <input type="radio" name="frekuensi_choice_{{ $kegiatan->id }}" :checked="selected === 'bulanan'" @change="selected = 'bulanan'" class="text-brand-500 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900">
+                                                    <span class="text-xs text-gray-700 dark:text-gray-300">Bulanan</span>
                                                 </label>
                                             </div>
                                         </div>
@@ -299,18 +303,22 @@
                     <div class="flex-1" x-data="{ selected: 'harian' }">
                         <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Frekuensi Kegiatan <span class="text-error-500">*</span></label>
                         <input type="hidden" name="frekuensi" :value="selected">
-                        <div class="flex items-center gap-4 mt-2">
-                            <label class="flex items-center gap-2 cursor-pointer">
-                                <input type="checkbox" :checked="selected === 'harian'" @change="selected = 'harian'" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900">
-                                <span class="text-sm text-gray-700 dark:text-gray-300">Harian</span>
+                        <div class="flex flex-wrap items-center gap-3 mt-2">
+                            <label class="flex items-center gap-1.5 cursor-pointer">
+                                <input type="radio" name="frekuensi_choice_tambah" :checked="selected === 'sekali'" @change="selected = 'sekali'" class="text-brand-500 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900">
+                                <span class="text-xs text-gray-700 dark:text-gray-300">Sekali (Insidental)</span>
                             </label>
-                            <label class="flex items-center gap-2 cursor-pointer">
-                                <input type="checkbox" :checked="selected === 'mingguan'" @change="selected = 'mingguan'" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900">
-                                <span class="text-sm text-gray-700 dark:text-gray-300">Mingguan</span>
+                            <label class="flex items-center gap-1.5 cursor-pointer">
+                                <input type="radio" name="frekuensi_choice_tambah" :checked="selected === 'harian'" @change="selected = 'harian'" class="text-brand-500 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900">
+                                <span class="text-xs text-gray-700 dark:text-gray-300">Harian</span>
                             </label>
-                            <label class="flex items-center gap-2 cursor-pointer">
-                                <input type="checkbox" :checked="selected === 'bulanan'" @change="selected = 'bulanan'" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900">
-                                <span class="text-sm text-gray-700 dark:text-gray-300">Bulanan</span>
+                            <label class="flex items-center gap-1.5 cursor-pointer">
+                                <input type="radio" name="frekuensi_choice_tambah" :checked="selected === 'mingguan'" @change="selected = 'mingguan'" class="text-brand-500 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900">
+                                <span class="text-xs text-gray-700 dark:text-gray-300">Mingguan</span>
+                            </label>
+                            <label class="flex items-center gap-1.5 cursor-pointer">
+                                <input type="radio" name="frekuensi_choice_tambah" :checked="selected === 'bulanan'" @change="selected = 'bulanan'" class="text-brand-500 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900">
+                                <span class="text-xs text-gray-700 dark:text-gray-300">Bulanan</span>
                             </label>
                         </div>
                     </div>

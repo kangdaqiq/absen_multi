@@ -8,7 +8,7 @@
         <h2 class="text-title-md2 font-semibold text-gray-800 dark:text-white/90">
             🎯 Absen Kegiatan
         </h2>
-        <p class="text-sm text-gray-500 dark:text-gray-400">Pencatatan Kehadiran Santri Secara Manual & Real-time</p>
+        <p class="text-sm text-gray-500 dark:text-gray-400">Pencatatan Kehadiran Siswa Secara Manual & Real-time</p>
     </div>
 </div>
 
@@ -51,8 +51,8 @@
             </div>
 
             <div class="w-full xl:w-1/4 relative">
-                <label for="search" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Cari Santri</label>
-                <input type="text" name="search" id="search" value="{{ request('search') }}" placeholder="Ketik nama santri..." 
+                <label for="search" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Cari Siswa</label>
+                <input type="text" name="search" id="search" value="{{ request('search') }}" placeholder="Ketik nama siswa..." 
                     oninput="clearTimeout(this.delay); this.delay = setTimeout(() => { this.form.submit() }, 600);"
                     class="w-full rounded-lg border border-gray-200 bg-transparent py-2 pl-4 pr-10 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
                 <div class="absolute right-3 bottom-2 text-gray-400">
@@ -106,9 +106,23 @@
 
     {{-- Students Table Card --}}
     <div class="rounded-2xl border border-gray-200 bg-white shadow-theme-sm dark:border-gray-800 dark:bg-gray-dark">
-        <div class="border-b border-gray-200 px-5 py-4 dark:border-gray-800 flex justify-between items-center">
-            <h6 class="font-semibold text-gray-800 dark:text-white/90">Daftar Santri & Presensi</h6>
-            <span class="text-sm text-gray-500 dark:text-gray-400">{{ $students->total() }} santri ditemukan</span>
+        <div class="border-b border-gray-200 px-5 py-4 dark:border-gray-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+            <div>
+                <h6 class="font-semibold text-gray-800 dark:text-white/90">Daftar Siswa & Presensi</h6>
+                <span class="text-sm text-gray-500 dark:text-gray-400">{{ $students->total() }} siswa ditemukan</span>
+            </div>
+            @if($students->count() > 0)
+            <form action="{{ route('kegiatan.absen.bulk') }}" method="POST" onsubmit="return confirm('Tandai semua siswa pada halaman/kelas ini sebagai HADIR?')">
+                @csrf
+                <input type="hidden" name="kegiatan_id" value="{{ $kegiatan->id }}">
+                <input type="hidden" name="tanggal" value="{{ $tanggal }}">
+                <input type="hidden" name="kelas_id" value="{{ $kelasId }}">
+                <input type="hidden" name="status" value="H">
+                <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-success-500 px-4 py-2 text-xs font-semibold text-white hover:bg-success-600 transition shadow-sm">
+                    <i class="fas fa-check-double"></i> Tandai Semua Hadir
+                </button>
+            </form>
+            @endif
         </div>
 
         <div class="max-w-full overflow-x-auto">
@@ -120,7 +134,7 @@
                         <th class="px-5 py-4">NIS</th>
                         <th class="px-5 py-4">Kelas</th>
                         <th class="px-5 py-4 text-center">Jam Presensi</th>
-                        <th class="px-5 py-4 text-center w-60">Status Kehadiran</th>
+                        <th class="px-5 py-4 text-center w-80">Status Kehadiran</th>
                     </tr>
                 </thead>
                 <tbody class="text-sm">
@@ -157,8 +171,9 @@
                                 .then(data => {
                                     if (data.success) {
                                         this.attendance = targetStatus;
-                                        this.jamMasuk = targetStatus === 'H' ? data.jam_masuk : '-';
-                                        showToast('success', 'Santri **' + '{{ $student->nama }}' + '** ditandai **' + (targetStatus === 'H' ? 'Hadir' : 'Alpha') + '**.');
+                                        this.jamMasuk = (targetStatus !== 'A') ? (data.jam_masuk || '-') : '-';
+                                        let labelMap = {'H': 'Hadir', 'I': 'Izin', 'S': 'Sakit', 'A': 'Alpha'};
+                                        showToast('success', 'Siswa **' + '{{ $student->nama }}' + '** ditandai **' + labelMap[targetStatus] + '**.');
                                     } else {
                                         showToast('error', 'Gagal mengubah status: ' + data.message);
                                     }
@@ -202,9 +217,29 @@
                                             :class="attendance === 'H' 
                                                 ? 'bg-success-500 text-white font-bold shadow-sm' 
                                                 : 'text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white'"
-                                            class="inline-flex items-center gap-1 rounded-md px-4 py-1.5 text-xs font-semibold transition-all duration-200">
+                                            class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-semibold transition-all duration-200">
                                         <i class="fas fa-check-circle" :class="attendance === 'H' ? 'text-white' : 'text-success-500'"></i>
                                         Hadir
+                                    </button>
+                                    {{-- Button Izin --}}
+                                    <button @click="toggle('I')" 
+                                            :disabled="loading"
+                                            :class="attendance === 'I' 
+                                                ? 'bg-warning-500 text-white font-bold shadow-sm' 
+                                                : 'text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white'"
+                                            class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-semibold transition-all duration-200">
+                                        <i class="fas fa-info-circle" :class="attendance === 'I' ? 'text-white' : 'text-warning-500'"></i>
+                                        Izin
+                                    </button>
+                                    {{-- Button Sakit --}}
+                                    <button @click="toggle('S')" 
+                                            :disabled="loading"
+                                            :class="attendance === 'S' 
+                                                ? 'bg-brand-500 text-white font-bold shadow-sm' 
+                                                : 'text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white'"
+                                            class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-semibold transition-all duration-200">
+                                        <i class="fas fa-notes-medical" :class="attendance === 'S' ? 'text-white' : 'text-brand-500'"></i>
+                                        Sakit
                                     </button>
                                     {{-- Button Alpha --}}
                                     <button @click="toggle('A')" 
@@ -212,7 +247,7 @@
                                             :class="attendance === 'A' 
                                                 ? 'bg-error-500 text-white font-bold shadow-sm' 
                                                 : 'text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white'"
-                                            class="inline-flex items-center gap-1 rounded-md px-4 py-1.5 text-xs font-semibold transition-all duration-200">
+                                            class="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-semibold transition-all duration-200">
                                         <i class="fas fa-times-circle" :class="attendance === 'A' ? 'text-white' : 'text-error-500'"></i>
                                         Alpha
                                     </button>
@@ -224,8 +259,8 @@
                             <td colspan="6" class="px-5 py-12 text-center">
                                 <div class="flex flex-col items-center gap-3 text-gray-400 dark:text-gray-600">
                                     <i class="fas fa-user-slash text-4xl"></i>
-                                    <p class="text-sm">Tidak ada data santri ditemukan.</p>
-                                    <p class="text-xs">Pastikan data kelas dan santri telah diisi atau ganti filter pencarian.</p>
+                                    <p class="text-sm">Tidak ada data siswa ditemukan.</p>
+                                    <p class="text-xs">Pastikan data kelas dan siswa telah diisi atau ganti filter pencarian.</p>
                                 </div>
                             </td>
                         </tr>

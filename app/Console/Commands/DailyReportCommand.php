@@ -71,7 +71,9 @@ class DailyReportCommand extends Command
             ->where('setting_key', 'schedule_daily_report')
             ->value('setting_value') ?? '08:15';
 
-        if (now()->format('H:i') < $scheduleTime && !$this->option('force')) {
+        $nowTimeStr = now()->format('H:i');
+
+        if ($nowTimeStr < $scheduleTime && !$this->option('force')) {
             $this->info("Too early for school ID $schoolId. Schedule: $scheduleTime. Skipped.");
             return;
         }
@@ -357,6 +359,25 @@ class DailyReportCommand extends Command
             $this->info("Queued class report: {$kelas->nama_kelas}");
         }
 
+        // Fetch Kegiatan Attendance Today for this school
+        $kegiatanAttToday = \App\Models\KegiatanAttendance::with('kegiatan')
+            ->where('school_id', $schoolId)
+            ->where('tanggal', $today)
+            ->get();
+
+        $listKegiatanGlobal = [];
+        if ($kegiatanAttToday->isNotEmpty()) {
+            foreach ($kegiatanAttToday->groupBy('kegiatan_id') as $kId => $atts) {
+                $kName = $atts->first()->kegiatan->nama_kegiatan ?? 'Kegiatan';
+                $listKegiatanGlobal[] = [
+                    'nama'  => $kName,
+                    'hadir' => $atts->where('status', 'H')->count(),
+                    'izin'  => $atts->where('status', 'I')->count(),
+                    'sakit' => $atts->where('status', 'S')->count(),
+                ];
+            }
+        }
+
         // --- SEND GLOBAL REPORT ---
         $guruGlobal = \App\Models\Guru::where('school_id', $schoolId)
             ->where('is_global_report', true)
@@ -369,7 +390,8 @@ class DailyReportCommand extends Command
                 totalMasuk: $totalMasuk,
                 totalTidakMasuk: $totalTidakMasuk,
                 absentByStatus: $absentByStatus,
-                statsByJurusan: $statsByJurusan
+                statsByJurusan: $statsByJurusan,
+                listKegiatan: $listKegiatanGlobal
             );
 
             if ($targetJid) {
@@ -483,6 +505,23 @@ class DailyReportCommand extends Command
                 }
             }
 
+            // Filter kegiatan attendance for this class
+            $listKegiatanClass = [];
+            if ($kegiatanAttToday->isNotEmpty()) {
+                $classStudentIds = $siswaKelas->pluck('id');
+                $kegiatanAttClass = $kegiatanAttToday->whereIn('student_id', $classStudentIds);
+
+                foreach ($kegiatanAttClass->groupBy('kegiatan_id') as $kId => $atts) {
+                    $kName = $atts->first()->kegiatan->nama_kegiatan ?? 'Kegiatan';
+                    $listKegiatanClass[] = [
+                        'nama'  => $kName,
+                        'hadir' => $atts->where('status', 'H')->count(),
+                        'izin'  => $atts->where('status', 'I')->count(),
+                        'sakit' => $atts->where('status', 'S')->count(),
+                    ];
+                }
+            }
+
             foreach ($walis as $wali) {
                 if (!$wali->no_wa) {
                     continue;
@@ -494,7 +533,8 @@ class DailyReportCommand extends Command
                     masuk: $masuk,
                     tidakMasuk: $tidakMasuk,
                     listAbsen: $listAbsen,
-                    listTerlambat: $listTerlambat
+                    listTerlambat: $listTerlambat,
+                    listKegiatan: $listKegiatanClass
                 );
 
                 if (!$wali->isWithinLastSeen(48)) {

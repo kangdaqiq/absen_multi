@@ -33,6 +33,7 @@ class RfidController extends Controller
     private $currentApiKey = null;
     private $currentUid = null;
     private $currentSchoolId = null;
+    private $currentScannedAt = null;
     private $hasLogged = false;
 
     public function __construct(\App\Services\WhatsAppService $wa, \App\Services\TelegramService $telegram)
@@ -290,6 +291,8 @@ class RfidController extends Controller
                 // scanned_at tidak valid, pakai now()
             }
         }
+
+        $this->currentScannedAt = $now;
 
         // 4. Cooldown
         if ($res = $this->checkScanCooldown($uid)) {
@@ -1070,6 +1073,8 @@ class RfidController extends Controller
     {
         $this->hasLogged = true;
 
+        $logTime = $this->currentScannedAt ?? now();
+
         ApiLog::create([
             'school_id' => $this->currentSchoolId,
             'api_key' => $apiKey,
@@ -1079,7 +1084,7 @@ class RfidController extends Controller
             'message' => substr($message, 0, 500),
             'ip_address' => request()->ip(),
             'user_agent' => request()->userAgent(),
-            'created_at' => now()
+            'created_at' => $logTime
         ]);
     }
 

@@ -330,8 +330,8 @@ class AutoBolosCommand extends Command
             foreach ($walis as $wali) {
                 // 2. Kirim ke Nomor WA Pribadi Wali Kelas (jika ada)
                 if (!empty($wali->no_wa)) {
-                    if (!$wali->isWithinLastSeen(48)) {
-                        $this->warn("Skipping AutoBolos report WA to Guru: {$wali->nama} (last_seen is null or older than 48 hours)");
+                    if (!$wali->isWithinLastSeen(72)) {
+                        $this->warn("Skipping AutoBolos report WA to Guru: {$wali->nama} (last_seen is null or older than 72 hours)");
                     } else {
                         $noWa = $wali->no_wa;
                         if (!str_contains($noWa, '@')) {
@@ -432,8 +432,8 @@ class AutoBolosCommand extends Command
 
             // Guru dengan akses report global
             foreach ($guruGlobal as $guru) {
-                if (!$guru->isWithinLastSeen(48)) {
-                    $this->warn("Skipping AutoBolos global report WA to Guru: {$guru->nama} (last_seen is null or older than 48 hours)");
+                if (!$guru->isWithinLastSeen(72)) {
+                    $this->warn("Skipping AutoBolos global report WA to Guru: {$guru->nama} (last_seen is null or older than 72 hours)");
                     continue;
                 }
 

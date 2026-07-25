@@ -17,6 +17,14 @@ class MessageQueue extends Model
     protected static function booted()
     {
         static::creating(function ($messageQueue) {
+            // Check Last Seen rule (72 hours) unless explicitly bypassed
+            if (empty($messageQueue->bypass_last_seen)) {
+                if (!static::isRecipientWithinLastSeen($messageQueue->phone_number, 72)) {
+                    \Illuminate\Support\Facades\Log::warning("Skipped WA message queue for {$messageQueue->phone_number}: last_seen is null or older than 72 hours.");
+                    return false;
+                }
+            }
+
             if ($messageQueue->school_id && !empty($messageQueue->message)) {
                 $school = \App\Models\School::find($messageQueue->school_id);
                 if ($school && !empty($school->name)) {
@@ -27,6 +35,54 @@ class MessageQueue extends Model
                 }
             }
         });
+    }
+
+    /**
+     * Cek apakah penerima WA (Guru, Siswa, atau Ortu) aktif dalam $hours jam terakhir (Last Seen).
+     */
+    public static function isRecipientWithinLastSeen(?string $phone, int $hours = 72): bool
+    {
+        if (empty($phone)) {
+            return false;
+        }
+
+        // Jika nomor adalah WA Group (@g.us), jangan batasi last seen
+        if (str_contains($phone, '@g.us')) {
+            return true;
+        }
+
+        $clean = preg_replace('/[^0-9]/', '', $phone);
+        if (empty($clean)) {
+            return false;
+        }
+
+        $variants = [$clean];
+        if (str_starts_with($clean, '62')) {
+            $variants[] = '0' . substr($clean, 2);
+        } elseif (str_starts_with($clean, '0')) {
+            $variants[] = '62' . substr($clean, 1);
+        }
+
+        // 1. Cek Guru
+        $guru = \App\Models\Guru::whereIn('no_wa', $variants)->first();
+        if ($guru) {
+            return $guru->isWithinLastSeen($hours);
+        }
+
+        // 2. Cek Siswa (sebagai nomor siswa)
+        $siswa = \App\Models\Siswa::whereIn('no_wa', $variants)->first();
+        if ($siswa) {
+            return $siswa->isSiswaWithinLastSeen($hours);
+        }
+
+        // 3. Cek Siswa (sebagai nomor orang tua)
+        $ortuSiswa = \App\Models\Siswa::whereIn('wa_ortu', $variants)->first();
+        if ($ortuSiswa) {
+            return $ortuSiswa->isOrtuWithinLastSeen($hours);
+        }
+
+        // Jika tidak terdaftar di tabel Guru/Siswa/Ortu (misal admin/sistem), izinkan pengiriman.
+        return true;
     }
     
     /**

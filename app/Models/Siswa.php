@@ -48,7 +48,7 @@ class Siswa extends Model
         'last_seen_ortu' => 'datetime',
     ];
 
-    public function isSiswaWithinLastSeen($hours = 48): bool
+    public function isSiswaWithinLastSeen($hours = 72): bool
     {
         if (!$this->last_seen_siswa) {
             return false;
@@ -56,7 +56,7 @@ class Siswa extends Model
         return \Carbon\Carbon::parse($this->last_seen_siswa)->gte(now()->subHours($hours));
     }
 
-    public function isOrtuWithinLastSeen($hours = 48): bool
+    public function isOrtuWithinLastSeen($hours = 72): bool
     {
         if (!$this->last_seen_ortu) {
             return false;

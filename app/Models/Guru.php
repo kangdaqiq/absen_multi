@@ -18,7 +18,7 @@ class Guru extends Model
         'last_seen' => 'datetime',
     ];
 
-    public function isWithinLastSeen($hours = 48): bool
+    public function isWithinLastSeen($hours = 72): bool
     {
         if (!$this->last_seen) {
             return false;

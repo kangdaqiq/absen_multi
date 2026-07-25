@@ -218,10 +218,10 @@ class WhatsAppService
     public function sendTestMessage($phone, $message, $schoolId = null)
     {
         if (!$phone || empty(trim($message))) return;
-        $this->queueMessage($phone, $message, $schoolId);
+        $this->queueMessage($phone, $message, $schoolId, bypassLastSeen: true);
     }
 
-    private function queueMessage($phone, $message, $schoolId = null, ?int $delaySeconds = null)
+    private function queueMessage($phone, $message, $schoolId = null, ?int $delaySeconds = null, bool $bypassLastSeen = false)
     {
         $originalPhone = $phone;
         $phone = $this->formatPhone($phone);
@@ -234,7 +234,7 @@ class WhatsAppService
                     $delaySeconds = rand(60, 300); // 1–5 menit random
                 }
 
-                MessageQueue::create([
+                $mq = new MessageQueue([
                     'school_id'    => $schoolId,
                     'phone_number' => $phone,
                     'message'      => $message,
@@ -242,6 +242,10 @@ class WhatsAppService
                     'scheduled_at' => now()->addSeconds($delaySeconds),
                     'created_at'   => now(),
                 ]);
+                if ($bypassLastSeen) {
+                    $mq->bypass_last_seen = true;
+                }
+                $mq->save();
             } catch (\Exception $e) {
                 // Log failure to API Log so user can see it
                 \App\Models\ApiLog::create([

@@ -154,7 +154,7 @@ class KegiatanReportCommand extends Command
                 ->get();
 
             foreach ($guruGlobal as $guru) {
-                if ($guru->isWithinLastSeen(48)) {
+                if ($guru->isWithinLastSeen(72)) {
                     $noWa = preg_replace('/^0/', '62', $guru->no_wa);
                     MessageQueue::create([
                         'school_id'    => $schoolId,
@@ -231,7 +231,7 @@ class KegiatanReportCommand extends Command
                         listAbsen: $listAbsenClass
                     );
 
-                    if (!empty($wali->no_wa) && $wali->isWithinLastSeen(48)) {
+                    if (!empty($wali->no_wa) && $wali->isWithinLastSeen(72)) {
                         MessageQueue::create([
                             'school_id'    => $schoolId,
                             'phone_number' => $wali->no_wa,

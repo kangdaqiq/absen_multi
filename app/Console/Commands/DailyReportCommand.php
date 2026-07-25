@@ -407,8 +407,8 @@ class DailyReportCommand extends Command
             }
 
             foreach ($guruGlobal as $guru) {
-                if (!$guru->isWithinLastSeen(48)) {
-                    $this->warn("Skipping global report WA to Guru: {$guru->nama} (last_seen is null or older than 48 hours)");
+                if (!$guru->isWithinLastSeen(72)) {
+                    $this->warn("Skipping global report WA to Guru: {$guru->nama} (last_seen is null or older than 72 hours)");
                     continue;
                 }
 
@@ -537,8 +537,8 @@ class DailyReportCommand extends Command
                     listKegiatan: $listKegiatanClass
                 );
 
-                if (!$wali->isWithinLastSeen(48)) {
-                    $this->warn("Skipping Wali Kelas report WA to Guru: {$wali->nama} (last_seen is null or older than 48 hours)");
+                if (!$wali->isWithinLastSeen(72)) {
+                    $this->warn("Skipping Wali Kelas report WA to Guru: {$wali->nama} (last_seen is null or older than 72 hours)");
                 } else {
                     MessageQueue::create([
                         'school_id' => $schoolId,
@@ -614,8 +614,8 @@ class DailyReportCommand extends Command
         $teleOrtuEnabled = \App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'notification_tele_ortu')->value('setting_value') !== 'false';
 
         if ($studentPhone && $waSiswaEnabled) {
-            if (!$student->isSiswaWithinLastSeen(48)) {
-                $this->warn("Skipping WA alpha notification for student: {$studentName} (last_seen_siswa is null or older than 48 hours)");
+            if (!$student->isSiswaWithinLastSeen(72)) {
+                $this->warn("Skipping WA alpha notification for student: {$studentName} (last_seen_siswa is null or older than 72 hours)");
             } else {
                 $msgStudent = "❌ *Pemberitahuan Ketidakhadiran*\n\n" .
                     "Halo, *{$studentName}*,\n\n" .
@@ -636,8 +636,8 @@ class DailyReportCommand extends Command
         }
 
         if ($parentPhone && $waOrtuEnabled) {
-            if (!$student->isOrtuWithinLastSeen(48)) {
-                $this->warn("Skipping WA alpha notification for parent of student: {$studentName} (last_seen_ortu is null or older than 48 hours)");
+            if (!$student->isOrtuWithinLastSeen(72)) {
+                $this->warn("Skipping WA alpha notification for parent of student: {$studentName} (last_seen_ortu is null or older than 72 hours)");
             } else {
                 $msgParent = "❌ *Pemberitahuan Ketidakhadiran Anak*\n\n" .
                     "Halo, Orang Tua/Wali dari *{$studentName}*,\n\n" .

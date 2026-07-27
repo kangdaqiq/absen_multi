@@ -30,12 +30,12 @@ class Kegiatan extends Model
     /**
      * Cek apakah kegiatan sedang berjalan berdasarkan jadwal waktu hari ini.
      */
-    public function isScheduledNow(): bool
+    public function isScheduledNow($now = null): bool
     {
         if (!$this->jam_mulai || !$this->jam_selesai) {
             return false;
         }
-        $now = now();
+        $now = $now ? \Carbon\Carbon::parse($now) : now();
         $nowTimeStr = $now->format('H:i:s');
         $todayStr = $now->format('Y-m-d');
         

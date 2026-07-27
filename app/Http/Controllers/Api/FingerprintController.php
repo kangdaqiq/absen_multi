@@ -982,6 +982,34 @@ return $this->response(false, 'gagal', 'Enroll Timeout / No Request');
                     'created_at' => $now,
                 ]);
             }
+
+            // OTOMATIS CATAT ABSEN KEGIATAN JIKA TERDAPAT JADWAL KEGIATAN AKTIF
+            $activeKegiatans = \App\Models\Kegiatan::where('school_id', $device->school_id)
+                ->where('is_active', 1)
+                ->get()
+                ->filter(function ($keg) use ($now) {
+                    return $keg->isScheduledNow($now);
+                });
+
+            foreach ($activeKegiatans as $keg) {
+                $alreadyKeg = \App\Models\KegiatanAttendance::where('kegiatan_id', $keg->id)
+                    ->where('student_id', $siswa->id)
+                    ->where('tanggal', $today)
+                    ->exists();
+
+                if (!$alreadyKeg) {
+                    \App\Models\KegiatanAttendance::create([
+                        'school_id'   => $device->school_id,
+                        'kegiatan_id' => $keg->id,
+                        'student_id'  => $siswa->id,
+                        'tanggal'     => $today,
+                        'jam_masuk'   => $now->toTimeString(),
+                        'status'      => 'H',
+                        'keterangan'  => 'Auto dari Absen Masuk',
+                    ]);
+                }
+            }
+
             DB::commit();
 
             $this->wa->sendCheckIn($siswa->nama, $siswa->no_wa, $now->format('H:i'), $status, $device->school_id, $keterangan, $siswa->wa_ortu, $siswa->kelas->nama_kelas ?? '-');

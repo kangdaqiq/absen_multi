@@ -47,10 +47,126 @@ class RfidController extends Controller
         }
 
         $this->currentSchoolId = $device->school_id;
+
+        // Parse scanned_at untuk dukungan sync offline
         $now = now();
+        $scannedAt = trim($request->input('scanned_at', ''));
+        if ($scannedAt !== '') {
+            try {
+                $parsed = Carbon::parse($scannedAt);
+                if ($parsed->lte(now()) && $parsed->gte(now()->subDays(7))) {
+                    $now = $parsed;
+                    $this->currentScannedAt = $now;
+                }
+            } catch (\Exception $e) {}
+        }
         $today = $now->format('Y-m-d');
 
-        // Cari Siswa berdasarkan RFID UID
+        // 1. Cek Gate Card (Kartu Pembuka Gerbang Kepulangan)
+        $gateCard = GateCard::where('school_id', $device->school_id)
+            ->where(function($q) use ($uid) {
+                $q->where('uid_rfid', $uid)
+                  ->orWhere('id', str_replace('gate_card_', '', $uid));
+            })
+            ->first();
+
+        if ($gateCard) {
+            try {
+                DB::beginTransaction();
+                $gateName = $gateCard->guru_id ? ($gateCard->guru->nama ?? $gateCard->name) : $gateCard->name;
+                $sessionUid = $gateCard->uid_rfid ?: "gate_card_{$gateCard->id}";
+
+                TeacherCheckoutSession::where('expires_at', '<', $now)->delete();
+
+                $activeSession = TeacherCheckoutSession::where('uid_rfid', $sessionUid)
+                    ->where('expires_at', '>=', $now)
+                    ->first();
+
+                if ($activeSession) {
+                    $activeSession->delete();
+                    DB::commit();
+
+                    $this->logRequest($apiKey, 'gate_closed', $uid, true, 'Sesi Kepulangan Ditutup: ' . $gateName);
+                    return $this->response(true, 'success', "Gerbang Ditutup.", 'ok', [
+                        'type' => 'gate_closed',
+                        'nama' => $gateName
+                    ]);
+                }
+
+                TeacherCheckoutSession::create([
+                    'teacher_id' => $gateCard->guru_id,
+                    'teacher_name' => $gateName,
+                    'uid_rfid' => $sessionUid,
+                    'status' => 'open',
+                    'expires_at' => $now->copy()->addMinutes(30),
+                    'created_at' => $now
+                ]);
+
+                DB::commit();
+
+                $this->logRequest($apiKey, 'gate_access', $uid, true, 'Sesi Kepulangan Dibuka: ' . $gateName);
+                return $this->response(true, 'success', "Gerbang Dibuka (30 Menit).", 'ok', [
+                    'type' => 'gate_opened',
+                    'nama' => $gateName
+                ]);
+            } catch (\Exception $e) {
+                DB::rollBack();
+                Log::error("Gate RFID scan error: " . $e->getMessage());
+                return $this->response(false, 'error', 'System Error');
+            }
+        }
+
+        // 2. Cek Guru
+        $guru = Guru::where('school_id', $device->school_id)
+            ->where('uid_rfid', $uid)
+            ->first();
+
+        if ($guru) {
+            try {
+                DB::beginTransaction();
+                $absensiGuru = \App\Models\AbsensiGuru::where('guru_id', $guru->id)
+                    ->where('tanggal', $today)
+                    ->where('school_id', $device->school_id)
+                    ->whereNull('jadwal_pelajaran_id')
+                    ->lockForUpdate()
+                    ->first();
+
+                if (!$absensiGuru) {
+                    \App\Models\AbsensiGuru::create([
+                        'guru_id' => $guru->id,
+                        'school_id' => $device->school_id,
+                        'jadwal_pelajaran_id' => null,
+                        'tanggal' => $today,
+                        'jam_masuk' => $now->toTimeString(),
+                        'waktu_hadir' => $now,
+                        'status' => 'Hadir',
+                        'created_at' => $now
+                    ]);
+
+                    DB::commit();
+
+                    $this->wa->sendCheckIn($guru->nama, $guru->no_wa, $now->format('H:i'), 'Hadir', $device->school_id, '-', null, '-');
+                    $this->logRequest($apiKey, 'checkin_success', $uid, true, 'Guru Masuk RFID: ' . $guru->nama);
+
+                    return $this->response(true, 'success', "Selamat Pagi, {$guru->nama}.", 'ok', [
+                        'type' => 'absen_masuk_guru',
+                        'nama' => $guru->nama
+                    ]);
+                } else {
+                    DB::rollBack();
+                    return $this->response(true, 'success', "Sudah Absen Masuk, {$guru->nama}.", 'ok', [
+                        'type' => 'sudah_absen_masuk_guru',
+                        'nama' => $guru->nama
+                    ]);
+                }
+            } catch (\Exception $e) {
+                DB::rollBack();
+                Log::error("Guru RFID scan error: " . $e->getMessage());
+                return $this->response(false, 'gagal', 'Terjadi kesalahan sistem', 'error');
+            }
+        }
+
+        // 3. Cek Siswa berdasarkan RFID UID
         $siswa = Siswa::where('school_id', $device->school_id)
             ->where('uid_rfid', $uid)
             ->with('kelas')

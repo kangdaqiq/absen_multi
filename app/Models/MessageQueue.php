@@ -17,10 +17,12 @@ class MessageQueue extends Model
     protected static function booted()
     {
         static::creating(function ($messageQueue) {
-            // Check Last Seen rule (72 hours) unless explicitly bypassed
+            // Check Last Seen rule (default 3 days / 72 hours) unless explicitly bypassed
             if (empty($messageQueue->bypass_last_seen)) {
-                if (!static::isRecipientWithinLastSeen($messageQueue->phone_number, 72)) {
-                    \Illuminate\Support\Facades\Log::warning("Skipped WA message queue for {$messageQueue->phone_number}: last_seen is null or older than 72 hours.");
+                $expiryDays = (int) (\App\Models\Setting::where('setting_key', 'last_seen_expiry_days')->value('setting_value') ?: 3);
+                $expiryHours = $expiryDays * 24;
+                if (!static::isRecipientWithinLastSeen($messageQueue->phone_number, $expiryHours)) {
+                    \Illuminate\Support\Facades\Log::warning("Skipped WA message queue for {$messageQueue->phone_number}: last_seen is null or older than {$expiryHours} hours.");
                     return false;
                 }
             }

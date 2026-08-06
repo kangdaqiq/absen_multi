@@ -238,6 +238,22 @@
                                 class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
                             <p class="mt-1 text-xs text-gray-500">Jumlah hari izin "Sakit" berlaku (Contoh: 2 hari berarti jika hari ini izin sakit, besok otomatis masih izin sakit bila tidak absen masuk).</p>
                         </div>
+
+                        <div>
+                            <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Pengingat Last Seen WA (Otomatis)</label>
+                            <input type="time" name="schedule_last_seen_reminder"
+                                value="{{ $settings['schedule_last_seen_reminder'] ?? '07:00' }}"
+                                class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                            <p class="mt-1 text-xs text-gray-500">Waktu pengiriman pengingat WhatsApp otomatis untuk memperbarui last_seen sebelum kadaluarsa (Default: 07:00)</p>
+                        </div>
+
+                        <div>
+                            <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Masa Kadaluarsa Last Seen WA (Hari)</label>
+                            <input type="number" name="last_seen_expiry_days" min="1" max="30"
+                                value="{{ $settings['last_seen_expiry_days'] ?? '3' }}"
+                                class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                            <p class="mt-1 text-xs text-gray-500">Batas masa aktif status last_seen WhatsApp secara global (Default: 3 hari = 72 jam)</p>
+                        </div>
                     </div>
 
                     <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90 border-b border-gray-200 dark:border-gray-800 pb-2 mt-8">

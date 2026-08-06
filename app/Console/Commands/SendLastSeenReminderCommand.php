@@ -37,17 +37,19 @@ class SendLastSeenReminderCommand extends Command
 
         $this->info("Starting Last Seen Reminder check (Global expiry: {$expiryHours} hours [{$expiryDays} days], Threshold: {$warningThresholdHours} hours)...");
 
+        $expiryTime = now()->subHours($expiryHours);
         $thresholdTime = now()->subHours($warningThresholdHours);
         $processedPhones = [];
         $countGuru = 0;
         $countSiswa = 0;
         $countOrtu = 0;
 
-        // 1. GURU (Hanya yang SUDAH ADA last_seen dan hampir kadaluarsa)
+        // 1. GURU (Hanya yang SUDAH ADA last_seen dan masanya di rentang 48 jam s/d 72 jam)
         $gurus = Guru::whereNotNull('no_wa')
             ->where('no_wa', '!=', '')
             ->whereNotNull('last_seen')
             ->where('last_seen', '<=', $thresholdTime)
+            ->where('last_seen', '>=', $expiryTime)
             ->get();
 
         foreach ($gurus as $guru) {
@@ -73,11 +75,12 @@ class SendLastSeenReminderCommand extends Command
             $countGuru++;
         }
 
-        // 2. SISWA (Hanya yang SUDAH ADA last_seen_siswa dan hampir kadaluarsa)
+        // 2. SISWA (Hanya yang SUDAH ADA last_seen_siswa dan masanya di rentang 48 jam s/d 72 jam)
         $siswas = Siswa::whereNotNull('no_wa')
             ->where('no_wa', '!=', '')
             ->whereNotNull('last_seen_siswa')
             ->where('last_seen_siswa', '<=', $thresholdTime)
+            ->where('last_seen_siswa', '>=', $expiryTime)
             ->get();
 
         foreach ($siswas as $siswa) {
@@ -102,11 +105,12 @@ class SendLastSeenReminderCommand extends Command
             $countSiswa++;
         }
 
-        // 3. ORTU (Hanya yang SUDAH ADA last_seen_ortu dan hampir kadaluarsa)
+        // 3. ORTU (Hanya yang SUDAH ADA last_seen_ortu dan masanya di rentang 48 jam s/d 72 jam)
         $ortus = Siswa::whereNotNull('wa_ortu')
             ->where('wa_ortu', '!=', '')
             ->whereNotNull('last_seen_ortu')
             ->where('last_seen_ortu', '<=', $thresholdTime)
+            ->where('last_seen_ortu', '>=', $expiryTime)
             ->get();
 
         foreach ($ortus as $siswa) {

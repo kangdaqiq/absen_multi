@@ -33,7 +33,7 @@ class SendLastSeenReminderCommand extends Command
     {
         $expiryDays = (int) (Setting::where('setting_key', 'last_seen_expiry_days')->value('setting_value') ?: 3);
         $expiryHours = $expiryDays * 24;
-        $warningThresholdHours = max(24, $expiryHours - 24);
+        $warningThresholdHours = max(1, $expiryHours - 12); // 60 jam (rentang 60 - 72 jam)
 
         $this->info("Starting Last Seen Reminder check (Global expiry: {$expiryHours} hours [{$expiryDays} days], Threshold: {$warningThresholdHours} hours)...");
 
@@ -44,7 +44,7 @@ class SendLastSeenReminderCommand extends Command
         $countSiswa = 0;
         $countOrtu = 0;
 
-        // 1. GURU (Hanya yang SUDAH ADA last_seen dan masanya di rentang 48 jam s/d 72 jam)
+        // 1. GURU (Hanya yang SUDAH ADA last_seen dan masanya di rentang 60 jam s/d 72 jam)
         $gurus = Guru::whereNotNull('no_wa')
             ->where('no_wa', '!=', '')
             ->whereNotNull('last_seen')
@@ -75,7 +75,7 @@ class SendLastSeenReminderCommand extends Command
             $countGuru++;
         }
 
-        // 2. SISWA (Hanya yang SUDAH ADA last_seen_siswa dan masanya di rentang 48 jam s/d 72 jam)
+        // 2. SISWA (Hanya yang SUDAH ADA last_seen_siswa dan masanya di rentang 60 jam s/d 72 jam)
         $siswas = Siswa::whereNotNull('no_wa')
             ->where('no_wa', '!=', '')
             ->whereNotNull('last_seen_siswa')
@@ -105,7 +105,7 @@ class SendLastSeenReminderCommand extends Command
             $countSiswa++;
         }
 
-        // 3. ORTU (Hanya yang SUDAH ADA last_seen_ortu dan masanya di rentang 48 jam s/d 72 jam)
+        // 3. ORTU (Hanya yang SUDAH ADA last_seen_ortu dan masanya di rentang 60 jam s/d 72 jam)
         $ortus = Siswa::whereNotNull('wa_ortu')
             ->where('wa_ortu', '!=', '')
             ->whereNotNull('last_seen_ortu')

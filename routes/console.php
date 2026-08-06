@@ -53,6 +53,6 @@ Schedule::command('subscription:check')->dailyAt('08:00')->withoutOverlapping();
 // Kirim Ucapan Selamat Ulang Tahun ke Guru & Siswa (Runs at 00:01 AM)
 Schedule::command('absen:send-birthdays')->dailyAt('00:01')->withoutOverlapping();
 
-// Kirim Reminder Last Seen ke Guru, Siswa & Ortu (Runs at 07:00 AM)
-Schedule::command('absen:send-last-seen-reminder')->at($getTime('schedule_last_seen_reminder', '07:00'))->withoutOverlapping();
+// Kirim Reminder Last Seen ke Guru, Siswa & Ortu (Runs every 2 hours)
+Schedule::command('absen:send-last-seen-reminder')->everyTwoHours()->withoutOverlapping(10);
 

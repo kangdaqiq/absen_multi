@@ -54,7 +54,7 @@ class SendLastSeenReminderCommand extends Command
 
         foreach ($gurus as $guru) {
             $phone = $this->cleanPhone($guru->no_wa);
-            if (!$phone || in_array($phone, $processedPhones)) {
+            if (!$phone || in_array($phone, $processedPhones) || $this->isReminderAlreadySent($phone)) {
                 continue;
             }
 
@@ -70,7 +70,6 @@ class SendLastSeenReminderCommand extends Command
                 "_Terima kasih atas kerja samanya._ 🙏";
 
             $this->enqueueReminder($phone, $msg, $guru->school_id);
-            $guru->update(['last_seen' => now()]);
             $processedPhones[] = $phone;
             $countGuru++;
         }
@@ -85,7 +84,7 @@ class SendLastSeenReminderCommand extends Command
 
         foreach ($siswas as $siswa) {
             $phone = $this->cleanPhone($siswa->no_wa);
-            if (!$phone || in_array($phone, $processedPhones)) {
+            if (!$phone || in_array($phone, $processedPhones) || $this->isReminderAlreadySent($phone)) {
                 continue;
             }
 
@@ -100,7 +99,6 @@ class SendLastSeenReminderCommand extends Command
                 "_Terima kasih._ 🙏";
 
             $this->enqueueReminder($phone, $msg, $siswa->school_id);
-            $siswa->update(['last_seen_siswa' => now()]);
             $processedPhones[] = $phone;
             $countSiswa++;
         }
@@ -115,7 +113,7 @@ class SendLastSeenReminderCommand extends Command
 
         foreach ($ortus as $siswa) {
             $phone = $this->cleanPhone($siswa->wa_ortu);
-            if (!$phone || in_array($phone, $processedPhones)) {
+            if (!$phone || in_array($phone, $processedPhones) || $this->isReminderAlreadySent($phone)) {
                 continue;
             }
 
@@ -130,13 +128,23 @@ class SendLastSeenReminderCommand extends Command
                 "_Terima kasih atas perhatian dan kerja samanya._ 🙏";
 
             $this->enqueueReminder($phone, $msg, $siswa->school_id);
-            $siswa->update(['last_seen_ortu' => now()]);
             $processedPhones[] = $phone;
             $countOrtu++;
         }
 
         $this->info("Last Seen Reminder finished. Sent to {$countGuru} Guru, {$countSiswa} Siswa, {$countOrtu} Ortu.");
         Log::info("Last Seen Reminder Command executed: {$countGuru} Guru, {$countSiswa} Siswa, {$countOrtu} Ortu notified.");
+    }
+
+    /**
+     * Cek apakah reminder pesan sudah pernah dikirimkan ke nomor ini dalam 24 jam terakhir.
+     */
+    private function isReminderAlreadySent(string $phone): bool
+    {
+        return MessageQueue::where('phone_number', $phone)
+            ->where('message', 'like', '%PEMBERITAHUAN AKTIVASI NOTIFIKASI ABSENSI%')
+            ->where('created_at', '>=', now()->subHours(24))
+            ->exists();
     }
 
     /**

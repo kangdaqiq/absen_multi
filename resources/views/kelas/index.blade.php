@@ -233,9 +233,9 @@
                             <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">ID Grup
                                 WhatsApp</label>
                             <div class="relative">
-                                <input type="text" name="wa_group_id" id="tambah_wa_group_id"
-                                    placeholder="Contoh: 120363XXXXXX@g.us"
-                                    class="w-full rounded-lg border border-gray-200 bg-transparent py-2 pl-4 pr-24 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                                <input type="text" name="wa_group_id" id="tambah_wa_group_id" readonly
+                                    placeholder="Pilih grup melalui tombol Pilih ->"
+                                    class="w-full rounded-lg border border-gray-200 bg-gray-50 dark:bg-gray-800/60 py-2 pl-4 pr-24 outline-none dark:border-gray-800 text-gray-700 dark:text-gray-300 cursor-not-allowed">
                                 <button type="button" onclick="loadWaGroups('tambah_wa_group_id')"
                                     class="absolute right-1 top-1 bottom-1 rounded-md bg-brand-500 px-3 py-1 text-sm font-medium text-white hover:bg-brand-600 transition">
                                     <i class="fab fa-whatsapp"></i> Pilih
@@ -309,9 +309,9 @@
                             <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">ID Grup
                                 WhatsApp</label>
                             <div class="relative">
-                                <input type="text" name="wa_group_id" id="edit_wa_group_id"
-                                    placeholder="Contoh: 120363XXXXXX@g.us"
-                                    class="w-full rounded-lg border border-gray-200 bg-transparent py-2 pl-4 pr-24 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                                <input type="text" name="wa_group_id" id="edit_wa_group_id" readonly
+                                    placeholder="Pilih grup melalui tombol Pilih ->"
+                                    class="w-full rounded-lg border border-gray-200 bg-gray-50 dark:bg-gray-800/60 py-2 pl-4 pr-24 outline-none dark:border-gray-800 text-gray-700 dark:text-gray-300 cursor-not-allowed">
                                 <button type="button" onclick="loadWaGroups('edit_wa_group_id')"
                                     class="absolute right-1 top-1 bottom-1 rounded-md bg-brand-500 px-3 py-1 text-sm font-medium text-white hover:bg-brand-600 transition">
                                     <i class="fab fa-whatsapp"></i> Pilih
@@ -579,7 +579,13 @@
                             return;
                         }
 
-                        let html = '';
+                        let html = `
+                            <button type="button" class="flex items-center justify-between w-full rounded-lg border border-rose-200 bg-rose-50/50 p-3.5 hover:bg-rose-100 dark:border-rose-900/30 dark:bg-rose-950/20 text-rose-700 dark:text-rose-400 transition text-left mb-2"
+                                onclick="selectWaGroup('')">
+                                <span class="font-semibold text-xs flex items-center gap-2"><i class="fas fa-ban"></i> Kosongkan ID Grup WA</span>
+                                <span class="text-[11px] bg-rose-100 dark:bg-rose-900/40 px-2 py-0.5 rounded">Reset</span>
+                            </button>
+                        `;
                         data.groups.forEach(group => {
                             html += `
                                     <button type="button" class="flex flex-col items-start w-full rounded-lg border border-gray-200 p-4 hover:border-brand-500 hover:bg-brand-50 dark:border-gray-700 dark:hover:border-brand-500 dark:hover:bg-brand-500/10 transition text-left" 

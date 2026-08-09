@@ -34,7 +34,7 @@ class WhatsappLogController extends Controller
 
     public function clearPending()
     {
-        $query = MessageQueue::whereIn('status', ['pending', 'processing']);
+        $query = MessageQueue::whereIn('status', ['pending', 'processing', 'failed']);
 
         if (!auth()->user()->isSuperAdmin()) {
             $schoolId = auth()->user()->school_id;
@@ -46,7 +46,7 @@ class WhatsappLogController extends Controller
         }
 
         $count = $query->delete();
-        return back()->with('success', "Berhasil menghapus {$count} pesan antrean pending.");
+        return back()->with('success', "Berhasil menghapus {$count} pesan antrean (pending & failed).");
     }
 
     public function clearAll()

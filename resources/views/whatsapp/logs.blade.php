@@ -10,13 +10,13 @@
     <div class="flex flex-wrap items-center gap-2">
         <form method="POST" action="{{ route('whatsapp-logs.clear-pending') }}" onsubmit="return confirm('Yakin ingin menghapus semua pesan antrean PENDING?')">
             @csrf
-            <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white hover:bg-amber-600 transition shadow-sm">
+            <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-warning-500 px-4 py-2 text-sm font-medium text-white hover:bg-warning-600 transition shadow-sm" style="background-color: #d97706; color: #ffffff;">
                 <i class="fas fa-trash-alt"></i> Hapus Antrean Pending
             </button>
         </form>
         <form method="POST" action="{{ route('whatsapp-logs.clear-all') }}" onsubmit="return confirm('Yakin ingin menghapus SELURUH riwayat log WhatsApp?')">
             @csrf
-            <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white hover:bg-rose-700 transition shadow-sm">
+            <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-error-500 px-4 py-2 text-sm font-medium text-white hover:bg-error-600 transition shadow-sm" style="background-color: #dc2626; color: #ffffff;">
                 <i class="fas fa-dumpster"></i> Hapus Semua Log
             </button>
         </form>
@@ -24,13 +24,13 @@
 </div>
 
 @if(session('success'))
-    <div class="mb-4 rounded-lg bg-emerald-50 border border-emerald-200 p-4 text-sm text-emerald-800 dark:bg-emerald-500/15 dark:border-emerald-500/20 dark:text-emerald-400">
+    <div class="mb-4 rounded-lg bg-success-50 border border-success-200 p-4 text-sm text-success-700 dark:bg-success-500/15 dark:text-success-400">
         {{ session('success') }}
     </div>
 @endif
 
 @if(session('error'))
-    <div class="mb-4 rounded-lg bg-rose-50 border border-rose-200 p-4 text-sm text-rose-800 dark:bg-rose-500/15 dark:border-rose-500/20 dark:text-rose-400">
+    <div class="mb-4 rounded-lg bg-error-50 border border-error-200 p-4 text-sm text-error-700 dark:bg-error-500/15 dark:text-error-400">
         {{ session('error') }}
     </div>
 @endif

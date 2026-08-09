@@ -72,14 +72,6 @@ class ProcessWhatsappQueue extends Command
             }
         });
 
-        // Auto-retry: kembalikan pesan 'failed' hari ini (retry_count < 3) ke 'pending'
-        MessageQueue::where('status', 'failed')
-            ->whereDate('created_at', today())
-            ->where(function ($q) {
-                $q->whereNull('retry_count')->orWhere('retry_count', '<', 3);
-            })
-            ->update(['status' => 'pending', 'updated_at' => now()]);
-
         if (empty($messages)) {
             return;
         }

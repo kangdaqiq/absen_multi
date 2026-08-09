@@ -8,6 +8,7 @@ class MessageQueue extends Model
 {
     protected $table = 'message_queues';
     public $timestamps = true;
+    public bool $bypass_last_seen = false;
     protected $fillable = ['school_id', 'phone_number', 'message', 'status', 'priority', 'scheduled_at', 'attempts', 'last_error', 'retry_count', 'created_at', 'updated_at'];
 
     protected $casts = [
@@ -17,6 +18,9 @@ class MessageQueue extends Model
     protected static function booted()
     {
         static::creating(function ($messageQueue) {
+            // Clean up attributes if bypass_last_seen was dynamically set into attributes
+            unset($messageQueue->attributes['bypass_last_seen']);
+
             // Check Last Seen rule (default 3 days / 72 hours) unless explicitly bypassed
             if (empty($messageQueue->bypass_last_seen)) {
                 $expiryDays = (int) (\App\Models\Setting::where('setting_key', 'last_seen_expiry_days')->value('setting_value') ?: 3);

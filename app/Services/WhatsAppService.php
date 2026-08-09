@@ -250,6 +250,7 @@ class WhatsAppService
                 // Log failure to API Log so user can see it
                 \App\Models\ApiLog::create([
                     'school_id' => $schoolId,
+                    'api_key' => 'SYSTEM',
                     'action' => 'wa_error',
                     'success' => false,
                     'message' => 'DB Error: ' . $e->getMessage(),
@@ -260,6 +261,7 @@ class WhatsAppService
             // Log skipped empty phone
             \App\Models\ApiLog::create([
                 'school_id' => $schoolId,
+                'api_key' => 'SYSTEM',
                 'action' => 'wa_skip',
                 'success' => false,
                 'message' => "Phone number invalid/empty. Original: '$originalPhone'",

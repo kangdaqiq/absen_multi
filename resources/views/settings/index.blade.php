@@ -239,13 +239,6 @@
                             <p class="mt-1 text-xs text-gray-500">Jumlah hari izin "Sakit" berlaku (Contoh: 2 hari berarti jika hari ini izin sakit, besok otomatis masih izin sakit bila tidak absen masuk).</p>
                         </div>
 
-                        <div>
-                            <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Pengingat Last Seen WA (Otomatis)</label>
-                            <input type="time" name="schedule_last_seen_reminder"
-                                value="{{ $settings['schedule_last_seen_reminder'] ?? '07:00' }}"
-                                class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
-                            <p class="mt-1 text-xs text-gray-500">Waktu pengiriman pengingat WhatsApp otomatis untuk memperbarui last_seen sebelum kadaluarsa (Default: 07:00)</p>
-                        </div>
 
                         <div>
                             <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Masa Kadaluarsa Last Seen WA (Hari)</label>

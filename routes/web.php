@@ -232,6 +232,8 @@ Route::middleware('auth')->group(function () {
 
         // WhatsApp Logs
         Route::get('/whatsapp-logs', [App\Http\Controllers\WhatsappLogController::class, 'index'])->name('whatsapp-logs.index');
+        Route::post('/whatsapp-logs/clear-pending', [App\Http\Controllers\WhatsappLogController::class, 'clearPending'])->name('whatsapp-logs.clear-pending');
+        Route::post('/whatsapp-logs/clear-all', [App\Http\Controllers\WhatsappLogController::class, 'clearAll'])->name('whatsapp-logs.clear-all');
 
         // Telegram Logs
         Route::get('/telegram-logs', [App\Http\Controllers\TelegramLogController::class, 'index'])->name('telegram-logs.index');

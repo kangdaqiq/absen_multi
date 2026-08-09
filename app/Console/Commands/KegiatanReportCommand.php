@@ -154,9 +154,9 @@ class KegiatanReportCommand extends Command
                 ->get();
 
             foreach ($guruGlobal as $guru) {
-                if ($guru->isWithinLastSeen(72)) {
+                if ($guru->isWithinLastSeen(168)) {
                     $noWa = preg_replace('/^0/', '62', $guru->no_wa);
-                    MessageQueue::create([
+                    $mq = new MessageQueue([
                         'school_id'    => $schoolId,
                         'phone_number' => $noWa,
                         'message'      => $msgGlobal,
@@ -164,6 +164,8 @@ class KegiatanReportCommand extends Command
                         'priority'     => 10,
                         'created_at'   => now()
                     ]);
+                    $mq->bypass_last_seen = true;
+                    $mq->save();
                 }
 
                 if ($telegramEnabled && $telegramToken && !empty($guru->telegram_chat_id)) {
@@ -231,8 +233,8 @@ class KegiatanReportCommand extends Command
                         listAbsen: $listAbsenClass
                     );
 
-                    if (!empty($wali->no_wa) && $wali->isWithinLastSeen(72)) {
-                        MessageQueue::create([
+                    if (!empty($wali->no_wa) && $wali->isWithinLastSeen(168)) {
+                        $mq = new MessageQueue([
                             'school_id'    => $schoolId,
                             'phone_number' => $wali->no_wa,
                             'message'      => $msgWali,
@@ -240,6 +242,8 @@ class KegiatanReportCommand extends Command
                             'priority'     => 10,
                             'created_at'   => now()
                         ]);
+                        $mq->bypass_last_seen = true;
+                        $mq->save();
                     }
 
                     if ($telegramEnabled && $telegramToken && !empty($wali->telegram_chat_id)) {

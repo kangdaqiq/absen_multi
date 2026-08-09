@@ -407,8 +407,8 @@ class DailyReportCommand extends Command
             }
 
             foreach ($guruGlobal as $guru) {
-                if (!$guru->isWithinLastSeen(72)) {
-                    $this->warn("Skipping global report WA to Guru: {$guru->nama} (last_seen is null or older than 72 hours)");
+                if (!$guru->isWithinLastSeen(168)) {
+                    $this->warn("Skipping global report WA to Guru: {$guru->nama} (last_seen is null or older than 7 days / 168 hours)");
                     continue;
                 }
 
@@ -418,7 +418,7 @@ class DailyReportCommand extends Command
                     // $noWa = $noWa . '@s.whatsapp.net';
                 }
 
-                MessageQueue::create([
+                $mq = new MessageQueue([
                     'school_id' => $schoolId,
                     'phone_number' => $noWa,
                     'message' => $msg,
@@ -426,6 +426,8 @@ class DailyReportCommand extends Command
                     'priority' => 10,
                     'created_at' => now()
                 ]);
+                $mq->bypass_last_seen = true;
+                $mq->save();
                 $this->info("Queued global report to Guru: {$guru->nama}");
             }
 
@@ -537,10 +539,10 @@ class DailyReportCommand extends Command
                     listKegiatan: $listKegiatanClass
                 );
 
-                if (!$wali->isWithinLastSeen(72)) {
-                    $this->warn("Skipping Wali Kelas report WA to Guru: {$wali->nama} (last_seen is null or older than 72 hours)");
+                if (!$wali->isWithinLastSeen(168)) {
+                    $this->warn("Skipping Wali Kelas report WA to Guru: {$wali->nama} (last_seen is null or older than 7 days / 168 hours)");
                 } else {
-                    MessageQueue::create([
+                    $mq = new MessageQueue([
                         'school_id' => $schoolId,
                         'phone_number' => $wali->no_wa,
                         'message' => $msgWali,
@@ -548,6 +550,8 @@ class DailyReportCommand extends Command
                         'priority' => 10,
                         'created_at' => now()
                     ]);
+                    $mq->bypass_last_seen = true;
+                    $mq->save();
                     $this->info("Queued Wali Kelas report to Guru: {$wali->nama}");
                 }
 

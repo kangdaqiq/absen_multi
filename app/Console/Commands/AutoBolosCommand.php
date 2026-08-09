@@ -330,21 +330,23 @@ class AutoBolosCommand extends Command
             foreach ($walis as $wali) {
                 // 2. Kirim ke Nomor WA Pribadi Wali Kelas (jika ada)
                 if (!empty($wali->no_wa)) {
-                    if (!$wali->isWithinLastSeen(72)) {
-                        $this->warn("Skipping AutoBolos report WA to Guru: {$wali->nama} (last_seen is null or older than 72 hours)");
+                    if (!$wali->isWithinLastSeen(168)) {
+                        $this->warn("Skipping AutoBolos report WA to Guru: {$wali->nama} (last_seen is null or older than 7 days / 168 hours)");
                     } else {
                         $noWa = $wali->no_wa;
                         if (!str_contains($noWa, '@')) {
                             $noWa = preg_replace('/^0/', '62', $noWa);
                         }
 
-                        MessageQueue::create([
+                        $mq = new MessageQueue([
                             'school_id'    => $schoolId,
                             'phone_number' => $noWa,
                             'message'      => $msgKelas,
                             'status'       => 'pending',
                             'created_at'   => now()
                         ]);
+                        $mq->bypass_last_seen = true;
+                        $mq->save();
                     }
                 }
 
@@ -432,8 +434,8 @@ class AutoBolosCommand extends Command
 
             // Guru dengan akses report global
             foreach ($guruGlobal as $guru) {
-                if (!$guru->isWithinLastSeen(72)) {
-                    $this->warn("Skipping AutoBolos global report WA to Guru: {$guru->nama} (last_seen is null or older than 72 hours)");
+                if (!$guru->isWithinLastSeen(168)) {
+                    $this->warn("Skipping AutoBolos global report WA to Guru: {$guru->nama} (last_seen is null or older than 7 days / 168 hours)");
                     continue;
                 }
 
@@ -443,13 +445,15 @@ class AutoBolosCommand extends Command
                     // $noWa = $noWa . '@s.whatsapp.net';
                 }
 
-                MessageQueue::create([
+                $mq = new MessageQueue([
                     'school_id'    => $schoolId,
                     'phone_number' => $noWa,
                     'message'      => $messageGlobal,
                     'status'       => 'pending',
                     'created_at'   => now()
                 ]);
+                $mq->bypass_last_seen = true;
+                $mq->save();
             }
 
             // Telegram Laporan Global

@@ -40,10 +40,22 @@ class KegiatanController extends Controller
             'deskripsi'      => 'nullable|string|max:500',
             'tanggal_mulai'  => 'required|date',
             'frekuensi'      => 'required|string|in:harian,mingguan,bulanan,sekali',
+            'hari'           => 'nullable|array',
+            'hari.*'         => 'integer|between:1,7',
             'jam_mulai'      => 'nullable|date_format:H:i',
             'jam_selesai'    => 'nullable|date_format:H:i|after:jam_mulai',
             'uid_kartu'      => 'nullable|string|max:50',
         ]);
+
+        $hari = null;
+        if ($request->frekuensi === 'harian') {
+            $hari = $request->input('hari', [1, 2, 3, 4, 5, 6, 7]);
+            if (empty($hari)) {
+                $hari = [1, 2, 3, 4, 5, 6, 7];
+            } else {
+                $hari = array_values(array_map('intval', $hari));
+            }
+        }
 
         Kegiatan::create([
             'school_id'      => auth()->user()->school_id,
@@ -51,6 +63,7 @@ class KegiatanController extends Controller
             'deskripsi'      => $request->deskripsi,
             'tanggal_mulai'  => $request->tanggal_mulai,
             'frekuensi'      => $request->frekuensi,
+            'hari'           => $hari,
             'jam_mulai'      => $request->jam_mulai ?: null,
             'jam_selesai'    => $request->jam_selesai ?: null,
             'uid_kartu'      => $request->uid_kartu ? strtoupper(trim($request->uid_kartu)) : null,
@@ -74,17 +87,30 @@ class KegiatanController extends Controller
             'deskripsi'      => 'nullable|string|max:500',
             'tanggal_mulai'  => 'required|date',
             'frekuensi'      => 'required|string|in:harian,mingguan,bulanan,sekali',
+            'hari'           => 'nullable|array',
+            'hari.*'         => 'integer|between:1,7',
             'jam_mulai'      => 'nullable|date_format:H:i',
             'jam_selesai'    => 'nullable|date_format:H:i|after:jam_mulai',
             'uid_kartu'      => 'nullable|string|max:50',
             'is_active'      => 'boolean',
         ]);
 
+        $hari = null;
+        if ($request->frekuensi === 'harian') {
+            $hari = $request->input('hari', [1, 2, 3, 4, 5, 6, 7]);
+            if (empty($hari)) {
+                $hari = [1, 2, 3, 4, 5, 6, 7];
+            } else {
+                $hari = array_values(array_map('intval', $hari));
+            }
+        }
+
         $kegiatan->update([
             'nama_kegiatan'  => $request->nama_kegiatan,
             'deskripsi'      => $request->deskripsi,
             'tanggal_mulai'  => $request->tanggal_mulai,
             'frekuensi'      => $request->frekuensi,
+            'hari'           => $hari,
             'jam_mulai'      => $request->jam_mulai ?: null,
             'jam_selesai'    => $request->jam_selesai ?: null,
             'uid_kartu'      => $request->uid_kartu ? strtoupper(trim($request->uid_kartu)) : null,

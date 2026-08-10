@@ -19,7 +19,7 @@
             <i class="fas fa-calendar text-brand-500"></i>
             Mulai: {{ \Carbon\Carbon::parse($kegiatan->tanggal_mulai)->format('d/m/Y') }}
             <span class="ml-1 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400">
-                {{ $kegiatan->frekuensi === 'harian' ? 'Harian' : ($kegiatan->frekuensi === 'mingguan' ? 'Mingguan' : 'Bulanan') }}
+                {{ $kegiatan->formatted_hari }}
             </span>
         </span>
 </div>

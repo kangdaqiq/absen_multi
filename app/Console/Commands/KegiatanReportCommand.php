@@ -62,7 +62,13 @@ class KegiatanReportCommand extends Command
             } elseif ($kegiatan->frekuensi === 'bulanan') {
                 $isToday = (now()->day === $kegiatan->tanggal_mulai->day);
             } else {
-                $isToday = true; // harian
+                // harian
+                if (!empty($kegiatan->hari) && is_array($kegiatan->hari)) {
+                    $dayIndex = now()->dayOfWeekIso; // 1 (Mon) - 7 (Sun)
+                    $isToday = in_array($dayIndex, array_map('intval', $kegiatan->hari));
+                } else {
+                    $isToday = true;
+                }
             }
 
             if (!$isToday) {

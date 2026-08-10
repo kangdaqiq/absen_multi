@@ -27,7 +27,7 @@
                 <select name="kegiatan_id" id="kegiatan_id" class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white" onchange="this.form.submit()">
                     @forelse($kegiatans as $k)
                         <option value="{{ $k->id }}" {{ $selectedKegiatanId == $k->id ? 'selected' : '' }}>
-                            {{ $k->nama_kegiatan }} ({{ $k->frekuensi === 'harian' ? 'Harian' : ($k->frekuensi === 'mingguan' ? 'Mingguan' : 'Bulanan') }})
+                            {{ $k->nama_kegiatan }} ({{ $k->formatted_hari }})
                         </option>
                     @empty
                         <option value="">-- Belum Ada Kegiatan Aktif --</option>
@@ -86,8 +86,8 @@
         <div>
             <h5 class="text-lg font-bold text-brand-800 dark:text-brand-400 flex items-center gap-2">
                 <span>🎯 {{ $kegiatan->nama_kegiatan }}</span>
-                <span class="text-xs px-2 py-0.5 rounded-full bg-brand-100 text-brand-700 dark:bg-brand-500/20 dark:text-brand-300 font-semibold uppercase">
-                    {{ $kegiatan->frekuensi }}
+                <span class="text-xs px-2.5 py-0.5 rounded-full bg-brand-100 text-brand-700 dark:bg-brand-500/20 dark:text-brand-300 font-semibold">
+                    {{ $kegiatan->formatted_hari }}
                 </span>
             </h5>
             <p class="text-sm text-brand-600 dark:text-brand-300 mt-1">{{ $kegiatan->deskripsi ?: 'Tidak ada deskripsi kegiatan.' }}</p>

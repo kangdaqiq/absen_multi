@@ -82,7 +82,7 @@
                             <div class="flex flex-col gap-1">
                                 <span class="font-medium text-gray-800 dark:text-white/90">{{ \Carbon\Carbon::parse($kegiatan->tanggal_mulai)->format('d/m/Y') }}</span>
                                 <span class="inline-flex items-center self-start px-2.5 py-0.5 rounded-full text-xs font-semibold bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400">
-                                    {{ $kegiatan->frekuensi === 'harian' ? 'Harian' : ($kegiatan->frekuensi === 'mingguan' ? 'Mingguan' : ($kegiatan->frekuensi === 'bulanan' ? 'Bulanan' : 'Sekali (Insidental)')) }}
+                                    {{ $kegiatan->formatted_hari }}
                                 </span>
                             </div>
                         </td>
@@ -168,13 +168,16 @@
                                         <textarea name="deskripsi" rows="2"
                                             class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">{{ $kegiatan->deskripsi }}</textarea>
                                     </div>
-                                    <div class="flex gap-3">
-                                        <div class="flex-1">
+                                    <div class="flex flex-col sm:flex-row gap-3">
+                                        <div class="sm:w-1/3">
                                             <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Tanggal Mulai <span class="text-error-500">*</span></label>
                                             <input type="date" name="tanggal_mulai" value="{{ $kegiatan->tanggal_mulai->format('Y-m-d') }}" required
                                                 class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
                                         </div>
-                                        <div class="flex-1" x-data="{ selected: '{{ $kegiatan->frekuensi ?? 'harian' }}' }">
+                                        <div class="flex-1" x-data="{ 
+                                            selected: '{{ $kegiatan->frekuensi ?? 'harian' }}',
+                                            days: {{ json_encode(array_map('intval', is_array($kegiatan->hari) ? $kegiatan->hari : [1, 2, 3, 4, 5, 6, 7])) }}
+                                        }">
                                             <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Frekuensi Kegiatan <span class="text-error-500">*</span></label>
                                             <input type="hidden" name="frekuensi" :value="selected">
                                             <div class="flex flex-wrap items-center gap-3 mt-2">
@@ -194,6 +197,48 @@
                                                     <input type="radio" name="frekuensi_choice_{{ $kegiatan->id }}" :checked="selected === 'bulanan'" @change="selected = 'bulanan'" class="text-brand-500 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900">
                                                     <span class="text-xs text-gray-700 dark:text-gray-300">Bulanan</span>
                                                 </label>
+                                            </div>
+
+                                            {{-- Options hari jika harian --}}
+                                            <div x-show="selected === 'harian'" x-transition class="mt-3 p-3 rounded-xl border border-gray-200 bg-gray-50/70 dark:border-gray-800 dark:bg-gray-900/50">
+                                                <div class="flex items-center justify-between mb-2">
+                                                    <span class="text-xs font-semibold text-gray-700 dark:text-gray-300">Pilih Hari Kegiatan:</span>
+                                                    <div class="flex items-center gap-2 text-xs">
+                                                        <button type="button" @click="days = [1,2,3,4,5,6,7]" class="text-brand-600 hover:underline dark:text-brand-400 font-medium">Semua Hari</button>
+                                                        <span class="text-gray-300 dark:text-gray-700">•</span>
+                                                        <button type="button" @click="days = [1,2,3,4,5]" class="text-brand-600 hover:underline dark:text-brand-400 font-medium">Senin - Jumat</button>
+                                                    </div>
+                                                </div>
+                                                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                                    <label class="flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300 cursor-pointer p-1 rounded hover:bg-white dark:hover:bg-gray-800 transition">
+                                                        <input type="checkbox" name="hari[]" :value="1" x-model.number="days" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800">
+                                                        <span>Senin</span>
+                                                    </label>
+                                                    <label class="flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300 cursor-pointer p-1 rounded hover:bg-white dark:hover:bg-gray-800 transition">
+                                                        <input type="checkbox" name="hari[]" :value="2" x-model.number="days" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800">
+                                                        <span>Selasa</span>
+                                                    </label>
+                                                    <label class="flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300 cursor-pointer p-1 rounded hover:bg-white dark:hover:bg-gray-800 transition">
+                                                        <input type="checkbox" name="hari[]" :value="3" x-model.number="days" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800">
+                                                        <span>Rabu</span>
+                                                    </label>
+                                                    <label class="flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300 cursor-pointer p-1 rounded hover:bg-white dark:hover:bg-gray-800 transition">
+                                                        <input type="checkbox" name="hari[]" :value="4" x-model.number="days" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800">
+                                                        <span>Kamis</span>
+                                                    </label>
+                                                    <label class="flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300 cursor-pointer p-1 rounded hover:bg-white dark:hover:bg-gray-800 transition">
+                                                        <input type="checkbox" name="hari[]" :value="5" x-model.number="days" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800">
+                                                        <span>Jumat</span>
+                                                    </label>
+                                                    <label class="flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300 cursor-pointer p-1 rounded hover:bg-white dark:hover:bg-gray-800 transition">
+                                                        <input type="checkbox" name="hari[]" :value="6" x-model.number="days" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800">
+                                                        <span>Sabtu</span>
+                                                    </label>
+                                                    <label class="flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300 cursor-pointer p-1 rounded hover:bg-white dark:hover:bg-gray-800 transition">
+                                                        <input type="checkbox" name="hari[]" :value="7" x-model.number="days" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800">
+                                                        <span>Minggu</span>
+                                                    </label>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -294,13 +339,13 @@
                     <textarea name="deskripsi" rows="2" placeholder="Keterangan singkat kegiatan (opsional)"
                         class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white"></textarea>
                 </div>
-                <div class="flex gap-3">
-                    <div class="flex-1">
+                <div class="flex flex-col sm:flex-row gap-3">
+                    <div class="sm:w-1/3">
                         <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Tanggal Mulai <span class="text-error-500">*</span></label>
                         <input type="date" name="tanggal_mulai" value="{{ now()->format('Y-m-d') }}" required
                             class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
                     </div>
-                    <div class="flex-1" x-data="{ selected: 'harian' }">
+                    <div class="flex-1" x-data="{ selected: 'harian', days: [1, 2, 3, 4, 5, 6, 7] }">
                         <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Frekuensi Kegiatan <span class="text-error-500">*</span></label>
                         <input type="hidden" name="frekuensi" :value="selected">
                         <div class="flex flex-wrap items-center gap-3 mt-2">
@@ -320,6 +365,48 @@
                                 <input type="radio" name="frekuensi_choice_tambah" :checked="selected === 'bulanan'" @change="selected = 'bulanan'" class="text-brand-500 focus:ring-brand-500 dark:border-gray-800 dark:bg-gray-900">
                                 <span class="text-xs text-gray-700 dark:text-gray-300">Bulanan</span>
                             </label>
+                        </div>
+
+                        {{-- Options hari jika harian --}}
+                        <div x-show="selected === 'harian'" x-transition class="mt-3 p-3 rounded-xl border border-gray-200 bg-gray-50/70 dark:border-gray-800 dark:bg-gray-900/50">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-xs font-semibold text-gray-700 dark:text-gray-300">Pilih Hari Kegiatan:</span>
+                                <div class="flex items-center gap-2 text-xs">
+                                    <button type="button" @click="days = [1,2,3,4,5,6,7]" class="text-brand-600 hover:underline dark:text-brand-400 font-medium">Semua Hari</button>
+                                    <span class="text-gray-300 dark:text-gray-700">•</span>
+                                    <button type="button" @click="days = [1,2,3,4,5]" class="text-brand-600 hover:underline dark:text-brand-400 font-medium">Senin - Jumat</button>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                <label class="flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300 cursor-pointer p-1 rounded hover:bg-white dark:hover:bg-gray-800 transition">
+                                    <input type="checkbox" name="hari[]" :value="1" x-model.number="days" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800">
+                                    <span>Senin</span>
+                                </label>
+                                <label class="flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300 cursor-pointer p-1 rounded hover:bg-white dark:hover:bg-gray-800 transition">
+                                    <input type="checkbox" name="hari[]" :value="2" x-model.number="days" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800">
+                                    <span>Selasa</span>
+                                </label>
+                                <label class="flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300 cursor-pointer p-1 rounded hover:bg-white dark:hover:bg-gray-800 transition">
+                                    <input type="checkbox" name="hari[]" :value="3" x-model.number="days" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800">
+                                    <span>Rabu</span>
+                                </label>
+                                <label class="flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300 cursor-pointer p-1 rounded hover:bg-white dark:hover:bg-gray-800 transition">
+                                    <input type="checkbox" name="hari[]" :value="4" x-model.number="days" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800">
+                                    <span>Kamis</span>
+                                </label>
+                                <label class="flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300 cursor-pointer p-1 rounded hover:bg-white dark:hover:bg-gray-800 transition">
+                                    <input type="checkbox" name="hari[]" :value="5" x-model.number="days" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800">
+                                    <span>Jumat</span>
+                                </label>
+                                <label class="flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300 cursor-pointer p-1 rounded hover:bg-white dark:hover:bg-gray-800 transition">
+                                    <input type="checkbox" name="hari[]" :value="6" x-model.number="days" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800">
+                                    <span>Sabtu</span>
+                                </label>
+                                <label class="flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300 cursor-pointer p-1 rounded hover:bg-white dark:hover:bg-gray-800 transition">
+                                    <input type="checkbox" name="hari[]" :value="7" x-model.number="days" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-800">
+                                    <span>Minggu</span>
+                                </label>
+                            </div>
                         </div>
                     </div>
                 </div>

@@ -15,6 +15,7 @@ class Kegiatan extends Model
         'deskripsi',
         'tanggal_mulai',
         'frekuensi',
+        'hari',
         'jam_mulai',
         'jam_selesai',
         'uid_kartu',
@@ -25,6 +26,7 @@ class Kegiatan extends Model
     protected $casts = [
         'is_active'       => 'boolean',
         'tanggal_mulai'   => 'date',
+        'hari'            => 'array',
     ];
 
     /**
@@ -49,6 +51,14 @@ class Kegiatan extends Model
             if ($todayStr !== $startDateStr) {
                 return false;
             }
+        } elseif ($this->frekuensi === 'harian') {
+            if (!empty($this->hari) && is_array($this->hari) && count($this->hari) < 7) {
+                $dayIndex = $now->dayOfWeekIso; // 1 (Mon) - 7 (Sun)
+                $hariList = array_map('intval', $this->hari);
+                if (!in_array($dayIndex, $hariList)) {
+                    return false;
+                }
+            }
         } elseif ($this->frekuensi === 'mingguan') {
             if ($now->dayOfWeek !== $this->tanggal_mulai->dayOfWeek) {
                 return false;
@@ -60,6 +70,49 @@ class Kegiatan extends Model
         }
 
         return $nowTimeStr >= $this->jam_mulai && $nowTimeStr <= $this->jam_selesai;
+    }
+
+    /**
+     * Accessor untuk teks frekuensi & hari kegiatan.
+     */
+    public function getFormattedHariAttribute(): string
+    {
+        if ($this->frekuensi !== 'harian') {
+            return match($this->frekuensi) {
+                'sekali' => 'Sekali (Insidental)',
+                'mingguan' => 'Mingguan',
+                'bulanan' => 'Bulanan',
+                default => ucfirst($this->frekuensi ?? 'Harian')
+            };
+        }
+
+        $hari = $this->hari;
+        if (empty($hari) || !is_array($hari) || count($hari) === 7) {
+            return 'Harian (Setiap Hari)';
+        }
+
+        $hariInt = array_map('intval', $hari);
+        sort($hariInt);
+
+        if ($hariInt === [1, 2, 3, 4, 5]) {
+            return 'Harian (Senin - Jumat)';
+        }
+        if ($hariInt === [1, 2, 3, 4, 5, 6]) {
+            return 'Harian (Senin - Sabtu)';
+        }
+
+        $map = [
+            1 => 'Sen',
+            2 => 'Sel',
+            3 => 'Rab',
+            4 => 'Kam',
+            5 => 'Jum',
+            6 => 'Sab',
+            7 => 'Min',
+        ];
+
+        $names = array_map(fn($d) => $map[$d] ?? '', $hariInt);
+        return 'Harian (' . implode(', ', array_filter($names)) . ')';
     }
 
 

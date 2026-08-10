@@ -21,7 +21,7 @@ use App\Models\GateCard;
 class RfidController extends Controller
 {
     // Config
-    const MAX_REQUESTS_PER_MINUTE = 60;
+    const MAX_REQUESTS_PER_MINUTE = 180;
     const SCAN_COOLDOWN_SECONDS = 0;
 
     protected $wa;
@@ -315,13 +315,23 @@ class RfidController extends Controller
         // Update last used (manual query to avoid timestamp interfering if model timestamps disabled)
         DB::table('api_keys')->where('id', $device->id)->update(['last_used_at' => now()]);
 
-        // Rate Limit
+        // Rate Limit (Hanya hitung request non-rate_limit agar penalti tidak menyebabkan self-fulfilling loop)
         $count = ApiLog::where('api_key', $apiKey)
+            ->where('action', '!=', 'rate_limit')
             ->where('created_at', '>', now()->subMinute())
             ->count();
 
         if ($count > self::MAX_REQUESTS_PER_MINUTE) {
-            $this->logRequest($apiKey, 'rate_limit', '', false, 'Rate limit exceeded');
+            // Cegah penumpukan log berulang dalam rentang 10 detik jika perangkat melakukan spam retry
+            $recentRateLimitLog = ApiLog::where('api_key', $apiKey)
+                ->where('action', 'rate_limit')
+                ->where('created_at', '>', now()->subSeconds(10))
+                ->exists();
+
+            if (!$recentRateLimitLog) {
+                $this->logRequest($apiKey, 'rate_limit', '', false, 'Rate limit exceeded');
+            }
+
             $this->response(false, 'gagal', 'Terlalu banyak request. Tunggu sebentar.', 'error')->send();
             exit;
         }
@@ -726,6 +736,34 @@ class RfidController extends Controller
                         'created_at' => now(),
                     ]);
                 }
+
+                // OTOMATIS CATAT ABSEN KEGIATAN JIKA TERDAPAT JADWAL KEGIATAN AKTIF
+                $activeKegiatans = \App\Models\Kegiatan::where('school_id', $device->school_id)
+                    ->where('is_active', 1)
+                    ->get()
+                    ->filter(function ($keg) use ($now) {
+                        return $keg->isScheduledNow($now);
+                    });
+
+                foreach ($activeKegiatans as $keg) {
+                    $alreadyKeg = \App\Models\KegiatanAttendance::where('kegiatan_id', $keg->id)
+                        ->where('student_id', $siswa->id)
+                        ->where('tanggal', $today)
+                        ->exists();
+
+                    if (!$alreadyKeg) {
+                        \App\Models\KegiatanAttendance::create([
+                            'school_id'   => $device->school_id,
+                            'kegiatan_id' => $keg->id,
+                            'student_id'  => $siswa->id,
+                            'tanggal'     => $today,
+                            'jam_masuk'   => $now->toTimeString(),
+                            'status'      => 'H',
+                            'keterangan'  => 'Auto dari Absen Masuk',
+                        ]);
+                    }
+                }
+
                 DB::commit();
 
                 $this->wa->sendCheckIn($siswa->nama, $siswa->no_wa, $now->format('H:i'), $status, $device->school_id, $keterangan, $siswa->wa_ortu, $siswa->kelas->nama_kelas ?? '-');

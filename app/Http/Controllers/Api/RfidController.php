@@ -206,6 +206,11 @@ class RfidController extends Controller
 
     public function handle(Request $request)
     {
+        // 0. Quick Ping / Heartbeat Check (Tanpa query DB / Log bloat)
+        if ($request->has('ping') || ($request->isMethod('get') && !$request->has('uid'))) {
+            return response()->json(['ok' => true, 'message' => 'pong'], 200);
+        }
+
         $apiKey = trim($request->input('api_key', ''));
         $this->currentApiKey = $apiKey;
 

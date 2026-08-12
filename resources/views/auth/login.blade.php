@@ -380,6 +380,19 @@
                     </p>
                 </div>
 
+                {{-- Warning / Session Alert --}}
+                @if (session('warning') || session('status') || session('error'))
+                    <div class="mb-6 flex items-start gap-3.5 rounded-2xl border border-amber-200/60 dark:border-amber-500/20 bg-amber-50/50 dark:bg-amber-500/10 p-4 backdrop-blur-md shadow-[0_10px_20px_rgba(245,158,11,0.05)] text-amber-800 dark:text-amber-300">
+                        <div class="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-amber-500 text-white shadow-[0_4px_10px_rgba(245,158,11,0.3)]">
+                            <i class="fas fa-exclamation-triangle text-xs"></i>
+                        </div>
+                        <div class="flex-1">
+                            <h4 class="font-extrabold text-xs tracking-wide uppercase">Pemberitahuan Sesi</h4>
+                            <p class="mt-1 text-xs font-semibold leading-relaxed">{{ session('warning') ?? session('status') ?? session('error') }}</p>
+                        </div>
+                    </div>
+                @endif
+
                 {{-- Interactive Redesigned Error Alert --}}
                 @if ($errors->any())
                     <div class="mb-6 flex items-start gap-3.5 rounded-2xl border border-rose-200/60 dark:border-rose-500/20 bg-rose-50/50 dark:bg-rose-500/5 p-4 backdrop-blur-md shadow-[0_10px_20px_rgba(244,63,94,0.04)] dark:shadow-none animate-shake">

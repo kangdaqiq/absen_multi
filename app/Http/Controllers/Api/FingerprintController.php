@@ -503,10 +503,18 @@ return $this->response(false, 'gagal', 'Enroll Timeout / No Request');
                 
                 TeacherCheckoutSession::where('expires_at', '<', $now)->delete();
 
-                // Cek apakah gerbang sedang terbuka oleh kartu ini
-                $activeSession = TeacherCheckoutSession::where('uid_rfid', $sessionUid)
-                    ->where('expires_at', '>=', $now)
-                    ->first();
+                // Cek apakah gerbang sekolah ini sedang terbuka
+                $schoolGateCardUids = GateCard::where('school_id', $this->currentSchoolId)
+                    ->pluck('uid_rfid')
+                    ->filter()
+                    ->toArray();
+
+                $activeSession = TeacherCheckoutSession::where(function ($q) use ($sessionUid, $schoolGateCardUids) {
+                    $q->where('uid_rfid', $sessionUid)
+                      ->orWhereIn('uid_rfid', $schoolGateCardUids);
+                })
+                ->where('expires_at', '>=', $now)
+                ->first();
 
                 if ($activeSession) {
                     $activeSession->delete();

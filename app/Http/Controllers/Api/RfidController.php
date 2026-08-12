@@ -48,11 +48,18 @@ class RfidController extends Controller
             // Clean expired sessions
             TeacherCheckoutSession::where('expires_at', '<', $now)->delete();
 
+            // Cek apakah gerbang sekolah ini sedang terbuka (oleh kartu gerbang mana saja di sekolah ini)
+            $schoolGateCardUids = GateCard::where('school_id', $device->school_id)
+                ->pluck('uid_rfid')
+                ->filter()
+                ->toArray();
 
-            // Cek apakah gerbang sedang terbuka oleh kartu ini
-            $activeSession = TeacherCheckoutSession::where('uid_rfid', $uid)
-                ->where('expires_at', '>=', $now)
-                ->first();
+            $activeSession = TeacherCheckoutSession::where(function ($q) use ($uid, $schoolGateCardUids) {
+                $q->where('uid_rfid', $uid)
+                  ->orWhereIn('uid_rfid', $schoolGateCardUids);
+            })
+            ->where('expires_at', '>=', $now)
+            ->first();
 
             if ($activeSession) {
                 // Jika sedang terbuka, TUTUP gerbang

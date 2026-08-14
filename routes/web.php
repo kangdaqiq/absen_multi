@@ -79,6 +79,7 @@ Route::middleware(['auth', 'self_hosted_guard'])->prefix('super-admin')->name('s
         // OTA Update Management
         Route::get('/ota', [App\Http\Controllers\SuperAdmin\OtaController::class, 'index'])->name('ota.index');
         Route::post('/ota/upload', [App\Http\Controllers\SuperAdmin\OtaController::class, 'upload'])->name('ota.upload');
+        Route::delete('/ota/{filename}', [App\Http\Controllers\SuperAdmin\OtaController::class, 'destroy'])->name('ota.destroy');
     });
 });
 

@@ -197,6 +197,8 @@ Route::middleware('auth')->group(function () {
         // Subscription / Paket Langganan
         Route::get('subscription', [App\Http\Controllers\SubscriptionController::class, 'index'])->name('subscription.index');
         Route::post('subscription', [App\Http\Controllers\SubscriptionController::class, 'store'])->name('subscription.store');
+        Route::get('subscription/status/{subscription}', [App\Http\Controllers\SubscriptionController::class, 'checkStatus'])->name('subscription.status');
+        Route::post('subscription/cancel/{subscription}', [App\Http\Controllers\SubscriptionController::class, 'cancel'])->name('subscription.cancel');
 
         // Backup & Restore
         Route::get('/backup', [App\Http\Controllers\SchoolBackupController::class, 'index'])->name('backup.index');

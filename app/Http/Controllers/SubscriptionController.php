@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\Package;
 use App\Models\Subscription;
+use App\Services\QrisService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -22,6 +24,31 @@ class SubscriptionController extends Controller
             ->where('status', 'paid')
             ->orderByDesc('expired_at')
             ->first();
+
+        // Active pending (unpaid) subscription order if any
+        $pendingSubscription = Subscription::with('package')
+            ->where('school_id', $school->id)
+            ->where('status', 'unpaid')
+            ->latest()
+            ->first();
+
+        $pendingOrderData = null;
+        if ($pendingSubscription) {
+            $dynamicPayload = QrisService::generateDynamicQris($pendingSubscription->amount);
+            $pendingOrderData = [
+                'id'            => $pendingSubscription->id,
+                'package_id'    => $pendingSubscription->package_id,
+                'package_name'  => $pendingSubscription->package?->name ?? 'Paket',
+                'billing_cycle' => $pendingSubscription->billing_cycle,
+                'base_amount'   => (float) ($pendingSubscription->amount - $pendingSubscription->unique_code),
+                'unique_code'   => (int) $pendingSubscription->unique_code,
+                'total_amount'  => (float) $pendingSubscription->amount,
+                'status'        => $pendingSubscription->status,
+                'created_at'    => $pendingSubscription->created_at?->format('d M Y H:i'),
+                'qris_payload'  => $dynamicPayload,
+                'qris_image'    => QrisService::getQrCodeUrl($dynamicPayload, 300),
+            ];
+        }
 
         // All active packages available
         $packages = Package::where('is_active', true)->orderBy('price_monthly')->get();
@@ -57,6 +84,8 @@ class SubscriptionController extends Controller
         return view('subscription.index', compact(
             'school',
             'activeSubscription',
+            'pendingSubscription',
+            'pendingOrderData',
             'packages',
             'history',
             'usage',
@@ -66,55 +95,144 @@ class SubscriptionController extends Controller
     }
 
     /**
-     * Store a new pending subscription request.
+     * Store or update a subscription payment request (QRIS or Manual).
      */
-    public function store(Request $request)
+    public function store(Request $request): JsonResponse
     {
         $request->validate([
-            'package_id' => 'required|exists:packages,id'
+            'package_id'     => 'required|exists:packages,id',
+            'billing_cycle'  => 'nullable|in:monthly,yearly',
+            'payment_method' => 'nullable|in:qris,manual',
         ]);
 
         $school = Auth::user()->school;
         $package = Package::findOrFail($request->package_id);
+        $billingCycle = $request->input('billing_cycle', 'monthly');
+        $paymentMethod = $request->input('payment_method', 'qris');
 
-        // Check if there is already a unpaid subscription for this package
+        $basePrice = $billingCycle === 'yearly'
+            ? (float) $package->price_yearly
+            : (float) $package->price_monthly;
+
+        // Check if there is already an unpaid subscription for this school
         $existingPending = Subscription::where('school_id', $school->id)
             ->where('status', 'unpaid')
             ->first();
+
+        // Calculate unique code for QRIS auto-matching
+        $uniqueCode = 0;
+        $totalAmount = $basePrice;
+
+        if ($paymentMethod === 'qris' && $basePrice > 0) {
+            // Generate 3 digit random code that doesn't collide with other unpaid subscriptions
+            do {
+                $uniqueCode = rand(100, 999);
+                $totalAmount = $basePrice + $uniqueCode;
+                $exists = Subscription::where('status', 'unpaid')
+                    ->where('amount', $totalAmount)
+                    ->when($existingPending, fn($q) => $q->where('id', '!=', $existingPending->id))
+                    ->exists();
+            } while ($exists);
+        }
 
         $now = now();
         $startedAt = $now;
         if ($school->expired_at && $school->expired_at > $now) {
             $startedAt = clone $school->expired_at;
         }
-        $expiredAt = (clone $startedAt)->addMonth(); // Default to 1 month for this request
+        
+        $expiredAt = $billingCycle === 'yearly'
+            ? (clone $startedAt)->addYear()
+            : (clone $startedAt)->addMonth();
+
+        $subscriptionData = [
+            'school_id'      => $school->id,
+            'package_id'     => $package->id,
+            'amount'         => $totalAmount,
+            'unique_code'    => $uniqueCode,
+            'status'         => 'unpaid',
+            'billing_cycle'  => $billingCycle,
+            'payment_method' => $paymentMethod,
+            'started_at'     => $startedAt,
+            'expired_at'     => $expiredAt,
+        ];
 
         if ($existingPending) {
-            // Update the existing pending instead of creating a new one to avoid spam
-            $existingPending->update([
-                'package_id' => $package->id,
-                'amount' => $package->price_monthly, // default to monthly for now, or could be dynamic
-                'status' => 'unpaid',
-                'billing_cycle' => 'monthly',
-                'started_at' => $startedAt,
-                'expired_at' => $expiredAt,
-            ]);
+            $existingPending->update($subscriptionData);
             $subscription = $existingPending;
         } else {
-            $subscription = Subscription::create([
-                'school_id' => $school->id,
-                'package_id' => $package->id,
-                'amount' => $package->price_monthly,
-                'status' => 'unpaid',
-                'billing_cycle' => 'monthly', // assuming default is monthly
-                'started_at' => $startedAt,
-                'expired_at' => $expiredAt,
-            ]);
+            $subscription = Subscription::create($subscriptionData);
+        }
+
+        // Generate Dynamic QRIS payload and QR Code URL
+        $dynamicPayload = QrisService::generateDynamicQris($totalAmount);
+        $qrisImageUrl = QrisService::getQrCodeUrl($dynamicPayload, 300);
+
+        return response()->json([
+            'success'      => true,
+            'message'      => 'Permintaan perpanjangan berhasil diproses.',
+            'subscription' => [
+                'id'            => $subscription->id,
+                'package_id'    => $package->id,
+                'package_name'  => $package->name,
+                'billing_cycle' => $billingCycle,
+                'base_amount'   => $basePrice,
+                'unique_code'   => $uniqueCode,
+                'total_amount'  => $totalAmount,
+                'status'        => $subscription->status,
+                'created_at'    => $subscription->created_at?->format('d M Y H:i'),
+                'qris_payload'  => $dynamicPayload,
+                'qris_image'    => $qrisImageUrl,
+            ]
+        ]);
+    }
+
+    /**
+     * Check real-time payment status of a subscription order.
+     */
+    public function checkStatus($id): JsonResponse
+    {
+        $school = Auth::user()->school;
+        $subscription = Subscription::with('package')
+            ->where('school_id', $school->id)
+            ->where('id', $id)
+            ->first();
+
+        if (!$subscription) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Data langganan tidak ditemukan.'
+            ], 404);
+        }
+
+        return response()->json([
+            'success'    => true,
+            'is_paid'    => $subscription->status === 'paid',
+            'status'     => $subscription->status,
+            'amount'     => (float) $subscription->amount,
+            'paid_at'    => $subscription->paid_at?->format('d M Y H:i'),
+            'expired_at' => $subscription->expired_at?->format('d M Y'),
+        ]);
+    }
+
+    /**
+     * Cancel an unpaid subscription order.
+     */
+    public function cancel($id): JsonResponse
+    {
+        $school = Auth::user()->school;
+        $subscription = Subscription::where('school_id', $school->id)
+            ->where('id', $id)
+            ->where('status', 'unpaid')
+            ->first();
+
+        if ($subscription) {
+            $subscription->update(['status' => 'cancelled']);
         }
 
         return response()->json([
             'success' => true,
-            'message' => 'Permintaan perpanjangan berhasil dicatat.'
+            'message' => 'Tagihan perpanjangan berhasil dibatalkan.'
         ]);
     }
 }

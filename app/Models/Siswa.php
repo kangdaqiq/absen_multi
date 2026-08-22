@@ -24,6 +24,7 @@ class Siswa extends Model
         'nis',
         'kelas_id',
         'tgl_lahir',
+        'alamat',
         'no_wa',
         'wa_ortu',
         'uid_rfid',

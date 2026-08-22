@@ -16,6 +16,11 @@ Route::any('/fingerprint/check-enroll', [App\Http\Controllers\Api\FingerprintCon
 // License validation (public — for self-hosted clients)
 Route::post('/license/validate', [App\Http\Controllers\Api\LicenseValidateController::class, 'validate']);
 
+// Qiospay QRIS Callback Endpoint (POST /api/callback/accept/{secret_key})
+Route::any('/callback/accept/{key?}', [App\Http\Controllers\Api\QrisCallbackController::class, 'accept']);
+Route::any('/endpoint/accept/{key?}', [App\Http\Controllers\Api\QrisCallbackController::class, 'accept']);
+
+
 Route::get('/debug-db', function () {
     return DB::connection()->getDatabaseName();
 });

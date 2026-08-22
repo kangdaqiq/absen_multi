@@ -30,7 +30,8 @@ class SiswaController extends Controller
             $query->where(function($q) use ($search) {
                 $q->where('nama', 'like', "%{$search}%")
                   ->orWhere('nis', 'like', "%{$search}%")
-                  ->orWhere('no_wa', 'like', "%{$search}%");
+                  ->orWhere('no_wa', 'like', "%{$search}%")
+                  ->orWhere('alamat', 'like', "%{$search}%");
             });
         }
 
@@ -69,6 +70,7 @@ class SiswaController extends Controller
                 Rule::unique('siswa')->where(fn($q) => $q->where('school_id', $schoolId))
             ],
             'tgl_lahir' => 'nullable|date',
+            'alamat' => 'nullable|string|max:500',
             'kelas_id' => 'required|exists:kelas,id',
             'no_wa' => [
                 'nullable',
@@ -89,6 +91,8 @@ class SiswaController extends Controller
 
         $input = $request->all();
         // Force null if empty string to avoid unique constraint issues on empty strings
+        if (empty($input['alamat']))
+            $input['alamat'] = null;
         if (empty($input['no_wa']))
             $input['no_wa'] = null;
         if (empty($input['wa_ortu']))
@@ -152,6 +156,7 @@ class SiswaController extends Controller
                 Rule::unique('siswa')->ignore($siswa->id)->where(fn($q) => $q->where('school_id', $schoolId))
             ],
             'tgl_lahir' => 'nullable|date',
+            'alamat' => 'nullable|string|max:500',
             'kelas_id' => 'required|exists:kelas,id',
             'no_wa' => [
                 'nullable',
@@ -172,6 +177,8 @@ class SiswaController extends Controller
         ]);
 
         $input = $request->all();
+        if (empty($input['alamat']))
+            $input['alamat'] = null;
         if (empty($input['no_wa']))
             $input['no_wa'] = null;
         if (empty($input['wa_ortu']))
@@ -282,6 +289,9 @@ class SiswaController extends Controller
                     // Column F (Index 5): WA Ortu
                     $waOrtu = isset($row[5]) ? trim($row[5]) : null;
 
+                    // Column G (Index 6): Alamat
+                    $alamat = isset($row[6]) ? trim($row[6]) : null;
+
                     if ($nama === '' || $nis === '') {
                         $countSkip++;
                         continue;
@@ -326,6 +336,7 @@ class SiswaController extends Controller
                         'nama' => $nama,
                         'nis' => $nis,
                         'tgl_lahir' => $tglLahir ?: null, // Ensure null if empty string
+                        'alamat' => $alamat ?: null,
                         'kelas_id' => $kelasId,
                         'no_wa' => $this->normalizeWa($wa) ?: null,
                         'wa_ortu' => $this->normalizeWa($waOrtu) ?: null,
@@ -368,6 +379,7 @@ class SiswaController extends Controller
         $sheet->setCellValue('D1', 'Nama Kelas');
         $sheet->setCellValue('E1', 'No WhatsApp Siswa');
         $sheet->setCellValue('F1', 'No WhatsApp Ortu');
+        $sheet->setCellValue('G1', 'Alamat');
 
         // Example
         $sheet->setCellValue('A2', 'Ahmad Dani');
@@ -376,6 +388,7 @@ class SiswaController extends Controller
         $sheet->setCellValue('D2', 'X TKJ 1');
         $sheet->setCellValue('E2', '081234567890');
         $sheet->setCellValue('F2', '081234567891');
+        $sheet->setCellValue('G2', 'Jl. Merdeka No. 123');
 
         // Format kolom C sebagai teks agar Excel tidak mengubah format tanggal
         $sheet->getStyle('C2:C1000')->getNumberFormat()->setFormatCode(\PhpOffice\PhpSpreadsheet\Style\NumberFormat::FORMAT_TEXT);
@@ -386,10 +399,11 @@ class SiswaController extends Controller
         $sheet->getColumnDimension('D')->setWidth(15);
         $sheet->getColumnDimension('E')->setWidth(20);
         $sheet->getColumnDimension('F')->setWidth(20);
+        $sheet->getColumnDimension('G')->setWidth(30);
         // Style header
-        $sheet->getStyle('A1:F1')->getFont()->setBold(true);
-        $sheet->getStyle('A1:F1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB('FF3C50E0');
-        $sheet->getStyle('A1:F1')->getFont()->getColor()->setARGB('FFFFFFFF');
+        $sheet->getStyle('A1:G1')->getFont()->setBold(true);
+        $sheet->getStyle('A1:G1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB('FF3C50E0');
+        $sheet->getStyle('A1:G1')->getFont()->getColor()->setARGB('FFFFFFFF');
 
         $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
 

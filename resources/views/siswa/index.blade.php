@@ -91,6 +91,7 @@
                     <th class="px-4 py-4">NISN</th>
                     <th class="px-4 py-4">Tgl Lahir</th>
                     <th class="px-4 py-4">Kelas</th>
+                    <th class="px-4 py-4">Alamat</th>
                     <th class="px-4 py-4">No WA Siswa / Ortu</th>
                     <th class="px-4 py-4 text-center">UID RFID</th>
                     <th class="px-4 py-4 text-center">ID Finger</th>
@@ -125,6 +126,9 @@
                         </td>
                         <td class="border-b border-gray-100 px-4 py-4 dark:border-gray-800">
                             <p class="text-gray-500 dark:text-gray-400">{{ $s->kelas->nama_kelas ?? '-' }}</p>
+                        </td>
+                        <td class="border-b border-gray-100 px-4 py-4 dark:border-gray-800">
+                            <p class="text-gray-500 dark:text-gray-400 max-w-[180px] truncate" title="{{ $s->alamat }}">{{ $s->alamat ?: '-' }}</p>
                         </td>
                         <td class="border-b border-gray-100 px-4 py-4 dark:border-gray-800">
                             <p class="text-gray-500 dark:text-gray-400">S: {{ $s->no_wa ?: '-' }}</p>
@@ -163,6 +167,7 @@
                                 <!-- Edit -->
                                 <button class="btnEdit text-orange-500 hover:text-orange-700 hover:bg-orange-50 p-2 rounded-lg transition" 
                                     data-id="{{ $s->id }}" data-nama="{{ $s->nama }}" data-nis="{{ $s->nis }}" data-tgl_lahir="{{ $s->tgl_lahir }}"
+                                    data-alamat="{{ $s->alamat }}"
                                     data-kelas="{{ $s->kelas_id }}" data-wa="{{ $s->no_wa }}" data-wa_ortu="{{ $s->wa_ortu }}" data-uid="{{ $s->uid_rfid }}"
                                     data-telegram="{{ $s->telegram_chat_id }}" data-telegram_ortu="{{ $s->telegram_ortu_chat_id }}"
                                     data-is_khusus="{{ $s->is_khusus }}"
@@ -183,7 +188,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="10" class="border-b border-gray-100 px-4 py-8 dark:border-gray-800 text-center text-gray-500 dark:text-gray-400">
+                        <td colspan="11" class="border-b border-gray-100 px-4 py-8 dark:border-gray-800 text-center text-gray-500 dark:text-gray-400">
                             Tidak ada data siswa ditemukan.
                         </td>
                     </tr>
@@ -269,6 +274,10 @@
                             <option value="{{ $k->id }}">{{ $k->nama_kelas }}</option>
                         @endforeach
                     </select>
+                </div>
+                <div>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Alamat <span class="text-gray-400 font-normal">(opsional)</span></label>
+                    <textarea name="alamat" rows="2" placeholder="Masukkan alamat siswa..." class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white"></textarea>
                 </div>
                 <div>
                     <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">No WhatsApp Siswa</label>
@@ -373,6 +382,10 @@
                     </select>
                 </div>
                 <div>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Alamat <span class="text-gray-400 font-normal">(opsional)</span></label>
+                    <textarea name="alamat" id="edit_alamat" rows="2" placeholder="Masukkan alamat siswa..." class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white"></textarea>
+                </div>
+                <div>
                     <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">No WhatsApp Siswa</label>
                     <input type="text" name="no_wa" id="edit_no_wa" placeholder="08xxx atau 628xxx" pattern="^(08|628)[0-9]{8,13}$" class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
                 </div>
@@ -475,7 +488,7 @@
         <form @submit.prevent="submitForm" x-show="!isImporting && !isFinished" enctype="multipart/form-data">
             @csrf
             <div class="mb-4 rounded-lg bg-info-50 p-4 text-sm text-info-700 dark:bg-info-500/15 dark:text-info-500">
-                <i class="fas fa-info-circle mr-1"></i> Gunakan file Excel (.xlsx) dengan format kolom: <strong>Nama, NIS, Tgl Lahir, Kelas, WA Siswa, WA Ortu</strong>.
+                <i class="fas fa-info-circle mr-1"></i> Gunakan file Excel (.xlsx) dengan format kolom: <strong>Nama, NIS, Tgl Lahir, Kelas, WA Siswa, WA Ortu, Alamat</strong>.
             </div>
             <div class="space-y-4">
                 <div>
@@ -599,6 +612,7 @@
                 var nama = $(this).data('nama');
                 var nis = $(this).data('nis');
                 var tgl_lahir = $(this).data('tgl_lahir');
+                var alamat = $(this).data('alamat');
                 var kelas = $(this).data('kelas');
                 var wa = $(this).data('wa');
                 var wa_ortu = $(this).data('wa_ortu');
@@ -612,6 +626,7 @@
                 $('#edit_nama').val(nama);
                 $('#edit_nis').val(nis);
                 $('#edit_tgl_lahir').val(tgl_lahir);
+                $('#edit_alamat').val(alamat);
                 $('#edit_kelas_id').val(kelas);
                 $('#edit_no_wa').val(wa);
                 $('#edit_wa_ortu').val(wa_ortu);

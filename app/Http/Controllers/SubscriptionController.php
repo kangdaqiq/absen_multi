@@ -33,22 +33,6 @@ class SubscriptionController extends Controller
             ->first();
 
         $pendingOrderData = null;
-        if ($pendingSubscription) {
-            $dynamicPayload = QrisService::generateDynamicQris($pendingSubscription->amount);
-            $pendingOrderData = [
-                'id'            => $pendingSubscription->id,
-                'package_id'    => $pendingSubscription->package_id,
-                'package_name'  => $pendingSubscription->package?->name ?? 'Paket',
-                'billing_cycle' => $pendingSubscription->billing_cycle,
-                'base_amount'   => (float) ($pendingSubscription->amount - $pendingSubscription->unique_code),
-                'unique_code'   => (int) $pendingSubscription->unique_code,
-                'total_amount'  => (float) $pendingSubscription->amount,
-                'status'        => $pendingSubscription->status,
-                'created_at'    => $pendingSubscription->created_at?->format('d M Y H:i'),
-                'qris_payload'  => $dynamicPayload,
-                'qris_image'    => QrisService::getQrCodeUrl($dynamicPayload, 300),
-            ];
-        }
 
         // All active packages available
         $packages = Package::where('is_active', true)->orderBy('price_monthly')->get();
@@ -95,7 +79,7 @@ class SubscriptionController extends Controller
     }
 
     /**
-     * Store or update a subscription payment request (QRIS or Manual).
+     * Store or update a subscription payment request (Manual).
      */
     public function store(Request $request): JsonResponse
     {
@@ -108,7 +92,7 @@ class SubscriptionController extends Controller
         $school = Auth::user()->school;
         $package = Package::findOrFail($request->package_id);
         $billingCycle = $request->input('billing_cycle', 'monthly');
-        $paymentMethod = $request->input('payment_method', 'qris');
+        $paymentMethod = $request->input('payment_method', 'manual');
 
         $basePrice = $billingCycle === 'yearly'
             ? (float) $package->price_yearly
@@ -119,21 +103,8 @@ class SubscriptionController extends Controller
             ->where('status', 'unpaid')
             ->first();
 
-        // Calculate unique code for QRIS auto-matching
         $uniqueCode = 0;
         $totalAmount = $basePrice;
-
-        if ($paymentMethod === 'qris' && $basePrice > 0) {
-            // Generate 3 digit random code that doesn't collide with other unpaid subscriptions
-            do {
-                $uniqueCode = rand(100, 999);
-                $totalAmount = $basePrice + $uniqueCode;
-                $exists = Subscription::where('status', 'unpaid')
-                    ->where('amount', $totalAmount)
-                    ->when($existingPending, fn($q) => $q->where('id', '!=', $existingPending->id))
-                    ->exists();
-            } while ($exists);
-        }
 
         $now = now();
         $startedAt = $now;
@@ -164,10 +135,6 @@ class SubscriptionController extends Controller
             $subscription = Subscription::create($subscriptionData);
         }
 
-        // Generate Dynamic QRIS payload and QR Code URL
-        $dynamicPayload = QrisService::generateDynamicQris($totalAmount);
-        $qrisImageUrl = QrisService::getQrCodeUrl($dynamicPayload, 300);
-
         return response()->json([
             'success'      => true,
             'message'      => 'Permintaan perpanjangan berhasil diproses.',
@@ -181,8 +148,6 @@ class SubscriptionController extends Controller
                 'total_amount'  => $totalAmount,
                 'status'        => $subscription->status,
                 'created_at'    => $subscription->created_at?->format('d M Y H:i'),
-                'qris_payload'  => $dynamicPayload,
-                'qris_image'    => $qrisImageUrl,
             ]
         ]);
     }

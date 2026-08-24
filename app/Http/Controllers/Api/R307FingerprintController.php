@@ -272,6 +272,7 @@ private function getNextFreeFingerId($deviceId) {
 
 private function finalizeEnrollment($fingerId, $device)
 {
+$templateData = request()->input('template_data');
 DB::beginTransaction();
 try {
         // PRE-CHECK DUPLIKASI FINGER ID
@@ -320,8 +321,8 @@ if ($guru) {
             }
 
 GuruFingerprint::updateOrCreate(
-['guru_id' => $guru->id, 'device_id' => $device->id, 'finger_id' => $fingerId],
-['created_at' => now()]
+    ['guru_id' => $guru->id, 'device_id' => $device->id, 'finger_id' => $fingerId],
+    ['template_data' => $templateData, 'created_at' => now()]
 );
 
 $guru->update([
@@ -365,8 +366,8 @@ if ($siswa) {
             }
 
 SiswaFingerprint::updateOrCreate(
-['student_id' => $siswa->id, 'device_id' => $device->id, 'finger_id' => $fingerId],
-['created_at' => now()]
+    ['student_id' => $siswa->id, 'device_id' => $device->id, 'finger_id' => $fingerId],
+    ['template_data' => $templateData, 'created_at' => now()]
 );
 
 $siswa->update([

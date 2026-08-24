@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 namespace App\Models;
 
@@ -14,7 +14,8 @@ class GateCardFingerprint extends Model
     protected $fillable = [
         'gate_card_id',
         'device_id',
-        'finger_id'
+        'finger_id',
+        'template_data'
     ];
 
     public function gateCard()

@@ -35,6 +35,7 @@ $this->telegram = $telegram;
 
 public function handle(Request $request)
 {
+    try {
     $ip = $request->ip();
     $isBlocked = \Illuminate\Support\Facades\Cache::remember("ip_blocked_" . $ip, 300, function () use ($ip) {
         $failedCount = \App\Models\ApiLog::where('ip_address', $ip)
@@ -170,6 +171,14 @@ return $this->handleScan($fingerId, $device, $now);
 }
 
 return $this->response(false, 'gagal', 'Finger ID required');
+    } catch (\Throwable $e) {
+        \Illuminate\Support\Facades\Log::error("FingerprintController Handle Critical Error: " . $e->getMessage() . " in " . $e->getFile() . ":" . $e->getLine());
+        return response()->json([
+            'ok' => false,
+            'status' => 'error',
+            'message' => 'Server Error: ' . $e->getMessage()
+        ], 500);
+    }
 }
 
     public function checkEnrollRequest(Request $request)
@@ -487,8 +496,10 @@ return $this->response(false, 'gagal', 'Enroll Timeout / No Request');
         
 
 
-        // Check Gate Card first
-        $gateCardFingerprint = GateCardFingerprint::where('device_id', $device->id)
+        $schoolDeviceIds = Device::where('school_id', $device->school_id)->pluck('id')->toArray();
+
+        // Check Gate Card first (scoped to school)
+        $gateCardFingerprint = GateCardFingerprint::whereIn('device_id', $schoolDeviceIds)
             ->where('finger_id', $fingerId)
             ->with('gateCard.guru')
             ->first();
@@ -577,14 +588,20 @@ return $this->response(false, 'gagal', 'Enroll Timeout / No Request');
             }
         }
 
-        // Check Guru
-        $guruFingerprint = GuruFingerprint::where('device_id', $device->id)
+        // Check Guru (scoped to school)
+        $guru = null;
+        $guruFingerprint = GuruFingerprint::whereIn('device_id', $schoolDeviceIds)
             ->where('finger_id', $fingerId)
             ->with('guru')
             ->first();
 
         if ($guruFingerprint && $guruFingerprint->guru) {
             $guru = $guruFingerprint->guru;
+        } else {
+            $guru = Guru::where('id_finger', $fingerId)->where('school_id', $device->school_id)->first();
+        }
+
+        if ($guru) {
 
             try {
                 DB::beginTransaction();
@@ -746,14 +763,20 @@ return $this->response(false, 'gagal', 'Enroll Timeout / No Request');
             }
         }
 
-        // Check Siswa
-        $siswaFingerprint = SiswaFingerprint::where('device_id', $device->id)
+        // Check Siswa (scoped to school)
+        $siswa = null;
+        $siswaFingerprint = SiswaFingerprint::whereIn('device_id', $schoolDeviceIds)
             ->where('finger_id', $fingerId)
             ->with('student.kelas')
             ->first();
 
         if ($siswaFingerprint && $siswaFingerprint->student) {
             $siswa = $siswaFingerprint->student;
+        } else {
+            $siswa = Siswa::where('id_finger', $fingerId)->where('school_id', $device->school_id)->with('kelas')->first();
+        }
+
+        if ($siswa) {
 
             try {
                 return $this->handleStudentAttendance($siswa, $fingerId, $device, $now);
@@ -919,7 +942,11 @@ return $this->response(false, 'gagal', 'Enroll Timeout / No Request');
             $mins = floor(($totalSeconds % 3600) / 60);
             $authorizedBy = $teacherSession ? $teacherSession->teacher_name : 'Sistem Otomatis';
             
-            $this->wa->sendCheckOut($siswa->nama, $siswa->no_wa, $now->format('H:i'), $hours, $mins, $authorizedBy, $device->school_id, $masuk->format('H:i'), $siswa->wa_ortu, $now->format('d/m/Y'));
+            try {
+                $this->wa->sendCheckOut($siswa->nama, $siswa->no_wa, $now->format('H:i'), $hours, $mins, $authorizedBy, $device->school_id, $masuk->format('H:i'), $siswa->wa_ortu, $now->format('d/m/Y'));
+            } catch (\Throwable $e) {
+                Log::error("WA Student Checkout Error: " . $e->getMessage());
+            }
 
             // Telegram
             try {
@@ -1020,7 +1047,11 @@ return $this->response(false, 'gagal', 'Enroll Timeout / No Request');
 
             DB::commit();
 
-            $this->wa->sendCheckIn($siswa->nama, $siswa->no_wa, $now->format('H:i'), $status, $device->school_id, $keterangan, $siswa->wa_ortu, $siswa->kelas->nama_kelas ?? '-');
+            try {
+                $this->wa->sendCheckIn($siswa->nama, $siswa->no_wa, $now->format('H:i'), $status, $device->school_id, $keterangan, $siswa->wa_ortu, $siswa->kelas->nama_kelas ?? '-');
+            } catch (\Throwable $e) {
+                Log::error("WA Student CheckIn Error: " . $e->getMessage());
+            }
 
             // Telegram
             try {

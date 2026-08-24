@@ -548,32 +548,26 @@ class SiswaController extends Controller
     public function deleteFingerId($id)
     {
         $siswa = Siswa::findOrFail($id);
+        $targetId = $siswa->id_finger;
 
-        // Get all fingerprints for this student
+        // Ambil semua ID sidik jari siswa ini
         $fingerprints = SiswaFingerprint::where('student_id', $siswa->id)->get();
+        $fingerIds = $fingerprints->pluck('finger_id')->toArray();
+        if ($targetId && !in_array($targetId, $fingerIds)) {
+            $fingerIds[] = (int)$targetId;
+        }
 
-        foreach ($fingerprints as $fingerprint) {
-            $device = Device::find($fingerprint->device_id);
-            if ($device) {
-                // Get device IP
-                $latestLog = ApiLog::where('api_key', $device->api_key)
-                    ->whereNotNull('ip_address')
-                    ->orderBy('created_at', 'desc')
-                    ->first();
+        // Ambil semua perangkat terdaftar di sekolah ini
+        $schoolDevices = Device::where('school_id', $siswa->school_id)->get();
 
-                if ($latestLog && $latestLog->ip_address) {
-                    try {
-                        $url = "http://{$latestLog->ip_address}/delete-finger?id={$fingerprint->finger_id}";
-                        \Illuminate\Support\Facades\Http::timeout(3)->get($url);
-                    } catch (\Exception $e) {}
-                }
-                
-                // Tambahan: Gunakan sistem Polling/Cache agar lebih robust
-                \Illuminate\Support\Facades\Cache::put('delete_finger_' . $device->id, $fingerprint->finger_id, now()->addMinutes(5));
+        foreach ($schoolDevices as $device) {
+            foreach ($fingerIds as $fId) {
+                // Set cache delete untuk di-poll oleh ESP8266
+                \Illuminate\Support\Facades\Cache::put('delete_finger_' . $device->id, $fId, now()->addMinutes(15));
             }
         }
 
-        // Delete from database
+        // Hapus dari database
         SiswaFingerprint::where('student_id', $siswa->id)->delete();
         $siswa->update(['id_finger' => null, 'enroll_finger_status' => 'none']);
 

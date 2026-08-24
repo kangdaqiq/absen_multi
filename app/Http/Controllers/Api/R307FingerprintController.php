@@ -34,7 +34,9 @@ $this->telegram = $telegram;
 // ... (handle and checkEnrollRequest methods omitted for brevity as they are unchanged) ...
 
 public function handle(Request $request)
-{
+    {
+        try {
+
     $ip = $request->ip();
     $isBlocked = \Illuminate\Support\Facades\Cache::remember("ip_blocked_" . $ip, 300, function () use ($ip) {
         $failedCount = \App\Models\ApiLog::where('ip_address', $ip)
@@ -170,7 +172,15 @@ return $this->handleScan($fingerId, $device, $now);
 }
 
 return $this->response(false, 'gagal', 'Finger ID required');
-}
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error("R307 Handle Critical Error: " . $e->getMessage() . " at " . $e->getFile() . ":" . $e->getLine());
+            return response()->json([
+                'ok' => false,
+                'status' => 'error',
+                'message' => 'Server Error: ' . $e->getMessage()
+            ], 500);
+        }
+    }
 
     public function checkEnrollRequest(Request $request)
     {

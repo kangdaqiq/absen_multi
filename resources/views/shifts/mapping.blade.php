@@ -140,8 +140,8 @@
                 </div>
 
                 {{-- MODAL KELOLA GURU DI SHIFT INI --}}
-                <x-ui.modal id="modalManageShift-{{ $s->id }}" :is-open="false" class="max-w-2xl max-h-[90vh] flex flex-col">
-                    <div class="p-6 flex flex-col max-h-[88vh] overflow-hidden" x-data="{
+                <x-ui.modal id="modalManageShift-{{ $s->id }}" :is-open="false" class="max-w-2xl">
+                    <div class="p-6" x-data="{
                         allTeachers: {{ json_encode($allGurusList) }},
                         assignedTeachers: {{ json_encode($assignedGurusList) }},
                         selectedToAdd: '',
@@ -164,8 +164,8 @@
                             this.assignedTeachers = [];
                         }
                     }">
-                        <!-- Modal Header (Fixed) -->
-                        <div class="flex items-center justify-between border-b border-gray-100 pb-3 dark:border-gray-800 shrink-0">
+                        <!-- Modal Header -->
+                        <div class="flex items-center justify-between border-b border-gray-100 pb-3 dark:border-gray-800">
                             <div>
                                 <h4 class="text-base sm:text-lg font-bold text-gray-800 dark:text-white/90">
                                     Anggota Shift: <span class="text-brand-500">{{ $s->nama_shift }}</span>
@@ -179,8 +179,8 @@
                             </button>
                         </div>
 
-                        <!-- Modal Form (Scrollable Body) -->
-                        <form action="{{ route('shifts.mapping.assign') }}" method="POST" class="mt-3 flex flex-col flex-1 overflow-hidden">
+                        <!-- Modal Form -->
+                        <form action="{{ route('shifts.mapping.assign') }}" method="POST" class="mt-4 space-y-4">
                             @csrf
                             <input type="hidden" name="shift_id" value="{{ $s->id }}" />
 
@@ -189,144 +189,144 @@
                                 <input type="hidden" name="guru_ids[]" :value="t.id" />
                             </template>
 
-                            <!-- Scrollable Content Area -->
-                            <div class="flex-1 overflow-y-auto space-y-3 pr-1">
-                                <!-- Searchable Dropdown Guru -->
-                                <div class="rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50 p-3"
-                                    x-data="{
-                                        searchQuery: '',
-                                        isOpen: false,
-                                        get filteredAvailable() {
-                                            if (!this.searchQuery) return this.availableTeachers.slice(0, 20);
-                                            const q = this.searchQuery.toLowerCase();
-                                            return this.availableTeachers.filter(t => 
-                                                t.nama.toLowerCase().includes(q) || 
-                                                (t.nip && t.nip.toLowerCase().includes(q))
-                                            );
-                                        }
-                                    }">
-                                    <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
-                                        <div class="relative flex-1">
-                                            <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
-                                                <i class="fas fa-search text-xs"></i>
+                            <!-- Kolom Search Guru (Punya Scroll Dropdown Sendiri) -->
+                            <div class="rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50 p-3"
+                                x-data="{
+                                    searchQuery: '',
+                                    isOpen: false,
+                                    get filteredAvailable() {
+                                        if (!this.searchQuery) return this.availableTeachers;
+                                        const q = this.searchQuery.toLowerCase();
+                                        return this.availableTeachers.filter(t => 
+                                            t.nama.toLowerCase().includes(q) || 
+                                            (t.nip && t.nip.toLowerCase().includes(q))
+                                        );
+                                    }
+                                }">
+                                <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+                                    <div class="relative flex-1">
+                                        <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
+                                            <i class="fas fa-search text-xs"></i>
+                                        </div>
+                                        <input type="text" 
+                                            x-model="searchQuery" 
+                                            @focus="isOpen = true" 
+                                            @input="isOpen = true"
+                                            @keydown.escape="isOpen = false"
+                                            placeholder="Ketik nama atau NIP guru untuk mencari..."
+                                            class="w-full rounded-lg border border-gray-200 bg-white py-2 pl-9 pr-8 text-xs text-gray-800 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white shadow-sm" />
+                                        <button type="button" x-show="searchQuery" @click="searchQuery = ''; isOpen = false" 
+                                            class="absolute inset-y-0 right-0 flex items-center pr-2.5 text-gray-400 hover:text-gray-600 text-xs">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+
+                                        <!-- Floating Search Suggestions (Scroll Khusus Dropdown Hasil Pencarian) -->
+                                        <div x-show="isOpen && filteredAvailable.length > 0" 
+                                            x-cloak 
+                                            @click.away="isOpen = false"
+                                            class="absolute left-0 right-0 top-full mt-1 max-h-52 overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-2xl dark:border-gray-700 dark:bg-gray-900 z-50 divide-y divide-gray-100 dark:divide-gray-800">
+                                            
+                                            <div class="p-2 bg-gray-50 dark:bg-gray-800/90 flex items-center justify-between text-[11px] text-gray-500 border-b border-gray-100 dark:border-gray-700 sticky top-0 z-10">
+                                                <span>Klik guru untuk memasukkan:</span>
+                                                <button type="button" @click="filteredAvailable.forEach(t => selectTeacher(t))"
+                                                    class="font-semibold text-brand-600 dark:text-brand-400 hover:underline">
+                                                    + Pilih Semua (<span x-text="filteredAvailable.length"></span>)
+                                                </button>
                                             </div>
-                                            <input type="text" 
-                                                x-model="searchQuery" 
-                                                @focus="isOpen = true" 
-                                                @input="isOpen = true"
-                                                @keydown.escape="isOpen = false"
-                                                placeholder="Ketik nama atau NIP guru untuk mencari..."
-                                                class="w-full rounded-lg border border-gray-200 bg-white py-2 pl-9 pr-8 text-xs text-gray-800 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white shadow-sm" />
-                                            <button type="button" x-show="searchQuery" @click="searchQuery = ''; isOpen = false" 
-                                                class="absolute inset-y-0 right-0 flex items-center pr-2.5 text-gray-400 hover:text-gray-600 text-xs">
-                                                <i class="fas fa-times"></i>
-                                            </button>
 
-                                            <!-- Floating Autocomplete Dropdown List -->
-                                            <div x-show="isOpen && filteredAvailable.length > 0" 
-                                                x-cloak 
-                                                @click.away="isOpen = false"
-                                                class="absolute left-0 right-0 top-full mt-1 max-h-48 overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900 z-50 divide-y divide-gray-100 dark:divide-gray-800">
-                                                
-                                                <div class="p-2 bg-gray-50 dark:bg-gray-800/80 flex items-center justify-between text-[11px] text-gray-500 border-b border-gray-100 dark:border-gray-700 sticky top-0 z-10">
-                                                    <span>Klik nama guru untuk menambahkan:</span>
-                                                    <button type="button" @click="filteredAvailable.forEach(t => selectTeacher(t))"
-                                                        class="font-semibold text-brand-600 dark:text-brand-400 hover:underline">
-                                                        + Pilih Semua Hasil (<span x-text="filteredAvailable.length"></span>)
-                                                    </button>
-                                                </div>
-
-                                                <template x-for="at in filteredAvailable" :key="at.id">
-                                                    <div @click.stop="selectTeacher(at)" 
-                                                        class="flex items-center justify-between p-2 hover:bg-brand-50/80 dark:hover:bg-brand-500/15 cursor-pointer transition group">
-                                                        <div class="flex items-center gap-2">
-                                                            <div class="w-4 h-4 rounded border border-gray-300 group-hover:border-brand-500 flex items-center justify-center text-transparent group-hover:text-brand-500 transition text-[9px]">
-                                                                <i class="fas fa-plus"></i>
-                                                            </div>
-                                                            <div>
-                                                                <p class="text-xs font-semibold text-gray-800 dark:text-white" x-text="at.nama"></p>
-                                                                <span class="text-[10px] text-gray-400 font-mono" x-text="'NIP: ' + at.nip"></span>
-                                                            </div>
+                                            <template x-for="at in filteredAvailable" :key="at.id">
+                                                <div @click.stop="selectTeacher(at)" 
+                                                    class="flex items-center justify-between p-2 hover:bg-brand-50/80 dark:hover:bg-brand-500/15 cursor-pointer transition group">
+                                                    <div class="flex items-center gap-2">
+                                                        <div class="w-4 h-4 rounded border border-gray-300 group-hover:border-brand-500 flex items-center justify-center text-transparent group-hover:text-brand-500 transition text-[9px]">
+                                                            <i class="fas fa-plus"></i>
                                                         </div>
-                                                        <span class="text-[10px] font-bold text-brand-600 dark:text-brand-400 bg-brand-50 dark:bg-brand-500/15 px-2 py-0.5 rounded group-hover:bg-brand-500 group-hover:text-white transition">
-                                                            + Masukkan
-                                                        </span>
+                                                        <div>
+                                                            <p class="text-xs font-semibold text-gray-800 dark:text-white" x-text="at.nama"></p>
+                                                            <span class="text-[10px] text-gray-400 font-mono" x-text="'NIP: ' + at.nip"></span>
+                                                        </div>
                                                     </div>
-                                                </template>
-                                            </div>
-
-                                            <div x-show="isOpen && searchQuery && filteredAvailable.length === 0" 
-                                                x-cloak 
-                                                @click.away="isOpen = false"
-                                                class="absolute left-0 right-0 top-full mt-1 p-3 text-center text-xs text-gray-400 rounded-xl border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900 z-50">
-                                                Tidak ada guru yang cocok dengan pencarian
-                                            </div>
+                                                    <span class="text-[10px] font-bold text-brand-600 dark:text-brand-400 bg-brand-50 dark:bg-brand-500/15 px-2 py-0.5 rounded group-hover:bg-brand-500 group-hover:text-white transition">
+                                                        + Masukkan
+                                                    </span>
+                                                </div>
+                                            </template>
                                         </div>
 
-                                        <div class="flex items-center gap-1.5 shrink-0">
-                                            <button type="button" @click="addAllTeachers()"
-                                                class="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2.5 py-2 text-xs font-medium text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 transition whitespace-nowrap">
-                                                <i class="fas fa-users-cog text-brand-500"></i> Tambah Semua
-                                            </button>
-                                            <button type="button" @click="clearAllTeachers()"
-                                                x-show="assignedTeachers.length > 0"
-                                                class="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2.5 py-2 text-xs font-medium text-red-600 hover:bg-red-100 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-400 transition whitespace-nowrap">
-                                                <i class="fas fa-trash-alt"></i> Kosongkan
-                                            </button>
+                                        <div x-show="isOpen && searchQuery && filteredAvailable.length === 0" 
+                                            x-cloak 
+                                            @click.away="isOpen = false"
+                                            class="absolute left-0 right-0 top-full mt-1 p-3 text-center text-xs text-gray-400 rounded-xl border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900 z-50">
+                                            Tidak ada guru yang cocok dengan pencarian
                                         </div>
                                     </div>
-                                </div>
 
-                                <!-- Tabel Guru yang Terdaftar di Shift Ini -->
-                                <div>
-                                    <div class="flex items-center justify-between mb-1.5 px-1">
-                                        <h5 class="text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                                            Guru Terdaftar Saat Ini (<span x-text="assignedTeachers.length"></span> Guru)
-                                        </h5>
+                                    <div class="flex items-center gap-1.5 shrink-0">
+                                        <button type="button" @click="addAllTeachers()"
+                                            class="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 transition whitespace-nowrap">
+                                            <i class="fas fa-users-cog text-brand-500"></i> Tambah Semua
+                                        </button>
+                                        <button type="button" @click="clearAllTeachers()"
+                                            x-show="assignedTeachers.length > 0"
+                                            class="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-100 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-400 transition whitespace-nowrap">
+                                            <i class="fas fa-trash-alt"></i> Kosongkan
+                                        </button>
                                     </div>
-
-                                    <template x-if="assignedTeachers.length > 0">
-                                        <div class="max-h-60 overflow-y-auto rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-dark shadow-sm">
-                                            <table class="w-full table-auto text-left text-xs">
-                                                <thead class="sticky top-0 bg-gray-50 dark:bg-gray-800/95 text-gray-600 dark:text-gray-300 font-semibold border-b border-gray-200 dark:border-gray-800 z-10">
-                                                    <tr>
-                                                        <th class="px-3 py-2 w-10 text-center">No</th>
-                                                        <th class="px-3 py-2">Nama Guru</th>
-                                                        <th class="px-3 py-2">NIP</th>
-                                                        <th class="px-3 py-2 text-center w-24">Aksi</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
-                                                    <template x-for="(guru, idx) in assignedTeachers" :key="guru.id">
-                                                        <tr class="hover:bg-gray-50/80 dark:hover:bg-gray-800/40 transition">
-                                                            <td class="px-3 py-2 text-center text-gray-400 font-medium" x-text="idx + 1"></td>
-                                                            <td class="px-3 py-2 font-semibold text-gray-800 dark:text-white" x-text="guru.nama"></td>
-                                                            <td class="px-3 py-2 font-mono text-gray-500 dark:text-gray-400" x-text="guru.nip"></td>
-                                                            <td class="px-3 py-2 text-center">
-                                                                <button type="button" @click="removeTeacher(guru.id)"
-                                                                    class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 font-medium transition" title="Keluarkan dari shift">
-                                                                    <i class="fas fa-trash-alt text-[10px]"></i> Hapus
-                                                                </button>
-                                                            </td>
-                                                        </tr>
-                                                    </template>
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </template>
-
-                                    <template x-if="assignedTeachers.length === 0">
-                                        <div class="p-5 text-center rounded-xl border border-dashed border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-dark">
-                                            <i class="fas fa-users-slash text-xl text-gray-300 dark:text-gray-600 mb-1"></i>
-                                            <p class="text-xs text-gray-500 dark:text-gray-400">Belum ada guru yang terdaftar di shift ini.</p>
-                                            <p class="text-[10px] text-gray-400 mt-0.5">Pilih guru pada kolom pencarian di atas untuk memasukkan guru ke shift ini.</p>
-                                        </div>
-                                    </template>
                                 </div>
                             </div>
 
-                            <!-- Modal Action Buttons (Fixed Footer) -->
-                            <div class="flex items-center justify-end gap-3 pt-3 border-t border-gray-100 dark:border-gray-800 mt-2 shrink-0">
+                            <!-- Tabel Guru yang Terdaftar di Shift Ini (SCROLL KHUSUS TABEL) -->
+                            <div>
+                                <div class="flex items-center justify-between mb-1.5 px-1">
+                                    <h5 class="text-xs font-bold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                                        Guru Terdaftar di Shift Ini (<span x-text="assignedTeachers.length"></span> Guru)
+                                    </h5>
+                                </div>
+
+                                <template x-if="assignedTeachers.length > 0">
+                                    <div class="max-h-72 overflow-y-auto rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-dark shadow-sm">
+                                        <table class="w-full table-auto text-left text-xs">
+                                            <thead class="sticky top-0 bg-gray-50 dark:bg-gray-800/95 text-gray-600 dark:text-gray-300 font-semibold border-b border-gray-200 dark:border-gray-800 z-10">
+                                                <tr>
+                                                    <th class="px-3.5 py-2.5 w-10 text-center">No</th>
+                                                    <th class="px-3.5 py-2.5">Nama Guru</th>
+                                                    <th class="px-3.5 py-2.5">NIP</th>
+                                                    <th class="px-3.5 py-2.5 text-center w-24">Aksi</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                                                <template x-for="(guru, idx) in assignedTeachers" :key="guru.id">
+                                                    <tr class="hover:bg-gray-50/80 dark:hover:bg-gray-800/40 transition">
+                                                        <td class="px-3.5 py-2.5 text-center text-gray-400 font-medium" x-text="idx + 1"></td>
+                                                        <td class="px-3.5 py-2.5">
+                                                            <p class="font-semibold text-gray-800 dark:text-white" x-text="guru.nama"></p>
+                                                            <span class="text-[10px] text-gray-400" x-text="guru.no_wa"></span>
+                                                        </td>
+                                                        <td class="px-3.5 py-2.5 font-mono text-gray-500 dark:text-gray-400" x-text="guru.nip"></td>
+                                                        <td class="px-3.5 py-2.5 text-center">
+                                                            <button type="button" @click="removeTeacher(guru.id)"
+                                                                class="inline-flex items-center gap-1 px-2 py-1 rounded text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 font-medium transition" title="Keluarkan dari shift">
+                                                                <i class="fas fa-trash-alt text-[10px]"></i> Hapus
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                </template>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </template>
+
+                                <template x-if="assignedTeachers.length === 0">
+                                    <div class="p-6 text-center rounded-xl border border-dashed border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-dark">
+                                        <i class="fas fa-users-slash text-2xl text-gray-300 dark:text-gray-600 mb-2"></i>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400">Belum ada guru yang terdaftar di shift ini.</p>
+                                        <p class="text-[11px] text-gray-400 mt-0.5">Pilih guru pada kolom pencarian di atas untuk memasukkan guru ke shift ini.</p>
+                                    </div>
+                                </template>
+                            </div>
+
+                            <!-- Modal Action Buttons -->
+                            <div class="flex items-center justify-end gap-3 pt-3 border-t border-gray-100 dark:border-gray-800">
                                 <button type="button" @click="$dispatch('close-modal', 'modalManageShift-{{ $s->id }}')"
                                     class="rounded-lg border border-gray-200 px-4 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-gray-800">
                                     Batal

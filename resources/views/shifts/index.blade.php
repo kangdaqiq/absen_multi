@@ -194,14 +194,14 @@
                     <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                         Nama Shift <span class="text-error-500">*</span>
                     </label>
-                    <input type="text" name="nama_shift" required placeholder="Contoh: Shift Pagi Guru Tetap"
+                    <input type="text" name="nama_shift" required placeholder="Contoh: Shift Pagi Senin"
                         class="w-full rounded-lg border border-gray-300 bg-white px-3.5 py-2 text-sm text-gray-800 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white" />
                 </div>
                 <div>
                     <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                         Kode Singkat / Alias
                     </label>
-                    <input type="text" name="kode_shift" placeholder="Contoh: PAGI / SIANG"
+                    <input type="text" name="kode_shift" placeholder="Contoh: Senin Pagi"
                         class="w-full rounded-lg border border-gray-300 bg-white px-3.5 py-2 text-sm text-gray-800 focus:border-brand-500 focus:outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-white" />
                 </div>
             </div>

@@ -322,10 +322,19 @@ $guru = Guru::where('enroll_finger_status', 'requested')
 
 if ($guru) {
             if ($conflictName && ($conflictType !== 'guru' || $conflictId != $guru->id)) {
-                $guru->update(['enroll_finger_status' => null]);
-                DB::commit();
-                return $this->response(false, 'gagal', "Ditolak: ID telah dipakai oleh $conflictName");
-            }
+            $guru->update(['enroll_finger_status' => null]);
+            DB::commit();
+            ApiLog::create([
+                'school_id' => $this->currentSchoolId,
+                'api_key' => $this->currentApiKey,
+                'action' => 'enroll_failed',
+                'uid' => $fingerId,
+                'success' => false,
+                'message' => "Ditolak: Sidik jari sudah terdaftar atas nama $conflictName (ID #$fingerId)",
+                'created_at' => now()
+            ]);
+            return $this->response(false, 'gagal', "Ditolak: Sidik jari sudah terdaftar atas nama $conflictName (ID #$fingerId)");
+        }
 
 GuruFingerprint::updateOrCreate(
     ['guru_id' => $guru->id, 'device_id' => $device->id, 'finger_id' => $fingerId],
@@ -367,10 +376,19 @@ $siswa = Siswa::where('enroll_finger_status', 'requested')
 
 if ($siswa) {
             if ($conflictName && ($conflictType !== 'siswa' || $conflictId != $siswa->id)) {
-                $siswa->update(['enroll_finger_status' => null]);
-                DB::commit();
-                return $this->response(false, 'gagal', "Ditolak: ID telah dipakai oleh $conflictName");
-            }
+            $siswa->update(['enroll_finger_status' => null]);
+            DB::commit();
+            ApiLog::create([
+                'school_id' => $this->currentSchoolId,
+                'api_key' => $this->currentApiKey,
+                'action' => 'enroll_failed',
+                'uid' => $fingerId,
+                'success' => false,
+                'message' => "Ditolak: Sidik jari sudah terdaftar atas nama $conflictName (ID #$fingerId)",
+                'created_at' => now()
+            ]);
+            return $this->response(false, 'gagal', "Ditolak: Sidik jari sudah terdaftar atas nama $conflictName (ID #$fingerId)");
+        }
 
 SiswaFingerprint::updateOrCreate(
     ['student_id' => $siswa->id, 'device_id' => $device->id, 'finger_id' => $fingerId],
@@ -411,11 +429,7 @@ return $this->response(true, 'success', 'Enroll Berhasil (Siswa): ' . $siswa->na
             ->first();
 
         if ($gate) {
-            if ($conflictName && ($conflictType !== 'gate' || $conflictId != $gate->id)) {
-                $gate->update(['enroll_finger_status' => null]);
-                DB::commit();
-                return $this->response(false, 'gagal', "Ditolak: ID telah dipakai oleh $conflictName");
-            }
+            // Auto-reuse existing finger ID slot
 
             GateCardFingerprint::updateOrCreate(
                 ['gate_card_id' => $gate->id, 'device_id' => $device->id, 'finger_id' => $fingerId],

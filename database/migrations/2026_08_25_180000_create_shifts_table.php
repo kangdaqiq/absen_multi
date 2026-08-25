@@ -33,7 +33,7 @@ return new class extends Migration
             Schema::create('guru_shift_assignments', function (Blueprint $table) {
                 $table->id();
                 $table->unsignedBigInteger('school_id')->nullable();
-                $table->unsignedBigInteger('guru_id');
+                $table->unsignedInteger('guru_id');
                 $table->unsignedBigInteger('shift_id');
                 $table->date('tanggal')->nullable();
                 $table->tinyInteger('index_hari')->nullable()->comment('1: Senin s/d 7: Minggu');
@@ -43,8 +43,7 @@ return new class extends Migration
                 $table->foreign('guru_id')->references('id')->on('guru')->onDelete('cascade');
                 $table->foreign('shift_id')->references('id')->on('shifts')->onDelete('cascade');
 
-                $table->index(['guru_id', 'tanggal']);
-                $table->index(['guru_id', 'index_hari']);
+                $table->index(['guru_id', 'shift_id']);
             });
         }
     }

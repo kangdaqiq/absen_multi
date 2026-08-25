@@ -10,11 +10,13 @@ class GuruController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Guru::orderBy('nama');
+        $query = Guru::with('defaultShift')->orderBy('nama');
 
         // Filter by school_id for non-super admin users
+        $schoolId = null;
         if (auth()->user() && !auth()->user()->isSuperAdmin()) {
-            $query->where('school_id', auth()->user()->school_id);
+            $schoolId = auth()->user()->school_id;
+            $query->where('school_id', $schoolId);
         }
 
         // Search functionality
@@ -30,7 +32,14 @@ class GuruController extends Controller
         $guru = $query->paginate(20)->withQueryString();
         // Fetch active devices for enrollment dropdowns
         $devices = \App\Models\Device::where('active', 1)->get();
-        return view('guru.index', compact('guru', 'devices'));
+        // Fetch active shifts for school
+        $shiftsQuery = \App\Models\Shift::where('is_active', true);
+        if ($schoolId) {
+            $shiftsQuery->where('school_id', $schoolId);
+        }
+        $shifts = $shiftsQuery->orderBy('jam_masuk')->get();
+
+        return view('guru.index', compact('guru', 'devices', 'shifts'));
     }
 
     public function store(Request $request)
@@ -54,6 +63,7 @@ class GuruController extends Controller
         $request->validate([
             'nama' => 'required|string|max:100',
             'nip' => 'nullable|string|max:50',
+            'default_shift_id' => 'nullable|exists:shifts,id',
             'tgl_lahir' => 'nullable|date',
             'no_wa' => [
                 'required',
@@ -98,6 +108,7 @@ class GuruController extends Controller
         $request->validate([
             'nama' => 'required|string|max:100',
             'nip' => 'nullable|string|max:50',
+            'default_shift_id' => 'nullable|exists:shifts,id',
             'tgl_lahir' => 'nullable|date',
             'no_wa' => [
                 'required',

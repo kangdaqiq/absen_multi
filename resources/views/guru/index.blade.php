@@ -68,6 +68,7 @@
                     <th class="px-4 py-4">Nama</th>
                     <th class="px-4 py-4">{{ $labelNIP }}</th>
                     <th class="px-4 py-4">No WhatsApp</th>
+                    <th class="px-4 py-4 text-center">Shift Default</th>
                     <th class="px-4 py-4 text-center">Tgl. Lahir</th>
                     <th class="px-4 py-4 text-center">UID RFID</th>
                     <th class="px-4 py-4 text-center">ID Finger</th>
@@ -91,6 +92,17 @@
                         </td>
                         <td class="border-b border-gray-100 px-4 py-4 dark:border-gray-800">
                             <p class="text-gray-500 dark:text-gray-400">{{ $g->no_wa ?: '-' }}</p>
+                        </td>
+                        <td class="border-b border-gray-100 px-4 py-4 dark:border-gray-800 text-center whitespace-nowrap">
+                            @if($g->defaultShift)
+                                <span class="inline-flex items-center gap-1 font-mono text-xs font-semibold px-2.5 py-1 rounded-full bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
+                                    <i class="far fa-clock text-[10px]"></i> {{ $g->defaultShift->kode_shift ?: $g->defaultShift->nama_shift }}
+                                </span>
+                            @else
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-600 dark:bg-red-500/15 dark:text-red-400">
+                                    Belum Diplot
+                                </span>
+                            @endif
                         </td>
                         <td class="border-b border-gray-100 px-4 py-4 dark:border-gray-800 text-center">
                             @if($g->tgl_lahir)
@@ -160,7 +172,7 @@
                                 
                                 <!-- Edit -->
                                 <button class="btnEdit text-warning-500 hover:text-warning-700 hover:bg-warning-50 p-2 rounded-lg transition" 
-                                    data-id="{{ $g->id }}" data-nama="{{ $g->nama }}" data-nip="{{ $g->nip }}" data-wa="{{ $g->no_wa }}" data-rfid="{{ $g->uid_rfid }}" data-is-global="{{ $g->is_global_report ? 1 : 0 }}" data-tgl_lahir="{{ $g->tgl_lahir }}" data-telegram="{{ $g->telegram_chat_id }}"
+                                    data-id="{{ $g->id }}" data-nama="{{ $g->nama }}" data-nip="{{ $g->nip }}" data-wa="{{ $g->no_wa }}" data-rfid="{{ $g->uid_rfid }}" data-shift="{{ $g->default_shift_id }}" data-is-global="{{ $g->is_global_report ? 1 : 0 }}" data-tgl_lahir="{{ $g->tgl_lahir }}" data-telegram="{{ $g->telegram_chat_id }}"
                                     @click="$dispatch('open-modal', 'modalEditGuru')" title="Edit">
                                     <i class="fas fa-edit"></i>
                                 </button>
@@ -176,7 +188,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="{{ $showBotCol ? 9 : 8 }}" class="border-b border-gray-100 px-4 py-8 dark:border-gray-800 text-center text-gray-500 dark:text-gray-400">
+                        <td colspan="{{ $showBotCol ? 10 : 9 }}" class="border-b border-gray-100 px-4 py-8 dark:border-gray-800 text-center text-gray-500 dark:text-gray-400">
                             Tidak ada data {{ strtolower($labelKaryawan) }} ditemukan.
                         </td>
                     </tr>
@@ -225,6 +237,15 @@
                     <input type="text" name="telegram_chat_id" placeholder="Contoh: 123456789" class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
                 </div>
                 <div>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Default Shift Kerja</label>
+                    <select name="default_shift_id" class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                        <option value="">-- Pilih Shift (Wajib) --</option>
+                        @foreach($shifts as $s)
+                            <option value="{{ $s->id }}">{{ $s->nama_shift }} ({{ $s->formatted_jam_masuk }} - {{ $s->formatted_jam_pulang }})</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
                     <label class="mb-1.5 flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
                         <input type="checkbox" name="is_global_report" value="1" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-900">
                         Terima Laporan Global (Rekap Harian Semua Siswa)
@@ -265,6 +286,15 @@
                 <div>
                     <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">No WhatsApp</label>
                     <input type="text" name="no_wa" id="edit_wa" placeholder="08xxx atau 628xxx" pattern="^(08|628)[0-9]{8,13}$" required class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                </div>
+                <div>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Default Shift Kerja</label>
+                    <select name="default_shift_id" id="edit_default_shift_id" class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                        <option value="">-- Pilih Shift (Wajib) --</option>
+                        @foreach($shifts as $s)
+                            <option value="{{ $s->id }}">{{ $s->nama_shift }} ({{ $s->formatted_jam_masuk }} - {{ $s->formatted_jam_pulang }})</option>
+                        @endforeach
+                    </select>
                 </div>
                 <div>
                     <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Telegram Chat ID <span class="text-gray-400 font-normal">(opsional)</span></label>
@@ -447,6 +477,7 @@
                 var rfid = $(this).data('rfid');
                 var isGlobal = $(this).data('is-global');
                 var tglLahir = $(this).data('tgl_lahir');
+                var shift = $(this).data('shift');
 
                 $('#edit_nama').val(nama);
                 $('#edit_nip').val(nip);
@@ -454,6 +485,7 @@
                 $('#edit_wa').val(wa);
                 $('#edit_telegram').val(telegram);
                 $('#edit_rfid').val(rfid);
+                $('#edit_default_shift_id').val(shift || '');
                 $('#edit_global_report').prop('checked', isGlobal == 1);
 
                 $('#formEditGuru').attr('action', '{{ url('guru') }}/' + id);

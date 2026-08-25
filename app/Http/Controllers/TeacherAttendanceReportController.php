@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\AbsensiGuru;
 use App\Models\Guru;
+use App\Models\Shift;
 use App\Models\JadwalPelajaran;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
@@ -30,15 +31,23 @@ class TeacherAttendanceReportController extends Controller
         // 2. Get School ID
         $schoolId = (auth()->user() && !auth()->user()->isSuperAdmin()) ? auth()->user()->school_id : null;
 
-        // 3. Get Teachers
-        $guruQuery = Guru::orderBy('nama');
+        // 3. Get Shifts for Filter
+        $shiftsQuery = Shift::where('is_active', true);
+        if ($schoolId) {
+            $shiftsQuery->where('school_id', $schoolId);
+        }
+        $shifts = $shiftsQuery->orderBy('jam_masuk')->get();
+
+        // 4. Get Teachers
+        $guruQuery = Guru::with(['defaultShift'])->orderBy('nama');
         if ($schoolId) {
             $guruQuery->where('school_id', $schoolId);
         }
         $gurus = $guruQuery->get();
 
-        // 4. Get Attendance for Date
-        $attendanceQuery = AbsensiGuru::where('tanggal', $dateStr)
+        // 5. Get Attendance for Date
+        $attendanceQuery = AbsensiGuru::with('shift')
+            ->where('tanggal', $dateStr)
             ->whereNull('jadwal_pelajaran_id'); // Only daily records
 
         if ($schoolId) {
@@ -46,12 +55,17 @@ class TeacherAttendanceReportController extends Controller
         }
         $attendances = $attendanceQuery->get()->keyBy('guru_id');
 
-        // 5. Merge Data
-        $report = $gurus->map(function ($guru) use ($attendances) {
+        // 6. Merge Data
+        $report = $gurus->map(function ($guru) use ($attendances, $dateStr) {
             $att = $attendances->get($guru->id);
+            $shift = $att?->shift ?: $guru->getShiftForDate($dateStr);
+
             return [
                 'guru' => $guru,
+                'shift' => $shift,
                 'status' => $att ? $att->status : 'Belum Absen',
+                'status_kehadiran' => $att ? $att->status_kehadiran : null,
+                'menit_terlambat' => $att ? $att->menit_terlambat : 0,
                 'jam_masuk' => $att ? $att->jam_masuk : '-',
                 'jam_pulang' => $att ? $att->jam_pulang : '-',
                 'keterangan' => $att ? $att->keterangan : '',
@@ -59,13 +73,19 @@ class TeacherAttendanceReportController extends Controller
             ];
         });
 
-        // 6. Filter by Status (server-side)
+        // 7. Filter by Status
         $filterStatus = $request->input('status', '');
         if ($filterStatus !== '') {
             $report = $report->filter(fn($item) => $item['status'] === $filterStatus)->values();
         }
 
-        return view('teacher-attendance.index', compact('report', 'dateStr', 'dayName', 'filterStatus'));
+        // 8. Filter by Shift
+        $filterShift = $request->input('shift_id', '');
+        if ($filterShift !== '') {
+            $report = $report->filter(fn($item) => $item['shift']?->id == $filterShift)->values();
+        }
+
+        return view('teacher-attendance.index', compact('report', 'shifts', 'dateStr', 'dayName', 'filterStatus', 'filterShift'));
     }
 
     public function store(Request $request)
@@ -73,12 +93,36 @@ class TeacherAttendanceReportController extends Controller
         $request->validate([
             'guru_id' => 'required|exists:guru,id',
             'jadwal_pelajaran_id' => 'nullable|exists:jadwal_pelajaran,id',
+            'shift_id' => 'nullable|exists:shifts,id',
             'tanggal' => 'required|date',
             'status' => 'required',
             'jam_masuk' => 'nullable|date_format:H:i',
             'jam_pulang' => 'nullable|date_format:H:i',
             'keterangan' => 'nullable|string|max:255',
         ]);
+
+        $guru = Guru::findOrFail($request->guru_id);
+        $shiftId = $request->shift_id ?: ($guru->getShiftForDate($request->tanggal)?->id);
+        $shift = $shiftId ? Shift::find($shiftId) : null;
+
+        if (!$shift && in_array($request->status, ['Hadir', 'Terlambat'])) {
+            return redirect()->back()->with('error', 'Guru tidak memiliki jadwal shift pada tanggal ini. Silakan pilih shift terlebih dahulu.');
+        }
+
+        $menitTerlambat = 0;
+        $statusKehadiran = 'tepat_waktu';
+        $status = $request->status;
+
+        if ($request->jam_masuk && $shift && in_array($status, ['Hadir', 'Terlambat'])) {
+            if ($shift->isLate($request->jam_masuk)) {
+                $menitTerlambat = $shift->calculateLateMinutes($request->jam_masuk);
+                $status = 'Terlambat';
+                $statusKehadiran = 'terlambat';
+            } else {
+                $status = 'Hadir';
+                $statusKehadiran = 'tepat_waktu';
+            }
+        }
 
         $data = [
             'guru_id' => $request->guru_id,
@@ -87,12 +131,11 @@ class TeacherAttendanceReportController extends Controller
             'school_id' => auth()->user()->school_id ?? null,
         ];
 
-        // Jika Hadir, set waktu_hadir sekarang (jika belum ada) atau tetap
-        // Tapi biasanya admin yang input, jadi waktu_hadir bisa null atau now()
-        // Kita set now() jika status Hadir dan belum punya waktu_hadir
-
         $updateData = [
-            'status' => $request->status,
+            'shift_id' => $shiftId,
+            'status' => $status,
+            'status_kehadiran' => $statusKehadiran,
+            'menit_terlambat' => $menitTerlambat,
             'jam_masuk' => $request->jam_masuk,
             'jam_pulang' => $request->jam_pulang,
             'keterangan' => $request->keterangan,

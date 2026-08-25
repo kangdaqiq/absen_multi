@@ -105,6 +105,17 @@ class RfidController extends Controller
             $now = $now ?? now();
             $today = $now->format('Y-m-d');
 
+            // 0. CEK SHIFT GURU (Wajib memiliki shift aktif hari ini)
+            $shift = $teacher->getShiftForDate($now);
+            if (!$shift) {
+                DB::rollBack();
+                $this->logRequest($apiKey, 'scan_rejected', $uid, false, 'Guru Tanpa Shift: ' . $teacher->nama);
+                return $this->response(false, 'gagal', 'Tidak ada jadwal shift.', 'error', [
+                    'type' => 'no_shift',
+                    'nama' => $teacher->nama
+                ]);
+            }
+
             // 1. ABSENSI HARIAN (Daily)
             $absensi = \App\Models\AbsensiGuru::where('guru_id', $teacher->id)
                 ->where('tanggal', $today)
@@ -115,30 +126,74 @@ class RfidController extends Controller
 
             if (!$absensi) {
                 // CASE: CHECK-IN
+                // Cek Rentang Jam Scan Masuk
+                if (!$shift->isInCheckInWindow($now->format('H:i:s'))) {
+                    DB::rollBack();
+                    $windowStr = ($shift->awal_absen_masuk && $shift->akhir_absen_masuk)
+                        ? \Carbon\Carbon::parse($shift->awal_absen_masuk)->format('H:i') . '-' . \Carbon\Carbon::parse($shift->akhir_absen_masuk)->format('H:i')
+                        : '';
+                    $this->logRequest($apiKey, 'scan_rejected', $uid, false, "Di luar jam absen masuk ({$windowStr}): {$teacher->nama}");
+                    return $this->response(false, 'gagal', 'Di luar jam absen masuk.', 'warning', [
+                        'type' => 'outside_checkin_window',
+                        'nama' => $teacher->nama,
+                        'window' => $windowStr
+                    ]);
+                }
+
+                $shiftId = $shift->id;
+                $status = 'Hadir';
+                $statusKehadiran = 'tepat_waktu';
+                $menitTerlambat = 0;
+                $keterangan = null;
+
+                if ($shift->isLate($now->format('H:i:s'))) {
+                    $status = 'Terlambat';
+                    $statusKehadiran = 'terlambat';
+                    $menitTerlambat = $shift->calculateLateMinutes($now->format('H:i:s'));
+                    $keterangan = "Terlambat {$menitTerlambat} m ({$shift->nama_shift})";
+                } else {
+                    $status = 'Hadir';
+                    $statusKehadiran = 'tepat_waktu';
+                    $keterangan = "Tepat Waktu ({$shift->nama_shift})";
+                }
+
                 \App\Models\AbsensiGuru::create([
                     'guru_id' => $teacher->id,
                     'school_id' => $device->school_id, // Scope
                     'jadwal_pelajaran_id' => null, // Daily
+                    'shift_id' => $shiftId,
                     'tanggal' => $today,
                     'jam_masuk' => $now->toTimeString(),
                     'waktu_hadir' => $now, // Legacy field
-                    'status' => 'Hadir', // Default Hadir
-                    'keterangan' => null
+                    'menit_terlambat' => $menitTerlambat,
+                    'status' => $status,
+                    'status_kehadiran' => $statusKehadiran,
+                    'keterangan' => $keterangan,
+                    'created_at' => $now
                 ]);
 
                 DB::commit();
 
                 // Send WA Check-in
                 try {
-                    $this->wa->sendCheckIn($teacher->nama, $teacher->no_wa, $now->format('H:i'), 'Hadir', $device->school_id, '-', null, '-');
+                    $this->wa->sendCheckIn($teacher->nama, $teacher->no_wa, $now->format('H:i'), $status, $device->school_id, $keterangan, null, '-');
                 } catch (\Exception $e) {
                     Log::error("WA Guru Checkin Error: " . $e->getMessage());
                 }
 
-                $this->logRequest($apiKey, 'checkin_success', $uid, true, 'Guru Masuk: ' . $teacher->nama);
-                return $this->response(true, 'success', "Selamat Pagi, {$teacher->nama}.", 'ok', [
+                $msgLog = "Guru Masuk: {$teacher->nama} ({$shift->nama_shift} - {$status})";
+                $this->logRequest($apiKey, 'checkin_success', $uid, true, $msgLog);
+
+                $respMsg = $status === 'Terlambat'
+                    ? "Masuk ({$status}): {$teacher->nama} (+{$menitTerlambat}m)"
+                    : "Selamat Pagi, {$teacher->nama}.";
+
+                return $this->response(true, 'success', $respMsg, 'ok', [
                     'type' => 'absen_masuk_guru',
                     'nama' => $teacher->nama,
+                    'shift' => $shift->nama_shift,
+                    'status' => $status,
+                    'menit_terlambat' => $menitTerlambat,
                     'jam' => $now->format('H:i')
                 ]);
 
@@ -159,12 +214,24 @@ class RfidController extends Controller
                     ]);
                 }
 
+                // Cek Rentang Jam Scan Pulang
+                if (!$shift->isInCheckOutWindow($now->format('H:i:s'))) {
+                    DB::rollBack();
+                    $windowStr = ($shift->awal_absen_pulang && $shift->akhir_absen_pulang)
+                        ? \Carbon\Carbon::parse($shift->awal_absen_pulang)->format('H:i') . '-' . \Carbon\Carbon::parse($shift->akhir_absen_pulang)->format('H:i')
+                        : '';
+                    $this->logRequest($apiKey, 'scan_rejected', $uid, false, "Di luar jam absen pulang ({$windowStr}): {$teacher->nama}");
+                    return $this->response(false, 'gagal', 'Di luar jam absen pulang.', 'warning', [
+                        'type' => 'outside_checkout_window',
+                        'nama' => $teacher->nama,
+                        'window' => $windowStr
+                    ]);
+                }
+
                 // Teacher Check-Out is ENABLED
                 // Require Gate Session to check out
                 $gateSession = TeacherCheckoutSession::where('expires_at', '>', $now)
                     ->where('status', 'open')
-                    // It doesn't strictly need school_id if TeacherCheckoutSession doesn't have it, but gate cards are scoped implicitly
-                    // We assume any open gate session is valid. (Ideally add school_id to session, but keeping it simple)
                     ->orderBy('created_at', 'desc')
                     ->first();
 

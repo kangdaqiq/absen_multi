@@ -97,6 +97,13 @@ class MenuHelper
             if (in_array($role, ['admin', 'teacher']) && !$isPesantren) {
                 $absensiSubItems[] = ['name' => "Rekap $labelKaryawan", 'path' => route('rekap-guru.index', [], false)];
             }
+            if (in_array($role, ['admin', 'teacher']) && !$isPesantren) {
+                if (!$isOffice) {
+                    $absensiSubItems[] = ['name' => 'Jam Masuk Siswa', 'path' => route('jadwal.index', [], false)];
+                }
+                $absensiSubItems[] = ['name' => "Shift $labelKaryawan", 'path' => route('shifts.index', [], false)];
+                $absensiSubItems[] = ['name' => "Plotting Shift $labelKaryawan", 'path' => route('shifts.mapping', [], false)];
+            }
 
             $kehadiranItems = [
                 [
@@ -154,9 +161,6 @@ class MenuHelper
             }
 
             $pengaturanSubItems = [];
-            if (!$isPesantren) {
-                $pengaturanSubItems[] = ['name' => 'Jam Masuk/Pulang', 'path' => route('jadwal.index', [], false)];
-            }
             $pengaturanSubItems[] = ['name' => 'Device / Mesin', 'path' => route('devices.index', [], false)];
             $pengaturanSubItems[] = ['name' => 'Pengaturan Umum', 'path' => route('settings.index', [], false)];
             if ($school && $school->wa_enabled) {

@@ -14,23 +14,33 @@ class RekapGuruExport implements FromCollection, WithHeadings, WithMapping, With
     protected $startDate;
     protected $endDate;
     protected $guruId;
+    protected $shiftId;
 
-    public function __construct($startDate, $endDate, $guruId = null)
+    public function __construct($startDate, $endDate, $guruId = null, $shiftId = null)
     {
         $this->startDate = $startDate;
         $this->endDate = $endDate;
         $this->guruId = $guruId;
+        $this->shiftId = $shiftId;
     }
 
     public function collection()
     {
-        $query = AbsensiGuru::with(['guru', 'jadwal.mapel', 'jadwal.kelas'])
+        $query = AbsensiGuru::with(['guru', 'shift', 'jadwal.mapel', 'jadwal.kelas'])
             ->whereBetween('tanggal', [$this->startDate, $this->endDate])
             ->orderBy('tanggal', 'asc')
-            ->orderBy('waktu_hadir', 'asc');
+            ->orderBy('jam_masuk', 'asc');
 
         if ($this->guruId) {
             $query->where('guru_id', $this->guruId);
+        }
+
+        if ($this->shiftId) {
+            $query->where('shift_id', $this->shiftId);
+        }
+
+        if (auth()->user() && !auth()->user()->isSuperAdmin()) {
+            $query->where('school_id', auth()->user()->school_id);
         }
 
         return $query->get();
@@ -40,33 +50,30 @@ class RekapGuruExport implements FromCollection, WithHeadings, WithMapping, With
     {
         return [
             'Tanggal',
-            'Guru',
-            'Mata Pelajaran',
-            'Kelas',
-            'Jam Mengajar',
+            'Nama Guru / Staff',
+            'NIP',
+            'Shift',
             'Status',
-            'Waktu Hadir',
+            'Jam Masuk',
+            'Jam Pulang',
+            'Terlambat (Menit)',
             'Keterangan'
         ];
     }
 
     public function map($absensi): array
     {
-        $jamMengajar = '-';
-        if ($absensi->jadwal) {
-            $jamMulai = substr($absensi->jadwal->jam_mulai, 0, 5);
-            $jamSelesai = substr($absensi->jadwal->jam_selesai, 0, 5);
-            $jamMengajar = "{$jamMulai} - {$jamSelesai}";
-        }
+        $shiftName = $absensi->shift ? $absensi->shift->nama_shift : '-';
 
         return [
             \Carbon\Carbon::parse($absensi->tanggal)->format('d/m/Y'),
             $absensi->guru->nama ?? '-',
-            $absensi->jadwal->mapel->nama_mapel ?? '-',
-            $absensi->jadwal->kelas->nama_kelas ?? '-',
-            $jamMengajar,
+            $absensi->guru->nip ?? '-',
+            $shiftName,
             $absensi->status,
-            $absensi->waktu_hadir ? \Carbon\Carbon::parse($absensi->waktu_hadir)->format('H:i') : '-',
+            $absensi->jam_masuk ? \Carbon\Carbon::parse($absensi->jam_masuk)->format('H:i') : '-',
+            $absensi->jam_pulang ? \Carbon\Carbon::parse($absensi->jam_pulang)->format('H:i') : '-',
+            $absensi->menit_terlambat > 0 ? $absensi->menit_terlambat : '0',
             $absensi->keterangan ?? '-'
         ];
     }

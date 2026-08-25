@@ -7,51 +7,63 @@
     <style>
         body {
             font-family: Arial, sans-serif;
-            font-size: 11px;
+            font-size: 10px;
         }
 
         table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 20px;
+            margin-top: 15px;
         }
 
         th,
         td {
-            border: 1px solid #000;
-            padding: 5px;
+            border: 1px solid #333;
+            padding: 4px 6px;
             text-align: left;
         }
 
         th {
-            background-color: #f0f0f0;
+            background-color: #f2f2f2;
             font-weight: bold;
+            text-align: center;
         }
 
         .header {
             text-align: center;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
         }
 
         .stats {
-            margin: 15px 0;
-            padding: 10px;
+            margin: 10px 0;
+            padding: 8px;
             background-color: #f9f9f9;
             border: 1px solid #ddd;
+            font-size: 10px;
         }
 
         .badge-success {
             background-color: #28a745;
             color: white;
-            padding: 2px 6px;
+            padding: 2px 5px;
             border-radius: 3px;
+            font-size: 9px;
+        }
+
+        .badge-warning {
+            background-color: #ffc107;
+            color: #000;
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-size: 9px;
         }
 
         .badge-danger {
             background-color: #dc3545;
             color: white;
-            padding: 2px 6px;
+            padding: 2px 5px;
             border-radius: 3px;
+            font-size: 9px;
         }
     </style>
 </head>
@@ -73,67 +85,67 @@
         @endphp
 
         @if($kopPath && file_exists($kopPath))
-            <img src="{{ $kopPath }}" style="width: 100%; max-height: 120px; object-fit: contain; margin-bottom: 10px;">
+            <img src="{{ $kopPath }}" style="width: 100%; max-height: 100px; object-fit: contain; margin-bottom: 8px;">
         @else
-            <h2>{{ $schoolName ?? 'SMK Negeri Contoh' }}</h2>
-            <p>{{ $schoolAddress ?? 'Alamat Sekolah Belum Diatur' }}</p>
+            <h2 style="margin: 0 0 5px 0;">{{ $schoolName ?? 'Sistem Absensi' }}</h2>
+            <p style="margin: 0 0 5px 0;">{{ $schoolAddress ?? 'Laporan Kehadiran Guru & Staff' }}</p>
             <hr>
         @endif
-        <h3>REKAP ABSENSI GURU</h3>
-        <p>Periode: {{ \Carbon\Carbon::parse($startDate)->format('d/m/Y') }} -
-            {{ \Carbon\Carbon::parse($endDate)->format('d/m/Y') }}</p>
+        <h3 style="margin: 5px 0;">REKAPITULASI ABSENSI GURU & STAFF</h3>
+        <p style="margin: 0;">Periode: {{ \Carbon\Carbon::parse($startDate)->format('d/m/Y') }} s/d {{ \Carbon\Carbon::parse($endDate)->format('d/m/Y') }}</p>
     </div>
 
     <div class="stats">
-        <strong>Statistik:</strong>
-        Total: {{ $stats['total'] }} |
-        Hadir: {{ $stats['hadir'] }} |
-        Tidak Hadir: {{ $stats['tidak_hadir'] }}
+        <strong>Ringkasan:</strong>
+        Total: <b>{{ $stats['total'] }}</b> |
+        Hadir (Tepat Waktu): <b>{{ $stats['hadir'] }}</b> |
+        Terlambat: <b>{{ $stats['terlambat'] ?? 0 }}</b> |
+        Tidak Hadir / Alpha: <b>{{ $stats['tidak_hadir'] }}</b>
     </div>
 
     <table>
         <thead>
             <tr>
-                <th width="5%">No</th>
+                <th width="4%">No</th>
                 <th width="10%">Tanggal</th>
-                <th width="20%">Guru</th>
-                <th width="20%">Mata Pelajaran</th>
-                <th width="15%">Kelas</th>
-                <th width="15%">Jam Mengajar</th>
+                <th width="20%">Nama Guru / Staff</th>
+                <th width="12%">NIP</th>
+                <th width="14%">Shift</th>
                 <th width="10%">Status</th>
-                <th width="10%">Waktu Hadir</th>
+                <th width="8%">Jam Masuk</th>
+                <th width="8%">Jam Pulang</th>
+                <th width="14%">Keterangan</th>
             </tr>
         </thead>
         <tbody>
             @foreach($absensi as $a)
                 <tr>
-                    <td>{{ $loop->iteration }}</td>
-                    <td>{{ \Carbon\Carbon::parse($a->tanggal)->format('d/m/Y') }}</td>
-                    <td>{{ $a->guru->nama ?? '-' }}</td>
-                    <td>{{ $a->jadwal->mapel->nama_mapel ?? '-' }}</td>
-                    <td>{{ $a->jadwal->kelas->nama_kelas ?? '-' }}</td>
-                    <td>
-                        @if($a->jadwal)
-                            {{ substr($a->jadwal->jam_mulai, 0, 5) }} - {{ substr($a->jadwal->jam_selesai, 0, 5) }}
-                        @else
-                            -
-                        @endif
-                    </td>
-                    <td>
+                    <td align="center">{{ $loop->iteration }}</td>
+                    <td align="center">{{ \Carbon\Carbon::parse($a->tanggal)->format('d/m/Y') }}</td>
+                    <td><b>{{ $a->guru->nama ?? '-' }}</b></td>
+                    <td align="center">{{ $a->guru->nip ?? '-' }}</td>
+                    <td align="center">{{ $a->shift ? $a->shift->nama_shift : '-' }}</td>
+                    <td align="center">
                         @if($a->status == 'Hadir')
                             <span class="badge-success">Hadir</span>
+                        @elseif($a->status == 'Terlambat')
+                            <span class="badge-warning">Terlambat ({{ $a->menit_terlambat }}m)</span>
+                        @elseif(in_array($a->status, ['Izin', 'Sakit']))
+                            <span class="badge-warning">{{ $a->status }}</span>
                         @else
-                            <span class="badge-danger">Tidak Hadir</span>
+                            <span class="badge-danger">{{ $a->status }}</span>
                         @endif
                     </td>
-                    <td>{{ $a->waktu_hadir ? \Carbon\Carbon::parse($a->waktu_hadir)->format('H:i') : '-' }}</td>
+                    <td align="center">{{ $a->jam_masuk ? \Carbon\Carbon::parse($a->jam_masuk)->format('H:i') : '-' }}</td>
+                    <td align="center">{{ $a->jam_pulang ? \Carbon\Carbon::parse($a->jam_pulang)->format('H:i') : '-' }}</td>
+                    <td>{{ $a->keterangan ?? '-' }}</td>
                 </tr>
             @endforeach
         </tbody>
     </table>
 
-    <div style="margin-top: 30px; font-size: 10px; color: #666;">
-        <p>Dicetak pada: {{ now()->format('d/m/Y H:i') }}</p>
+    <div style="margin-top: 25px; font-size: 9px; color: #666;">
+        <p>Dicetak pada: {{ now()->format('d/m/Y H:i:s') }}</p>
     </div>
 </body>
 

@@ -607,6 +607,25 @@ return $this->response(false, 'gagal', 'Enroll Timeout / No Request');
                 DB::beginTransaction();
                 $today = $now->format('Y-m-d');
 
+                // 0. CEK SHIFT GURU (Wajib memiliki shift aktif hari ini)
+                $shift = $guru->getShiftForDate($now);
+                if (!$shift) {
+                    DB::rollBack();
+                    ApiLog::create([
+                        'school_id' => $this->currentSchoolId,
+                        'api_key' => $this->currentApiKey,
+                        'action' => 'scan_rejected',
+                        'uid' => $fingerId,
+                        'success' => false,
+                        'message' => 'Guru Tanpa Shift: ' . $guru->nama,
+                        'created_at' => $now
+                    ]);
+                    return $this->response(false, 'gagal', 'Tidak ada jadwal shift.', 'error', [
+                        'type' => 'no_shift',
+                        'nama' => $guru->nama
+                    ]);
+                }
+
                 // ABSENSI HARIAN (Daily)
                 $absensi = \App\Models\AbsensiGuru::where('guru_id', $guru->id)
                     ->where('tanggal', $today)
@@ -617,15 +636,57 @@ return $this->response(false, 'gagal', 'Enroll Timeout / No Request');
 
                 if (!$absensi) {
                     // CASE: CHECK-IN
+                    // Cek Rentang Jam Scan Masuk
+                    if (!$shift->isInCheckInWindow($now->format('H:i:s'))) {
+                        DB::rollBack();
+                        $windowStr = ($shift->awal_absen_masuk && $shift->akhir_absen_masuk)
+                            ? \Carbon\Carbon::parse($shift->awal_absen_masuk)->format('H:i') . '-' . \Carbon\Carbon::parse($shift->akhir_absen_masuk)->format('H:i')
+                            : '';
+                        ApiLog::create([
+                            'school_id' => $this->currentSchoolId,
+                            'api_key' => $this->currentApiKey,
+                            'action' => 'scan_rejected',
+                            'uid' => $fingerId,
+                            'success' => false,
+                            'message' => "Di luar jam absen masuk ({$windowStr}): {$guru->nama}",
+                            'created_at' => $now
+                        ]);
+                        return $this->response(false, 'gagal', 'Di luar jam absen masuk.', 'warning', [
+                            'type' => 'outside_checkin_window',
+                            'nama' => $guru->nama,
+                            'window' => $windowStr
+                        ]);
+                    }
+
+                    $shiftId = $shift->id;
+                    $status = 'Hadir';
+                    $statusKehadiran = 'tepat_waktu';
+                    $menitTerlambat = 0;
+                    $keterangan = null;
+
+                    if ($shift->isLate($now->format('H:i:s'))) {
+                        $status = 'Terlambat';
+                        $statusKehadiran = 'terlambat';
+                        $menitTerlambat = $shift->calculateLateMinutes($now->format('H:i:s'));
+                        $keterangan = "Terlambat {$menitTerlambat} m ({$shift->nama_shift})";
+                    } else {
+                        $status = 'Hadir';
+                        $statusKehadiran = 'tepat_waktu';
+                        $keterangan = "Tepat Waktu ({$shift->nama_shift})";
+                    }
+
                     \App\Models\AbsensiGuru::create([
                         'guru_id' => $guru->id,
                         'school_id' => $device->school_id, // Scope
                         'jadwal_pelajaran_id' => null, // Daily
+                        'shift_id' => $shiftId,
                         'tanggal' => $today,
                         'jam_masuk' => $now->toTimeString(),
                         'waktu_hadir' => $now, // Legacy field
-                        'status' => 'Hadir', // Default Hadir
-                        'keterangan' => null,
+                        'menit_terlambat' => $menitTerlambat,
+                        'status' => $status,
+                        'status_kehadiran' => $statusKehadiran,
+                        'keterangan' => $keterangan,
                         'created_at' => $now
                     ]);
 
@@ -633,31 +694,39 @@ return $this->response(false, 'gagal', 'Enroll Timeout / No Request');
 
                     // Send WA Check-in
                     try {
-                        $this->wa->sendCheckIn($guru->nama, $guru->no_wa, $now->format('H:i'), 'Hadir', $device->school_id, '-', null, '-');
+                        $this->wa->sendCheckIn($guru->nama, $guru->no_wa, $now->format('H:i'), $status, $device->school_id, $keterangan, null, '-');
                     } catch (\Exception $e) {
                         Log::error("WA Guru Checkin Error: " . $e->getMessage());
                     }
 
                     // Send Telegram Check-in
                     try {
-                        $this->telegram->sendCheckIn($guru->nama, $guru->telegram_chat_id, $now->format('H:i'), 'Hadir', $device->school_id, '-', null, '-');
+                        $this->telegram->sendCheckIn($guru->nama, $guru->telegram_chat_id, $now->format('H:i'), $status, $device->school_id, $keterangan, null, '-');
                     } catch (\Exception $e) {
                         Log::error("Telegram Guru Checkin Error: " . $e->getMessage());
                     }
 
+                    $msgLog = "Guru Masuk: {$guru->nama} ({$shift->nama_shift} - {$status})";
                     ApiLog::create([
                         'school_id' => $this->currentSchoolId,
                         'api_key' => $this->currentApiKey,
                         'action' => 'checkin_success',
                         'uid' => $fingerId,
                         'success' => true,
-                        'message' => 'Guru Masuk: ' . $guru->nama,
+                        'message' => $msgLog,
                         'created_at' => $now
                     ]);
 
-                    return $this->response(true, 'success', "Selamat Pagi, {$guru->nama}.", 'ok', [
+                    $respMsg = $status === 'Terlambat'
+                        ? "Masuk ({$status}): {$guru->nama} (+{$menitTerlambat}m)"
+                        : "Selamat Pagi, {$guru->nama}.";
+
+                    return $this->response(true, 'success', $respMsg, 'ok', [
                         'type' => 'absen_masuk_guru',
                         'nama' => $guru->nama,
+                        'shift' => $shift->nama_shift,
+                        'status' => $status,
+                        'menit_terlambat' => $menitTerlambat,
                         'jam' => $now->format('H:i')
                     ]);
 
@@ -681,6 +750,28 @@ return $this->response(false, 'gagal', 'Enroll Timeout / No Request');
                         return $this->response(true, 'success', "Sudah Absen Masuk.", 'ok', [
                             'type' => 'absen_sudah_masuk_guru',
                             'nama' => $guru->nama
+                        ]);
+                    }
+
+                    // Cek Rentang Jam Scan Pulang
+                    if (!$shift->isInCheckOutWindow($now->format('H:i:s'))) {
+                        DB::rollBack();
+                        $windowStr = ($shift->awal_absen_pulang && $shift->akhir_absen_pulang)
+                            ? \Carbon\Carbon::parse($shift->awal_absen_pulang)->format('H:i') . '-' . \Carbon\Carbon::parse($shift->akhir_absen_pulang)->format('H:i')
+                            : '';
+                        ApiLog::create([
+                            'school_id' => $this->currentSchoolId,
+                            'api_key' => $this->currentApiKey,
+                            'action' => 'scan_rejected',
+                            'uid' => $fingerId,
+                            'success' => false,
+                            'message' => "Di luar jam absen pulang ({$windowStr}): {$guru->nama}",
+                            'created_at' => $now
+                        ]);
+                        return $this->response(false, 'gagal', 'Di luar jam absen pulang.', 'warning', [
+                            'type' => 'outside_checkout_window',
+                            'nama' => $guru->nama,
+                            'window' => $windowStr
                         ]);
                     }
 

@@ -14,12 +14,15 @@ class AbsensiGuru extends Model
     protected $fillable = [
         'guru_id',
         'jadwal_pelajaran_id', // Nullable for daily
+        'shift_id',
         'school_id',
         'tanggal',
         'waktu_hadir', // Keep for backward compatibility or use as created_at
         'jam_masuk',
         'jam_pulang',
+        'menit_terlambat',
         'status',
+        'status_kehadiran',
         'keterangan'
     ];
 
@@ -31,5 +34,10 @@ class AbsensiGuru extends Model
     public function jadwal()
     {
         return $this->belongsTo(JadwalPelajaran::class, 'jadwal_pelajaran_id');
+    }
+
+    public function shift()
+    {
+        return $this->belongsTo(Shift::class, 'shift_id');
     }
 }

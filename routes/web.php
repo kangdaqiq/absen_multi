@@ -178,6 +178,16 @@ Route::middleware('auth')->group(function () {
         Route::post('/jadwal/update-all', [App\Http\Controllers\JadwalController::class, 'updateAll'])->name('jadwal.update-all');
         Route::resource('jadwal', App\Http\Controllers\JadwalController::class)->except(['create', 'show', 'edit']);
 
+        // Shifts & Plotting Jadwal Guru
+        Route::patch('shifts/{id}/toggle-active', [App\Http\Controllers\ShiftController::class, 'toggleActive'])->name('shifts.toggle-active');
+        Route::resource('shifts', App\Http\Controllers\ShiftController::class)->except(['create', 'show', 'edit']);
+        Route::get('shifts-mapping', [App\Http\Controllers\GuruShiftMappingController::class, 'index'])->name('shifts.mapping');
+        Route::post('shifts-mapping/assign', [App\Http\Controllers\GuruShiftMappingController::class, 'assignGurusToShift'])->name('shifts.mapping.assign');
+        Route::post('shifts-mapping/add-guru', [App\Http\Controllers\GuruShiftMappingController::class, 'addGuruToShift'])->name('shifts.mapping.add-guru');
+        Route::post('shifts-mapping/add-all', [App\Http\Controllers\GuruShiftMappingController::class, 'addAllGurusToShift'])->name('shifts.mapping.add-all');
+        Route::post('shifts-mapping/remove-guru', [App\Http\Controllers\GuruShiftMappingController::class, 'removeGuruFromShift'])->name('shifts.mapping.remove');
+        Route::post('shifts-mapping/bulk-unassigned', [App\Http\Controllers\GuruShiftMappingController::class, 'bulkAssignUnassigned'])->name('shifts.mapping.bulk-unassigned');
+
         // Kegiatan (Absensi Per Kegiatan)
         Route::get('kegiatan/absen', [App\Http\Controllers\KegiatanController::class, 'absen'])->name('kegiatan.absen');
         Route::post('kegiatan/absen/update', [App\Http\Controllers\KegiatanController::class, 'updateAttendance'])->name('kegiatan.absen.update');

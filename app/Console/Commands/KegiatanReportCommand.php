@@ -91,14 +91,20 @@ class KegiatanReportCommand extends Command
                 continue; // already reported today
             }
 
-            $this->info("Sending Activity Report for '{$kegiatan->nama_kegiatan}' in school {$school->name}...");
-
             // Fetch all attendance for this activity today
             $attendancesToday = KegiatanAttendance::where('school_id', $schoolId)
                 ->where('kegiatan_id', $kegiatan->id)
                 ->where('tanggal', $today)
                 ->get()
                 ->keyBy('student_id');
+
+            // Skip if no student attendance recorded today (assumed holiday / no activity)
+            if ($attendancesToday->isEmpty() && !$this->option('force')) {
+                $this->info("No attendance recorded for '{$kegiatan->nama_kegiatan}' in school {$school->name}. Assumed Holiday/Inactive. Skipped.");
+                continue;
+            }
+
+            $this->info("Sending Activity Report for '{$kegiatan->nama_kegiatan}' in school {$school->name}...");
 
             // 1. GLOBAL ACTIVITY REPORT
             $totalHadir = $attendancesToday->where('status', 'H')->count();

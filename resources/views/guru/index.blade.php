@@ -666,6 +666,9 @@
                             $('#enroll_finger_status').html('<span class="text-success-500 font-bold"><i class="fas fa-check-circle mr-1"></i> Berhasil! Menyegarkan...</span>');
 
                             setTimeout(function () { location.reload(); }, 1500);
+                        } else if (res.status === 'failed') {
+                            clearInterval(enrollFingerInterval);
+                            $('#enroll_finger_status').html('<span class="text-error-500 font-bold"><i class="fas fa-times-circle mr-1"></i> ' + (res.message || 'Pendaftaran Gagal. Coba lagi.') + '</span>');
                         }
                     });
                 }, 1500);

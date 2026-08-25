@@ -542,6 +542,16 @@ class SiswaController extends Controller
             return response()->json(['ok' => true, 'id_finger' => $siswa->id_finger, 'status' => 'done']);
         }
 
+        if ($siswa->enroll_finger_status === null) {
+            $lastLog = \App\Models\ApiLog::where('school_id', $siswa->school_id)
+                ->where('action', 'enroll_failed')
+                ->where('created_at', '>=', now()->subSeconds(45))
+                ->latest()
+                ->first();
+            $msg = $lastLog ? $lastLog->message : 'Pendaftaran sidik jari gagal / jari tidak cocok.';
+            return response()->json(['ok' => false, 'status' => 'failed', 'message' => $msg]);
+        }
+
         return response()->json(['ok' => true, 'id_finger' => null, 'status' => 'requested']);
     }
 

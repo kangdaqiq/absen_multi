@@ -224,9 +224,10 @@
                                         <div x-show="isOpen && filteredAvailable.length > 0" 
                                             x-cloak 
                                             @click.away="isOpen = false"
-                                            class="absolute left-0 right-0 top-full mt-1 max-h-52 overflow-y-auto rounded-xl border border-gray-200 bg-white shadow-2xl dark:border-gray-700 dark:bg-gray-900 z-50 divide-y divide-gray-100 dark:divide-gray-800">
+                                            class="absolute left-0 right-0 top-full mt-1 rounded-xl border border-gray-200 bg-white shadow-2xl dark:border-gray-700 dark:bg-gray-900 z-50 divide-y divide-gray-100 dark:divide-gray-800"
+                                            style="max-height: 240px; overflow-y: auto;">
                                             
-                                            <div class="p-2 bg-gray-50 dark:bg-gray-800/90 flex items-center justify-between text-[11px] text-gray-500 border-b border-gray-100 dark:border-gray-700 sticky top-0 z-10">
+                                            <div class="p-2 bg-gray-50 dark:bg-gray-800/95 flex items-center justify-between text-[11px] text-gray-500 border-b border-gray-100 dark:border-gray-700 sticky top-0 z-10">
                                                 <span>Klik guru untuk memasukkan:</span>
                                                 <button type="button" @click="filteredAvailable.forEach(t => selectTeacher(t))"
                                                     class="font-semibold text-brand-600 dark:text-brand-400 hover:underline">
@@ -284,7 +285,8 @@
                                 </div>
 
                                 <template x-if="assignedTeachers.length > 0">
-                                    <div class="max-h-72 overflow-y-auto rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-dark shadow-sm">
+                                    <div class="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-dark shadow-sm"
+                                        style="max-height: 280px; overflow-y: auto;">
                                         <table class="w-full table-auto text-left text-xs">
                                             <thead class="sticky top-0 bg-gray-50 dark:bg-gray-800/95 text-gray-600 dark:text-gray-300 font-semibold border-b border-gray-200 dark:border-gray-800 z-10">
                                                 <tr>

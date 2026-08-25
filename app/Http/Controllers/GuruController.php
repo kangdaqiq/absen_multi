@@ -304,10 +304,12 @@ class GuruController extends Controller
         $guru = Guru::findOrFail($id);
 
         if ($guru->enroll_finger_status === 'done' && $guru->id_finger) {
+            \Illuminate\Support\Facades\Cache::forget('enroll_stage_' . $guru->school_id);
             return response()->json(['ok' => true, 'id_finger' => $guru->id_finger, 'status' => 'done']);
         }
 
         if ($guru->enroll_finger_status === null) {
+            \Illuminate\Support\Facades\Cache::forget('enroll_stage_' . $guru->school_id);
             $lastLog = \App\Models\ApiLog::where('school_id', $guru->school_id)
                 ->where('action', 'enroll_failed')
                 ->where('created_at', '>=', now()->subSeconds(45))
@@ -317,7 +319,8 @@ class GuruController extends Controller
             return response()->json(['ok' => false, 'status' => 'failed', 'message' => $msg]);
         }
 
-        return response()->json(['ok' => true, 'id_finger' => null, 'status' => 'requested']);
+        $stage = \Illuminate\Support\Facades\Cache::get('enroll_stage_' . $guru->school_id, 'touch_1');
+        return response()->json(['ok' => true, 'id_finger' => null, 'status' => 'requested', 'stage' => $stage]);
     }
 
     public function deleteFingerId($id)

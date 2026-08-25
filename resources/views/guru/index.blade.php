@@ -655,10 +655,8 @@
                     }
 
                     // Update step guidance message
-                    updateStepMessage(counter);
-
                     $.get('{{ url('guru') }}/' + id + '/enroll-finger-check', function (res) {
-                        if (res.ok && res.id_finger) {
+                        if (res.ok && res.id_finger && res.status === 'done') {
                             clearInterval(enrollFingerInterval);
                             $('#enroll_finger_id').text(res.id_finger);
                             $('#finger_wrapper').removeClass('hidden');
@@ -669,6 +667,15 @@
                         } else if (res.status === 'failed') {
                             clearInterval(enrollFingerInterval);
                             $('#enroll_finger_status').html('<span class="text-error-500 font-bold"><i class="fas fa-times-circle mr-1"></i> ' + (res.message || 'Pendaftaran Gagal. Coba lagi.') + '</span>');
+                        } else if (res.status === 'requested') {
+                            // REAL-TIME HARDWARE STAGE
+                            if (res.stage === 'lift_finger') {
+                                $('#enroll_finger_status').html('<span class="text-warning-500 animate-pulse"><i class="fas fa-arrow-up mr-2"></i><b>Langkah 1 selesai!</b> Sekarang <u>angkat jari</u>...</span>');
+                            } else if (res.stage === 'touch_2') {
+                                $('#enroll_finger_status').html('<span class="text-brand-500 animate-pulse"><i class="fas fa-hand-point-up mr-2"></i><b>Langkah 2/2:</b> Tempelkan jari <b>sekali lagi</b>...</span>');
+                            } else {
+                                $('#enroll_finger_status').html('<span class="text-success-500 animate-pulse"><i class="fas fa-hand-point-up mr-2"></i><b>Langkah 1/2:</b> Tempelkan jari ke sensor...</span>');
+                            }
                         }
                     });
                 }, 1500);

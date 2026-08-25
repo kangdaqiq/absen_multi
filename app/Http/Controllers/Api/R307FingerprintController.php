@@ -84,6 +84,13 @@ return $this->response(false, 'gagal', 'API Key Invalid');
 $fingerId = $request->input('finger_id');
 $this->currentId = $fingerId;
 
+// Check for Enroll Stage Progress Update (Real-time hardware stage)
+if ($request->has('enroll_stage')) {
+    $stage = $request->input('enroll_stage');
+    \Illuminate\Support\Facades\Cache::put('enroll_stage_' . $device->school_id, $stage, 60);
+    return $this->response(true, 'ok', 'Stage updated');
+}
+
 // Check for Ping (Boot Notification)
 if ($request->has('ping')) {
 ApiLog::create([

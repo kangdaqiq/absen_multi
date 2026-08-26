@@ -10,6 +10,14 @@ class Guru extends Model
     public $timestamps = true;
     // timestamps enabled by default
     // const UPDATED_AT = null;  // Column does not exist in DB
+
+    protected static function booted()
+    {
+        static::deleting(function ($guru) {
+            $guru->fingerprints()->delete();
+        });
+    }
+
     protected $fillable = ['nama', 'nip', 'tgl_lahir', 'no_wa', 'bot_access', 'is_global_report', 'id_finger', 'uid_rfid', 'enroll_status', 'enroll_finger_status', 'created_at', 'updated_at', 'school_id', 'default_shift_id', 'user_id', 'telegram_chat_id', 'last_seen'];
 
     protected $casts = [

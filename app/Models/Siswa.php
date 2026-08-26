@@ -19,6 +19,13 @@ class Siswa extends Model
 
     public $timestamps = true;
 
+    protected static function booted()
+    {
+        static::deleting(function ($siswa) {
+            $siswa->fingerprints()->delete();
+        });
+    }
+
     protected $fillable = [
         'nama',
         'nis',

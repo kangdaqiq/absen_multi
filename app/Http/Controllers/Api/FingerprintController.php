@@ -273,35 +273,51 @@ private function finalizeEnrollment($fingerId, $device)
 {
 DB::beginTransaction();
 try {
-        // PRE-CHECK DUPLIKASI FINGER ID
+        // PRE-CHECK DUPLIKASI FINGER ID (Hanya cek jika pemilik sidik jari masih aktif di database)
         $conflictName = null;
         $conflictId = null;
         $conflictType = null;
         
-        $usedBySiswa = SiswaFingerprint::where('device_id', $device->id)->where('finger_id', $fingerId)->with('student')->first();
-        if ($usedBySiswa) {
+        $usedBySiswa = SiswaFingerprint::where('device_id', $device->id)
+            ->where('finger_id', $fingerId)
+            ->whereHas('student')
+            ->with('student')
+            ->latest('id')
+            ->first();
+        if ($usedBySiswa && $usedBySiswa->student) {
             $conflictName = $usedBySiswa->student->nama ?? 'Siswa Lain';
             $conflictId = $usedBySiswa->student_id;
             $conflictType = 'siswa';
         }
 
         if (!$conflictName) {
-            $usedByGuru = GuruFingerprint::where('device_id', $device->id)->where('finger_id', $fingerId)->with('guru')->first();
-            if ($usedByGuru) {
+            $usedByGuru = GuruFingerprint::where('device_id', $device->id)
+                ->where('finger_id', $fingerId)
+                ->whereHas('guru')
+                ->with('guru')
+                ->latest('id')
+                ->first();
+            if ($usedByGuru && $usedByGuru->guru) {
                 $conflictName = $usedByGuru->guru->nama ?? 'Guru Lain';
                 $conflictId = $usedByGuru->guru_id;
                 $conflictType = 'guru';
             }
         }
         if (!$conflictName) {
-            $usedByGate = GateCardFingerprint::where('device_id', $device->id)->where('finger_id', $fingerId)->with('gateCard')->first();
-            if ($usedByGate) {
+            $usedByGate = GateCardFingerprint::where('device_id', $device->id)
+                ->where('finger_id', $fingerId)
+                ->whereHas('gateCard')
+                ->with('gateCard')
+                ->latest('id')
+                ->first();
+            if ($usedByGate && $usedByGate->gateCard) {
                 $conflictName = $usedByGate->gateCard->name ?? 'Gerbang Lain';
                 $conflictId = $usedByGate->gate_card_id;
                 $conflictType = 'gate';
             }
         }
 
+        $schoolDeviceIds = Device::where('school_id', $device->school_id)->pluck('id')->toArray();
 
 // Check Guru first SCOPED
 $guru = Guru::where('enroll_finger_status', 'requested')
@@ -317,6 +333,11 @@ if ($guru) {
                 DB::commit();
                 return $this->response(false, 'gagal', "Ditolak: ID telah dipakai oleh $conflictName");
             }
+
+// Bersihkan template lama yang mungkin masih ada pada slot finger_id ini di seluruh device sekolah
+GuruFingerprint::whereIn('device_id', $schoolDeviceIds)->where('finger_id', $fingerId)->where('guru_id', '!=', $guru->id)->delete();
+SiswaFingerprint::whereIn('device_id', $schoolDeviceIds)->where('finger_id', $fingerId)->delete();
+GateCardFingerprint::whereIn('device_id', $schoolDeviceIds)->where('finger_id', $fingerId)->delete();
 
 GuruFingerprint::updateOrCreate(
 ['guru_id' => $guru->id, 'device_id' => $device->id, 'finger_id' => $fingerId],
@@ -363,6 +384,11 @@ if ($siswa) {
                 return $this->response(false, 'gagal', "Ditolak: ID telah dipakai oleh $conflictName");
             }
 
+// Bersihkan template lama yang mungkin masih ada pada slot finger_id ini di seluruh device sekolah
+SiswaFingerprint::whereIn('device_id', $schoolDeviceIds)->where('finger_id', $fingerId)->where('student_id', '!=', $siswa->id)->delete();
+GuruFingerprint::whereIn('device_id', $schoolDeviceIds)->where('finger_id', $fingerId)->delete();
+GateCardFingerprint::whereIn('device_id', $schoolDeviceIds)->where('finger_id', $fingerId)->delete();
+
 SiswaFingerprint::updateOrCreate(
 ['student_id' => $siswa->id, 'device_id' => $device->id, 'finger_id' => $fingerId],
 ['created_at' => now()]
@@ -407,6 +433,11 @@ return $this->response(true, 'success', 'Enroll Berhasil (Siswa): ' . $siswa->na
                 DB::commit();
                 return $this->response(false, 'gagal', "Ditolak: ID telah dipakai oleh $conflictName");
             }
+
+            // Bersihkan template lama yang mungkin masih ada pada slot finger_id ini di seluruh device sekolah
+            GateCardFingerprint::whereIn('device_id', $schoolDeviceIds)->where('finger_id', $fingerId)->where('gate_card_id', '!=', $gate->id)->delete();
+            GuruFingerprint::whereIn('device_id', $schoolDeviceIds)->where('finger_id', $fingerId)->delete();
+            SiswaFingerprint::whereIn('device_id', $schoolDeviceIds)->where('finger_id', $fingerId)->delete();
 
             GateCardFingerprint::updateOrCreate(
                 ['gate_card_id' => $gate->id, 'device_id' => $device->id, 'finger_id' => $fingerId],

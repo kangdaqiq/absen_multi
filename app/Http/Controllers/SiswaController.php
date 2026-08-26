@@ -598,7 +598,11 @@ class SiswaController extends Controller
             $query->where('school_id', auth()->user()->school_id);
         }
         
-        $count = $query->delete();
+        $targetIds = $query->pluck('id')->toArray();
+        if (!empty($targetIds)) {
+            SiswaFingerprint::whereIn('student_id', $targetIds)->delete();
+        }
+        $count = Siswa::whereIn('id', $targetIds)->delete();
 
         return response()->json([
             'success' => true,

@@ -11,6 +11,13 @@ class GateCard extends Model
 
     protected $table = 'gate_cards';
 
+    protected static function booted()
+    {
+        static::deleting(function ($gateCard) {
+            $gateCard->fingerprints()->delete();
+        });
+    }
+
     protected $fillable = [
         'school_id',
         'guru_id',

@@ -282,35 +282,51 @@ private function finalizeEnrollment($fingerId, $device)
 $templateData = request()->input('template_data');
 DB::beginTransaction();
 try {
-        // PRE-CHECK DUPLIKASI FINGER ID
+        // PRE-CHECK DUPLIKASI FINGER ID (Hanya cek jika pemilik sidik jari masih aktif di database)
         $conflictName = null;
         $conflictId = null;
         $conflictType = null;
         
-        $usedBySiswa = SiswaFingerprint::where('device_id', $device->id)->where('finger_id', $fingerId)->with('student')->first();
-        if ($usedBySiswa) {
+        $usedBySiswa = SiswaFingerprint::where('device_id', $device->id)
+            ->where('finger_id', $fingerId)
+            ->whereHas('student')
+            ->with('student')
+            ->latest('id')
+            ->first();
+        if ($usedBySiswa && $usedBySiswa->student) {
             $conflictName = $usedBySiswa->student->nama ?? 'Siswa Lain';
             $conflictId = $usedBySiswa->student_id;
             $conflictType = 'siswa';
         }
 
         if (!$conflictName) {
-            $usedByGuru = GuruFingerprint::where('device_id', $device->id)->where('finger_id', $fingerId)->with('guru')->first();
-            if ($usedByGuru) {
+            $usedByGuru = GuruFingerprint::where('device_id', $device->id)
+                ->where('finger_id', $fingerId)
+                ->whereHas('guru')
+                ->with('guru')
+                ->latest('id')
+                ->first();
+            if ($usedByGuru && $usedByGuru->guru) {
                 $conflictName = $usedByGuru->guru->nama ?? 'Guru Lain';
                 $conflictId = $usedByGuru->guru_id;
                 $conflictType = 'guru';
             }
         }
         if (!$conflictName) {
-            $usedByGate = GateCardFingerprint::where('device_id', $device->id)->where('finger_id', $fingerId)->with('gateCard')->first();
-            if ($usedByGate) {
+            $usedByGate = GateCardFingerprint::where('device_id', $device->id)
+                ->where('finger_id', $fingerId)
+                ->whereHas('gateCard')
+                ->with('gateCard')
+                ->latest('id')
+                ->first();
+            if ($usedByGate && $usedByGate->gateCard) {
                 $conflictName = $usedByGate->gateCard->name ?? 'Gerbang Lain';
                 $conflictId = $usedByGate->gate_card_id;
                 $conflictType = 'gate';
             }
         }
 
+        $schoolDeviceIds = Device::where('school_id', $device->school_id)->pluck('id')->toArray();
 
 // Check Guru first SCOPED
 $guru = Guru::where('enroll_finger_status', 'requested')
@@ -335,6 +351,11 @@ if ($guru) {
             ]);
             return $this->response(false, 'gagal', "Ditolak: Sidik jari sudah terdaftar atas nama $conflictName (ID #$fingerId)");
         }
+
+// Bersihkan template lama yang mungkin masih ada pada slot finger_id ini di seluruh device sekolah
+GuruFingerprint::whereIn('device_id', $schoolDeviceIds)->where('finger_id', $fingerId)->where('guru_id', '!=', $guru->id)->delete();
+SiswaFingerprint::whereIn('device_id', $schoolDeviceIds)->where('finger_id', $fingerId)->delete();
+GateCardFingerprint::whereIn('device_id', $schoolDeviceIds)->where('finger_id', $fingerId)->delete();
 
 GuruFingerprint::updateOrCreate(
     ['guru_id' => $guru->id, 'device_id' => $device->id, 'finger_id' => $fingerId],
@@ -390,6 +411,11 @@ if ($siswa) {
             return $this->response(false, 'gagal', "Ditolak: Sidik jari sudah terdaftar atas nama $conflictName (ID #$fingerId)");
         }
 
+// Bersihkan template lama yang mungkin masih ada pada slot finger_id ini di seluruh device sekolah
+SiswaFingerprint::whereIn('device_id', $schoolDeviceIds)->where('finger_id', $fingerId)->where('student_id', '!=', $siswa->id)->delete();
+GuruFingerprint::whereIn('device_id', $schoolDeviceIds)->where('finger_id', $fingerId)->delete();
+GateCardFingerprint::whereIn('device_id', $schoolDeviceIds)->where('finger_id', $fingerId)->delete();
+
 SiswaFingerprint::updateOrCreate(
     ['student_id' => $siswa->id, 'device_id' => $device->id, 'finger_id' => $fingerId],
     ['template_data' => $templateData, 'created_at' => now()]
@@ -429,11 +455,20 @@ return $this->response(true, 'success', 'Enroll Berhasil (Siswa): ' . $siswa->na
             ->first();
 
         if ($gate) {
-            // Auto-reuse existing finger ID slot
+            if ($conflictName && ($conflictType !== 'gate' || $conflictId != $gate->id)) {
+                $gate->update(['enroll_finger_status' => null]);
+                DB::commit();
+                return $this->response(false, 'gagal', "Ditolak: ID telah dipakai oleh $conflictName");
+            }
+
+            // Bersihkan template lama yang mungkin masih ada pada slot finger_id ini di seluruh device sekolah
+            GateCardFingerprint::whereIn('device_id', $schoolDeviceIds)->where('finger_id', $fingerId)->where('gate_card_id', '!=', $gate->id)->delete();
+            GuruFingerprint::whereIn('device_id', $schoolDeviceIds)->where('finger_id', $fingerId)->delete();
+            SiswaFingerprint::whereIn('device_id', $schoolDeviceIds)->where('finger_id', $fingerId)->delete();
 
             GateCardFingerprint::updateOrCreate(
                 ['gate_card_id' => $gate->id, 'device_id' => $device->id, 'finger_id' => $fingerId],
-                ['created_at' => now()]
+                ['template_data' => $templateData, 'created_at' => now()]
             );
 
             $gate->update([
@@ -1217,24 +1252,27 @@ return response()->json(array_merge([
         $schoolId = $device->school_id;
         $schoolDeviceIds = Device::where('school_id', $schoolId)->pluck('id')->toArray();
 
-        // Ambil sidik jari siswa di sekolah ini yang memiliki template
+        // Ambil sidik jari siswa di sekolah ini yang memiliki template dan siswanya masih aktif
         $siswaFingers = SiswaFingerprint::whereIn('device_id', $schoolDeviceIds)
             ->whereNotNull('template_data')
             ->where('template_data', '!=', '')
+            ->whereHas('student')
             ->pluck('finger_id')
             ->toArray();
 
-        // Ambil sidik jari guru di sekolah ini yang memiliki template
+        // Ambil sidik jari guru di sekolah ini yang memiliki template dan gurunya masih aktif
         $guruFingers = GuruFingerprint::whereIn('device_id', $schoolDeviceIds)
             ->whereNotNull('template_data')
             ->where('template_data', '!=', '')
+            ->whereHas('guru')
             ->pluck('finger_id')
             ->toArray();
 
-        // Ambil sidik jari gerbang di sekolah ini yang memiliki template
+        // Ambil sidik jari gerbang di sekolah ini yang memiliki template dan kartunya masih aktif
         $gateFingers = GateCardFingerprint::whereIn('device_id', $schoolDeviceIds)
             ->whereNotNull('template_data')
             ->where('template_data', '!=', '')
+            ->whereHas('gateCard')
             ->pluck('finger_id')
             ->toArray();
 
@@ -1263,13 +1301,15 @@ return response()->json(array_merge([
 
         $schoolDeviceIds = Device::where('school_id', $device->school_id)->pluck('id')->toArray();
 
-        // Cari di Siswa
+        // Cari di Siswa (hanya siswa aktif, ambil template terbaru)
         $siswaFp = SiswaFingerprint::whereIn('device_id', $schoolDeviceIds)
             ->where('finger_id', $fingerId)
+            ->whereHas('student')
             ->with('student')
+            ->latest('id')
             ->first();
 
-        if ($siswaFp && !empty($siswaFp->template_data)) {
+        if ($siswaFp && !empty($siswaFp->template_data) && $siswaFp->student) {
             return response()->json([
                 'ok' => true,
                 'finger_id' => $fingerId,
@@ -1279,13 +1319,15 @@ return response()->json(array_merge([
             ]);
         }
 
-        // Cari di Guru
+        // Cari di Guru (hanya guru aktif, ambil template terbaru)
         $guruFp = GuruFingerprint::whereIn('device_id', $schoolDeviceIds)
             ->where('finger_id', $fingerId)
+            ->whereHas('guru')
             ->with('guru')
+            ->latest('id')
             ->first();
 
-        if ($guruFp && !empty($guruFp->template_data)) {
+        if ($guruFp && !empty($guruFp->template_data) && $guruFp->guru) {
             return response()->json([
                 'ok' => true,
                 'finger_id' => $fingerId,
@@ -1295,13 +1337,15 @@ return response()->json(array_merge([
             ]);
         }
 
-        // Cari di Gate Card
+        // Cari di Gate Card (hanya gate aktif, ambil template terbaru)
         $gateFp = GateCardFingerprint::whereIn('device_id', $schoolDeviceIds)
             ->where('finger_id', $fingerId)
+            ->whereHas('gateCard')
             ->with('gateCard')
+            ->latest('id')
             ->first();
 
-        if ($gateFp && !empty($gateFp->template_data)) {
+        if ($gateFp && !empty($gateFp->template_data) && $gateFp->gateCard) {
             return response()->json([
                 'ok' => true,
                 'finger_id' => $fingerId,

@@ -604,6 +604,22 @@ class SiswaController extends Controller
                 // Set cache delete untuk di-poll oleh ESP8266
                 \Illuminate\Support\Facades\Cache::put('delete_finger_' . $device->id, $fId, now()->addMinutes(15));
             }
+
+            // HTTP Push jika IP tersedia
+            $lastLog = ApiLog::where('api_key', $device->api_key)
+                ->whereNotNull('ip_address')
+                ->orderBy('created_at', 'desc')
+                ->first();
+
+            if ($lastLog && $lastLog->ip_address) {
+                foreach ($fingerIds as $fId) {
+                    try {
+                        Http::timeout(2)->get("http://{$lastLog->ip_address}/delete-finger?id=" . $fId);
+                    } catch (\Exception $e) {
+                        \Log::warning("Failed to push delete to ESP {$lastLog->ip_address}: " . $e->getMessage());
+                    }
+                }
+            }
         }
 
         // Hapus dari database

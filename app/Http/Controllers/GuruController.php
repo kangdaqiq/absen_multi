@@ -364,26 +364,36 @@ class GuruController extends Controller
     public function deleteFingerId($id)
     {
         $guru = Guru::findOrFail($id);
+        $targetId = $guru->id_finger;
 
         // 1. Get all fingerprints
         $fingerprints = $guru->fingerprints()->with('device')->get();
+        $fingerIds = $fingerprints->pluck('finger_id')->toArray();
+        if ($targetId && !in_array($targetId, $fingerIds)) {
+            $fingerIds[] = (int)$targetId;
+        }
 
-        foreach ($fingerprints as $fp) {
-            if ($fp->device) {
-                // Find last IP
-                $lastLog = \App\Models\ApiLog::where('api_key', $fp->device->api_key)
-                    ->whereNotNull('ip_address')
-                    ->orderBy('created_at', 'desc')
-                    ->first();
+        $schoolDevices = \App\Models\Device::where('school_id', $guru->school_id)->get();
 
-                if ($lastLog && $lastLog->ip_address) {
-                    \Illuminate\Support\Facades\Log::info("Pushing Delete to ESP: {$lastLog->ip_address} for Finger ID: {$fp->finger_id}");
+        foreach ($schoolDevices as $device) {
+            foreach ($fingerIds as $fId) {
+                // Set cache delete untuk di-poll oleh ESP8266
+                \Illuminate\Support\Facades\Cache::put('delete_finger_' . $device->id, $fId, now()->addMinutes(15));
+            }
+
+            // HTTP Push jika IP tersedia
+            $lastLog = \App\Models\ApiLog::where('api_key', $device->api_key)
+                ->whereNotNull('ip_address')
+                ->orderBy('created_at', 'desc')
+                ->first();
+
+            if ($lastLog && $lastLog->ip_address) {
+                foreach ($fingerIds as $fId) {
                     try {
-                        // Send Push to /delete-finger
                         \Illuminate\Support\Facades\Http::timeout(2)
-                            ->get("http://{$lastLog->ip_address}/delete-finger?id=" . $fp->finger_id);
+                            ->get("http://{$lastLog->ip_address}/delete-finger?id=" . $fId);
                     } catch (\Exception $e) {
-                        \Illuminate\Support\Facades\Log::error("Failed to push delete to ESP {$lastLog->ip_address}: " . $e->getMessage());
+                        \Illuminate\Support\Facades\Log::warning("Failed to push delete to ESP {$lastLog->ip_address}: " . $e->getMessage());
                     }
                 }
             }

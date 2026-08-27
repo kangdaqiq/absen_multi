@@ -207,6 +207,12 @@ return $this->response(false, 'gagal', 'Finger ID required');
             ]);
         }
 
+        // Cek jika enroll ditargetkan untuk device tertentu
+        $targetDeviceId = \Illuminate\Support\Facades\Cache::get('enroll_target_device_' . $device->school_id);
+        if ($targetDeviceId && $targetDeviceId != $device->id) {
+            return $this->response(false, 'standby', 'Enrollment active for another device');
+        }
+
         // Check Guru Enroll Request first SCOPED
 $guru = Guru::where('enroll_finger_status', 'requested')
 ->where('school_id', $device->school_id)
@@ -262,6 +268,10 @@ if ($siswa) {
 }
 
 private function getNextFreeFingerId($deviceId) {
+    $device = Device::find($deviceId);
+    $min = $device && $device->finger_id_min ? (int)$device->finger_id_min : 1;
+    $max = $device && $device->finger_id_max ? (int)$device->finger_id_max : 200;
+
     $usedSiswa = SiswaFingerprint::where('device_id', $deviceId)->pluck('finger_id')->toArray();
     $usedGuru = GuruFingerprint::where('device_id', $deviceId)->pluck('finger_id')->toArray();
     $usedGate = GateCardFingerprint::where('device_id', $deviceId)->pluck('finger_id')->toArray();
@@ -269,7 +279,7 @@ private function getNextFreeFingerId($deviceId) {
     $allUsed = array_merge($usedSiswa, $usedGuru, $usedGate);
     $allUsed = array_map('intval', $allUsed);
     
-    for ($i = 1; $i <= 200; $i++) {
+    for ($i = $min; $i <= $max; $i++) {
         if (!in_array($i, $allUsed)) {
             return $i;
         }
@@ -336,36 +346,41 @@ $guru = Guru::where('enroll_finger_status', 'requested')
 ->lockForUpdate()
 ->first();
 
-if ($guru) {
+        if ($guru) {
             if ($conflictName && ($conflictType !== 'guru' || $conflictId != $guru->id)) {
-            $guru->update(['enroll_finger_status' => null]);
-            DB::commit();
-            ApiLog::create([
-                'school_id' => $this->currentSchoolId,
-                'api_key' => $this->currentApiKey,
-                'action' => 'enroll_failed',
-                'uid' => $fingerId,
-                'success' => false,
-                'message' => "Ditolak: Sidik jari sudah terdaftar atas nama $conflictName (ID #$fingerId)",
-                'created_at' => now()
+                $guru->update(['enroll_finger_status' => null]);
+                \Illuminate\Support\Facades\Cache::forget('enroll_target_device_' . $device->school_id);
+                \Illuminate\Support\Facades\Cache::forget('enroll_stage_' . $device->school_id);
+                DB::commit();
+                ApiLog::create([
+                    'school_id' => $this->currentSchoolId,
+                    'api_key' => $this->currentApiKey,
+                    'action' => 'enroll_failed',
+                    'uid' => $fingerId,
+                    'success' => false,
+                    'message' => "Ditolak: Sidik jari sudah terdaftar atas nama $conflictName (ID #$fingerId)",
+                    'created_at' => now()
+                ]);
+                return $this->response(false, 'gagal', "Ditolak: Sidik jari sudah terdaftar atas nama $conflictName (ID #$fingerId)");
+            }
+
+            // Bersihkan template lama yang mungkin masih ada pada slot finger_id ini di seluruh device sekolah
+            GuruFingerprint::whereIn('device_id', $schoolDeviceIds)->where('finger_id', $fingerId)->where('guru_id', '!=', $guru->id)->delete();
+            SiswaFingerprint::whereIn('device_id', $schoolDeviceIds)->where('finger_id', $fingerId)->delete();
+            GateCardFingerprint::whereIn('device_id', $schoolDeviceIds)->where('finger_id', $fingerId)->delete();
+
+            GuruFingerprint::updateOrCreate(
+                ['guru_id' => $guru->id, 'device_id' => $device->id, 'finger_id' => $fingerId],
+                ['template_data' => $templateData, 'created_at' => now()]
+            );
+
+            $guru->update([
+                'enroll_finger_status' => 'done',
+                'id_finger' => $fingerId,
             ]);
-            return $this->response(false, 'gagal', "Ditolak: Sidik jari sudah terdaftar atas nama $conflictName (ID #$fingerId)");
-        }
 
-// Bersihkan template lama yang mungkin masih ada pada slot finger_id ini di seluruh device sekolah
-GuruFingerprint::whereIn('device_id', $schoolDeviceIds)->where('finger_id', $fingerId)->where('guru_id', '!=', $guru->id)->delete();
-SiswaFingerprint::whereIn('device_id', $schoolDeviceIds)->where('finger_id', $fingerId)->delete();
-GateCardFingerprint::whereIn('device_id', $schoolDeviceIds)->where('finger_id', $fingerId)->delete();
-
-GuruFingerprint::updateOrCreate(
-    ['guru_id' => $guru->id, 'device_id' => $device->id, 'finger_id' => $fingerId],
-    ['template_data' => $templateData, 'created_at' => now()]
-);
-
-$guru->update([
-'enroll_finger_status' => 'done',
-'id_finger' => $fingerId,
-]);
+            \Illuminate\Support\Facades\Cache::forget('enroll_target_device_' . $device->school_id);
+            \Illuminate\Support\Facades\Cache::forget('enroll_stage_' . $device->school_id);
 
             // Telegram Notification
             try {
@@ -374,57 +389,62 @@ $guru->update([
                 Log::error("Telegram Enroll Error: " . $e->getMessage());
             }
 
-DB::commit();
-ApiLog::create([
-    'school_id' => $this->currentSchoolId,
-    'api_key' => $this->currentApiKey,
-    'action' => 'enroll_success',
-    'uid' => $fingerId,
-    'success' => true,
-    'message' => 'Enroll Berhasil (Guru): ' . $guru->nama,
-    'created_at' => now()
-]);
-return $this->response(true, 'success', 'Enroll Berhasil (Guru): ' . $guru->nama, 'success');
-}
-
-// Check Siswa SCOPED
-$siswa = Siswa::where('enroll_finger_status', 'requested')
-->where('school_id', $device->school_id)
-->where('updated_at', '>=', now()->subMinutes(15))
-->orderBy('updated_at', 'desc')
-->lockForUpdate()
-->first();
-
-if ($siswa) {
-            if ($conflictName && ($conflictType !== 'siswa' || $conflictId != $siswa->id)) {
-            $siswa->update(['enroll_finger_status' => null]);
             DB::commit();
             ApiLog::create([
                 'school_id' => $this->currentSchoolId,
                 'api_key' => $this->currentApiKey,
-                'action' => 'enroll_failed',
+                'action' => 'enroll_success',
                 'uid' => $fingerId,
-                'success' => false,
-                'message' => "Ditolak: Sidik jari sudah terdaftar atas nama $conflictName (ID #$fingerId)",
+                'success' => true,
+                'message' => 'Enroll Berhasil (Guru): ' . $guru->nama,
                 'created_at' => now()
             ]);
-            return $this->response(false, 'gagal', "Ditolak: Sidik jari sudah terdaftar atas nama $conflictName (ID #$fingerId)");
+            return $this->response(true, 'success', 'Enroll Berhasil (Guru): ' . $guru->nama, 'success');
         }
 
-// Bersihkan template lama yang mungkin masih ada pada slot finger_id ini di seluruh device sekolah
-SiswaFingerprint::whereIn('device_id', $schoolDeviceIds)->where('finger_id', $fingerId)->where('student_id', '!=', $siswa->id)->delete();
-GuruFingerprint::whereIn('device_id', $schoolDeviceIds)->where('finger_id', $fingerId)->delete();
-GateCardFingerprint::whereIn('device_id', $schoolDeviceIds)->where('finger_id', $fingerId)->delete();
+        // Check Siswa SCOPED
+        $siswa = Siswa::where('enroll_finger_status', 'requested')
+            ->where('school_id', $device->school_id)
+            ->where('updated_at', '>=', now()->subMinutes(15))
+            ->orderBy('updated_at', 'desc')
+            ->lockForUpdate()
+            ->first();
 
-SiswaFingerprint::updateOrCreate(
-    ['student_id' => $siswa->id, 'device_id' => $device->id, 'finger_id' => $fingerId],
-    ['template_data' => $templateData, 'created_at' => now()]
-);
+        if ($siswa) {
+            if ($conflictName && ($conflictType !== 'siswa' || $conflictId != $siswa->id)) {
+                $siswa->update(['enroll_finger_status' => null]);
+                \Illuminate\Support\Facades\Cache::forget('enroll_target_device_' . $device->school_id);
+                \Illuminate\Support\Facades\Cache::forget('enroll_stage_' . $device->school_id);
+                DB::commit();
+                ApiLog::create([
+                    'school_id' => $this->currentSchoolId,
+                    'api_key' => $this->currentApiKey,
+                    'action' => 'enroll_failed',
+                    'uid' => $fingerId,
+                    'success' => false,
+                    'message' => "Ditolak: Sidik jari sudah terdaftar atas nama $conflictName (ID #$fingerId)",
+                    'created_at' => now()
+                ]);
+                return $this->response(false, 'gagal', "Ditolak: Sidik jari sudah terdaftar atas nama $conflictName (ID #$fingerId)");
+            }
 
-$siswa->update([
-'enroll_finger_status' => 'done',
-'id_finger' => $fingerId,
-]);
+            // Bersihkan template lama yang mungkin masih ada pada slot finger_id ini di seluruh device sekolah
+            SiswaFingerprint::whereIn('device_id', $schoolDeviceIds)->where('finger_id', $fingerId)->where('student_id', '!=', $siswa->id)->delete();
+            GuruFingerprint::whereIn('device_id', $schoolDeviceIds)->where('finger_id', $fingerId)->delete();
+            GateCardFingerprint::whereIn('device_id', $schoolDeviceIds)->where('finger_id', $fingerId)->delete();
+
+            SiswaFingerprint::updateOrCreate(
+                ['student_id' => $siswa->id, 'device_id' => $device->id, 'finger_id' => $fingerId],
+                ['template_data' => $templateData, 'created_at' => now()]
+            );
+
+            $siswa->update([
+                'enroll_finger_status' => 'done',
+                'id_finger' => $fingerId,
+            ]);
+
+            \Illuminate\Support\Facades\Cache::forget('enroll_target_device_' . $device->school_id);
+            \Illuminate\Support\Facades\Cache::forget('enroll_stage_' . $device->school_id);
 
             // Telegram Notification
             try {
@@ -433,18 +453,18 @@ $siswa->update([
                 Log::error("Telegram Enroll Error: " . $e->getMessage());
             }
 
-DB::commit();
-ApiLog::create([
-    'school_id' => $this->currentSchoolId,
-    'api_key' => $this->currentApiKey,
-    'action' => 'enroll_success',
-    'uid' => $fingerId,
-    'success' => true,
-    'message' => 'Enroll Berhasil (Siswa): ' . $siswa->nama,
-    'created_at' => now()
-]);
-return $this->response(true, 'success', 'Enroll Berhasil (Siswa): ' . $siswa->nama, 'success');
-}
+            DB::commit();
+            ApiLog::create([
+                'school_id' => $this->currentSchoolId,
+                'api_key' => $this->currentApiKey,
+                'action' => 'enroll_success',
+                'uid' => $fingerId,
+                'success' => true,
+                'message' => 'Enroll Berhasil (Siswa): ' . $siswa->nama,
+                'created_at' => now()
+            ]);
+            return $this->response(true, 'success', 'Enroll Berhasil (Siswa): ' . $siswa->nama, 'success');
+        }
 
         // Check Gate Card SCOPED
         $gate = GateCard::where('enroll_finger_status', 'requested')
@@ -457,7 +477,18 @@ return $this->response(true, 'success', 'Enroll Berhasil (Siswa): ' . $siswa->na
         if ($gate) {
             if ($conflictName && ($conflictType !== 'gate' || $conflictId != $gate->id)) {
                 $gate->update(['enroll_finger_status' => null]);
+                \Illuminate\Support\Facades\Cache::forget('enroll_target_device_' . $device->school_id);
+                \Illuminate\Support\Facades\Cache::forget('enroll_stage_' . $device->school_id);
                 DB::commit();
+                ApiLog::create([
+                    'school_id' => $this->currentSchoolId,
+                    'api_key' => $this->currentApiKey,
+                    'action' => 'enroll_failed',
+                    'uid' => $fingerId,
+                    'success' => false,
+                    'message' => "Ditolak: Sidik jari sudah terdaftar atas nama $conflictName (ID #$fingerId)",
+                    'created_at' => now()
+                ]);
                 return $this->response(false, 'gagal', "Ditolak: ID telah dipakai oleh $conflictName");
             }
 
@@ -476,6 +507,9 @@ return $this->response(true, 'success', 'Enroll Berhasil (Siswa): ' . $siswa->na
                 'id_finger' => $fingerId,
             ]);
 
+            \Illuminate\Support\Facades\Cache::forget('enroll_target_device_' . $device->school_id);
+            \Illuminate\Support\Facades\Cache::forget('enroll_stage_' . $device->school_id);
+
             DB::commit();
             ApiLog::create([
                 'school_id' => $this->currentSchoolId,
@@ -491,7 +525,7 @@ return $this->response(true, 'success', 'Enroll Berhasil (Siswa): ' . $siswa->na
 
         // Neither found
         DB::rollBack();
-return $this->response(false, 'gagal', 'Enroll Timeout / No Request');
+        return $this->response(false, 'gagal', 'Enroll Timeout / No Request');
 
 } catch (\Exception $e) {
     DB::rollBack();
@@ -1279,11 +1313,22 @@ return response()->json(array_merge([
         $allIds = array_values(array_unique(array_merge($siswaFingers, $guruFingers, $gateFingers)));
         sort($allIds);
 
+        // Filter berdasarkan mapping rentang slot ID device jika diatur
+        $min = $device->finger_id_min ? (int)$device->finger_id_min : 1;
+        $max = $device->finger_id_max ? (int)$device->finger_id_max : 200;
+
+        $filteredIds = array_values(array_filter($allIds, function($id) use ($min, $max) {
+            return $id >= $min && $id <= $max;
+        }));
+
         return response()->json([
             'ok' => true,
             'school_id' => $schoolId,
-            'total' => count($allIds),
-            'allowed_ids' => $allIds
+            'device_id' => $device->id,
+            'id_min' => $min,
+            'id_max' => $max,
+            'total' => count($filteredIds),
+            'allowed_ids' => $filteredIds
         ]);
     }
 

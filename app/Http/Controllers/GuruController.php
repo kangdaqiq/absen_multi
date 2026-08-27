@@ -31,7 +31,13 @@ class GuruController extends Controller
 
         $guru = $query->paginate(20)->withQueryString();
         // Fetch active devices for enrollment dropdowns
-        $devices = \App\Models\Device::where('active', 1)->get();
+        $devicesQuery = \App\Models\Device::where('active', 1)
+            ->whereIn('type', ['fingerprint', 'rfid_fingerprint'])
+            ->orderBy('name');
+        if ($schoolId) {
+            $devicesQuery->where('school_id', $schoolId);
+        }
+        $devices = $devicesQuery->get();
         // Fetch active shifts for school
         $shiftsQuery = \App\Models\Shift::where('is_active', true);
         if ($schoolId) {
@@ -266,35 +272,53 @@ class GuruController extends Controller
         $guru = Guru::findOrFail($id);
         $schoolId = $guru->school_id;
 
+        if (auth()->user() && !auth()->user()->isSuperAdmin()) {
+            if ($guru->school_id !== auth()->user()->school_id) {
+                return response()->json(['ok' => false, 'message' => 'Akses ditolak.'], 403);
+            }
+        }
+
+        $device = \App\Models\Device::where('id', $request->device_id)
+            ->where('school_id', $schoolId)
+            ->first();
+
+        if (!$device) {
+            return response()->json(['ok' => false, 'message' => 'Device tidak valid untuk sekolah guru ini.'], 422);
+        }
+
+        \App\Models\Siswa::where('enroll_finger_status', 'requested')
+            ->where('school_id', $schoolId)
+            ->update(['enroll_finger_status' => 'none']);
+
         Guru::where('enroll_finger_status', 'requested')
             ->where('school_id', $schoolId)
-            ->where('id', '!=', $id)
+            ->update(['enroll_finger_status' => 'none']);
+
+        \App\Models\GateCard::where('enroll_finger_status', 'requested')
+            ->where('school_id', $schoolId)
             ->update(['enroll_finger_status' => 'none']);
 
         $guru->update(['enroll_finger_status' => 'requested']);
+        \Illuminate\Support\Facades\Cache::put('enroll_target_device_' . $schoolId, $device->id, now()->addMinutes(2));
 
         // --- Push Notification to Selected Device ---
-        $device = \App\Models\Device::find($request->device_id);
-        if ($device) {
-            // Find last known IP from ApiLog
-            $lastLog = \App\Models\ApiLog::where('api_key', $device->api_key)
-                ->whereNotNull('ip_address')
-                ->orderBy('created_at', 'desc')
-                ->first();
+        $lastLog = \App\Models\ApiLog::where('api_key', $device->api_key)
+            ->whereNotNull('ip_address')
+            ->orderBy('created_at', 'desc')
+            ->first();
 
-            if ($lastLog && $lastLog->ip_address) {
-                \Illuminate\Support\Facades\Log::info("Pushing Enroll to ESP: {$lastLog->ip_address} for Guru ID: {$guru->id}");
-                try {
-                    // Send Push to /enroll-finger or similar
-                    // Using query params to pass ID if needed, or just trigger mode
-                    \Illuminate\Support\Facades\Http::timeout(2)
-                        ->get("http://{$lastLog->ip_address}/enroll-finger?id=" . $guru->id);
-                } catch (\Exception $e) {
-                    \Illuminate\Support\Facades\Log::error("Failed to push to ESP Finger at {$lastLog->ip_address}: " . $e->getMessage());
-                }
-            } else {
-                \Illuminate\Support\Facades\Log::warning("No IP found for device: {$device->name}");
+        if ($lastLog && $lastLog->ip_address) {
+            \Illuminate\Support\Facades\Log::info("Pushing Enroll to ESP: {$lastLog->ip_address} for Guru ID: {$guru->id}");
+            try {
+                // Send Push to /enroll-finger or similar
+                // Using query params to pass ID if needed, or just trigger mode
+                \Illuminate\Support\Facades\Http::timeout(2)
+                    ->get("http://{$lastLog->ip_address}/enroll-finger?id=" . $guru->id);
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::error("Failed to push to ESP Finger at {$lastLog->ip_address}: " . $e->getMessage());
             }
+        } else {
+            \Illuminate\Support\Facades\Log::warning("No IP found for device: {$device->name}");
         }
         // --------------------------------------------
 
@@ -304,6 +328,7 @@ class GuruController extends Controller
     public function cancelFingerEnroll($id)
     {
         $guru = Guru::findOrFail($id);
+        \Illuminate\Support\Facades\Cache::forget('enroll_target_device_' . $guru->school_id);
         if ($guru->enroll_finger_status === 'requested') {
             $guru->update(['enroll_finger_status' => 'none']);
         }
@@ -316,11 +341,13 @@ class GuruController extends Controller
 
         if ($guru->enroll_finger_status === 'done' && $guru->id_finger) {
             \Illuminate\Support\Facades\Cache::forget('enroll_stage_' . $guru->school_id);
+            \Illuminate\Support\Facades\Cache::forget('enroll_target_device_' . $guru->school_id);
             return response()->json(['ok' => true, 'id_finger' => $guru->id_finger, 'status' => 'done']);
         }
 
         if ($guru->enroll_finger_status === null) {
             \Illuminate\Support\Facades\Cache::forget('enroll_stage_' . $guru->school_id);
+            \Illuminate\Support\Facades\Cache::forget('enroll_target_device_' . $guru->school_id);
             $lastLog = \App\Models\ApiLog::where('school_id', $guru->school_id)
                 ->where('action', 'enroll_failed')
                 ->where('created_at', '>=', now()->subSeconds(45))

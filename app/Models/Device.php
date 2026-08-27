@@ -24,6 +24,8 @@ class Device extends Model
         'name',
         'api_key',
         'type',
+        'finger_id_min',
+        'finger_id_max',
         'active',
         'created_at',
         'school_id'
@@ -31,6 +33,8 @@ class Device extends Model
 
     protected $casts = [
         'active' => 'boolean',
+        'finger_id_min' => 'integer',
+        'finger_id_max' => 'integer',
     ];
 
     protected static function boot()

@@ -49,10 +49,15 @@ class SiswaController extends Controller
         }
         $kelas = $kelasQuery->get();
 
-        $devices = Device::where('active', true)
+        $devicesQuery = Device::where('active', true)
             ->whereIn('type', ['fingerprint', 'rfid_fingerprint'])
-            ->orderBy('name')
-            ->get();
+            ->orderBy('name');
+
+        if (auth()->user() && !auth()->user()->isSuperAdmin()) {
+            $devicesQuery->where('school_id', auth()->user()->school_id);
+        }
+
+        $devices = $devicesQuery->get();
 
         return view('siswa.index', compact('siswa', 'kelas', 'devices'));
     }
@@ -492,6 +497,20 @@ class SiswaController extends Controller
 
         $siswa = Siswa::findOrFail($id);
 
+        if (auth()->user() && !auth()->user()->isSuperAdmin()) {
+            if ($siswa->school_id !== auth()->user()->school_id) {
+                return response()->json(['ok' => false, 'message' => 'Akses ditolak.'], 403);
+            }
+        }
+
+        $device = Device::where('id', $request->device_id)
+            ->where('school_id', $siswa->school_id)
+            ->first();
+
+        if (!$device) {
+            return response()->json(['ok' => false, 'message' => 'Device tidak valid untuk sekolah siswa ini.'], 422);
+        }
+
         // Reset ALL other pending requests - SCOPED
         $schoolId = $siswa->school_id; // Get school from the student being enrolled
 
@@ -503,10 +522,14 @@ class SiswaController extends Controller
             ->where('school_id', $schoolId)
             ->update(['enroll_finger_status' => 'none']);
 
+        \App\Models\GateCard::where('enroll_finger_status', 'requested')
+            ->where('school_id', $schoolId)
+            ->update(['enroll_finger_status' => 'none']);
+
         $siswa->update(['enroll_finger_status' => 'requested']);
+        \Illuminate\Support\Facades\Cache::put('enroll_target_device_' . $schoolId, $device->id, now()->addMinutes(2));
 
         // Get device IP and send push notification
-        $device = Device::find($request->device_id);
         $latestLog = ApiLog::where('api_key', $device->api_key)
             ->whereNotNull('ip_address')
             ->orderBy('created_at', 'desc')
@@ -528,6 +551,7 @@ class SiswaController extends Controller
     public function cancelFingerEnroll($id)
     {
         $siswa = Siswa::findOrFail($id);
+        \Illuminate\Support\Facades\Cache::forget('enroll_target_device_' . $siswa->school_id);
         if ($siswa->enroll_finger_status === 'requested') {
             $siswa->update(['enroll_finger_status' => 'none']);
         }
@@ -540,11 +564,13 @@ class SiswaController extends Controller
 
         if ($siswa->enroll_finger_status === 'done' && $siswa->id_finger) {
             \Illuminate\Support\Facades\Cache::forget('enroll_stage_' . $siswa->school_id);
+            \Illuminate\Support\Facades\Cache::forget('enroll_target_device_' . $siswa->school_id);
             return response()->json(['ok' => true, 'id_finger' => $siswa->id_finger, 'status' => 'done']);
         }
 
         if ($siswa->enroll_finger_status === null) {
             \Illuminate\Support\Facades\Cache::forget('enroll_stage_' . $siswa->school_id);
+            \Illuminate\Support\Facades\Cache::forget('enroll_target_device_' . $siswa->school_id);
             $lastLog = \App\Models\ApiLog::where('school_id', $siswa->school_id)
                 ->where('action', 'enroll_failed')
                 ->where('created_at', '>=', now()->subSeconds(45))

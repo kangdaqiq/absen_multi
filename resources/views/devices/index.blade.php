@@ -55,6 +55,7 @@
                             <th class="py-4 px-4 font-medium text-black dark:text-white">Nama Device</th>
                             <th class="py-4 px-4 font-medium text-black dark:text-white">Token (api_key)</th>
                             <th class="py-4 px-4 font-medium text-black dark:text-white">Tipe</th>
+                            <th class="py-4 px-4 font-medium text-black dark:text-white text-center">Slot ID Sidik Jari</th>
                             <th class="py-4 px-4 font-medium text-black dark:text-white">Status</th>
                             <th class="py-4 px-4 font-medium text-black dark:text-white" width="15%">Aksi</th>
                         </tr>
@@ -87,6 +88,15 @@
                                                 class="fas fa-microchip mr-1 mt-0.5"></i> RFID + Finger</span>
                                     @endif
                                 </td>
+                                <td class="border-b border-gray-100 py-5 px-4 dark:border-gray-800 text-center">
+                                    @if($d->type !== 'rfid')
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
+                                            ID {{ $d->finger_id_min ?? 1 }} - {{ $d->finger_id_max ?? 200 }}
+                                        </span>
+                                    @else
+                                        <span class="text-gray-400 text-xs">-</span>
+                                    @endif
+                                </td>
                                 <td class="border-b border-gray-100 py-5 px-4 dark:border-gray-800">
                                     @if($d->active)
                                         <span
@@ -100,7 +110,7 @@
                                     <div class="flex items-center space-x-3.5" x-data>
                                         <button
                                             class="text-orange-500 hover:text-orange-700 hover:bg-orange-50 p-2 rounded-lg transition"
-                                            @click="$dispatch('open-modal', 'modalEditDevice'); $dispatch('set-edit-device', { id: '{{ $d->id }}', name: '{{ addslashes($d->name) }}', key: '{{ $d->api_key }}', type: '{{ $d->type }}', active: '{{ $d->active }}' })"
+                                            @click="$dispatch('open-modal', 'modalEditDevice'); $dispatch('set-edit-device', { id: '{{ $d->id }}', name: '{{ addslashes($d->name) }}', key: '{{ $d->api_key }}', type: '{{ $d->type }}', finger_min: '{{ $d->finger_id_min ?? 1 }}', finger_max: '{{ $d->finger_id_max ?? 200 }}', active: '{{ $d->active }}' })"
                                             title="Edit">
                                             <i class="fas fa-edit"></i>
                                         </button>
@@ -159,6 +169,21 @@
                     </div>
                 </div>
 
+                <div class="grid grid-cols-2 gap-4 mb-4.5">
+                    <div>
+                        <label class="mb-2.5 block text-black dark:text-white">Slot ID Min (Sidik Jari)</label>
+                        <input type="number" name="finger_id_min" value="1" min="1" max="1000"
+                            class="w-full rounded border border-stroke bg-transparent py-3 px-5 outline-none transition focus:border-brand-500 active:border-brand-500 dark:border-form-strokedark dark:bg-form-input dark:focus:border-brand-500" />
+                        <span class="text-xs text-gray-500 mt-1 block">Contoh: 1, 150, 300</span>
+                    </div>
+                    <div>
+                        <label class="mb-2.5 block text-black dark:text-white">Slot ID Max (Sidik Jari)</label>
+                        <input type="number" name="finger_id_max" value="200" min="1" max="1000"
+                            class="w-full rounded border border-stroke bg-transparent py-3 px-5 outline-none transition focus:border-brand-500 active:border-brand-500 dark:border-form-strokedark dark:bg-form-input dark:focus:border-brand-500" />
+                        <span class="text-xs text-gray-500 mt-1 block">Contoh: 200, 300, 600</span>
+                    </div>
+                </div>
+
                 <div class="mb-5.5">
                     <label class="mb-2.5 block text-black dark:text-white">Status</label>
                     <div class="relative z-20 bg-transparent dark:bg-form-input">
@@ -186,13 +211,15 @@
     <!-- Modal Edit -->
     <x-ui.modal id="modalEditDevice">
         <div class="p-6" x-data="{ 
-                id: '', name: '', key: '', type: 'rfid_fingerprint', active: '1',
+                id: '', name: '', key: '', type: 'rfid_fingerprint', finger_min: 1, finger_max: 200, active: '1',
                 actionUrl: ''
             }" @set-edit-device.window="
                 id = $event.detail.id;
                 name = $event.detail.name;
                 key = $event.detail.key;
                 type = $event.detail.type;
+                finger_min = $event.detail.finger_min || 1;
+                finger_max = $event.detail.finger_max || 200;
                 active = $event.detail.active;
                 actionUrl = '{{ url('devices') }}/' + id;
             ">
@@ -232,6 +259,21 @@
                         <span class="absolute top-1/2 right-4 z-30 -translate-y-1/2">
                             <i class="fas fa-chevron-down text-sm"></i>
                         </span>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4 mb-4.5">
+                    <div>
+                        <label class="mb-2.5 block text-black dark:text-white">Slot ID Min (Sidik Jari)</label>
+                        <input type="number" name="finger_id_min" x-model="finger_min" min="1" max="1000"
+                            class="w-full rounded border border-stroke bg-transparent py-3 px-5 outline-none transition focus:border-brand-500 active:border-brand-500 dark:border-form-strokedark dark:bg-form-input dark:focus:border-brand-500" />
+                        <span class="text-xs text-gray-500 mt-1 block">Contoh: 1, 150, 300</span>
+                    </div>
+                    <div>
+                        <label class="mb-2.5 block text-black dark:text-white">Slot ID Max (Sidik Jari)</label>
+                        <input type="number" name="finger_id_max" x-model="finger_max" min="1" max="1000"
+                            class="w-full rounded border border-stroke bg-transparent py-3 px-5 outline-none transition focus:border-brand-500 active:border-brand-500 dark:border-form-strokedark dark:bg-form-input dark:focus:border-brand-500" />
+                        <span class="text-xs text-gray-500 mt-1 block">Contoh: 200, 300, 600</span>
                     </div>
                 </div>
 

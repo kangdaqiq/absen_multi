@@ -14,14 +14,24 @@ class GateCardController extends Controller
 {
     public function index()
     {
-        $schoolId = auth()->user()->school_id;
-        $gateCards = GateCard::where('school_id', $schoolId)->get();
-        $gurus = Guru::where('school_id', $schoolId)->orderBy('nama')->get();
-        $devices = \App\Models\Device::where('school_id', $schoolId)
-            ->where('active', true)
+        $schoolId = auth()->user() && !auth()->user()->isSuperAdmin() ? auth()->user()->school_id : null;
+        
+        $gateCardsQuery = GateCard::query();
+        $gurusQuery = Guru::orderBy('nama');
+        $devicesQuery = \App\Models\Device::where('active', true)
             ->whereIn('type', ['fingerprint', 'rfid_fingerprint'])
-            ->orderBy('name')
-            ->get();
+            ->orderBy('name');
+
+        if ($schoolId) {
+            $gateCardsQuery->where('school_id', $schoolId);
+            $gurusQuery->where('school_id', $schoolId);
+            $devicesQuery->where('school_id', $schoolId);
+        }
+
+        $gateCards = $gateCardsQuery->get();
+        $gurus = $gurusQuery->get();
+        $devices = $devicesQuery->get();
+
         return view('gate-cards.index', compact('gateCards', 'gurus', 'devices'));
     }
 
@@ -212,8 +222,24 @@ class GateCardController extends Controller
 
     public function enrollFingerRequest($id, Request $request)
     {
-        $gateCard = GateCard::where('school_id', auth()->user()->school_id)->findOrFail($id);
+        $request->validate([
+            'device_id' => 'required|exists:api_keys,id',
+        ]);
+
+        $gateCardQuery = GateCard::query();
+        if (auth()->user() && !auth()->user()->isSuperAdmin()) {
+            $gateCardQuery->where('school_id', auth()->user()->school_id);
+        }
+        $gateCard = $gateCardQuery->findOrFail($id);
         $schoolId = $gateCard->school_id;
+
+        $device = \App\Models\Device::where('id', $request->device_id)
+            ->where('school_id', $schoolId)
+            ->first();
+
+        if (!$device) {
+            return response()->json(['ok' => false, 'message' => 'Device tidak valid untuk sekolah ini.'], 422);
+        }
 
         // Reset others
         Siswa::where('enroll_finger_status', 'requested')
@@ -229,9 +255,9 @@ class GateCardController extends Controller
             ->update(['enroll_finger_status' => 'none']);
 
         $gateCard->update(['enroll_finger_status' => 'requested']);
+        \Illuminate\Support\Facades\Cache::put('enroll_target_device_' . $schoolId, $device->id, now()->addMinutes(2));
 
         // Get device IP and send push notification
-        $device = \App\Models\Device::find($request->device_id);
         $latestLog = \App\Models\ApiLog::where('api_key', $device->api_key)
             ->whereNotNull('ip_address')
             ->orderBy('created_at', 'desc')
@@ -252,7 +278,12 @@ class GateCardController extends Controller
 
     public function cancelFingerEnroll($id)
     {
-        $gateCard = GateCard::where('school_id', auth()->user()->school_id)->findOrFail($id);
+        $query = GateCard::query();
+        if (auth()->user() && !auth()->user()->isSuperAdmin()) {
+            $query->where('school_id', auth()->user()->school_id);
+        }
+        $gateCard = $query->findOrFail($id);
+        \Illuminate\Support\Facades\Cache::forget('enroll_target_device_' . $gateCard->school_id);
         if ($gateCard->enroll_finger_status === 'requested') {
             $gateCard->update(['enroll_finger_status' => 'none']);
         }
@@ -261,9 +292,14 @@ class GateCardController extends Controller
 
     public function enrollFingerCheck($id)
     {
-        $gateCard = GateCard::where('school_id', auth()->user()->school_id)->findOrFail($id);
+        $query = GateCard::query();
+        if (auth()->user() && !auth()->user()->isSuperAdmin()) {
+            $query->where('school_id', auth()->user()->school_id);
+        }
+        $gateCard = $query->findOrFail($id);
 
         if ($gateCard->enroll_finger_status === 'done' && $gateCard->id_finger) {
+            \Illuminate\Support\Facades\Cache::forget('enroll_target_device_' . $gateCard->school_id);
             return response()->json(['ok' => true, 'id_finger' => $gateCard->id_finger, 'status' => 'done']);
         }
 
@@ -272,7 +308,11 @@ class GateCardController extends Controller
 
     public function deleteFingerId($id)
     {
-        $gateCard = GateCard::where('school_id', auth()->user()->school_id)->findOrFail($id);
+        $query = GateCard::query();
+        if (auth()->user() && !auth()->user()->isSuperAdmin()) {
+            $query->where('school_id', auth()->user()->school_id);
+        }
+        $gateCard = $query->findOrFail($id);
 
         // Get all fingerprints for this gate card
         $fingerprints = \App\Models\GateCardFingerprint::where('gate_card_id', $gateCard->id)->get();

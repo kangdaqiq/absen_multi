@@ -32,6 +32,7 @@
                     <th class="py-4 px-4 font-medium text-black dark:text-white">Nama Device</th>
                     <th class="py-4 px-4 font-medium text-black dark:text-white">Token (api_key)</th>
                     <th class="py-4 px-4 font-medium text-black dark:text-white text-center">Tipe</th>
+                    <th class="py-4 px-4 font-medium text-black dark:text-white text-center">Slot ID Sidik Jari</th>
                     <th class="py-4 px-4 font-medium text-black dark:text-white text-center">Status</th>
                     <th class="py-4 px-4 font-medium text-black dark:text-white text-center" width="15%">Aksi</th>
                 </tr>
@@ -58,6 +59,15 @@
                             @endif
                         </td>
                         <td class="border-b border-gray-100 py-5 px-4 dark:border-gray-800 text-center align-middle">
+                            @if($d->type !== 'rfid')
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
+                                    ID {{ $d->finger_id_min ?? 1 }} - {{ $d->finger_id_max ?? 200 }}
+                                </span>
+                            @else
+                                <span class="text-gray-400 text-xs">-</span>
+                            @endif
+                        </td>
+                        <td class="border-b border-gray-100 py-5 px-4 dark:border-gray-800 text-center align-middle">
                             @if($d->active)
                                 <span class="inline-flex rounded-full bg-green-50 px-3 py-1 text-xs font-medium text-green-600 dark:bg-green-500/15 dark:text-green-500">Active</span>
                             @else
@@ -66,7 +76,7 @@
                         </td>
                         <td class="border-b border-gray-100 py-5 px-4 dark:border-gray-800 text-center align-middle">
                             <div class="flex items-center justify-center space-x-3.5">
-                                <button @click="openEditModal({{ $d->id }}, '{{ addslashes($d->name) }}', '{{ $d->api_key }}', '{{ $d->type }}', {{ $d->active }})" class="text-orange-500 hover:text-orange-700 hover:bg-orange-50 p-2 rounded-lg transition" title="Edit">
+                                <button @click="openEditModal({{ $d->id }}, '{{ addslashes($d->name) }}', '{{ $d->api_key }}', '{{ $d->type }}', {{ $d->finger_id_min ?? 1 }}, {{ $d->finger_id_max ?? 200 }}, {{ $d->active }})" class="text-orange-500 hover:text-orange-700 hover:bg-orange-50 p-2 rounded-lg transition" title="Edit">
                                     <i class="fas fa-edit"></i>
                                 </button>
                                 <button @click="openDeleteModal({{ $d->id }}, '{{ addslashes($d->name) }}')" class="text-red-500 hover:text-red-700 hover:bg-red-50 p-2 rounded-lg transition" title="Hapus">
@@ -131,6 +141,19 @@
                             <span class="absolute top-1/2 right-4 z-30 -translate-y-1/2">
                                 <i class="fas fa-chevron-down text-sm"></i>
                             </span>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4 mb-4.5">
+                        <div>
+                            <label class="mb-2.5 block text-black dark:text-white">Slot ID Min (Sidik Jari)</label>
+                            <input type="number" name="finger_id_min" value="1" min="1" max="1000" class="w-full rounded border border-stroke bg-transparent py-3 px-5 outline-none transition focus:border-brand-500 active:border-brand-500 dark:border-form-strokedark dark:bg-form-input dark:focus:border-brand-500" />
+                            <span class="text-xs text-gray-500 mt-1 block">Contoh: 1, 150, 300</span>
+                        </div>
+                        <div>
+                            <label class="mb-2.5 block text-black dark:text-white">Slot ID Max (Sidik Jari)</label>
+                            <input type="number" name="finger_id_max" value="200" min="1" max="1000" class="w-full rounded border border-stroke bg-transparent py-3 px-5 outline-none transition focus:border-brand-500 active:border-brand-500 dark:border-form-strokedark dark:bg-form-input dark:focus:border-brand-500" />
+                            <span class="text-xs text-gray-500 mt-1 block">Contoh: 200, 300, 600</span>
                         </div>
                     </div>
 
@@ -204,6 +227,19 @@
                         </div>
                     </div>
 
+                    <div class="grid grid-cols-2 gap-4 mb-4.5">
+                        <div>
+                            <label class="mb-2.5 block text-black dark:text-white">Slot ID Min (Sidik Jari)</label>
+                            <input type="number" name="finger_id_min" x-model="editData.finger_id_min" min="1" max="1000" class="w-full rounded border border-stroke bg-transparent py-3 px-5 outline-none transition focus:border-brand-500 active:border-brand-500 dark:border-form-strokedark dark:bg-form-input dark:focus:border-brand-500" />
+                            <span class="text-xs text-gray-500 mt-1 block">Contoh: 1, 150, 300</span>
+                        </div>
+                        <div>
+                            <label class="mb-2.5 block text-black dark:text-white">Slot ID Max (Sidik Jari)</label>
+                            <input type="number" name="finger_id_max" x-model="editData.finger_id_max" min="1" max="1000" class="w-full rounded border border-stroke bg-transparent py-3 px-5 outline-none transition focus:border-brand-500 active:border-brand-500 dark:border-form-strokedark dark:bg-form-input dark:focus:border-brand-500" />
+                            <span class="text-xs text-gray-500 mt-1 block">Contoh: 200, 300, 600</span>
+                        </div>
+                    </div>
+
                     <div class="mb-5.5">
                         <label class="mb-2.5 block text-black dark:text-white">Status</label>
                         <div class="relative z-20 bg-transparent dark:bg-form-input">
@@ -274,6 +310,8 @@ function deviceManager() {
             name: '',
             api_key: '',
             type: '',
+            finger_id_min: 1,
+            finger_id_max: 200,
             active: 1
         },
         deleteData: {
@@ -291,12 +329,14 @@ function deviceManager() {
                 this.editData.api_key = out;
             }
         },
-        openEditModal(id, name, key, type, active) {
+        openEditModal(id, name, key, type, fingerMin, fingerMax, active) {
             this.editData = {
                 id: id,
                 name: name,
                 api_key: key,
                 type: type,
+                finger_id_min: fingerMin || 1,
+                finger_id_max: fingerMax || 200,
                 active: active ? 1 : 0
             };
             this.isEditModalOpen = true;

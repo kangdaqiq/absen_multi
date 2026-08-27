@@ -165,7 +165,7 @@
                                 
                                 <!-- Enroll Fingerprint -->
                                 <button class="btnFinger text-success-500 hover:text-success-700 hover:bg-success-50 p-2 rounded-lg transition" 
-                                    data-id="{{ $g->id }}" data-nama="{{ $g->nama }}" data-finger="{{ $g->id_finger }}"
+                                    data-id="{{ $g->id }}" data-nama="{{ $g->nama }}" data-finger="{{ $g->id_finger }}" data-school="{{ $g->school_id }}"
                                     @click="$dispatch('open-modal', 'modalEnrollFinger')" title="Registrasi Sidik Jari">
                                     <i class="fas fa-fingerprint"></i>
                                 </button>
@@ -438,7 +438,7 @@
             <select id="finger_device_id" class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
                 <option value="">-- Pilih Device --</option>
                 @foreach($devices as $dev)
-                    <option value="{{ $dev->id }}">{{ $dev->name }} ({{ ucfirst($dev->type) }})</option>
+                    <option value="{{ $dev->id }}" data-school="{{ $dev->school_id }}">{{ $dev->name }} ({{ ucfirst($dev->type) }})</option>
                 @endforeach
             </select>
         </div>
@@ -450,7 +450,7 @@
         <div id="enroll_finger_status" class="mb-6 min-h-10 flex items-center justify-center text-sm text-center"></div>
 
         <div class="flex flex-col gap-3">
-            <button type="button" class="rounded-lg bg-success-500 p-3 font-medium text-white hover:bg-success-600 transition" id="btnMulaiEnrollFinger">
+            <button type="button" class="rounded-lg bg-success-500 p-3 font-medium text-white hover:bg-success-600 transition disabled:opacity-50 disabled:cursor-not-allowed" id="btnMulaiEnrollFinger">
                 <i class="fas fa-fingerprint mr-1"></i> Mulai Scan Sidik Jari
             </button>
             <button type="button" class="rounded-lg bg-error-500 p-3 font-medium text-white hover:bg-error-600 transition disabled:opacity-50 disabled:cursor-not-allowed" id="btnHapusFinger" disabled>
@@ -615,9 +615,11 @@
             // ==========================
             let enrollFingerId = null;
             let enrollFingerInterval = null;
+            const fingerDevices = @json($devices);
 
             $('.btnFinger').on('click', function () {
                 enrollFingerId = $(this).data('id');
+                var schoolId = $(this).data('school');
                 $('#enroll_finger_nama').text($(this).data('nama'));
 
                 // Reset UI
@@ -625,7 +627,20 @@
                 $('#finger_wrapper').addClass('hidden');
                 $('#enroll_finger_id').text('');
                 $('#btnHapusFinger').prop('disabled', true);
-                $('#finger_device_id').val('');
+
+                // Populate and filter devices dropdown by school_id
+                var $devSelect = $('#finger_device_id');
+                $devSelect.empty().append('<option value="">-- Pilih Device --</option>');
+                fingerDevices.forEach(function(dev) {
+                    if (!schoolId || dev.school_id == schoolId) {
+                        var typeLabel = dev.type ? dev.type.charAt(0).toUpperCase() + dev.type.slice(1) : '';
+                        $devSelect.append($('<option>', {
+                            value: dev.id,
+                            text: dev.name + (typeLabel ? ' (' + typeLabel + ')' : '')
+                        }));
+                    }
+                });
+                $devSelect.val('');
 
                 // Check existing Finger ID
                 var fingerId = $(this).data('finger');
@@ -633,6 +648,11 @@
                     $('#enroll_finger_id').text(fingerId);
                     $('#finger_wrapper').removeClass('hidden');
                     $('#btnHapusFinger').prop('disabled', false);
+                    $('#btnMulaiEnrollFinger').prop('disabled', true);
+                    $('#enroll_finger_status').html('<span class="text-gray-500 dark:text-gray-400 text-xs"><i class="fas fa-info-circle mr-1"></i>Sidik jari sudah terdaftar. Hapus sidik jari terlebih dahulu jika ingin mendaftarkan ulang.</span>');
+                } else {
+                    $('#btnHapusFinger').prop('disabled', true);
+                    $('#btnMulaiEnrollFinger').prop('disabled', false);
                 }
             });
 

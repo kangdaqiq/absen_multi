@@ -18,12 +18,19 @@ class SubscriptionController extends Controller
     {
         $school = Auth::user()->school;
 
-        // Active subscription with package eager-loaded
+        // Active subscription with package eager-loaded (prioritize paid, fallback to latest)
         $activeSubscription = Subscription::with('package')
             ->where('school_id', $school->id)
             ->where('status', 'paid')
             ->orderByDesc('expired_at')
             ->first();
+
+        if (!$activeSubscription) {
+            $activeSubscription = Subscription::with('package')
+                ->where('school_id', $school->id)
+                ->latest()
+                ->first();
+        }
 
         // Active pending (unpaid) subscription order if any
         $pendingSubscription = Subscription::with('package')
@@ -31,6 +38,12 @@ class SubscriptionController extends Controller
             ->where('status', 'unpaid')
             ->latest()
             ->first();
+
+        // Default package to preselect (pending -> active -> matched by quota -> first)
+        $defaultPackageId = $pendingSubscription?->package_id
+            ?? $activeSubscription?->package_id
+            ?? Package::where('is_active', true)->where('student_limit', $school->student_limit)->first()?->id
+            ?? Package::where('is_active', true)->orderBy('price_monthly')->first()?->id;
 
         $pendingOrderData = null;
         if ($pendingSubscription) {
@@ -86,6 +99,7 @@ class SubscriptionController extends Controller
             'activeSubscription',
             'pendingSubscription',
             'pendingOrderData',
+            'defaultPackageId',
             'packages',
             'history',
             'usage',

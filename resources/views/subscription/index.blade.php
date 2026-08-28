@@ -5,8 +5,8 @@
 @section('content')
     <div x-data="{
         showModal: false,
-        selectedPackageId: '{{ $pendingSubscription?->package_id ?? ($activeSubscription?->package_id ?? ($packages->first()?->id ?? '')) }}',
-        billingCycle: '{{ $pendingSubscription?->billing_cycle ?? 'monthly' }}',
+        selectedPackageId: '{{ $defaultPackageId }}',
+        billingCycle: '{{ $pendingSubscription?->billing_cycle ?? ($activeSubscription?->billing_cycle ?? 'monthly') }}',
         paymentTab: 'qris',
         isSubmitting: false,
         isPolling: false,
@@ -15,7 +15,7 @@
         copied: false,
         activeOrder: @js($pendingOrderData),
         packages: @js($packages->map(fn($p) => [
-            'id' => $p->id,
+            'id' => (string) $p->id,
             'name' => $p->name,
             'price_monthly' => (float)$p->price_monthly,
             'price_yearly' => (float)$p->price_yearly,
@@ -27,14 +27,14 @@
             'history_quota_months' => $p->history_quota_months
         ])),
         get selectedPackage() {
-            return this.packages.find(p => p.id == this.selectedPackageId) || this.packages[0];
+            return this.packages.find(p => String(p.id) === String(this.selectedPackageId)) || this.packages[0];
         },
         get currentPrice() {
             if (!this.selectedPackage) return 0;
             return this.billingCycle === 'yearly' ? this.selectedPackage.price_yearly : this.selectedPackage.price_monthly;
         },
         openRenewModal(pkgId = null, cycle = null) {
-            if (pkgId) this.selectedPackageId = pkgId;
+            if (pkgId) this.selectedPackageId = String(pkgId);
             if (cycle) this.billingCycle = cycle;
             this.showModal = true;
             if (this.activeOrder && this.activeOrder.status === 'unpaid') {
@@ -213,7 +213,7 @@
                     @endif
                 @endif
 
-                <button @click="openRenewModal()"
+                <button @click="openRenewModal('{{ $defaultPackageId }}', '{{ $pendingSubscription?->billing_cycle ?? ($activeSubscription?->billing_cycle ?? 'monthly') }}')"
                     class="inline-flex items-center gap-2 rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600 transition shadow-sm">
                     <i class="fas fa-bolt"></i> Perpanjang / Bayar Paket
                 </button>
@@ -618,9 +618,9 @@
                                     <div>
                                         <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Pilih Paket:</label>
                                         <select x-model="selectedPackageId" class="w-full rounded-lg border border-stroke bg-white px-3 py-2 text-xs font-medium text-black outline-none focus:border-brand-500 dark:border-strokedark dark:bg-boxdark dark:text-white">
-                                            <template x-for="p in packages" :key="p.id">
-                                                <option :value="p.id" x-text="p.name + ' - Rp ' + Number(p.price_monthly).toLocaleString('id-ID') + '/bln'"></option>
-                                            </template>
+                                            @foreach($packages as $pkg)
+                                                <option value="{{ $pkg->id }}">{{ $pkg->name }} - Rp {{ number_format($pkg->price_monthly, 0, ',', '.') }}/bln</option>
+                                            @endforeach
                                         </select>
                                     </div>
 
@@ -637,7 +637,6 @@
                                             <button type="button" @click="billingCycle = 'yearly'"
                                                 :class="billingCycle === 'yearly' ? 'border-brand-500 bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400 font-bold' : 'border-stroke bg-white text-gray-700 dark:border-strokedark dark:bg-boxdark dark:text-gray-300'"
                                                 class="rounded-lg border p-2.5 text-left text-xs transition relative">
-                                                <span class="absolute -top-2 right-2 rounded-full bg-green-500 px-1.5 py-0.2 text-[9px] font-bold text-white uppercase">Hemat</span>
                                                 <p class="font-medium">Tahunan (1 Tahun)</p>
                                                 <p class="text-[11px] text-gray-500" x-text="'Rp ' + Number(selectedPackage?.price_yearly || 0).toLocaleString('id-ID')"></p>
                                             </button>
@@ -666,7 +665,7 @@
                                 <div class="inline-block p-4 bg-white rounded-2xl border-2 border-brand-500 shadow-md">
                                     <div class="mb-2">
                                         <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-300 text-[11px] font-bold tracking-wide border border-brand-200 dark:border-brand-500/30">
-                                            <i class="fas fa-bolt text-amber-500"></i> QRIS Dinamis (Nominal Terkunci)
+                                            <i class="fas fa-bolt text-amber-500"></i> QRIS
                                         </div>
                                     </div>
                                     
@@ -704,7 +703,7 @@
                                         <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-400 opacity-75"></span>
                                         <span class="relative inline-flex rounded-full h-3 w-3 bg-brand-500"></span>
                                     </span>
-                                    <span>Menunggu pembayaran masuk... (Cek otomatis real-time)</span>
+                                    <span>Menunggu pembayaran masuk... </span>
                                 </div>
 
                                 <div class="flex items-center justify-between text-xs text-gray-400 pt-1">

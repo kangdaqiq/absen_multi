@@ -16,7 +16,7 @@
         </div>
 
         <div class="flex flex-wrap items-center gap-3">
-            <a href="{{ route('portal-izin.index') }}" target="_blank"
+            <a href="{{ route('portal-izin.index', auth()->user()->school_id ?? 1) }}" target="_blank"
                class="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800 transition shadow-theme-xs">
                 <i class="fas fa-external-link-alt text-brand-500"></i> Buka Portal Publik
             </a>
@@ -115,7 +115,6 @@
                     <option value="">Semua Jenis</option>
                     <option value="sakit" {{ request('jenis') === 'sakit' ? 'selected' : '' }}>Sakit</option>
                     <option value="izin" {{ request('jenis') === 'izin' ? 'selected' : '' }}>Izin</option>
-                    <option value="dispensasi" {{ request('jenis') === 'dispensasi' ? 'selected' : '' }}>Dispensasi</option>
                 </select>
 
                 <div class="relative">
@@ -362,7 +361,6 @@
                     <select name="jenis" required class="w-full rounded-xl border border-gray-200 dark:border-gray-800 bg-transparent px-3 py-2 text-xs outline-none focus:border-brand-500 dark:text-white dark:bg-gray-900">
                         <option value="sakit">Sakit</option>
                         <option value="izin" selected>Izin</option>
-                        <option value="dispensasi">Dispensasi</option>
                     </select>
                 </div>
 

@@ -24,9 +24,10 @@
             <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
                 Pengajuan Izin & Sakit Online
             </h1>
-            <p class="text-sm sm:text-base text-slate-500 dark:text-slate-400 mt-1.5 font-medium">
-                {{ $school->name ?? 'Portal Mandiri Orang Tua & Siswa' }}
-            </p>
+            <div class="inline-flex items-center gap-2 mt-2 px-3 py-1 rounded-full bg-slate-200/70 dark:bg-gray-800 text-xs font-semibold text-slate-700 dark:text-slate-300">
+                <i class="fas fa-school text-brand-500"></i>
+                <span>{{ $school->name }}</span>
+            </div>
         </div>
 
         @if(session('error'))
@@ -42,43 +43,27 @@
 
             <form action="{{ route('portal-izin.store') }}" method="POST" enctype="multipart/form-data" @submit="handleSubmit">
                 @csrf
+                <!-- Fixed School ID -->
+                <input type="hidden" name="school_id" value="{{ $school->id }}">
 
-                <!-- 1. Pemilihan Sekolah jika Multi-Tenant tanpa School Context -->
-                @if(!$school && isset($schools) && $schools->count() > 1)
-                <div class="mb-5">
-                    <label class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
-                        Pilih Sekolah <span class="text-error-500">*</span>
-                    </label>
-                    <select name="school_id" x-model="selectedSchoolId" @change="resetStudent" required
-                            class="w-full rounded-xl border border-slate-200 dark:border-gray-800 bg-slate-50/50 dark:bg-gray-800/50 px-4 py-3 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition">
-                        <option value="">-- Pilih Sekolah --</option>
-                        @foreach($schools as $sc)
-                            <option value="{{ $sc->id }}">{{ $sc->name }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                @else
-                    <input type="hidden" name="school_id" value="{{ $school->id ?? ($schools->first()->id ?? '') }}" x-model="selectedSchoolId">
-                @endif
-
-                <!-- 2. Pencarian Siswa (Autocomplete) -->
+                <!-- 1. Pencarian Siswa (Autocomplete) -->
                 <div class="mb-5 relative" x-data="{ openDropdown: false }">
                     <label class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
-                        Nama / NISN Siswa <span class="text-error-500">*</span>
+                        Nama / NIS Siswa <span class="text-error-500">*</span>
                     </label>
 
-                    <div class="relative">
+                    <div class="relative flex items-center">
+                        <div class="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 z-10 flex items-center justify-center w-5 h-5">
+                            <i class="fas fa-search text-sm" x-show="!isLoading"></i>
+                            <i class="fas fa-spinner fa-spin text-brand-500 text-sm" x-show="isLoading"></i>
+                        </div>
                         <input type="text"
                                x-model="searchQuery"
                                @input.debounce.300ms="searchStudents()"
                                @focus="if(searchResults.length > 0) openDropdown = true"
-                               placeholder="Ketik minimal 2 huruf Nama atau NISN siswa..."
-                               :disabled="!selectedSchoolId"
-                               class="w-full rounded-xl border border-slate-200 dark:border-gray-800 bg-slate-50/50 dark:bg-gray-800/50 px-4 py-3 pl-11 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition disabled:opacity-60 disabled:cursor-not-allowed">
-                        <div class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
-                            <i class="fas fa-search" x-show="!isLoading"></i>
-                            <i class="fas fa-spinner fa-spin text-brand-500" x-show="isLoading"></i>
-                        </div>
+                               placeholder="Ketik minimal 2 huruf Nama atau NIS siswa..."
+                               style="padding-left: 44px !important;"
+                               class="w-full rounded-xl border border-slate-200 dark:border-gray-800 bg-slate-50/50 dark:bg-gray-800/50 py-3 pr-4 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition">
                     </div>
 
                     <input type="hidden" name="student_id" :value="selectedStudent ? selectedStudent.id : ''" required>
@@ -93,7 +78,7 @@
                                 <div class="font-bold text-sm text-slate-800 dark:text-white" x-text="selectedStudent?.nama"></div>
                                 <div class="text-xs text-slate-500 dark:text-slate-400">
                                     Kelas: <span class="font-semibold text-brand-600 dark:text-brand-400" x-text="selectedStudent?.kelas"></span> |
-                                    NISN: <span x-text="selectedStudent?.nisn || '-'"></span>
+                                    NIS: <span x-text="selectedStudent?.nis || '-'"></span>
                                 </div>
                             </div>
                         </div>
@@ -113,7 +98,7 @@
                                 <div>
                                     <div class="font-semibold text-sm text-slate-800 dark:text-white" x-text="item.nama"></div>
                                     <div class="text-xs text-slate-400">
-                                        NISN: <span x-text="item.nisn || '-'"></span> • Kelas: <span class="text-brand-500 font-medium" x-text="item.kelas"></span>
+                                        NIS: <span x-text="item.nis || '-'"></span> • Kelas: <span class="text-brand-500 font-medium" x-text="item.kelas"></span>
                                     </div>
                                 </div>
                                 <span class="text-xs bg-slate-100 dark:bg-gray-700 text-slate-600 dark:text-slate-300 font-medium px-2 py-1 rounded-md">Pilih</span>
@@ -122,37 +107,30 @@
                     </div>
                 </div>
 
-                <!-- 3. Jenis Izin -->
+                <!-- 2. Jenis Izin (Hanya 2 Pilihan: Sakit dan Izin) -->
                 <div class="mb-5">
                     <label class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
                         Jenis Pengajuan <span class="text-error-500">*</span>
                     </label>
-                    <div class="grid grid-cols-3 gap-3">
+                    <div class="grid grid-cols-2 gap-3">
                         <label class="cursor-pointer">
                             <input type="radio" name="jenis" value="sakit" x-model="jenis" class="peer sr-only">
-                            <div class="p-3.5 rounded-xl border border-slate-200 dark:border-gray-800 text-center peer-checked:border-brand-500 peer-checked:bg-brand-50/50 dark:peer-checked:bg-brand-500/10 peer-checked:text-brand-600 dark:peer-checked:text-brand-400 hover:bg-slate-50 dark:hover:bg-gray-800/60 transition">
-                                <i class="fas fa-head-side-cough text-xl mb-1 block"></i>
-                                <span class="text-xs font-bold">Sakit</span>
+                            <div class="p-4 rounded-xl border-2 border-slate-200 dark:border-gray-800 text-center peer-checked:border-brand-500 peer-checked:bg-brand-50/50 dark:peer-checked:bg-brand-500/10 peer-checked:text-brand-600 dark:peer-checked:text-brand-400 hover:bg-slate-50 dark:hover:bg-gray-800/60 transition">
+                                <i class="fas fa-head-side-cough text-2xl mb-1.5 block"></i>
+                                <span class="text-sm font-bold">Sakit</span>
                             </div>
                         </label>
                         <label class="cursor-pointer">
                             <input type="radio" name="jenis" value="izin" x-model="jenis" class="peer sr-only">
-                            <div class="p-3.5 rounded-xl border border-slate-200 dark:border-gray-800 text-center peer-checked:border-brand-500 peer-checked:bg-brand-50/50 dark:peer-checked:bg-brand-500/10 peer-checked:text-brand-600 dark:peer-checked:text-brand-400 hover:bg-slate-50 dark:hover:bg-gray-800/60 transition">
-                                <i class="fas fa-calendar-day text-xl mb-1 block"></i>
-                                <span class="text-xs font-bold">Izin</span>
-                            </div>
-                        </label>
-                        <label class="cursor-pointer">
-                            <input type="radio" name="jenis" value="dispensasi" x-model="jenis" class="peer sr-only">
-                            <div class="p-3.5 rounded-xl border border-slate-200 dark:border-gray-800 text-center peer-checked:border-brand-500 peer-checked:bg-brand-50/50 dark:peer-checked:bg-brand-500/10 peer-checked:text-brand-600 dark:peer-checked:text-brand-400 hover:bg-slate-50 dark:hover:bg-gray-800/60 transition">
-                                <i class="fas fa-medal text-xl mb-1 block"></i>
-                                <span class="text-xs font-bold">Dispensasi</span>
+                            <div class="p-4 rounded-xl border-2 border-slate-200 dark:border-gray-800 text-center peer-checked:border-brand-500 peer-checked:bg-brand-50/50 dark:peer-checked:bg-brand-500/10 peer-checked:text-brand-600 dark:peer-checked:text-brand-400 hover:bg-slate-50 dark:hover:bg-gray-800/60 transition">
+                                <i class="fas fa-calendar-day text-2xl mb-1.5 block"></i>
+                                <span class="text-sm font-bold">Izin</span>
                             </div>
                         </label>
                     </div>
                 </div>
 
-                <!-- 4. Rentang Tanggal -->
+                <!-- 3. Rentang Tanggal -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
                     <div>
                         <label class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
@@ -170,7 +148,7 @@
                     </div>
                 </div>
 
-                <!-- 5. Alasan / Keterangan -->
+                <!-- 4. Alasan / Keterangan -->
                 <div class="mb-5">
                     <label class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
                         Alasan / Keterangan Lengkap <span class="text-error-500">*</span>
@@ -179,7 +157,7 @@
                               class="w-full rounded-xl border border-slate-200 dark:border-gray-800 bg-slate-50/50 dark:bg-gray-800/50 px-4 py-3 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition"></textarea>
                 </div>
 
-                <!-- 6. Upload Bukti Foto / Surat Dokter -->
+                <!-- 5. Upload Bukti Foto / Surat Dokter -->
                 <div class="mb-6">
                     <label class="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
                         Upload Surat Dokter / Bukti Foto <span class="text-xs font-normal text-slate-400">(Opsional, Maks 5MB)</span>
@@ -206,7 +184,7 @@
                     </div>
                 </div>
 
-                <!-- 7. Data Pengaju (Orang Tua / Siswa) -->
+                <!-- 6. Data Pengaju (Orang Tua / Siswa) -->
                 <div class="p-4 rounded-2xl bg-slate-50 dark:bg-gray-800/40 border border-slate-200/80 dark:border-gray-800 mb-6 space-y-4">
                     <div class="text-xs font-bold text-slate-500 uppercase tracking-wider">Informasi Pengirim</div>
                     
@@ -245,14 +223,14 @@
 
         <!-- Footer Note -->
         <div class="text-center mt-6 text-xs text-slate-400">
-            Sistem Absensi & Perizinan Sekolah &copy; {{ date('Y') }}
+            Sistem Absensi & Perizinan {{ $school->name }} &copy; {{ date('Y') }}
         </div>
     </div>
 
     <script>
         function leavePortal() {
             return {
-                selectedSchoolId: '{{ $school->id ?? ($schools->first()->id ?? '') }}',
+                selectedSchoolId: '{{ $school->id }}',
                 searchQuery: '',
                 searchResults: [],
                 selectedStudent: null,

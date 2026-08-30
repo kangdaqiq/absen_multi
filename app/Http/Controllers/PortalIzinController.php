@@ -22,16 +22,23 @@ class PortalIzinController extends Controller
     /**
      * Tampilkan form pengajuan izin mandiri
      */
-    public function index(Request $request, $schoolCode = null)
+    public function index(Request $request, $schoolId = null)
     {
         $school = null;
 
-        // 1. Cek dari parameter route
-        if ($schoolCode) {
-            $school = School::where('code', $schoolCode)->where('is_active', true)->first();
+        // 1. Cek dari parameter route (id atau code)
+        if ($schoolId) {
+            $school = School::where('id', $schoolId)
+                ->orWhere('code', $schoolId)
+                ->first();
         }
 
-        // 2. Cek dari custom domain
+        // 2. Cek dari user yang login (jika ada)
+        if (!$school && auth()->check() && auth()->user()->school_id) {
+            $school = auth()->user()->school;
+        }
+
+        // 3. Cek dari custom domain
         if (!$school) {
             $host = $request->getHost();
             $globalHost = parse_url(config('app.url'), PHP_URL_HOST) ?? 'localhost';
@@ -40,18 +47,19 @@ class PortalIzinController extends Controller
             }
         }
 
-        // 3. Cek dari mode self-hosted
-        if (!$school && config('app.mode') === 'self_hosted') {
-            $school = School::where('is_active', true)->first();
-        }
-
-        // 4. Fallback jika SaaS & tanpa kode: ambil daftar sekolah aktif
-        $schools = null;
+        // 4. Default / Fallback: ambil sekolah aktif pertama
         if (!$school) {
-            $schools = School::where('is_active', true)->orderBy('name')->get();
+            $school = School::where('is_active', true)->first();
+            if ($school) {
+                return redirect()->route('portal-izin.index', $school->id);
+            }
         }
 
-        return view('portal-izin.index', compact('school', 'schools'));
+        if (!$school) {
+            abort(404, 'Data sekolah tidak ditemukan.');
+        }
+
+        return view('portal-izin.index', compact('school'));
     }
 
     /**
@@ -66,31 +74,32 @@ class PortalIzinController extends Controller
             return response()->json([]);
         }
 
-        $students = Siswa::where('school_id', $schoolId)
-            ->where('is_active', true)
-            ->where(function ($q) use ($query) {
-                $q->where('nama', 'LIKE', "%{$query}%")
-                  ->orWhere('nisn', 'LIKE', "%{$query}%")
-                  ->orWhere('nis', 'LIKE', "%{$query}%");
-            })
-            ->with('kelas')
-            ->limit(10)
-            ->get(['id', 'nama', 'nisn', 'nis', 'kelas_id', 'no_wa', 'wa_ortu', 'nama_ortu']);
+        try {
+            $students = Siswa::where('school_id', $schoolId)
+                ->where(function ($q) use ($query) {
+                    $q->where('nama', 'LIKE', "%{$query}%")
+                      ->orWhere('nis', 'LIKE', "%{$query}%");
+                })
+                ->with('kelas')
+                ->limit(10)
+                ->get(['id', 'nama', 'nis', 'kelas_id', 'no_wa', 'wa_ortu']);
 
-        $results = $students->map(function ($s) {
-            return [
-                'id'         => $s->id,
-                'nama'       => $s->nama,
-                'nisn'       => $s->nisn,
-                'nis'        => $s->nis,
-                'kelas'      => $s->kelas ? $s->kelas->nama_kelas : '-',
-                'no_wa'      => $s->no_wa,
-                'wa_ortu'    => $s->wa_ortu,
-                'nama_ortu'  => $s->nama_ortu,
-            ];
-        });
+            $results = $students->map(function ($s) {
+                return [
+                    'id'      => $s->id,
+                    'nama'    => $s->nama,
+                    'nis'     => $s->nis ?? '-',
+                    'kelas'   => $s->kelas ? $s->kelas->nama_kelas : '-',
+                    'no_wa'   => $s->no_wa,
+                    'wa_ortu' => $s->wa_ortu,
+                ];
+            });
 
-        return response()->json($results);
+            return response()->json($results);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error("Error searchStudent: " . $e->getMessage());
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
     }
 
     /**
@@ -101,7 +110,7 @@ class PortalIzinController extends Controller
         $validated = $request->validate([
             'school_id'       => 'required|exists:schools,id',
             'student_id'      => 'required|exists:siswa,id',
-            'jenis'           => 'required|in:sakit,izin,dispensasi',
+            'jenis'           => 'required|in:sakit,izin',
             'tanggal_mulai'   => 'required|date',
             'tanggal_selesai' => 'required|date|after_or_equal:tanggal_mulai',
             'keterangan'      => 'required|string|max:1000',

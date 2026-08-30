@@ -94,7 +94,7 @@ class StudentLeaveController extends Controller
                   ->orWhere('keterangan', 'LIKE', "%{$search}%")
                   ->orWhereHas('student', function ($sq) use ($search) {
                       $sq->where('nama', 'LIKE', "%{$search}%")
-                         ->orWhere('nisn', 'LIKE', "%{$search}%");
+                         ->orWhere('nis', 'LIKE', "%{$search}%");
                   });
             });
         }

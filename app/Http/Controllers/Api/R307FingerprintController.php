@@ -57,28 +57,28 @@ public function handle(Request $request)
     $apiKey = trim($request->input('api_key', ''));
     $this->currentApiKey = $apiKey;
 
-// Parse scanned_at (offline sync)
-$now = now();
-$scannedAt = trim($request->input('scanned_at', ''));
-if ($scannedAt !== '') {
-    try {
-        $parsed = Carbon::parse($scannedAt);
-        if ($parsed->lte(now()) && $parsed->gte(now()->subDays(7))) {
-            $now = $parsed;
-        }
-    } catch (\Exception $e) {}
-}
+    // 1. Auth: Get Device
+    if ($apiKey === '') {
+        $this->logFailedAuth('', 'API Key Kosong', $request);
+        return $this->response(false, 'gagal', 'API Key Kosong');
+    }
 
-// 1. Auth: Get Device
-if ($apiKey === '') {
-    $this->logFailedAuth('', 'API Key Kosong', $request);
-    return $this->response(false, 'gagal', 'API Key Kosong');
-}
+    $device = $this->authenticate($apiKey, $request);
+    if (!$device) {
+        return $this->response(false, 'gagal', 'API Key Invalid');
+    }
 
-$device = $this->authenticate($apiKey, $request);
-if (!$device) {
-return $this->response(false, 'gagal', 'API Key Invalid');
-}
+    // Parse scanned_at (offline sync) or current time with school timezone
+    $now = now();
+    $scannedAt = trim($request->input('scanned_at', ''));
+    if ($scannedAt !== '') {
+        try {
+            $parsed = Carbon::parse($scannedAt);
+            if ($parsed->lte(now()) && $parsed->gte(now()->subDays(7))) {
+                $now = $parsed;
+            }
+        } catch (\Exception $e) {}
+    }
 
 // 2. Input
 $fingerId = $request->input('finger_id');
@@ -577,6 +577,13 @@ $guru = Guru::where('enroll_finger_status', 'requested')
         }
         if ($device) {
             $this->currentSchoolId = $device->school_id;
+            $schoolTz = \App\Models\Setting::where('school_id', $device->school_id)
+                ->where('setting_key', 'timezone')
+                ->value('setting_value');
+            if ($schoolTz) {
+                date_default_timezone_set($schoolTz);
+                config(['app.timezone' => $schoolTz]);
+            }
             DB::table('api_keys')->where('id', $device->id)->update(['last_used_at' => now()]);
         }
         return $device;

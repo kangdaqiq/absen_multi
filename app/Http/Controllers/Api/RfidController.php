@@ -391,6 +391,14 @@ class RfidController extends Controller
 
         $this->currentSchoolId = $device->school_id;
 
+        $schoolTz = \App\Models\Setting::where('school_id', $device->school_id)
+            ->where('setting_key', 'timezone')
+            ->value('setting_value');
+        if ($schoolTz) {
+            date_default_timezone_set($schoolTz);
+            config(['app.timezone' => $schoolTz]);
+        }
+
         // Update last used (manual query to avoid timestamp interfering if model timestamps disabled)
         DB::table('api_keys')->where('id', $device->id)->update(['last_used_at' => now()]);
 

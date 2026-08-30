@@ -73,6 +73,29 @@
                                     class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
                             </div>
 
+                            <div>
+                                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Zona Waktu (Timezone)</label>
+                                @php
+                                    $currentTimezone = $settings['timezone'] ?? config('app.timezone', 'Asia/Jakarta');
+                                @endphp
+                                <select name="timezone"
+                                    class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                                    <optgroup label="Zona Waktu Indonesia">
+                                        <option value="Asia/Jakarta" {{ $currentTimezone === 'Asia/Jakarta' ? 'selected' : '' }}>WIB - Asia/Jakarta (UTC+07:00)</option>
+                                        <option value="Asia/Pontianak" {{ $currentTimezone === 'Asia/Pontianak' ? 'selected' : '' }}>WIB - Asia/Pontianak (UTC+07:00)</option>
+                                        <option value="Asia/Makassar" {{ $currentTimezone === 'Asia/Makassar' ? 'selected' : '' }}>WITA - Asia/Makassar (UTC+08:00)</option>
+                                        <option value="Asia/Jayapura" {{ $currentTimezone === 'Asia/Jayapura' ? 'selected' : '' }}>WIT - Asia/Jayapura (UTC+09:00)</option>
+                                    </optgroup>
+                                    <optgroup label="Zona Waktu Lainnya">
+                                        <option value="Asia/Singapore" {{ $currentTimezone === 'Asia/Singapore' ? 'selected' : '' }}>Asia/Singapore (UTC+08:00)</option>
+                                        <option value="Asia/Kuala_Lumpur" {{ $currentTimezone === 'Asia/Kuala_Lumpur' ? 'selected' : '' }}>Asia/Kuala Lumpur (UTC+08:00)</option>
+                                        <option value="Asia/Bangkok" {{ $currentTimezone === 'Asia/Bangkok' ? 'selected' : '' }}>Asia/Bangkok (UTC+07:00)</option>
+                                        <option value="UTC" {{ $currentTimezone === 'UTC' ? 'selected' : '' }}>UTC (UTC+00:00)</option>
+                                    </optgroup>
+                                </select>
+                                <p class="mt-1 text-xs text-gray-500">Zona waktu digunakan untuk sinkronisasi jam absensi, laporan, dan jadwal otomatis.</p>
+                            </div>
+
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
                                     <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Nama Kepala Sekolah</label>

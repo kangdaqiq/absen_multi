@@ -23,6 +23,18 @@ class AppServiceProvider extends ServiceProvider
         \Illuminate\Pagination\Paginator::useTailwind();
         \Carbon\Carbon::setLocale('id');
 
+        try {
+            if (\Illuminate\Support\Facades\Schema::hasTable('settings')) {
+                $globalTz = \App\Models\Setting::where('school_id', 0)->where('setting_key', 'timezone')->value('setting_value');
+                if ($globalTz) {
+                    date_default_timezone_set($globalTz);
+                    config(['app.timezone' => $globalTz]);
+                }
+            }
+        } catch (\Throwable $e) {
+            // DB not ready or during artisan commands
+        }
+
         // Force HTTPS if accessed via secure proxy, explicitly secure, or if FORCE_HTTPS is true in .env
         // Removed app()->environment('production') so it doesn't force HTTPS on local LAN servers
         if (request()->header('x-forwarded-proto') === 'https' ||
@@ -105,6 +117,11 @@ class AppServiceProvider extends ServiceProvider
                 }
 
                 $schoolName = $settings['nama_sekolah'] ?? $schoolName;
+
+                if (!empty($settings['timezone'])) {
+                    date_default_timezone_set($settings['timezone']);
+                    config(['app.timezone' => $settings['timezone']]);
+                }
 
                 // Logo: pakai logo sekolah jika akses via custom domain ATAU mode self-hosted.
                 // Jika dari domain global (SaaS) → pakai logo SVG bawaan aplikasi (logo.svg)

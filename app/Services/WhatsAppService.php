@@ -221,6 +221,85 @@ class WhatsAppService
         $this->queueMessage($phone, $message, $schoolId, bypassLastSeen: true);
     }
 
+    public function sendLeaveSubmittedNotification(\App\Models\StudentLeave $leave): void
+    {
+        $siswa = $leave->student;
+        if (!$siswa) return;
+
+        $kelas = $siswa->kelas;
+        if (!$kelas) return;
+
+        // Wali Kelas 1 & 2
+        $waliGurus = array_filter([$kelas->waliKelas, $kelas->waliKelas2]);
+        foreach ($waliGurus as $wali) {
+            if (!empty($wali?->no_wa)) {
+                $msg = WhatsAppMessageTemplates::leaveSubmittedToTeacher(
+                    namaWali: $wali->nama,
+                    namaSiswa: $siswa->nama,
+                    kelas: $kelas->nama_kelas,
+                    jenis: $leave->jenis,
+                    tglMulai: $leave->tanggal_mulai->format('d/m/Y'),
+                    tglSelesai: $leave->tanggal_selesai->format('d/m/Y'),
+                    keterangan: $leave->keterangan,
+                    code: $leave->code
+                );
+                $this->queueMessage($wali->no_wa, $msg, $leave->school_id, delaySeconds: 10, bypassLastSeen: true);
+            }
+        }
+    }
+
+    public function sendLeaveApprovedNotification(\App\Models\StudentLeave $leave, string $approverName): void
+    {
+        $siswa = $leave->student;
+        if (!$siswa) return;
+
+        $targetPhones = array_unique(array_filter([
+            $leave->no_wa_pengaju,
+            $siswa->wa_ortu,
+            $siswa->no_wa,
+        ]));
+
+        if (empty($targetPhones)) return;
+
+        $msg = WhatsAppMessageTemplates::leaveApprovedToParent(
+            namaSiswa: $siswa->nama,
+            jenis: $leave->jenis,
+            tglMulai: $leave->tanggal_mulai->format('d/m/Y'),
+            tglSelesai: $leave->tanggal_selesai->format('d/m/Y'),
+            approverName: $approverName
+        );
+
+        foreach ($targetPhones as $phone) {
+            $this->queueMessage($phone, $msg, $leave->school_id, delaySeconds: 15, bypassLastSeen: true);
+        }
+    }
+
+    public function sendLeaveRejectedNotification(\App\Models\StudentLeave $leave, string $reason): void
+    {
+        $siswa = $leave->student;
+        if (!$siswa) return;
+
+        $targetPhones = array_unique(array_filter([
+            $leave->no_wa_pengaju,
+            $siswa->wa_ortu,
+            $siswa->no_wa,
+        ]));
+
+        if (empty($targetPhones)) return;
+
+        $msg = WhatsAppMessageTemplates::leaveRejectedToParent(
+            namaSiswa: $siswa->nama,
+            jenis: $leave->jenis,
+            tglMulai: $leave->tanggal_mulai->format('d/m/Y'),
+            tglSelesai: $leave->tanggal_selesai->format('d/m/Y'),
+            reason: $reason
+        );
+
+        foreach ($targetPhones as $phone) {
+            $this->queueMessage($phone, $msg, $leave->school_id, delaySeconds: 15, bypassLastSeen: true);
+        }
+    }
+
     private function queueMessage($phone, $message, $schoolId = null, ?int $delaySeconds = null, bool $bypassLastSeen = false)
     {
         $originalPhone = $phone;

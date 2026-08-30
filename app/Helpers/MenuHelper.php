@@ -86,6 +86,7 @@ class MenuHelper
             $absensiSubItems = [];
             if (!$isOffice && !$isPesantren) {
                 $absensiSubItems[] = ['name' => 'Absensi Siswa', 'path' => route('absensi.index', [], false)];
+                $absensiSubItems[] = ['name' => 'Pengajuan Izin', 'path' => route('student-leaves.index', [], false)];
             }
             if (in_array($role, ['admin', 'teacher']) && !$isPesantren) {
                 $absensiSubItems[] = ['name' => "Absensi $labelKaryawan", 'path' => route('absensi-guru.index', [], false)];

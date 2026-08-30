@@ -40,6 +40,12 @@ Route::get('/login', [AuthController::class, 'showLoginForm'])->name('login');
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
+// ── Portal Pengajuan Izin & Sakit Mandiri (Publik) ────────────
+Route::get('/pengajuan-izin/{schoolCode?}', [App\Http\Controllers\PortalIzinController::class, 'index'])->name('portal-izin.index');
+Route::get('/portal-izin/search', [App\Http\Controllers\PortalIzinController::class, 'searchStudent'])->name('portal-izin.search');
+Route::post('/pengajuan-izin', [App\Http\Controllers\PortalIzinController::class, 'store'])->name('portal-izin.store');
+Route::get('/pengajuan-izin/status/{code}', [App\Http\Controllers\PortalIzinController::class, 'status'])->name('portal-izin.status');
+
 // Super Admin Routes
 Route::middleware(['auth', 'self_hosted_guard'])->prefix('super-admin')->name('super-admin.')->group(function () {
     Route::middleware('role:super_admin')->group(function () {
@@ -122,6 +128,13 @@ Route::middleware('auth')->group(function () {
         Route::post('/absensi/update', [App\Http\Controllers\AttendanceController::class, 'update'])->name('absensi.update');
         Route::post('/absensi/bulk-update', [App\Http\Controllers\AttendanceController::class, 'bulkUpdate'])->name('absensi.bulkUpdate');
         Route::delete('/absensi/destroy', [App\Http\Controllers\AttendanceController::class, 'destroy'])->name('absensi.destroy');
+
+        // Pengajuan Izin & Sakit Siswa
+        Route::get('/student-leaves', [App\Http\Controllers\StudentLeaveController::class, 'index'])->name('student-leaves.index');
+        Route::post('/student-leaves', [App\Http\Controllers\StudentLeaveController::class, 'store'])->name('student-leaves.store');
+        Route::post('/student-leaves/{id}/approve', [App\Http\Controllers\StudentLeaveController::class, 'approve'])->name('student-leaves.approve');
+        Route::post('/student-leaves/{id}/reject', [App\Http\Controllers\StudentLeaveController::class, 'reject'])->name('student-leaves.reject');
+        Route::delete('/student-leaves/{id}', [App\Http\Controllers\StudentLeaveController::class, 'destroy'])->name('student-leaves.destroy');
 
         // Rekap Siswa
         Route::get('/rekap', [App\Http\Controllers\RekapController::class, 'index'])->name('rekap.index');

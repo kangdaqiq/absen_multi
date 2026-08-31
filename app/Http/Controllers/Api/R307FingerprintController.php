@@ -852,8 +852,45 @@ $guru = Guru::where('enroll_finger_status', 'requested')
                         ]);
                     }
 
-                    // Cek Rentang Jam Scan Pulang
-                    if (!$shift->isInCheckOutWindow($now->format('H:i:s'))) {
+                    // Teacher Check-Out is ENABLED
+                    // 1. Cek apakah sedang berada di dalam rentang jam scan pulang shift
+                    $inCheckoutWindow = $shift->isInCheckOutWindow($now->format('H:i:s'));
+
+                    // 2. Cek sesi gerbang aktif (untuk pulang cepat / izin gerbang)
+                    $schoolGateCardUids = GateCard::where('school_id', $device->school_id)
+                        ->pluck('uid_rfid')
+                        ->filter()
+                        ->toArray();
+
+                    $gateSession = TeacherCheckoutSession::where('expires_at', '>', $now)
+                        ->where('status', 'open')
+                        ->where(function ($q) use ($device, $schoolGateCardUids) {
+                            $q->whereIn('uid_rfid', $schoolGateCardUids)
+                              ->orWhereHas('teacher', fn($t) => $t->where('school_id', $device->school_id));
+                        })
+                        ->orderBy('created_at', 'desc')
+                        ->first();
+
+                    // 3. Jika di luar rentang jam pulang DAN tidak ada izin gerbang -> Tolak
+                    if (!$inCheckoutWindow && !$gateSession) {
+                        // Jika masih dalam rentang jam masuk, anggap tap ulang (mencegah salah paham)
+                        if ($shift->isInCheckInWindow($now->format('H:i:s'))) {
+                            DB::commit();
+                            ApiLog::create([
+                                'school_id' => $this->currentSchoolId,
+                                'api_key' => $this->currentApiKey,
+                                'action' => 'checkin_success',
+                                'uid' => $fingerId,
+                                'success' => true,
+                                'message' => 'Sudah Absen Masuk: ' . $guru->nama,
+                                'created_at' => $now
+                            ]);
+                            return $this->response(true, 'success', "Sudah Absen Masuk.", 'ok', [
+                                'type' => 'absen_sudah_masuk_guru',
+                                'nama' => $guru->nama
+                            ]);
+                        }
+
                         DB::rollBack();
                         $windowStr = ($shift->awal_absen_pulang && $shift->akhir_absen_pulang)
                             ? \Carbon\Carbon::parse($shift->awal_absen_pulang)->format('H:i') . '-' . \Carbon\Carbon::parse($shift->akhir_absen_pulang)->format('H:i')
@@ -874,27 +911,7 @@ $guru = Guru::where('enroll_finger_status', 'requested')
                         ]);
                     }
 
-                    // Check for active gate session
-                    $gateSession = TeacherCheckoutSession::where('expires_at', '>', $now)
-                        ->where('status', 'open')
-                        ->orderBy('created_at', 'desc')
-                        ->first();
-
-                    if (!$gateSession) {
-                        DB::rollBack();
-                        ApiLog::create([
-                            'school_id' => $device->school_id,
-                            'api_key' => $device->api_key,
-                            'action' => 'scan_failed',
-                            'uid' => $fingerId,
-                            'success' => false,
-                            'message' => 'Belum ada izin gerbang: ' . $guru->nama,
-                            'created_at' => now()
-                        ]);
-                        return $this->response(false, 'gagal', 'Belum ada izin gerbang.', 'warning', ['type' => 'no_authorization', 'nama' => $guru->nama]);
-                    }
-
-                    // Process Pulang
+                    // 4. Proses Pulang
                     $masuk = \Carbon\Carbon::parse($absensi->tanggal . ' ' . $absensi->jam_masuk);
                     $totalSeconds = $now->diffInSeconds($masuk);
                     
@@ -904,18 +921,20 @@ $guru = Guru::where('enroll_finger_status', 'requested')
                     ]);
                     DB::commit();
 
+                    $authorizedBy = $gateSession ? $gateSession->teacher_name : 'Sistem';
+
                     $hours = floor($totalSeconds / 3600);
                     $mins = floor(($totalSeconds % 3600) / 60);
 
                     try {
-                        $this->wa->sendCheckOut($guru->nama, $guru->no_wa, $now->format('H:i'), $hours, $mins, $gateSession->teacher_name, $device->school_id, $masuk->format('H:i'), null, $now->format('d/m/Y'));
+                        $this->wa->sendCheckOut($guru->nama, $guru->no_wa, $now->format('H:i'), $hours, $mins, $authorizedBy, $device->school_id, $masuk->format('H:i'), null, $now->format('d/m/Y'));
                     } catch (\Exception $e) {
                         Log::error("WA Guru Checkout Error: " . $e->getMessage());
                     }
 
                     // Send Telegram Checkout
                     try {
-                        $this->telegram->sendCheckOut($guru->nama, $guru->telegram_chat_id, $now->format('H:i'), $hours, $mins, $gateSession->teacher_name, $device->school_id, $masuk->format('H:i'), null, $now->format('d/m/Y'));
+                        $this->telegram->sendCheckOut($guru->nama, $guru->telegram_chat_id, $now->format('H:i'), $hours, $mins, $authorizedBy, $device->school_id, $masuk->format('H:i'), null, $now->format('d/m/Y'));
                     } catch (\Exception $e) {
                         Log::error("Telegram Guru Checkout Error: " . $e->getMessage());
                     }
@@ -933,7 +952,7 @@ $guru = Guru::where('enroll_finger_status', 'requested')
                     return $this->response(true, 'success', "Absen pulang berhasil.", 'ok', [
                         'type' => 'absen_pulang_guru',
                         'nama' => $guru->nama,
-                        'authorized_by' => $gateSession->teacher_name
+                        'authorized_by' => $authorizedBy
                     ]);
                 }
 

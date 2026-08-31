@@ -214,8 +214,37 @@ class RfidController extends Controller
                     ]);
                 }
 
-                // Cek Rentang Jam Scan Pulang
-                if (!$shift->isInCheckOutWindow($now->format('H:i:s'))) {
+                // Teacher Check-Out is ENABLED
+                // 1. Cek apakah sedang berada di dalam rentang jam scan pulang shift
+                $inCheckoutWindow = $shift->isInCheckOutWindow($now->format('H:i:s'));
+
+                // 2. Cek sesi gerbang aktif (untuk pulang cepat / izin gerbang)
+                $schoolGateCardUids = GateCard::where('school_id', $device->school_id)
+                    ->pluck('uid_rfid')
+                    ->filter()
+                    ->toArray();
+
+                $gateSession = TeacherCheckoutSession::where('expires_at', '>', $now)
+                    ->where('status', 'open')
+                    ->where(function ($q) use ($device, $schoolGateCardUids) {
+                        $q->whereIn('uid_rfid', $schoolGateCardUids)
+                          ->orWhereHas('teacher', fn($t) => $t->where('school_id', $device->school_id));
+                    })
+                    ->orderBy('created_at', 'desc')
+                    ->first();
+
+                // 3. Jika di luar rentang jam pulang DAN tidak ada izin gerbang -> Tolak
+                if (!$inCheckoutWindow && !$gateSession) {
+                    // Jika masih dalam rentang jam masuk, anggap tap ulang (mencegah salah paham)
+                    if ($shift->isInCheckInWindow($now->format('H:i:s'))) {
+                        DB::commit();
+                        $this->logRequest($apiKey, 'checkin_success', $uid, true, 'Sudah Absen Masuk: ' . $teacher->nama);
+                        return $this->response(true, 'success', "Sudah Absen Masuk.", 'ok', [
+                            'type' => 'absen_sudah_masuk_guru',
+                            'nama' => $teacher->nama
+                        ]);
+                    }
+
                     DB::rollBack();
                     $windowStr = ($shift->awal_absen_pulang && $shift->akhir_absen_pulang)
                         ? \Carbon\Carbon::parse($shift->awal_absen_pulang)->format('H:i') . '-' . \Carbon\Carbon::parse($shift->akhir_absen_pulang)->format('H:i')
@@ -228,19 +257,7 @@ class RfidController extends Controller
                     ]);
                 }
 
-                // Teacher Check-Out is ENABLED
-                // Require Gate Session to check out
-                $gateSession = TeacherCheckoutSession::where('expires_at', '>', $now)
-                    ->where('status', 'open')
-                    ->orderBy('created_at', 'desc')
-                    ->first();
-
-                if (!$gateSession) {
-                    DB::rollBack();
-                    return $this->response(false, 'gagal', 'Belum ada izin gerbang.', 'warning', ['type' => 'no_authorization', 'nama' => $teacher->nama]);
-                }
-
-                // Process Pulang
+                // 4. Proses Pulang
                 $masuk = Carbon::parse($absensi->tanggal . ' ' . $absensi->jam_masuk);
                 $totalSeconds = $masuk->diffInSeconds($now, false);
                 if ($totalSeconds < 0) {
@@ -253,12 +270,14 @@ class RfidController extends Controller
                 ]);
                 DB::commit();
 
+                $authorizedBy = $gateSession ? $gateSession->teacher_name : 'Sistem';
+
                 // Send WA Check-Out
                 $hours = floor($totalSeconds / 3600);
                 $mins = floor(($totalSeconds % 3600) / 60);
 
                 try {
-                    $this->wa->sendCheckOut($teacher->nama, $teacher->no_wa, $now->format('H:i'), $hours, $mins, $gateSession->teacher_name, $device->school_id, $masuk->format('H:i'), null, $now->format('d/m/Y'));
+                    $this->wa->sendCheckOut($teacher->nama, $teacher->no_wa, $now->format('H:i'), $hours, $mins, $authorizedBy, $device->school_id, $masuk->format('H:i'), null, $now->format('d/m/Y'));
                 } catch (\Exception $e) {
                     Log::error("WA Guru Checkout Error: " . $e->getMessage());
                 }
@@ -267,7 +286,7 @@ class RfidController extends Controller
                 return $this->response(true, 'success', "Absen Berhasil.", 'ok', [
                     'type' => 'absen_pulang_guru',
                     'nama' => $teacher->nama,
-                    'authorized_by' => $gateSession->teacher_name
+                    'authorized_by' => $authorizedBy
                 ]);
             }
 

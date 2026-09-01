@@ -270,9 +270,8 @@ class AutoBolosCommand extends Command
             ->with(['student.kelas', 'student.kelas.jurusan'])
             ->get();
 
-        // Jika tidak ada siswa absen (non-T) SAMA SEKALI di sekolah, bisa langsung return
-        $hasRealAbsent = $absentStudents->whereIn('status', ['A', 'B', 'I', 'S'])->isNotEmpty();
-        if (!$hasRealAbsent && $absentStudents->where('status', 'T')->isEmpty()) {
+        // Jika tidak ada data absensi (hadir maupun tidak hadir) sama sekali di sekolah hari ini, skip
+        if ($presentStudents->isEmpty() && $absentStudents->isEmpty()) {
             return;
         }
 
@@ -289,14 +288,15 @@ class AutoBolosCommand extends Command
                 return $att->student->kelas_id == $kelas->id;
             });
 
-            if ($absenKelas->isEmpty()) {
-                continue; // Tidak ada yang absen di kelas ini, skip
-            }
-
             // Hitung siswa hadir di kelas ini
             $totalPresentKelas = $presentStudents->filter(function ($att) use ($kelas) {
                 return $att->student->kelas_id == $kelas->id;
             })->count();
+
+            // Lewati jika kelas tidak memiliki data siswa / absensi sama sekali hari ini
+            if ($totalPresentKelas === 0 && $absenKelas->isEmpty()) {
+                continue;
+            }
 
             $walis = array_filter([$kelas->waliKelas, $kelas->waliKelas2]);
             $namaWaliList = [];
@@ -322,6 +322,7 @@ class AutoBolosCommand extends Command
                     'phone_number' => $kelas->wa_group_id,
                     'message'      => $msgKelas,
                     'status'       => 'pending',
+                    'priority'     => 10,
                     'created_at'   => now()
                 ]);
             }
@@ -343,6 +344,7 @@ class AutoBolosCommand extends Command
                             'phone_number' => $noWa,
                             'message'      => $msgKelas,
                             'status'       => 'pending',
+                            'priority'     => 10,
                             'created_at'   => now()
                         ]);
                         $mq->bypass_last_seen = true;

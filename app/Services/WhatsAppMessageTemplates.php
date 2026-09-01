@@ -547,6 +547,7 @@ class WhatsAppMessageTemplates
             'S' => '🤒 Sakit'
         ];
 
+        $hasDetails = false;
         foreach (['T', 'A', 'B', 'I', 'S'] as $status) {
             if (!isset($absentStudentsGrouped[$status])) {
                 continue;
@@ -554,13 +555,19 @@ class WhatsAppMessageTemplates
 
             $students = $absentStudentsGrouped[$status];
             $count = is_countable($students) ? count($students) : iterator_count($students);
-
-            $msg .= "*{$statusLabels[$status]}* ({$count} siswa)\n";
-            foreach ($students as $att) {
-                $kelas = $att->student->kelas->nama_kelas ?? '-';
-                $msg .= "  • {$att->student->nama} ({$kelas})\n";
+            if ($count > 0) {
+                $hasDetails = true;
+                $msg .= "*{$statusLabels[$status]}* ({$count} siswa)\n";
+                foreach ($students as $att) {
+                    $kelas = $att->student->kelas->nama_kelas ?? '-';
+                    $msg .= "  • {$att->student->nama} ({$kelas})\n";
+                }
+                $msg .= "\n";
             }
-            $msg .= "\n";
+        }
+
+        if (!$hasDetails) {
+            $msg .= "🎉 *Nihil (Semua Hadir)*\n\n";
         }
 
         $msg .= str_repeat("─", 30) . "\n";
@@ -597,6 +604,7 @@ class WhatsAppMessageTemplates
             'S' => '🤒 Sakit'
         ];
 
+        $hasDetails = false;
         foreach (['T', 'A', 'B', 'I', 'S'] as $status) {
             if (!isset($absentStudentsGrouped[$status])) {
                 continue;
@@ -604,8 +612,14 @@ class WhatsAppMessageTemplates
 
             $students = $absentStudentsGrouped[$status];
             $count = is_countable($students) ? count($students) : iterator_count($students);
+            if ($count > 0) {
+                $hasDetails = true;
+                $msg .= "*{$statusLabels[$status]}*: {$count} siswa\n";
+            }
+        }
 
-            $msg .= "*{$statusLabels[$status]}*: {$count} siswa\n";
+        if (!$hasDetails) {
+            $msg .= "🎉 *Nihil (Semua Hadir)*\n";
         }
 
         if (!empty($statsByJurusan)) {

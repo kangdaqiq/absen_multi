@@ -17,7 +17,7 @@ class ProcessWhatsappQueue extends Command
      * Batas maksimal pesan yang dikirim per sekolah per jam.
      * Melebihi batas ini rawan memicu ban dari WhatsApp.
      */
-    private const RATE_LIMIT_PER_HOUR = 50;
+    private const RATE_LIMIT_PER_HOUR = 500;
 
     public function handle()
     {
@@ -112,10 +112,12 @@ class ProcessWhatsappQueue extends Command
 
             $this->info("Message ID {$msg->id} -> " . ($success ? 'SENT' : 'FAILED'));
 
-            // === RANDOM JITTER DELAY (3–8 detik) ===
+            // === RANDOM JITTER DELAY (8–15 detik) ===
             // Delay tidak konsisten meniru pola manusia dan menghindari
             // deteksi bot oleh WhatsApp yang mengenali pola interval tetap.
-            $jitter = rand(3_000_000, 8_000_000); // microseconds
+            $minDelay = (int) env('WA_DELAY_MIN_SECONDS', 8) * 1_000_000;
+            $maxDelay = (int) env('WA_DELAY_MAX_SECONDS', 15) * 1_000_000;
+            $jitter   = rand(min($minDelay, $maxDelay), max($minDelay, $maxDelay));
             usleep($jitter);
         }
     }
@@ -125,12 +127,17 @@ class ProcessWhatsappQueue extends Command
      */
     private function isRateLimited(int $schoolId): bool
     {
+        $limitPerHour = (int) env('WA_RATE_LIMIT_PER_HOUR', self::RATE_LIMIT_PER_HOUR);
+        if ($limitPerHour <= 0) {
+            return false;
+        }
+
         $sentThisHour = MessageQueue::where('school_id', $schoolId)
             ->where('status', 'sent')
             ->where('updated_at', '>=', now()->startOfHour())
             ->count();
 
-        return $sentThisHour >= self::RATE_LIMIT_PER_HOUR;
+        return $sentThisHour >= $limitPerHour;
     }
 
     /**

@@ -686,8 +686,19 @@ class RfidController extends Controller
                 $att = null;
             }
 
-            // Case 1: Lengkap
+            // Case 1: Lengkap (Jika sudah absen masuk & pulang, tapi tap di jam kegiatan aktif, catat kegiatan)
             if ($att && $att->jam_pulang) {
+                $recordedKegiatans = $this->recordActiveKegiatans($device->school_id, $siswa, $now, $today, 'Scan Mandiri Kegiatan');
+                if (!empty($recordedKegiatans)) {
+                    DB::commit();
+                    $namaKeg = implode(', ', $recordedKegiatans);
+                    $this->logRequest($apiKey, 'kegiatan_success', $uid, true, "Kegiatan ({$namaKeg}): " . $siswa->nama);
+                    return $this->response(true, 'success', 'Absen Kegiatan Berhasil', 'ok', [
+                        'type' => 'absen_kegiatan',
+                        'nama' => $siswa->nama,
+                        'kegiatan' => $namaKeg,
+                    ]);
+                }
                 DB::rollBack();
                 return $this->response(true, 'success', 'Absen Lengkap', 'ok', ['type' => 'sudah_lengkap', 'nama' => $siswa->nama]);
             }
@@ -701,6 +712,8 @@ class RfidController extends Controller
 
                 // If checkout is disabled, reject checkout entirely
                 if ($checkoutEnabled === 'false') {
+                    // Cek apakah ada kegiatan aktif
+                    $this->recordActiveKegiatans($device->school_id, $siswa, $now, $today, 'Auto dari Tap Kartu');
                     DB::rollBack();
                     return $this->response(true, 'success', 'Sudah Absen', 'ok', [
                         'type' => 'sudah_absen_masuk',
@@ -709,13 +722,6 @@ class RfidController extends Controller
                 }
 
                 // Check Teacher Session (only open gates) Global? Or should be scoped?
-                // Teacher session stores teacher_name.
-                // We should check sessions created by teachers OF THIS SCHOOL.
-                // Or simply check if there is ANY open session in the system?
-                // Ideally scoped. TeacherCheckoutSession needs school_id?
-                // Currently it only has teacher_id. We can join with guru table or just rely on teacher_id.
-                // For now, let's assume if a teacher opened a gate, it's for their school.
-
                 // Optimized: Check sessions where teacher belongs to this school
                 $teacherSession = TeacherCheckoutSession::select('teacher_checkout_sessions.*')
                     ->join('guru', 'teacher_checkout_sessions.teacher_id', '=', 'guru.id')
@@ -729,12 +735,36 @@ class RfidController extends Controller
 
                 // Jika sudah melewati batas akhir absen pulang dan tidak ada sesi guru, tolak
                 if ($now->gt($akhirAbsenPulang) && !$teacherSession) {
+                    $recordedKegiatans = $this->recordActiveKegiatans($device->school_id, $siswa, $now, $today, 'Auto dari Tap Kartu');
+                    if (!empty($recordedKegiatans)) {
+                        DB::commit();
+                        $namaKeg = implode(', ', $recordedKegiatans);
+                        $this->logRequest($apiKey, 'kegiatan_success', $uid, true, "Kegiatan ({$namaKeg}): " . $siswa->nama);
+                        return $this->response(true, 'success', 'Absen Kegiatan Berhasil', 'ok', [
+                            'type' => 'absen_kegiatan',
+                            'nama' => $siswa->nama,
+                            'kegiatan' => $namaKeg,
+                        ]);
+                    }
                     DB::rollBack();
                     return $this->response(false, 'gagal', 'Pulang Ditutup', 'warning', ['type' => 'checkout_closed', 'nama' => $siswa->nama]);
                 }
 
                 // Jika belum masuk waktu pulang otomatis dan tidak ada izin guru, tolak
                 if (!$isAutoCheckoutTime && !$teacherSession) {
+                    // Tetap catat absen kegiatan jika sedang dalam jam kegiatan
+                    $recordedKegiatans = $this->recordActiveKegiatans($device->school_id, $siswa, $now, $today, 'Auto dari Tap Kartu');
+                    if (!empty($recordedKegiatans)) {
+                        DB::commit();
+                        $namaKeg = implode(', ', $recordedKegiatans);
+                        $this->logRequest($apiKey, 'kegiatan_success', $uid, true, "Kegiatan ({$namaKeg}): " . $siswa->nama);
+                        return $this->response(true, 'success', 'Absen Kegiatan Berhasil', 'ok', [
+                            'type' => 'absen_kegiatan',
+                            'nama' => $siswa->nama,
+                            'kegiatan' => $namaKeg,
+                        ]);
+                    }
+
                     // Beri pesan berbeda jika masih di jam masuk (mencegah spam absen 2x)
                     if ($now->between($awalAbsenMasuk, $akhirAbsenMasuk)) {
                         DB::rollBack();
@@ -747,11 +777,8 @@ class RfidController extends Controller
 
                 // Pulang
                 $masuk = Carbon::parse($att->tanggal . ' ' . $att->jam_masuk);
-                // Calculate duration from check-in to check-out
-                // Use diffInSeconds with proper order: from $masuk to $now
-                $totalSeconds = $masuk->diffInSeconds($now, false); // false = signed difference
+                $totalSeconds = $masuk->diffInSeconds($now, false);
 
-                // Ensure positive value (in case of clock issues)
                 if ($totalSeconds < 0) {
                     $totalSeconds = abs($totalSeconds);
                 }
@@ -778,8 +805,12 @@ class RfidController extends Controller
                     'total_seconds' => $totalSeconds,
                     'status' => $newStatus,
                     'keterangan' => $newKeterangan,
-                    'updated_at' => now(), // Attendance has timestamp columns? In model I defined them.
+                    'updated_at' => now(),
                 ]);
+
+                // OTOMATIS CATAT ABSEN KEGIATAN JIKA TERDAPAT JADWAL KEGIATAN AKTIF SAAT PULANG
+                $this->recordActiveKegiatans($device->school_id, $siswa, $now, $today, 'Auto dari Absen Pulang');
+
                 DB::commit();
 
                 // WA
@@ -798,6 +829,20 @@ class RfidController extends Controller
 
             // Case 3: Absen Masuk
             if (!$att || !$att->jam_masuk) {
+                if ($now->lt($awalAbsenMasuk) || $now->gt($akhirAbsenMasuk)) {
+                    $recordedKegiatans = $this->recordActiveKegiatans($device->school_id, $siswa, $now, $today, 'Scan Mandiri Kegiatan');
+                    if (!empty($recordedKegiatans)) {
+                        DB::commit();
+                        $namaKeg = implode(', ', $recordedKegiatans);
+                        $this->logRequest($apiKey, 'kegiatan_success', $uid, true, "Kegiatan ({$namaKeg}): " . $siswa->nama);
+                        return $this->response(true, 'success', 'Absen Kegiatan Berhasil', 'ok', [
+                            'type' => 'absen_kegiatan',
+                            'nama' => $siswa->nama,
+                            'kegiatan' => $namaKeg,
+                        ]);
+                    }
+                }
+
                 if ($now->lt($awalAbsenMasuk)) {
                     DB::rollBack();
                     return $this->response(false, 'gagal', 'Absen Tutup', 'warning', ['type' => 'too_early']);
@@ -812,12 +857,10 @@ class RfidController extends Controller
 
                 if ($now->gt($batasTelat)) {
                     $status = 'T'; // Set status to Terlambat
-                    // Calculate late duration from jam_masuk
                     $diff = $now->timestamp - $batasTelat->timestamp;
                     $jam = floor($diff / 3600);
                     $menit = floor(($diff % 3600) / 60);
 
-                    // Format the late message
                     if ($jam > 0) {
                         $keterangan = "Telat {$jam} jam {$menit} menit";
                     } else {
@@ -843,37 +886,12 @@ class RfidController extends Controller
                     ]);
                 }
 
-                // OTOMATIS CATAT ABSEN KEGIATAN JIKA TERDAPAT JADWAL KEGIATAN AKTIF
-                $activeKegiatans = \App\Models\Kegiatan::where('school_id', $device->school_id)
-                    ->where('is_active', 1)
-                    ->get()
-                    ->filter(function ($keg) use ($now) {
-                        return $keg->isScheduledNow($now);
-                    });
-
-                foreach ($activeKegiatans as $keg) {
-                    $alreadyKeg = \App\Models\KegiatanAttendance::where('kegiatan_id', $keg->id)
-                        ->where('student_id', $siswa->id)
-                        ->where('tanggal', $today)
-                        ->exists();
-
-                    if (!$alreadyKeg) {
-                        \App\Models\KegiatanAttendance::create([
-                            'school_id'   => $device->school_id,
-                            'kegiatan_id' => $keg->id,
-                            'student_id'  => $siswa->id,
-                            'tanggal'     => $today,
-                            'jam_masuk'   => $now->toTimeString(),
-                            'status'      => 'H',
-                            'keterangan'  => 'Auto dari Absen Masuk',
-                        ]);
-                    }
-                }
+                // OTOMATIS CATAT ABSEN KEGIATAN JIKA TERDAPAT JADWAL KEGIATAN AKTIF SAAT MASUK
+                $this->recordActiveKegiatans($device->school_id, $siswa, $now, $today, 'Auto dari Absen Masuk');
 
                 DB::commit();
 
                 $this->wa->sendCheckIn($siswa->nama, $siswa->no_wa, $now->format('H:i'), $status, $device->school_id, $keterangan, $siswa->wa_ortu, $siswa->kelas->nama_kelas ?? '-');
-
 
                 $this->logRequest($apiKey, 'checkin_success', $uid, true, 'Masuk: ' . $siswa->nama);
                 return $this->response(true, 'success', 'Absen Berhasil', 'ok', [
@@ -951,5 +969,60 @@ class RfidController extends Controller
             $phone = '62' . $phone;
 
         return $phone;
+    }
+
+    /**
+     * Catat kehadiran siswa pada kegiatan yang sedang aktif dan relevan saat scan.
+     */
+    private function recordActiveKegiatans($schoolId, $siswa, $now, $today, $keterangan = 'Auto dari Scan Mesin'): array
+    {
+        $activeKegiatans = \App\Models\Kegiatan::where('school_id', $schoolId)
+            ->where('is_active', 1)
+            ->get()
+            ->filter(function ($keg) use ($now) {
+                return $keg->isScheduledNow($now);
+            });
+
+        $recordedKegiatans = [];
+        foreach ($activeKegiatans as $keg) {
+            if (!$keg->isStudentEligible($siswa)) {
+                continue;
+            }
+
+            $alreadyKeg = \App\Models\KegiatanAttendance::where('kegiatan_id', $keg->id)
+                ->where('student_id', $siswa->id)
+                ->where('tanggal', $today)
+                ->exists();
+
+            if (!$alreadyKeg) {
+                \App\Models\KegiatanAttendance::create([
+                    'school_id'   => $schoolId,
+                    'kegiatan_id' => $keg->id,
+                    'student_id'  => $siswa->id,
+                    'tanggal'     => $today,
+                    'jam_masuk'   => $now->toTimeString(),
+                    'status'      => 'H',
+                    'keterangan'  => $keterangan,
+                ]);
+                $recordedKegiatans[] = $keg->nama_kegiatan;
+
+                // Kirim notifikasi Telegram ke siswa & ortu (WA tidak dikirim)
+                try {
+                    $telegramService = app(\App\Services\TelegramService::class);
+                    $telegramService->sendKegiatanCheckIn(
+                        namaSiswa: $siswa->nama,
+                        namaKegiatan: $keg->nama_kegiatan,
+                        jam: $now->format('H:i'),
+                        tanggal: $now->translatedFormat('l, d F Y'),
+                        schoolId: $schoolId,
+                        chatIdSiswa: $siswa->telegram_chat_id ?: null,
+                        chatIdOrtu: $siswa->telegram_ortu_chat_id ?: null
+                    );
+                } catch (\Throwable $e) {
+                    \Log::error("Failed to send Telegram for kegiatan attendance: " . $e->getMessage());
+                }
+            }
+        }
+        return $recordedKegiatans;
     }
 }

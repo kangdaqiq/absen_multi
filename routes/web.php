@@ -217,6 +217,15 @@ Route::middleware('auth')->group(function () {
         Route::get('settings/telegram', [App\Http\Controllers\SettingsController::class, 'telegramIndex'])->name('settings.telegram');
         Route::put('settings/telegram', [App\Http\Controllers\SettingsController::class, 'telegramUpdate'])->name('settings.telegram.update');
 
+        // Template Pesan Notifikasi
+        Route::get('settings/templates', [App\Http\Controllers\TemplatePesanController::class, 'index'])->name('settings.templates.index');
+        Route::post('settings/templates', [App\Http\Controllers\TemplatePesanController::class, 'store'])->name('settings.templates.store');
+        Route::put('settings/templates/{template}', [App\Http\Controllers\TemplatePesanController::class, 'update'])->name('settings.templates.update');
+        Route::post('settings/templates/{template}/toggle', [App\Http\Controllers\TemplatePesanController::class, 'toggle'])->name('settings.templates.toggle');
+        Route::delete('settings/templates/{template}', [App\Http\Controllers\TemplatePesanController::class, 'destroy'])->name('settings.templates.destroy');
+        Route::post('settings/templates/reset-category', [App\Http\Controllers\TemplatePesanController::class, 'resetCategory'])->name('settings.templates.resetCategory');
+        Route::post('settings/templates/preview', [App\Http\Controllers\TemplatePesanController::class, 'preview'])->name('settings.templates.preview');
+
         // Subscription / Paket Langganan
         Route::get('subscription', [App\Http\Controllers\SubscriptionController::class, 'index'])->name('subscription.index');
         Route::post('subscription', [App\Http\Controllers\SubscriptionController::class, 'store'])->name('subscription.store');

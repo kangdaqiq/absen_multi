@@ -15,6 +15,9 @@ class Kegiatan extends Model
         'deskripsi',
         'tanggal_mulai',
         'frekuensi',
+        'target_type',
+        'kategori',
+        'pembina_id',
         'hari',
         'jam_mulai',
         'jam_selesai',
@@ -29,19 +32,111 @@ class Kegiatan extends Model
         'hari'            => 'array',
     ];
 
+    public function pembina()
+    {
+        return $this->belongsTo(Guru::class, 'pembina_id');
+    }
+
+    public function kelas()
+    {
+        return $this->belongsToMany(Kelas::class, 'kegiatan_kelas', 'kegiatan_id', 'kelas_id');
+    }
+
+    public function siswas()
+    {
+        return $this->belongsToMany(Siswa::class, 'kegiatan_siswa', 'kegiatan_id', 'student_id');
+    }
+
+    /**
+     * Cek apakah siswa berhak / terdaftar mengikuti kegiatan ini.
+     */
+    public function isStudentEligible($student): bool
+    {
+        if (is_numeric($student)) {
+            $student = Siswa::find($student);
+        }
+
+        if (!$student || $student->school_id != $this->school_id) {
+            return false;
+        }
+
+        if ($this->target_type === 'kelas') {
+            $targetKelasIds = $this->kelas()->pluck('kelas.id')->toArray();
+            return in_array($student->kelas_id, $targetKelasIds);
+        }
+
+        if ($this->target_type === 'siswa') {
+            $targetStudentIds = $this->siswas()->pluck('siswa.id')->toArray();
+            return in_array($student->id, $targetStudentIds);
+        }
+
+        // 'all' or default
+        return true;
+    }
+
+    /**
+     * Query builder untuk mengambil seluruh siswa target kegiatan ini.
+     */
+    public function getTargetStudentsQuery()
+    {
+        $query = Siswa::where('school_id', $this->school_id);
+
+        if ($this->target_type === 'kelas') {
+            $kelasIds = $this->kelas()->pluck('kelas.id')->toArray();
+            return $query->whereIn('kelas_id', $kelasIds);
+        }
+
+        if ($this->target_type === 'siswa') {
+            $siswaIds = $this->siswas()->pluck('siswa.id')->toArray();
+            return $query->whereIn('id', $siswaIds);
+        }
+
+        return $query;
+    }
+
+    /**
+     * Label cakupan peserta untuk UI.
+     */
+    public function getTargetScopeLabelAttribute(): string
+    {
+        if ($this->target_type === 'kelas') {
+            $count = $this->kelas()->count();
+            if ($count === 0) return 'Kelas (Belum Dipilih)';
+            if ($count === 1) {
+                return 'Kelas ' . ($this->kelas->first()->nama_kelas ?? '');
+            }
+            return $count . ' Kelas Terpilih';
+        }
+
+        if ($this->target_type === 'siswa') {
+            $count = $this->siswas()->count();
+            return $count . ' Siswa Terpilih';
+        }
+
+        return 'Semua Siswa';
+    }
+
     /**
      * Cek apakah kegiatan sedang berjalan berdasarkan jadwal waktu hari ini.
      */
     public function isScheduledNow($now = null): bool
     {
+        if (!$this->is_active) {
+            return false;
+        }
+
         if (!$this->jam_mulai || !$this->jam_selesai) {
             return false;
         }
+
         $now = $now ? \Carbon\Carbon::parse($now) : now();
         $nowTimeStr = $now->format('H:i:s');
         $todayStr = $now->format('Y-m-d');
         
-        $startDateStr = $this->tanggal_mulai->format('Y-m-d');
+        $rawTgl = $this->getRawOriginal('tanggal_mulai');
+        $startDate = \Carbon\Carbon::parse($rawTgl ?: $this->tanggal_mulai);
+        $startDateStr = $startDate->format('Y-m-d');
+
         if ($todayStr < $startDateStr) {
             return false;
         }
@@ -60,16 +155,19 @@ class Kegiatan extends Model
                 }
             }
         } elseif ($this->frekuensi === 'mingguan') {
-            if ($now->dayOfWeek !== $this->tanggal_mulai->dayOfWeek) {
+            if ($now->dayOfWeekIso !== $startDate->dayOfWeekIso) {
                 return false;
             }
         } elseif ($this->frekuensi === 'bulanan') {
-            if ($now->day !== $this->tanggal_mulai->day) {
+            if ($now->day !== $startDate->day) {
                 return false;
             }
         }
 
-        return $nowTimeStr >= $this->jam_mulai && $nowTimeStr <= $this->jam_selesai;
+        $jamMulaiStr = strlen($this->jam_mulai) === 5 ? $this->jam_mulai . ':00' : $this->jam_mulai;
+        $jamSelesaiStr = strlen($this->jam_selesai) === 5 ? $this->jam_selesai . ':59' : $this->jam_selesai;
+
+        return $nowTimeStr >= $jamMulaiStr && $nowTimeStr <= $jamSelesaiStr;
     }
 
     /**

@@ -164,6 +164,7 @@ class MenuHelper
             $pengaturanSubItems = [];
             $pengaturanSubItems[] = ['name' => 'Device / Mesin', 'path' => route('devices.index', [], false)];
             $pengaturanSubItems[] = ['name' => 'Pengaturan Umum', 'path' => route('settings.index', [], false)];
+            $pengaturanSubItems[] = ['name' => 'Template Pesan', 'path' => route('settings.templates.index', [], false)];
             if ($school && $school->wa_enabled) {
                 $pengaturanSubItems[] = ['name' => 'WhatsApp Device', 'path' => route('whatsapp.device.index', [], false)];
             }

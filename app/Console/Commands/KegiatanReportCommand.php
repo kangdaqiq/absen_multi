@@ -111,8 +111,8 @@ class KegiatanReportCommand extends Command
             $totalIzin  = $attendancesToday->where('status', 'I')->count();
             $totalSakit = $attendancesToday->where('status', 'S')->count();
 
-            // Total active students in school for context
-            $allStudents = Siswa::where('school_id', $schoolId)
+            // Total active target students for this kegiatan
+            $allStudents = $kegiatan->getTargetStudentsQuery()
                 ->whereHas('kelas', fn($q) => $q->where('is_active_attendance', true))
                 ->with('kelas')
                 ->get();
@@ -139,7 +139,7 @@ class KegiatanReportCommand extends Command
             ksort($statsByKelas);
 
             $msgGlobal = WhatsAppMessageTemplates::kegiatanReportGlobal(
-                namaKegiatan: $kegiatan->nama_kegiatan,
+                namaKegiatan: ($kegiatan->kategori === 'ekskul' ? '⚽ [Ekskul] ' : '🎯 ') . $kegiatan->nama_kegiatan,
                 totalHadir: $totalHadir,
                 totalIzin: $totalIzin,
                 totalSakit: $totalSakit,
@@ -147,109 +147,63 @@ class KegiatanReportCommand extends Command
                 statsByKelas: $statsByKelas
             );
 
-            // Send Global WA
-            if ($targetJid) {
-                MessageQueue::create([
-                    'school_id'    => $schoolId,
-                    'phone_number' => $targetJid,
-                    'message'      => $msgGlobal,
-                    'status'       => 'pending',
-                    'priority'     => 10,
-                    'created_at'   => now()
-                ]);
-            }
+            // A. JIKA EKSTRAKURIKULER: HANYA KIRIM KE GURU PEMBINA YANG DITUNJUK
+            if ($kegiatan->kategori === 'ekskul') {
+                if ($kegiatan->pembina_id) {
+                    $pembina = Guru::where('school_id', $schoolId)->find($kegiatan->pembina_id);
+                    if ($pembina) {
+                        if (!empty($pembina->no_wa) && $pembina->isWithinLastSeen(168)) {
+                            $noWaPembina = preg_replace('/^0/', '62', $pembina->no_wa);
+                            $mq = new MessageQueue([
+                                'school_id'    => $schoolId,
+                                'phone_number' => $noWaPembina,
+                                'message'      => $msgGlobal,
+                                'status'       => 'pending',
+                                'priority'     => 10,
+                                'created_at'   => now()
+                            ]);
+                            $mq->bypass_last_seen = true;
+                            $mq->save();
+                        }
 
-            $guruGlobal = Guru::where('school_id', $schoolId)
-                ->where('is_global_report', true)
-                ->whereNotNull('no_wa')
-                ->where('no_wa', '!=', '')
-                ->get();
-
-            foreach ($guruGlobal as $guru) {
-                if ($guru->isWithinLastSeen(168)) {
-                    $noWa = preg_replace('/^0/', '62', $guru->no_wa);
-                    $mq = new MessageQueue([
+                        if ($telegramEnabled && $telegramToken && !empty($pembina->telegram_chat_id)) {
+                            $telePembinaMsg = preg_replace('/\*([^*]+)\*/', '<b>$1</b>', $msgGlobal);
+                            $telePembinaMsg = preg_replace('/\_([^_]+)\_/', '<i>$1</i>', $telePembinaMsg);
+                            if (!empty($school->name)) {
+                                $telePembinaMsg .= "\n\n<b>" . trim($school->name) . "</b>";
+                            }
+                            \App\Jobs\SendTelegramMessageJob::dispatch($telegramToken, $pembina->telegram_chat_id, $telePembinaMsg, $schoolId);
+                        }
+                    }
+                }
+            } else {
+                // B. JIKA KEGIATAN SEKOLAH UMUM: KIRIM KE GLOBAL & WALI KELAS
+                // 1. Send Global WA
+                if ($targetJid) {
+                    MessageQueue::create([
                         'school_id'    => $schoolId,
-                        'phone_number' => $noWa,
+                        'phone_number' => $targetJid,
                         'message'      => $msgGlobal,
                         'status'       => 'pending',
                         'priority'     => 10,
                         'created_at'   => now()
                     ]);
-                    $mq->bypass_last_seen = true;
-                    $mq->save();
                 }
 
-                if ($telegramEnabled && $telegramToken && !empty($guru->telegram_chat_id)) {
-                    $teleMsg = preg_replace('/\*([^*]+)\*/', '<b>$1</b>', $msgGlobal);
-                    $teleMsg = preg_replace('/\_([^_]+)\_/', '<i>$1</i>', $teleMsg);
-                    if (!empty($school->name)) {
-                        $teleMsg .= "\n\n<b>" . trim($school->name) . "</b>";
-                    }
-                    \App\Jobs\SendTelegramMessageJob::dispatch($telegramToken, $guru->telegram_chat_id, $teleMsg, $schoolId);
-                }
-            }
+                // 2. Guru / Kepala Sekolah (Global Report)
+                $guruGlobal = Guru::where('school_id', $schoolId)
+                    ->where('is_global_report', true)
+                    ->whereNotNull('no_wa')
+                    ->where('no_wa', '!=', '')
+                    ->get();
 
-            // 2. WALI KELAS ACTIVITY REPORT
-            $kelasWithWali = Kelas::where('school_id', $schoolId)
-                ->where(function($q) {
-                    $q->whereNotNull('wali_kelas_id')->orWhereNotNull('wali_kelas_2_id');
-                })
-                ->where('is_active_attendance', true)
-                ->with(['waliKelas', 'waliKelas2'])
-                ->get();
-
-            $studentsByClass = $allStudents->groupBy('kelas_id');
-
-            foreach ($kelasWithWali as $kelas) {
-                $classStudents = $studentsByClass[$kelas->id] ?? collect();
-                if ($classStudents->isEmpty()) {
-                    continue;
-                }
-
-                $walis = array_filter([$kelas->waliKelas, $kelas->waliKelas2]);
-                if (empty($walis)) {
-                    continue;
-                }
-
-                $h = 0; $i = 0; $s = 0; $a = 0;
-                $listAbsenClass = [];
-
-                foreach ($classStudents as $st) {
-                    if ($attendancesToday->has($st->id)) {
-                        $attStatus = $attendancesToday[$st->id]->status;
-                        if ($attStatus === 'H') {
-                            $h++;
-                        } elseif ($attStatus === 'I') {
-                            $i++;
-                            $listAbsenClass[] = "{$st->nama} (Izin)";
-                        } elseif ($attStatus === 'S') {
-                            $s++;
-                            $listAbsenClass[] = "{$st->nama} (Sakit)";
-                        }
-                    } else {
-                        $a++;
-                        $listAbsenClass[] = "{$st->nama} (Belum Absen)";
-                    }
-                }
-
-                foreach ($walis as $wali) {
-                    $msgWali = WhatsAppMessageTemplates::kegiatanReportWaliKelas(
-                        namaKegiatan: $kegiatan->nama_kegiatan,
-                        namaKelas: $kelas->nama_kelas,
-                        namaWali: $wali->nama,
-                        hadir: $h,
-                        izin: $i,
-                        sakit: $s,
-                        alpha: $a,
-                        listAbsen: $listAbsenClass
-                    );
-
-                    if (!empty($wali->no_wa) && $wali->isWithinLastSeen(168)) {
+                foreach ($guruGlobal as $guru) {
+                    if ($guru->isWithinLastSeen(168)) {
+                        $noWa = preg_replace('/^0/', '62', $guru->no_wa);
                         $mq = new MessageQueue([
                             'school_id'    => $schoolId,
-                            'phone_number' => $wali->no_wa,
-                            'message'      => $msgWali,
+                            'phone_number' => $noWa,
+                            'message'      => $msgGlobal,
                             'status'       => 'pending',
                             'priority'     => 10,
                             'created_at'   => now()
@@ -258,13 +212,92 @@ class KegiatanReportCommand extends Command
                         $mq->save();
                     }
 
-                    if ($telegramEnabled && $telegramToken && !empty($wali->telegram_chat_id)) {
-                        $teleWaliMsg = preg_replace('/\*([^*]+)\*/', '<b>$1</b>', $msgWali);
-                        $teleWaliMsg = preg_replace('/\_([^_]+)\_/', '<i>$1</i>', $teleWaliMsg);
+                    if ($telegramEnabled && $telegramToken && !empty($guru->telegram_chat_id)) {
+                        $teleMsg = preg_replace('/\*([^*]+)\*/', '<b>$1</b>', $msgGlobal);
+                        $teleMsg = preg_replace('/\_([^_]+)\_/', '<i>$1</i>', $teleMsg);
                         if (!empty($school->name)) {
-                            $teleWaliMsg .= "\n\n<b>" . trim($school->name) . "</b>";
+                            $teleMsg .= "\n\n<b>" . trim($school->name) . "</b>";
                         }
-                        \App\Jobs\SendTelegramMessageJob::dispatch($telegramToken, $wali->telegram_chat_id, $teleWaliMsg, $schoolId);
+                        \App\Jobs\SendTelegramMessageJob::dispatch($telegramToken, $guru->telegram_chat_id, $teleMsg, $schoolId);
+                    }
+                }
+
+                // 3. WALI KELAS ACTIVITY REPORT
+                $kelasWithWali = Kelas::where('school_id', $schoolId)
+                    ->where(function($q) {
+                        $q->whereNotNull('wali_kelas_id')->orWhereNotNull('wali_kelas_2_id');
+                    })
+                    ->where('is_active_attendance', true)
+                    ->with(['waliKelas', 'waliKelas2'])
+                    ->get();
+
+                $studentsByClass = $allStudents->groupBy('kelas_id');
+
+                foreach ($kelasWithWali as $kelas) {
+                    $classStudents = $studentsByClass[$kelas->id] ?? collect();
+                    if ($classStudents->isEmpty()) {
+                        continue;
+                    }
+
+                    $walis = array_filter([$kelas->waliKelas, $kelas->waliKelas2]);
+                    if (empty($walis)) {
+                        continue;
+                    }
+
+                    $h = 0; $i = 0; $s = 0; $a = 0;
+                    $listAbsenClass = [];
+
+                    foreach ($classStudents as $st) {
+                        if ($attendancesToday->has($st->id)) {
+                            $attStatus = $attendancesToday[$st->id]->status;
+                            if ($attStatus === 'H') {
+                                $h++;
+                            } elseif ($attStatus === 'I') {
+                                $i++;
+                                $listAbsenClass[] = "{$st->nama} (Izin)";
+                            } elseif ($attStatus === 'S') {
+                                $s++;
+                                $listAbsenClass[] = "{$st->nama} (Sakit)";
+                            }
+                        } else {
+                            $a++;
+                            $listAbsenClass[] = "{$st->nama} (Belum Absen)";
+                        }
+                    }
+
+                    foreach ($walis as $wali) {
+                        $msgWali = WhatsAppMessageTemplates::kegiatanReportWaliKelas(
+                            namaKegiatan: $kegiatan->nama_kegiatan,
+                            namaKelas: $kelas->nama_kelas,
+                            namaWali: $wali->nama,
+                            hadir: $h,
+                            izin: $i,
+                            sakit: $s,
+                            alpha: $a,
+                            listAbsen: $listAbsenClass
+                        );
+
+                        if (!empty($wali->no_wa) && $wali->isWithinLastSeen(168)) {
+                            $mq = new MessageQueue([
+                                'school_id'    => $schoolId,
+                                'phone_number' => $wali->no_wa,
+                                'message'      => $msgWali,
+                                'status'       => 'pending',
+                                'priority'     => 10,
+                                'created_at'   => now()
+                            ]);
+                            $mq->bypass_last_seen = true;
+                            $mq->save();
+                        }
+
+                        if ($telegramEnabled && $telegramToken && !empty($wali->telegram_chat_id)) {
+                            $teleWaliMsg = preg_replace('/\*([^*]+)\*/', '<b>$1</b>', $msgWali);
+                            $teleWaliMsg = preg_replace('/\_([^_]+)\_/', '<i>$1</i>', $teleWaliMsg);
+                            if (!empty($school->name)) {
+                                $teleWaliMsg .= "\n\n<b>" . trim($school->name) . "</b>";
+                            }
+                            \App\Jobs\SendTelegramMessageJob::dispatch($telegramToken, $wali->telegram_chat_id, $teleWaliMsg, $schoolId);
+                        }
                     }
                 }
             }

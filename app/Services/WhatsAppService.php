@@ -75,14 +75,16 @@ class WhatsAppService
                      jamMasuk: $time,
                      kelas: $kelas,
                      lateHours: $lateHours,
-                     lateMinutes: $lateMinutes
+                     lateMinutes: $lateMinutes,
+                     schoolId: $schoolId
                 );
             } else {
                 $msg = WhatsAppMessageTemplates::checkIn(
                      nama: $name,
                      jamMasuk: $time,
                      kelas: $kelas,
-                     status: $readableStatus
+                     status: $readableStatus,
+                     schoolId: $schoolId
                 );
             }
             $this->queueMessage($phone, $msg, $schoolId);
@@ -98,14 +100,16 @@ class WhatsAppService
                      jamMasuk: $time,
                      kelas: $kelas,
                      lateHours: $lateHours,
-                     lateMinutes: $lateMinutes
+                     lateMinutes: $lateMinutes,
+                     schoolId: $schoolId
                 );
             } else {
                 $msgOrtu = WhatsAppMessageTemplates::checkInParent(
                      nama: $name,
                      jamMasuk: $time,
                      kelas: $kelas,
-                     status: $readableStatus
+                     status: $readableStatus,
+                     schoolId: $schoolId
                 );
             }
             $this->queueMessage($phoneOrtu, $msgOrtu, $schoolId);
@@ -155,7 +159,8 @@ class WhatsAppService
                 hours: $hours,
                 minutes: $mins,
                 authorizedBy: $authorizer,
-                tanggal: $tanggal
+                tanggal: $tanggal,
+                schoolId: $schoolId
             );
             $this->queueMessage($phone, $msg, $schoolId);
         }
@@ -169,7 +174,8 @@ class WhatsAppService
                 hours: $hours,
                 minutes: $mins,
                 authorizedBy: $authorizer,
-                tanggal: $tanggal
+                tanggal: $tanggal,
+                schoolId: $schoolId
             );
             $this->queueMessage($phoneOrtu, $msgOrtu, $schoolId);
         }

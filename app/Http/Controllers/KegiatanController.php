@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\Kegiatan;
 use App\Models\KegiatanAttendance;
 use App\Models\Siswa;
+use App\Models\Kelas;
 use Illuminate\Support\Facades\DB;
 
 class KegiatanController extends Controller
@@ -15,7 +16,10 @@ class KegiatanController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Kegiatan::where('school_id', auth()->user()->school_id)
+        $schoolId = auth()->user()->school_id;
+
+        $query = Kegiatan::where('school_id', $schoolId)
+            ->with(['kelas', 'siswas', 'pembina'])
             ->withCount(['attendances as total_hadir' => function ($q) {
                 $q->where('status', 'H');
             }])
@@ -27,7 +31,20 @@ class KegiatanController extends Controller
 
         $kegiatans = $query->paginate(20)->withQueryString();
 
-        return view('kegiatan.index', compact('kegiatans'));
+        $allKelas = Kelas::where('school_id', $schoolId)
+            ->orderBy('nama_kelas')
+            ->get();
+
+        $allStudents = Siswa::where('school_id', $schoolId)
+            ->with('kelas')
+            ->orderBy('nama')
+            ->get();
+
+        $allGurus = \App\Models\Guru::where('school_id', $schoolId)
+            ->orderBy('nama')
+            ->get();
+
+        return view('kegiatan.index', compact('kegiatans', 'allKelas', 'allStudents', 'allGurus'));
     }
 
     /**
@@ -40,6 +57,13 @@ class KegiatanController extends Controller
             'deskripsi'      => 'nullable|string|max:500',
             'tanggal_mulai'  => 'required|date',
             'frekuensi'      => 'required|string|in:harian,mingguan,bulanan,sekali',
+            'target_type'    => 'required|string|in:all,kelas,siswa',
+            'kategori'       => 'required|string|in:sekolah,ekskul',
+            'pembina_id'     => 'nullable|required_if:kategori,ekskul|integer|exists:guru,id',
+            'kelas_ids'      => 'nullable|array',
+            'kelas_ids.*'    => 'integer|exists:kelas,id',
+            'student_ids'    => 'nullable|array',
+            'student_ids.*'  => 'integer|exists:siswa,id',
             'hari'           => 'nullable|array',
             'hari.*'         => 'integer|between:1,7',
             'jam_mulai'      => 'nullable|date_format:H:i',
@@ -57,12 +81,19 @@ class KegiatanController extends Controller
             }
         }
 
-        Kegiatan::create([
+        $targetType = $request->input('target_type', 'all');
+        $kategori = $request->input('kategori', 'sekolah');
+        $pembinaId = ($kategori === 'ekskul') ? $request->input('pembina_id') : null;
+
+        $kegiatan = Kegiatan::create([
             'school_id'      => auth()->user()->school_id,
             'nama_kegiatan'  => $request->nama_kegiatan,
             'deskripsi'      => $request->deskripsi,
             'tanggal_mulai'  => $request->tanggal_mulai,
             'frekuensi'      => $request->frekuensi,
+            'target_type'    => $targetType,
+            'kategori'       => $kategori,
+            'pembina_id'     => $pembinaId,
             'hari'           => $hari,
             'jam_mulai'      => $request->jam_mulai ?: null,
             'jam_selesai'    => $request->jam_selesai ?: null,
@@ -70,6 +101,12 @@ class KegiatanController extends Controller
             'is_active'      => true,
             'created_by'     => auth()->id(),
         ]);
+
+        if ($targetType === 'kelas') {
+            $kegiatan->kelas()->sync($request->input('kelas_ids', []));
+        } elseif ($targetType === 'siswa') {
+            $kegiatan->siswas()->sync($request->input('student_ids', []));
+        }
 
         return back()->with('success', 'Kegiatan berhasil ditambahkan.');
     }
@@ -87,6 +124,13 @@ class KegiatanController extends Controller
             'deskripsi'      => 'nullable|string|max:500',
             'tanggal_mulai'  => 'required|date',
             'frekuensi'      => 'required|string|in:harian,mingguan,bulanan,sekali',
+            'target_type'    => 'required|string|in:all,kelas,siswa',
+            'kategori'       => 'required|string|in:sekolah,ekskul',
+            'pembina_id'     => 'nullable|required_if:kategori,ekskul|integer|exists:guru,id',
+            'kelas_ids'      => 'nullable|array',
+            'kelas_ids.*'    => 'integer|exists:kelas,id',
+            'student_ids'    => 'nullable|array',
+            'student_ids.*'  => 'integer|exists:siswa,id',
             'hari'           => 'nullable|array',
             'hari.*'         => 'integer|between:1,7',
             'jam_mulai'      => 'nullable|date_format:H:i',
@@ -105,17 +149,35 @@ class KegiatanController extends Controller
             }
         }
 
+        $targetType = $request->input('target_type', 'all');
+        $kategori = $request->input('kategori', 'sekolah');
+        $pembinaId = ($kategori === 'ekskul') ? $request->input('pembina_id') : null;
+
         $kegiatan->update([
             'nama_kegiatan'  => $request->nama_kegiatan,
             'deskripsi'      => $request->deskripsi,
             'tanggal_mulai'  => $request->tanggal_mulai,
             'frekuensi'      => $request->frekuensi,
+            'target_type'    => $targetType,
+            'kategori'       => $kategori,
+            'pembina_id'     => $pembinaId,
             'hari'           => $hari,
             'jam_mulai'      => $request->jam_mulai ?: null,
             'jam_selesai'    => $request->jam_selesai ?: null,
             'uid_kartu'      => $request->uid_kartu ? strtoupper(trim($request->uid_kartu)) : null,
             'is_active'      => $request->boolean('is_active', true),
         ]);
+
+        if ($targetType === 'kelas') {
+            $kegiatan->kelas()->sync($request->input('kelas_ids', []));
+            $kegiatan->siswas()->detach();
+        } elseif ($targetType === 'siswa') {
+            $kegiatan->siswas()->sync($request->input('student_ids', []));
+            $kegiatan->kelas()->detach();
+        } else {
+            $kegiatan->kelas()->detach();
+            $kegiatan->siswas()->detach();
+        }
 
         return back()->with('success', 'Kegiatan berhasil diperbarui.');
     }
@@ -139,6 +201,7 @@ class KegiatanController extends Controller
     public function attendance(Request $request, $id)
     {
         $kegiatan = Kegiatan::where('school_id', auth()->user()->school_id)
+            ->with(['kelas', 'siswas'])
             ->findOrFail($id);
 
         $tanggal = $request->input('tanggal', now()->format('Y-m-d'));
@@ -180,17 +243,30 @@ class KegiatanController extends Controller
 
         $kegiatan = null;
         if ($selectedKegiatanId) {
-            $kegiatan = Kegiatan::where('school_id', $schoolId)->find($selectedKegiatanId);
+            $kegiatan = Kegiatan::where('school_id', $schoolId)
+                ->with(['kelas', 'siswas'])
+                ->find($selectedKegiatanId);
         }
 
         // 3. Tentukan tanggal absensi (default hari ini)
         $tanggal = $request->input('tanggal', now()->format('Y-m-d'));
 
-        // 4. Filter Kelas
+        // 4. Filter Kelas berdasarkan cakupan kegiatan
         $kelasId = $request->input('kelas_id');
-        $allKelas = \App\Models\Kelas::where('school_id', $schoolId)
-            ->orderBy('nama_kelas')
-            ->get();
+        
+        if ($kegiatan && $kegiatan->target_type === 'kelas') {
+            $allKelas = $kegiatan->kelas()->orderBy('nama_kelas')->get();
+        } elseif ($kegiatan && $kegiatan->target_type === 'siswa') {
+            $targetClassIds = $kegiatan->siswas()->pluck('kelas_id')->unique();
+            $allKelas = Kelas::where('school_id', $schoolId)
+                ->whereIn('id', $targetClassIds)
+                ->orderBy('nama_kelas')
+                ->get();
+        } else {
+            $allKelas = Kelas::where('school_id', $schoolId)
+                ->orderBy('nama_kelas')
+                ->get();
+        }
 
         // 5. Dapatkan daftar siswa dan status kehadiran mereka
         $students = collect();
@@ -198,6 +274,15 @@ class KegiatanController extends Controller
             $studentQuery = Siswa::where('siswa.school_id', $schoolId)
                 ->with(['kelas'])
                 ->orderBy('nama');
+
+            // Terapkan cakupan peserta
+            if ($kegiatan->target_type === 'kelas') {
+                $targetClassIds = $kegiatan->kelas()->pluck('kelas.id');
+                $studentQuery->whereIn('kelas_id', $targetClassIds);
+            } elseif ($kegiatan->target_type === 'siswa') {
+                $targetStudentIds = $kegiatan->siswas()->pluck('siswa.id');
+                $studentQuery->whereIn('siswa.id', $targetStudentIds);
+            }
 
             if ($kelasId) {
                 $studentQuery->where('kelas_id', $kelasId);
@@ -337,9 +422,18 @@ class KegiatanController extends Controller
         ]);
 
         $schoolId = auth()->user()->school_id;
-        $kegiatan = Kegiatan::where('school_id', $schoolId)->findOrFail($request->kegiatan_id);
+        $kegiatan = Kegiatan::where('school_id', $schoolId)
+            ->with(['kelas', 'siswas'])
+            ->findOrFail($request->kegiatan_id);
 
         $studentQuery = Siswa::where('school_id', $schoolId);
+
+        if ($kegiatan->target_type === 'kelas') {
+            $studentQuery->whereIn('kelas_id', $kegiatan->kelas()->pluck('kelas.id'));
+        } elseif ($kegiatan->target_type === 'siswa') {
+            $studentQuery->whereIn('siswa.id', $kegiatan->siswas()->pluck('siswa.id'));
+        }
+
         if ($request->filled('kelas_id')) {
             $studentQuery->where('kelas_id', $request->kelas_id);
         }
@@ -369,6 +463,34 @@ class KegiatanController extends Controller
                     ]
                 );
             }
+
+            if ($request->status === 'H') {
+                $targetStudents = Siswa::whereIn('id', $studentIds)
+                    ->where(function($q) {
+                        $q->whereNotNull('telegram_chat_id')->orWhereNotNull('telegram_ortu_chat_id');
+                    })
+                    ->get();
+
+                $telegramService = app(\App\Services\TelegramService::class);
+                $formattedDate = \Carbon\Carbon::parse($request->tanggal)->translatedFormat('l, d F Y');
+                $formattedJam = \Carbon\Carbon::parse($jam)->format('H:i');
+
+                foreach ($targetStudents as $st) {
+                    try {
+                        $telegramService->sendKegiatanCheckIn(
+                            namaSiswa: $st->nama,
+                            namaKegiatan: $kegiatan->nama_kegiatan,
+                            jam: $formattedJam,
+                            tanggal: $formattedDate,
+                            schoolId: $schoolId,
+                            chatIdSiswa: $st->telegram_chat_id ?: null,
+                            chatIdOrtu: $st->telegram_ortu_chat_id ?: null
+                        );
+                    } catch (\Throwable $e) {
+                        \Log::error("Failed to send bulk Telegram kegiatan: " . $e->getMessage());
+                    }
+                }
+            }
         }
 
         return back()->with('success', 'Berhasil memperbarui absensi massal kegiatan.');
@@ -390,10 +512,11 @@ class KegiatanController extends Controller
         $kelasId    = $request->input('kelas_id');
 
         $kegiatans = Kegiatan::where('school_id', $schoolId)
+            ->with(['kelas', 'siswas'])
             ->orderBy('nama_kegiatan')
             ->get();
 
-        $allKelas = \App\Models\Kelas::where('school_id', $schoolId)
+        $allKelas = Kelas::where('school_id', $schoolId)
             ->orderBy('nama_kelas')
             ->get();
 
@@ -401,6 +524,17 @@ class KegiatanController extends Controller
         $studentQuery = Siswa::where('siswa.school_id', $schoolId)
             ->with(['kelas'])
             ->orderBy('nama');
+
+        if ($kegiatanId) {
+            $selectedKeg = $kegiatans->firstWhere('id', $kegiatanId);
+            if ($selectedKeg) {
+                if ($selectedKeg->target_type === 'kelas') {
+                    $studentQuery->whereIn('kelas_id', $selectedKeg->kelas()->pluck('kelas.id'));
+                } elseif ($selectedKeg->target_type === 'siswa') {
+                    $studentQuery->whereIn('siswa.id', $selectedKeg->siswas()->pluck('siswa.id'));
+                }
+            }
+        }
 
         if ($kelasId) {
             $studentQuery->where('kelas_id', $kelasId);
@@ -467,6 +601,17 @@ class KegiatanController extends Controller
         $studentQuery = Siswa::where('siswa.school_id', $schoolId)
             ->with(['kelas'])
             ->orderBy('nama');
+
+        if ($kegiatanId) {
+            $selectedKeg = Kegiatan::where('school_id', $schoolId)->with(['kelas', 'siswas'])->find($kegiatanId);
+            if ($selectedKeg) {
+                if ($selectedKeg->target_type === 'kelas') {
+                    $studentQuery->whereIn('kelas_id', $selectedKeg->kelas()->pluck('kelas.id'));
+                } elseif ($selectedKeg->target_type === 'siswa') {
+                    $studentQuery->whereIn('siswa.id', $selectedKeg->siswas()->pluck('siswa.id'));
+                }
+            }
+        }
 
         if ($kelasId) {
             $studentQuery->where('kelas_id', $kelasId);

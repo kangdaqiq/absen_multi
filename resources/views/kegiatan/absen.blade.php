@@ -85,10 +85,28 @@
     <div class="mb-6 rounded-2xl border border-brand-200 bg-brand-50 p-5 dark:border-brand-500/30 dark:bg-brand-500/10 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
             <h5 class="text-lg font-bold text-brand-800 dark:text-brand-400 flex items-center gap-2">
-                <span>🎯 {{ $kegiatan->nama_kegiatan }}</span>
+                <span>{{ $kegiatan->kategori === 'ekskul' ? '⚽' : '🎯' }} {{ $kegiatan->nama_kegiatan }}</span>
+                @if($kegiatan->kategori === 'ekskul')
+                    <span class="text-xs px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300 font-semibold">
+                        <i class="fas fa-futbol mr-1"></i>Ekskul {{ $kegiatan->pembina ? '• ' . $kegiatan->pembina->nama : '' }}
+                    </span>
+                @endif
                 <span class="text-xs px-2.5 py-0.5 rounded-full bg-brand-100 text-brand-700 dark:bg-brand-500/20 dark:text-brand-300 font-semibold">
                     {{ $kegiatan->formatted_hari }}
                 </span>
+                @if($kegiatan->target_type === 'kelas')
+                    <span class="text-xs px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300 font-semibold">
+                        <i class="fas fa-chalkboard mr-1"></i>{{ $kegiatan->target_scope_label }}
+                    </span>
+                @elseif($kegiatan->target_type === 'siswa')
+                    <span class="text-xs px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300 font-semibold">
+                        <i class="fas fa-user-check mr-1"></i>{{ $kegiatan->target_scope_label }}
+                    </span>
+                @else
+                    <span class="text-xs px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300 font-semibold">
+                        <i class="fas fa-globe mr-1"></i>Semua Siswa
+                    </span>
+                @endif
             </h5>
             <p class="text-sm text-brand-600 dark:text-brand-300 mt-1">{{ $kegiatan->deskripsi ?: 'Tidak ada deskripsi kegiatan.' }}</p>
         </div>

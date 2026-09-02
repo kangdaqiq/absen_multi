@@ -9,18 +9,35 @@
             <i class="fas fa-arrow-left text-xs"></i> Kembali ke Kegiatan
         </a>
         <h2 class="text-title-md2 font-semibold text-gray-800 dark:text-white/90">
-            🎯 {{ $kegiatan->nama_kegiatan }}
+            {{ $kegiatan->kategori === 'ekskul' ? '⚽' : '🎯' }} {{ $kegiatan->nama_kegiatan }}
         </h2>
         @if($kegiatan->deskripsi)
             <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{{ $kegiatan->deskripsi }}</p>
         @endif
     </div>
-        <span class="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-700 dark:border-gray-700 dark:text-gray-300">
+        <span class="inline-flex flex-wrap items-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-700 dark:border-gray-700 dark:text-gray-300">
             <i class="fas fa-calendar text-brand-500"></i>
-            Mulai: {{ \Carbon\Carbon::parse($kegiatan->tanggal_mulai)->format('d/m/Y') }}
-            <span class="ml-1 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400">
+            @if($kegiatan->kategori === 'ekskul')
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
+                    <i class="fas fa-futbol mr-1"></i>Ekstrakurikuler {{ $kegiatan->pembina ? '• Pembina: ' . $kegiatan->pembina->nama : '' }}
+                </span>
+            @endif
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400">
                 {{ $kegiatan->formatted_hari }}
             </span>
+            @if($kegiatan->target_type === 'kelas')
+                <span class="ml-1 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-50 text-purple-700 dark:bg-purple-500/15 dark:text-purple-300">
+                    <i class="fas fa-chalkboard mr-1"></i>{{ $kegiatan->target_scope_label }}
+                </span>
+            @elseif($kegiatan->target_type === 'siswa')
+                <span class="ml-1 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">
+                    <i class="fas fa-user-check mr-1"></i>{{ $kegiatan->target_scope_label }}
+                </span>
+            @else
+                <span class="ml-1 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300">
+                    <i class="fas fa-globe mr-1"></i>Semua Siswa
+                </span>
+            @endif
         </span>
 </div>
 

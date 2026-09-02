@@ -88,7 +88,13 @@
         <p class="text-sm text-info-600 dark:text-info-400 font-medium mb-1">Status Pencarian</p>
         <p class="text-base font-bold text-info-800 dark:text-info-300">
             @if($kegiatanId)
-                Spesifik 1 Kegiatan
+                @php $currentKeg = $kegiatans->firstWhere('id', $kegiatanId); @endphp
+                {{ $currentKeg->nama_kegiatan ?? '1 Kegiatan' }}
+                @if($currentKeg)
+                    <span class="block text-xs font-medium text-info-600 dark:text-info-400 mt-0.5">
+                        Cakupan: {{ $currentKeg->target_scope_label }}
+                    </span>
+                @endif
             @else
                 Akumulasi Semua Kegiatan
             @endif

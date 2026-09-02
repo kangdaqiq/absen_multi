@@ -1039,8 +1039,19 @@ $guru = Guru::where('enroll_finger_status', 'requested')
             $att = null;
         }
 
-        // Case 1: Already complete
+        // Case 1: Already complete (Jika sudah absen lengkap, tapi scan di jam kegiatan aktif, catat kegiatan)
         if ($att && $att->jam_pulang) {
+            $recordedKegiatans = $this->recordActiveKegiatans($device->school_id, $siswa, $now, $today, 'Scan Mandiri Kegiatan');
+            if (!empty($recordedKegiatans)) {
+                DB::commit();
+                $namaKeg = implode(', ', $recordedKegiatans);
+                ApiLog::create(['school_id' => $device->school_id, 'api_key' => $this->currentApiKey, 'action' => 'kegiatan_success', 'uid' => $fingerId, 'success' => true, 'message' => "Kegiatan ({$namaKeg}): " . $siswa->nama, 'created_at' => now()]);
+                return $this->response(true, 'success', 'Absen Kegiatan Berhasil', 'ok', [
+                    'type' => 'absen_kegiatan',
+                    'nama' => $siswa->nama,
+                    'kegiatan' => $namaKeg,
+                ]);
+            }
             DB::rollBack();
             return $this->response(true, 'success', 'Absen Lengkap', 'ok', [
                 'type' => 'sudah_lengkap',
@@ -1057,6 +1068,7 @@ $guru = Guru::where('enroll_finger_status', 'requested')
 
             // If checkout is disabled, treat as complete attendance
             if ($checkoutEnabled === 'false') {
+                $this->recordActiveKegiatans($device->school_id, $siswa, $now, $today, 'Auto dari Tap Sidik Jari');
                 DB::rollBack();
                 return $this->response(true, 'success', 'Absen Lengkap', 'ok', [
                     'type' => 'sudah_lengkap',
@@ -1091,12 +1103,35 @@ $guru = Guru::where('enroll_finger_status', 'requested')
             $isAutoCheckoutTime = $now->between($jamPulang, $akhirAbsenPulang);
 
             if ($now->gt($akhirAbsenPulang) && !$teacherSession) {
+                 $recordedKegiatans = $this->recordActiveKegiatans($device->school_id, $siswa, $now, $today, 'Auto dari Tap Sidik Jari');
+                 if (!empty($recordedKegiatans)) {
+                     DB::commit();
+                     $namaKeg = implode(', ', $recordedKegiatans);
+                     ApiLog::create(['school_id' => $device->school_id, 'api_key' => $this->currentApiKey, 'action' => 'kegiatan_success', 'uid' => $fingerId, 'success' => true, 'message' => "Kegiatan ({$namaKeg}): " . $siswa->nama, 'created_at' => now()]);
+                     return $this->response(true, 'success', 'Absen Kegiatan Berhasil', 'ok', [
+                         'type' => 'absen_kegiatan',
+                         'nama' => $siswa->nama,
+                         'kegiatan' => $namaKeg,
+                     ]);
+                 }
                  DB::rollBack();
                  ApiLog::create(['school_id' => $device->school_id, 'api_key' => $this->currentApiKey, 'action' => 'scan_failed', 'uid' => $fingerId, 'success' => false, 'message' => 'Pulang Ditutup: ' . $siswa->nama, 'created_at' => now()]);
                  return $this->response(false, 'gagal', 'Pulang Ditutup', 'warning', ['type' => 'checkout_closed', 'nama' => $siswa->nama]);
             }
 
             if (!$isAutoCheckoutTime && !$teacherSession) {
+                $recordedKegiatans = $this->recordActiveKegiatans($device->school_id, $siswa, $now, $today, 'Auto dari Tap Sidik Jari');
+                if (!empty($recordedKegiatans)) {
+                    DB::commit();
+                    $namaKeg = implode(', ', $recordedKegiatans);
+                    ApiLog::create(['school_id' => $device->school_id, 'api_key' => $this->currentApiKey, 'action' => 'kegiatan_success', 'uid' => $fingerId, 'success' => true, 'message' => "Kegiatan ({$namaKeg}): " . $siswa->nama, 'created_at' => now()]);
+                    return $this->response(true, 'success', 'Absen Kegiatan Berhasil', 'ok', [
+                        'type' => 'absen_kegiatan',
+                        'nama' => $siswa->nama,
+                        'kegiatan' => $namaKeg,
+                    ]);
+                }
+
                 if ($now->between($awalAbsenMasuk, $akhirAbsenMasuk)) {
                     DB::rollBack();
                     return $this->response(true, 'success', 'Sudah Absen Masuk', 'ok', ['type' => 'sudah_absen_masuk', 'nama' => $siswa->nama]);
@@ -1136,6 +1171,10 @@ $guru = Guru::where('enroll_finger_status', 'requested')
                 'keterangan' => $newKeterangan,
                 'updated_at' => now(),
             ]);
+
+            // OTOMATIS CATAT ABSEN KEGIATAN JIKA TERDAPAT JADWAL KEGIATAN AKTIF SAAT PULANG
+            $this->recordActiveKegiatans($device->school_id, $siswa, $now, $today, 'Auto dari Absen Pulang');
+
             DB::commit();
 
             $hours = floor($totalSeconds / 3600);
@@ -1218,32 +1257,8 @@ $guru = Guru::where('enroll_finger_status', 'requested')
                 ]);
             }
 
-            // OTOMATIS CATAT ABSEN KEGIATAN JIKA TERDAPAT JADWAL KEGIATAN AKTIF
-            $activeKegiatans = \App\Models\Kegiatan::where('school_id', $device->school_id)
-                ->where('is_active', 1)
-                ->get()
-                ->filter(function ($keg) use ($now) {
-                    return $keg->isScheduledNow($now);
-                });
-
-            foreach ($activeKegiatans as $keg) {
-                $alreadyKeg = \App\Models\KegiatanAttendance::where('kegiatan_id', $keg->id)
-                    ->where('student_id', $siswa->id)
-                    ->where('tanggal', $today)
-                    ->exists();
-
-                if (!$alreadyKeg) {
-                    \App\Models\KegiatanAttendance::create([
-                        'school_id'   => $device->school_id,
-                        'kegiatan_id' => $keg->id,
-                        'student_id'  => $siswa->id,
-                        'tanggal'     => $today,
-                        'jam_masuk'   => $now->toTimeString(),
-                        'status'      => 'H',
-                        'keterangan'  => 'Auto dari Absen Masuk',
-                    ]);
-                }
-            }
+            // OTOMATIS CATAT ABSEN KEGIATAN JIKA TERDAPAT JADWAL KEGIATAN AKTIF SAAT MASUK
+            $this->recordActiveKegiatans($device->school_id, $siswa, $now, $today, 'Auto dari Absen Masuk');
 
             DB::commit();
 
@@ -1278,14 +1293,68 @@ $guru = Guru::where('enroll_finger_status', 'requested')
         }
     }
 
+    /**
+     * Catat kehadiran siswa pada kegiatan yang sedang aktif dan relevan saat scan sidik jari.
+     */
+    private function recordActiveKegiatans($schoolId, $siswa, $now, $today, $keterangan = 'Auto dari Scan Mesin'): array
+    {
+        $activeKegiatans = \App\Models\Kegiatan::where('school_id', $schoolId)
+            ->where('is_active', 1)
+            ->get()
+            ->filter(function ($keg) use ($now) {
+                return $keg->isScheduledNow($now);
+            });
 
-private function response($ok, $status, $message, $sound = 'ok', $extra = [])
-{
-return response()->json(array_merge([
-'ok' => $ok,
-'status' => $status,
-'message' => $message,
-'sound' => $sound
-], $extra));
-}
+        $recordedKegiatans = [];
+        foreach ($activeKegiatans as $keg) {
+            if (!$keg->isStudentEligible($siswa)) {
+                continue;
+            }
+
+            $alreadyKeg = \App\Models\KegiatanAttendance::where('kegiatan_id', $keg->id)
+                ->where('student_id', $siswa->id)
+                ->where('tanggal', $today)
+                ->exists();
+
+            if (!$alreadyKeg) {
+                \App\Models\KegiatanAttendance::create([
+                    'school_id'   => $schoolId,
+                    'kegiatan_id' => $keg->id,
+                    'student_id'  => $siswa->id,
+                    'tanggal'     => $today,
+                    'jam_masuk'   => $now->toTimeString(),
+                    'status'      => 'H',
+                    'keterangan'  => $keterangan,
+                ]);
+                $recordedKegiatans[] = $keg->nama_kegiatan;
+
+                // Kirim notifikasi Telegram ke siswa & ortu (WA tidak dikirim)
+                try {
+                    $telegramService = app(\App\Services\TelegramService::class);
+                    $telegramService->sendKegiatanCheckIn(
+                        namaSiswa: $siswa->nama,
+                        namaKegiatan: $keg->nama_kegiatan,
+                        jam: $now->format('H:i'),
+                        tanggal: $now->translatedFormat('l, d F Y'),
+                        schoolId: $schoolId,
+                        chatIdSiswa: $siswa->telegram_chat_id ?: null,
+                        chatIdOrtu: $siswa->telegram_ortu_chat_id ?: null
+                    );
+                } catch (\Throwable $e) {
+                    \Log::error("Failed to send Telegram for kegiatan attendance: " . $e->getMessage());
+                }
+            }
+        }
+        return $recordedKegiatans;
+    }
+
+    private function response($ok, $status, $message, $sound = 'ok', $extra = [])
+    {
+        return response()->json(array_merge([
+            'ok' => $ok,
+            'status' => $status,
+            'message' => $message,
+            'sound' => $sound
+        ], $extra));
+    }
 }

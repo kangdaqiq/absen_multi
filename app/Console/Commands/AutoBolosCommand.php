@@ -114,7 +114,7 @@ class AutoBolosCommand extends Command
                     MessageQueue::create([
                         'school_id' => $schoolId,
                         'phone_number' => $bs->no_wa,
-                        'message' => \App\Services\WhatsAppMessageTemplates::bolosStudent($bs->nama),
+                        'message' => \App\Services\WhatsAppMessageTemplates::bolosStudent($bs->nama, $bs->nama_kelas ?? '-', $schoolId),
                         'status' => 'pending',
                         'created_at' => now()
                     ]);
@@ -123,7 +123,7 @@ class AutoBolosCommand extends Command
                     MessageQueue::create([
                         'school_id' => $schoolId,
                         'phone_number' => $bs->wa_ortu,
-                        'message' => \App\Services\WhatsAppMessageTemplates::bolosParent($bs->nama, $bs->nama_kelas),
+                        'message' => \App\Services\WhatsAppMessageTemplates::bolosParent($bs->nama, $bs->nama_kelas ?? '-', $schoolId),
                         'status' => 'pending',
                         'created_at' => now()
                     ]);

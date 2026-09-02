@@ -7,11 +7,28 @@ use Carbon\Carbon;
 class WhatsAppMessageTemplates
 {
     /**
-     * Salam pembuka yang bervariasi — deterministik per nama+tanggal,
-     * sehingga orang yang sama mendapat salam berbeda setiap hari.
+     * Salam pembuka yang bervariasi — deterministik per nama+tanggal.
+     * Menggunakan custom template salam sekolah jika telah dikonfigurasi.
      */
-    private static function randomGreeting(string $nama, bool $isParent = false): string
+    public static function randomGreeting(string $nama, bool $isParent = false, ?int $schoolId = null): string
     {
+        if ($schoolId && $schoolId > 0) {
+            try {
+                $cat = $isParent ? 'greeting_ortu' : 'greeting_siswa';
+                $customGreetings = \App\Models\NotificationTemplate::forSchool($schoolId, $cat)->pluck('content')->toArray();
+                if (!empty($customGreetings)) {
+                    $seed = abs(crc32($nama . date('Y-m-d'))) % count($customGreetings);
+                    $chosen = $customGreetings[$seed];
+                    return strtr($chosen, [
+                        '{nama}'    => $nama,
+                        '{tanggal}' => now()->format('d/m/Y'),
+                    ]);
+                }
+            } catch (\Throwable $e) {
+                // fallback to default
+            }
+        }
+
         $seed = crc32($nama . date('Y-m-d')) % 5;
 
         if ($isParent) {
@@ -37,10 +54,27 @@ class WhatsAppMessageTemplates
 
     /**
      * Kalimat penutup yang bervariasi — deterministik per nama+tanggal.
-     * Mengarahkan penerima agar membalas pesan untuk meningkatkan reputasi nomor pengirim di server WA.
+     * Menggunakan custom template penutup sekolah jika telah dikonfigurasi.
      */
-    private static function randomClosing(string $nama, bool $isParent = false): string
+    public static function randomClosing(string $nama, bool $isParent = false, ?int $schoolId = null): string
     {
+        if ($schoolId && $schoolId > 0) {
+            try {
+                $cat = $isParent ? 'closing_ortu' : 'closing_siswa';
+                $customClosings = \App\Models\NotificationTemplate::forSchool($schoolId, $cat)->pluck('content')->toArray();
+                if (!empty($customClosings)) {
+                    $seed = abs(crc32('closing_' . $nama . date('Y-m-d'))) % count($customClosings);
+                    $chosen = $customClosings[$seed];
+                    return strtr($chosen, [
+                        '{nama}'    => $nama,
+                        '{tanggal}' => now()->format('d/m/Y'),
+                    ]);
+                }
+            } catch (\Throwable $e) {
+                // fallback to default
+            }
+        }
+
         $seed = crc32('closing_' . $nama . date('Y-m-d')) % 5;
 
         if ($isParent) {
@@ -65,17 +99,92 @@ class WhatsAppMessageTemplates
     }
 
     /**
+     * Try to resolve a custom school template with multi-variation rotation.
+     * Returns null if no active custom templates exist for this school and category.
+     */
+    public static function resolveCustomTemplate(?int $schoolId, string $category, array $variables, string $seedKey = ''): ?string
+    {
+        if (!$schoolId || $schoolId <= 0) {
+            return null;
+        }
+
+        try {
+            $templates = \App\Models\NotificationTemplate::forSchool($schoolId, $category)
+                ->pluck('content')
+                ->toArray();
+
+            if (empty($templates)) {
+                return null;
+            }
+
+            $count = count($templates);
+            $nama = $variables['{nama}'] ?? '';
+            $tgl = $variables['{tanggal}'] ?? date('Y-m-d');
+
+            if ($count === 1) {
+                $chosen = $templates[0];
+            } else {
+                $seed = abs(crc32(($seedKey ?: ($category . '_' . $nama)) . $tgl)) % $count;
+                $chosen = $templates[$seed];
+            }
+
+            $isParent = str_contains($category, 'ortu') || str_contains($category, 'parent');
+
+            // Auto-fill common placeholders if not supplied (with schoolId support)
+            if (!isset($variables['{salam}'])) {
+                $variables['{salam}'] = self::randomGreeting($nama, $isParent, $schoolId);
+            }
+            if (!isset($variables['{penutup}'])) {
+                $variables['{penutup}'] = self::randomClosing($nama, $isParent, $schoolId);
+            }
+            if (!isset($variables['{tanggal}'])) {
+                $variables['{tanggal}'] = now()->format('d/m/Y');
+            }
+            if (!isset($variables['{nama_sekolah}'])) {
+                $school = \App\Models\School::find($schoolId);
+                $variables['{nama_sekolah}'] = $school?->name ?? 'Sekolah';
+            }
+
+            return strtr($chosen, $variables);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning("Error resolving custom template for school {$schoolId}, cat {$category}: " . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
      * Check-in notification (Hadir, Izin, Sakit)
      */
-    public static function checkIn(string $nama, string $jamMasuk, string $kelas, string $status = 'Hadir'): string
+    public static function checkIn(string $nama, string $jamMasuk, string $kelas, string $status = 'Hadir', ?int $schoolId = null): string
     {
         $tgl = now()->format('d/m/Y');
+        $statusLower = strtolower($status);
+
+        // Check custom templates first
+        $category = 'checkin_siswa';
+        if (str_contains($statusLower, 'sakit')) {
+            $category = 'sakit_siswa';
+        } elseif (str_contains($statusLower, 'izin')) {
+            $category = 'izin_siswa';
+        }
+
+        $custom = self::resolveCustomTemplate($schoolId, $category, [
+            '{nama}'      => $nama,
+            '{jam_masuk}' => $jamMasuk,
+            '{kelas}'     => $kelas,
+            '{status}'    => $status,
+            '{tanggal}'   => $tgl,
+        ]);
+        if ($custom !== null) {
+            return $custom;
+        }
+
         $greeting = self::randomGreeting($nama);
         $closing  = self::randomClosing($nama, isParent: false);
         $seed = crc32($nama . date('Y-m-d')) % 3;
 
         // Sakit template variations
-        if (str_contains(strtolower($status), 'sakit')) {
+        if (str_contains($statusLower, 'sakit')) {
             $options = [
                 "🤒 *Pemberitahuan Sakit*\n\n{$greeting}\n\nStatus absensi Anda tercatat *Sakit* hari ini. Semoga lekas sembuh ya! ❤️\n📅 Tanggal: {$tgl}\n🏫 Kelas: {$kelas}\n\n{$closing}",
                 "🔔 *Konfirmasi Izin Sakit*\n\n{$greeting}\n\nTercatat tidak masuk sekolah hari ini karena *Sakit*. Istirahat yang cukup dan semoga cepat pulih! 🤲\n📅 Tanggal: {$tgl}\n🏫 Kelas: {$kelas}\n\n{$closing}",
@@ -85,7 +194,7 @@ class WhatsAppMessageTemplates
         }
 
         // Izin template variations
-        if (str_contains(strtolower($status), 'izin')) {
+        if (str_contains($statusLower, 'izin')) {
             $options = [
                 "📝 *Pemberitahuan Izin*\n\n{$greeting}\n\nStatus absensi Anda tercatat *Izin* hari ini.\n📅 Tanggal: {$tgl}\n🏫 Kelas: {$kelas}\n\n{$closing}",
                 "🔔 *Konfirmasi Permohonan Izin*\n\n{$greeting}\n\nPengajuan izin sekolah Anda telah dikonfirmasi oleh sistem absensi.\n📅 Tanggal: {$tgl}\n🏫 Kelas: {$kelas}\n📊 Status: Izin\n\n{$closing}",
@@ -113,9 +222,24 @@ class WhatsAppMessageTemplates
         int $hours,
         int $minutes,
         string $authorizedBy,
-        ?string $tanggal = null
+        ?string $tanggal = null,
+        ?int $schoolId = null
     ): string {
-        $tgl      = $tanggal ?? now()->format('d/m/Y');
+        $tgl = $tanggal ?? now()->format('d/m/Y');
+        $durationText = "{$hours} jam {$minutes} menit";
+
+        $custom = self::resolveCustomTemplate($schoolId, 'checkout_siswa', [
+            '{nama}'         => $nama,
+            '{jam_masuk}'    => $jamMasuk,
+            '{jam_pulang}'   => $jamPulang,
+            '{durasi}'       => $durationText,
+            '{diotorisasi}'  => $authorizedBy,
+            '{tanggal}'      => $tgl,
+        ]);
+        if ($custom !== null) {
+            return $custom;
+        }
+
         $greeting = self::randomGreeting($nama);
         $closing  = self::randomClosing($nama, isParent: false);
         $seed = crc32('checkout_' . $nama . $tgl) % 3;
@@ -137,16 +261,28 @@ class WhatsAppMessageTemplates
         string $jamMasuk,
         string $kelas,
         int $lateHours = 0,
-        int $lateMinutes = 0
+        int $lateMinutes = 0,
+        ?int $schoolId = null
     ): string {
         $tgl = now()->format('d/m/Y');
-        // Format durasi: "1 jam 30 menit", "30 menit", atau "1 jam"
         if ($lateHours > 0 && $lateMinutes > 0) {
             $lateDuration = "{$lateHours} jam {$lateMinutes} menit";
         } elseif ($lateHours > 0) {
             $lateDuration = "{$lateHours} jam";
         } else {
             $lateDuration = "{$lateMinutes} menit";
+        }
+
+        $custom = self::resolveCustomTemplate($schoolId, 'late_siswa', [
+            '{nama}'              => $nama,
+            '{jam_masuk}'         => $jamMasuk,
+            '{kelas}'             => $kelas,
+            '{durasi_terlambat}'  => $lateDuration,
+            '{status}'            => 'Terlambat',
+            '{tanggal}'           => $tgl,
+        ]);
+        if ($custom !== null) {
+            return $custom;
         }
 
         $greeting = self::randomGreeting($nama);
@@ -165,15 +301,35 @@ class WhatsAppMessageTemplates
     /**
      * Check-in notification to parent
      */
-    public static function checkInParent(string $nama, string $jamMasuk, string $kelas, string $status = 'Hadir'): string
+    public static function checkInParent(string $nama, string $jamMasuk, string $kelas, string $status = 'Hadir', ?int $schoolId = null): string
     {
         $tgl = now()->format('d/m/Y');
+        $statusLower = strtolower($status);
+
+        $category = 'checkin_ortu';
+        if (str_contains($statusLower, 'sakit')) {
+            $category = 'sakit_ortu';
+        } elseif (str_contains($statusLower, 'izin')) {
+            $category = 'izin_ortu';
+        }
+
+        $custom = self::resolveCustomTemplate($schoolId, $category, [
+            '{nama}'      => $nama,
+            '{jam_masuk}' => $jamMasuk,
+            '{kelas}'     => $kelas,
+            '{status}'    => $status,
+            '{tanggal}'   => $tgl,
+        ]);
+        if ($custom !== null) {
+            return $custom;
+        }
+
         $greeting = self::randomGreeting($nama, isParent: true);
         $closing  = self::randomClosing($nama, isParent: true);
         $seed = crc32('parent_in_' . $nama . $tgl) % 3;
 
         // Sakit template variations to parent
-        if (str_contains(strtolower($status), 'sakit')) {
+        if (str_contains($statusLower, 'sakit')) {
             $options = [
                 "🤒 *Laporan Izin Sakit Anak*\n\n{$greeting}\n\nMenginfokan bahwa anak Anda tercatat tidak masuk sekolah hari ini karena *Sakit*. Semoga lekas sembuh dan lekas ceria kembali. 🤲\n📅 Tanggal: {$tgl}\n🏫 Kelas: {$kelas}\n\n{$closing}",
                 "🔔 *Pemberitahuan Siswa Sakit*\n\n{$greeting}\n\nPutra/putri Anda hari ini izin tidak masuk sekolah karena *Sakit*. Kami mendoakan semoga lekas pulih. ❤️\n📅 Tanggal: {$tgl}\n🏫 Kelas: {$kelas}\n\n{$closing}",
@@ -183,7 +339,7 @@ class WhatsAppMessageTemplates
         }
 
         // Izin template variations to parent
-        if (str_contains(strtolower($status), 'izin')) {
+        if (str_contains($statusLower, 'izin')) {
             $options = [
                 "📝 *Laporan Izin Anak*\n\n{$greeting}\n\nMenginfokan bahwa anak Anda tercatat tidak masuk sekolah dengan keterangan *Izin*.\n📅 Tanggal: {$tgl}\n🏫 Kelas: {$kelas}\n\n{$closing}",
                 "🔔 *Pemberitahuan Izin Sekolah*\n\n{$greeting}\n\nPermohonan izin putra/putri Anda hari ini telah diterima dan dicatat dalam absensi.\n📅 Tanggal: {$tgl}\n🏫 Kelas: {$kelas}\n\n{$closing}",
@@ -210,7 +366,8 @@ class WhatsAppMessageTemplates
         string $jamMasuk,
         string $kelas,
         int $lateHours = 0,
-        int $lateMinutes = 0
+        int $lateMinutes = 0,
+        ?int $schoolId = null
     ): string {
         $tgl = now()->format('d/m/Y');
         if ($lateHours > 0 && $lateMinutes > 0) {
@@ -219,6 +376,18 @@ class WhatsAppMessageTemplates
             $lateDuration = "{$lateHours} jam";
         } else {
             $lateDuration = "{$lateMinutes} menit";
+        }
+
+        $custom = self::resolveCustomTemplate($schoolId, 'late_ortu', [
+            '{nama}'              => $nama,
+            '{jam_masuk}'         => $jamMasuk,
+            '{kelas}'             => $kelas,
+            '{durasi_terlambat}'  => $lateDuration,
+            '{status}'            => 'Terlambat',
+            '{tanggal}'           => $tgl,
+        ]);
+        if ($custom !== null) {
+            return $custom;
         }
 
         $greeting = self::randomGreeting($nama, isParent: true);
@@ -244,9 +413,24 @@ class WhatsAppMessageTemplates
         int $hours,
         int $minutes,
         string $authorizedBy,
-        ?string $tanggal = null
+        ?string $tanggal = null,
+        ?int $schoolId = null
     ): string {
-        $tgl      = $tanggal ?? now()->format('d/m/Y');
+        $tgl = $tanggal ?? now()->format('d/m/Y');
+        $durationText = "{$hours} jam {$minutes} menit";
+
+        $custom = self::resolveCustomTemplate($schoolId, 'checkout_ortu', [
+            '{nama}'         => $nama,
+            '{jam_masuk}'    => $jamMasuk,
+            '{jam_pulang}'   => $jamPulang,
+            '{durasi}'       => $durationText,
+            '{diotorisasi}'  => $authorizedBy,
+            '{tanggal}'      => $tgl,
+        ]);
+        if ($custom !== null) {
+            return $custom;
+        }
+
         $greeting = self::randomGreeting($nama, isParent: true);
         $closing  = self::randomClosing($nama, isParent: true);
         $seed = crc32('parent_out_' . $nama . $tgl) % 3;
@@ -263,9 +447,20 @@ class WhatsAppMessageTemplates
     /**
      * Alpha (absent) notification to student
      */
-    public static function alphaStudent(string $nama): string
+    public static function alphaStudent(string $nama, string $kelas = '-', ?int $schoolId = null): string
     {
         $tgl = now()->format('d/m/Y');
+
+        $custom = self::resolveCustomTemplate($schoolId, 'alpha_siswa', [
+            '{nama}'    => $nama,
+            '{kelas}'   => $kelas,
+            '{status}'  => 'Alpha (Tidak Hadir)',
+            '{tanggal}' => $tgl,
+        ]);
+        if ($custom !== null) {
+            return $custom;
+        }
+
         $greeting = self::randomGreeting($nama);
         $closing  = self::randomClosing($nama, isParent: false);
         $seed = crc32('alpha_' . $nama . $tgl) % 3;
@@ -282,9 +477,20 @@ class WhatsAppMessageTemplates
     /**
      * Alpha (absent) notification to parent
      */
-    public static function alphaParent(string $nama, string $kelas): string
+    public static function alphaParent(string $nama, string $kelas = '-', ?int $schoolId = null): string
     {
         $tgl = now()->format('d/m/Y');
+
+        $custom = self::resolveCustomTemplate($schoolId, 'alpha_ortu', [
+            '{nama}'    => $nama,
+            '{kelas}'   => $kelas,
+            '{status}'  => 'Alpha (Tidak Hadir)',
+            '{tanggal}' => $tgl,
+        ]);
+        if ($custom !== null) {
+            return $custom;
+        }
+
         $greeting = self::randomGreeting($nama, isParent: true);
         $closing  = self::randomClosing($nama, isParent: true);
         $seed = crc32('parent_alpha_' . $nama . $tgl) % 3;
@@ -301,9 +507,20 @@ class WhatsAppMessageTemplates
     /**
      * Bolos (skipped checkout) notification to student
      */
-    public static function bolosStudent(string $nama): string
+    public static function bolosStudent(string $nama, string $kelas = '-', ?int $schoolId = null): string
     {
         $tgl = now()->format('d/m/Y');
+
+        $custom = self::resolveCustomTemplate($schoolId, 'bolos_siswa', [
+            '{nama}'    => $nama,
+            '{kelas}'   => $kelas,
+            '{status}'  => 'Bolos',
+            '{tanggal}' => $tgl,
+        ]);
+        if ($custom !== null) {
+            return $custom;
+        }
+
         $greeting = self::randomGreeting($nama);
         $closing  = self::randomClosing($nama, isParent: false);
         $seed = crc32('bolos_' . $nama . $tgl) % 3;
@@ -320,9 +537,20 @@ class WhatsAppMessageTemplates
     /**
      * Bolos (skipped checkout) notification to parent
      */
-    public static function bolosParent(string $nama, string $kelas): string
+    public static function bolosParent(string $nama, string $kelas = '-', ?int $schoolId = null): string
     {
         $tgl = now()->format('d/m/Y');
+
+        $custom = self::resolveCustomTemplate($schoolId, 'bolos_ortu', [
+            '{nama}'    => $nama,
+            '{kelas}'   => $kelas,
+            '{status}'  => 'Bolos',
+            '{tanggal}' => $tgl,
+        ]);
+        if ($custom !== null) {
+            return $custom;
+        }
+
         $greeting = self::randomGreeting($nama, isParent: true);
         $closing  = self::randomClosing($nama, isParent: true);
         $seed = crc32('parent_bolos_' . $nama . $tgl) % 3;

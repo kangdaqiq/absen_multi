@@ -1,6 +1,6 @@
 @props([
     'isOpen' => false,
-    'showCloseButton' => true,
+    'showCloseButton' => false,
 ])
 
 <div x-data="{
@@ -19,7 +19,7 @@
 @open-modal.window="if ($event.detail === id) { open = true }"
 @close-modal.window="if ($event.detail === id) { open = false }"
 x-show="open" x-cloak @keydown.escape.window="open = false"
-    class="modal fixed inset-0 z-99999 flex items-center justify-center overflow-y-auto p-5"
+    class="modal fixed inset-0 z-99999 flex min-h-full items-center justify-center overflow-y-auto p-4 sm:p-6"
     {{ $attributes->except(['class', 'id']) }}>
 
     <!-- Backdrop -->
@@ -30,7 +30,7 @@ x-show="open" x-cloak @keydown.escape.window="open = false"
     </div>
 
     <!-- Modal Content -->
-    <div @click.stop class="relative w-full rounded-3xl bg-white dark:bg-gray-900 {{ $attributes->get('class') }}"
+    <div @click.stop class="relative w-full max-w-lg max-h-[90vh] my-auto flex flex-col rounded-3xl bg-white dark:bg-gray-900 shadow-2xl overflow-hidden {{ $attributes->get('class') }}"
         x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform scale-95"
         x-transition:enter-end="opacity-100 transform scale-100" x-transition:leave="transition ease-in duration-200"
         x-transition:leave-start="opacity-100 transform scale-100"
@@ -50,7 +50,7 @@ x-show="open" x-cloak @keydown.escape.window="open = false"
         @endif
 
         <!-- Modal Body -->
-        <div>
+        <div class="overflow-y-auto max-h-[90vh]">
             {{ $slot }}
         </div>
     </div>

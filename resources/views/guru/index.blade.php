@@ -206,7 +206,7 @@
 <!-- ========================= MODALS ========================= -->
 
 <!-- Modal Tambah -->
-<x-ui.modal id="modalTambahGuru" :is-open="false">
+<x-ui.modal id="modalTambahGuru" :is-open="false" class="max-w-2xl">
     <div class="p-6">
         <div class="flex items-center justify-between mb-5">
             <h3 class="text-xl font-bold text-gray-800 dark:text-white/90">Tambah {{ $labelKaryawan }}</h3>
@@ -214,9 +214,9 @@
         </div>
         <form action="{{ route('guru.store') }}" method="POST">
             @csrf
-            <div class="space-y-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Nama Lengkap</label>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Nama Lengkap <span class="text-error-500">*</span></label>
                     <input type="text" name="nama" required class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
                 </div>
                 <div>
@@ -224,11 +224,11 @@
                     <input type="text" name="nip" placeholder="{{ $school && $school->isOffice() ? 'ID Pegawai (opsional)' : 'NIP' }}" class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
                 </div>
                 <div>
-                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Tanggal Lahir <span class="text-gray-400 font-normal">(opsional, untuk ucapan HUT)</span></label>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Tanggal Lahir <span class="text-gray-400 font-normal">(opsional)</span></label>
                     <input type="date" name="tgl_lahir" class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
                 </div>
                 <div>
-                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">No WhatsApp</label>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">No WhatsApp <span class="text-error-500">*</span></label>
                     <input type="text" name="no_wa" placeholder="08xxx atau 628xxx" pattern="^(08|628)[0-9]{8,13}$" required class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
                     <p class="mt-1 text-xs text-gray-500">Format: 08xxx atau 628xxx (8-13 digit)</p>
                 </div>
@@ -237,22 +237,22 @@
                     <input type="text" name="telegram_chat_id" placeholder="Contoh: 123456789" class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
                 </div>
                 <div>
-                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Default Shift Kerja</label>
-                    <select name="default_shift_id" class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Default Shift Kerja <span class="text-error-500">*</span></label>
+                    <select name="default_shift_id" required class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
                         <option value="">-- Pilih Shift (Wajib) --</option>
                         @foreach($shifts as $s)
                             <option value="{{ $s->id }}">{{ $s->nama_shift }} ({{ $s->formatted_jam_masuk }} - {{ $s->formatted_jam_pulang }})</option>
                         @endforeach
                     </select>
                 </div>
-                <div>
-                    <label class="mb-1.5 flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                <div class="sm:col-span-2">
+                    <label class="mb-1.5 flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer">
                         <input type="checkbox" name="is_global_report" value="1" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-900">
                         Terima Laporan Global (Rekap Harian Semua Siswa)
                     </label>
                 </div>
             </div>
-            <div class="mt-6 flex justify-end gap-3">
+            <div class="mt-6 flex justify-end gap-3 pt-4 border-t border-gray-100 dark:border-gray-800">
                 <button type="button" @click="open = false" class="rounded-lg border border-gray-200 px-4 py-2 text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-gray-800">Batal</button>
                 <button type="submit" class="rounded-lg bg-brand-500 px-4 py-2 text-white hover:bg-brand-600">Simpan</button>
             </div>
@@ -261,7 +261,7 @@
 </x-ui.modal>
 
 <!-- Modal Edit -->
-<x-ui.modal id="modalEditGuru" :is-open="false">
+<x-ui.modal id="modalEditGuru" :is-open="false" class="max-w-2xl">
     <div class="p-6">
         <div class="flex items-center justify-between mb-5">
             <h3 class="text-xl font-bold text-gray-800 dark:text-white/90">Edit {{ $labelKaryawan }}</h3>
@@ -270,9 +270,9 @@
         <form action="#" method="POST" id="formEditGuru">
             @csrf
             @method('PUT')
-            <div class="space-y-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Nama Lengkap</label>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Nama Lengkap <span class="text-error-500">*</span></label>
                     <input type="text" name="nama" id="edit_nama" required class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
                 </div>
                 <div>
@@ -280,16 +280,17 @@
                     <input type="text" name="nip" id="edit_nip" placeholder="{{ $school && $school->isOffice() ? 'ID Pegawai (opsional)' : 'NIP' }}" class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
                 </div>
                 <div>
-                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Tanggal Lahir <span class="text-gray-400 font-normal">(opsional, untuk ucapan HUT)</span></label>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Tanggal Lahir <span class="text-gray-400 font-normal">(opsional)</span></label>
                     <input type="date" name="tgl_lahir" id="edit_tgl_lahir" class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
                 </div>
                 <div>
-                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">No WhatsApp</label>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">No WhatsApp <span class="text-error-500">*</span></label>
                     <input type="text" name="no_wa" id="edit_wa" placeholder="08xxx atau 628xxx" pattern="^(08|628)[0-9]{8,13}$" required class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                    <p class="mt-1 text-xs text-gray-500">Format: 08xxx atau 628xxx (8-13 digit)</p>
                 </div>
                 <div>
-                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Default Shift Kerja</label>
-                    <select name="default_shift_id" id="edit_default_shift_id" class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Default Shift Kerja <span class="text-error-500">*</span></label>
+                    <select name="default_shift_id" id="edit_default_shift_id" required class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
                         <option value="">-- Pilih Shift (Wajib) --</option>
                         @foreach($shifts as $s)
                             <option value="{{ $s->id }}">{{ $s->nama_shift }} ({{ $s->formatted_jam_masuk }} - {{ $s->formatted_jam_pulang }})</option>
@@ -300,18 +301,18 @@
                     <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Telegram Chat ID <span class="text-gray-400 font-normal">(opsional)</span></label>
                     <input type="text" name="telegram_chat_id" id="edit_telegram" placeholder="Contoh: 123456789" class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
                 </div>
-                <div>
-                    <label class="mb-1.5 flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                <div class="sm:col-span-2">
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">UID RFID (readonly)</label>
+                    <input type="text" name="uid_rfid" id="edit_rfid" readonly class="w-full rounded-lg border border-gray-200 bg-gray-100 px-4 py-2 outline-none dark:border-gray-800 dark:bg-gray-800 dark:text-gray-400">
+                </div>
+                <div class="sm:col-span-2">
+                    <label class="mb-1.5 flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer">
                         <input type="checkbox" name="is_global_report" id="edit_global_report" value="1" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-900">
                         Terima Laporan Global (Rekap Harian Semua Siswa)
                     </label>
                 </div>
-                <div>
-                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">UID RFID</label>
-                    <input type="text" name="uid_rfid" id="edit_rfid" readonly class="w-full rounded-lg border border-gray-200 bg-gray-100 px-4 py-2 outline-none dark:border-gray-800 dark:bg-gray-800 dark:text-gray-400">
-                </div>
             </div>
-            <div class="mt-6 flex justify-end gap-3">
+            <div class="mt-6 flex justify-end gap-3 pt-4 border-t border-gray-100 dark:border-gray-800">
                 <button type="button" @click="open = false" class="rounded-lg border border-gray-200 px-4 py-2 text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-gray-800">Batal</button>
                 <button type="submit" class="rounded-lg bg-brand-500 px-4 py-2 text-white hover:bg-brand-600">Update</button>
             </div>
@@ -320,7 +321,7 @@
 </x-ui.modal>
 
 <!-- Modal Hapus -->
-<x-ui.modal id="modalHapusGuru" :is-open="false">
+<x-ui.modal id="modalHapusGuru" :is-open="false" class="max-w-md">
     <div class="p-6">
         <div class="flex items-center justify-between mb-5">
             <h3 class="text-xl font-bold text-error-500">Hapus {{ $labelKaryawan }}</h3>
@@ -330,7 +331,7 @@
             @csrf
             @method('DELETE')
             <p class="text-gray-700 dark:text-gray-300 mb-6">Yakin ingin menghapus {{ strtolower($labelKaryawan) }}: <strong id="hapus_nama" class="text-gray-900 dark:text-white"></strong>?</p>
-            <div class="flex justify-end gap-3">
+            <div class="flex justify-end gap-3 pt-4 border-t border-gray-100 dark:border-gray-800">
                 <button type="button" @click="open = false" class="rounded-lg border border-gray-200 px-4 py-2 text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-gray-800">Batal</button>
                 <button type="submit" class="rounded-lg bg-error-500 px-4 py-2 text-white hover:bg-error-600">Hapus</button>
             </div>
@@ -339,7 +340,7 @@
 </x-ui.modal>
 
 <!-- Modal Import -->
-<x-ui.modal id="modalImportGuru" :is-open="false">
+<x-ui.modal id="modalImportGuru" :is-open="false" class="max-w-lg">
     <div class="p-6" x-data="importFormGuru()">
         <div class="flex items-center justify-between mb-5">
             <h3 class="text-xl font-bold text-gray-800 dark:text-white/90">Import Data {{ $labelKaryawan }}</h3>
@@ -360,7 +361,7 @@
                     <a href="{{ route('guru.template') }}" class="text-sm font-medium text-brand-500 hover:underline"><i class="fas fa-download mr-1"></i> Download Template Excel</a>
                 </div>
             </div>
-            <div class="mt-6 flex justify-end gap-3">
+            <div class="mt-6 flex justify-end gap-3 pt-4 border-t border-gray-100 dark:border-gray-800">
                 <button type="button" @click="open = false" class="rounded-lg border border-gray-200 px-4 py-2 text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-gray-800">Batal</button>
                 <button type="submit" class="rounded-lg bg-success-500 px-4 py-2 text-white hover:bg-success-600">Import Data</button>
             </div>
@@ -393,7 +394,7 @@
 </x-ui.modal>
 
 <!-- Modal Enroll RFID -->
-<x-ui.modal id="modalEnrollRFID" :is-open="false">
+<x-ui.modal id="modalEnrollRFID" :is-open="false" class="max-w-md">
     <div class="p-6 text-center">
         <div class="flex justify-end mb-2">
             <button @click="open = false" class="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white"><i class="fas fa-times"></i></button>
@@ -422,7 +423,7 @@
 </x-ui.modal>
 
 <!-- Modal Enroll Fingerprint -->
-<x-ui.modal id="modalEnrollFinger" :is-open="false">
+<x-ui.modal id="modalEnrollFinger" :is-open="false" class="max-w-md">
     <div class="p-6 text-center">
         <div class="flex justify-end mb-2">
             <button @click="open = false" class="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white"><i class="fas fa-times"></i></button>

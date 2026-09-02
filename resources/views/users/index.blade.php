@@ -121,7 +121,7 @@
 </div>
 
 {{-- ========================= MODAL EDIT USER ========================= --}}
-<x-ui.modal id="modalEditUser" :is-open="false">
+<x-ui.modal id="modalEditUser" :is-open="false" class="max-w-xl">
     <div class="p-6">
         <div class="flex items-center justify-between mb-5">
             <h3 class="text-xl font-bold text-gray-800 dark:text-white/90">Edit User</h3>

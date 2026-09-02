@@ -206,7 +206,7 @@
 <!-- ========================= MODALS ========================= -->
 
 <!-- Modal Bulk Edit Kelas -->
-<x-ui.modal id="modalBulkEditKelas" :is-open="false">
+<x-ui.modal id="modalBulkEditKelas" :is-open="false" class="max-w-md">
     <div class="p-6">
         <div class="flex items-center justify-between mb-5">
             <h3 class="text-xl font-bold text-gray-800 dark:text-white/90">Edit Kelas Masal</h3>
@@ -222,7 +222,7 @@
                 @endforeach
             </select>
         </div>
-        <div class="flex justify-end gap-3">
+        <div class="flex justify-end gap-3 pt-4 border-t border-gray-100 dark:border-gray-800">
             <button type="button" @click="open = false" class="rounded-lg border border-gray-200 px-4 py-2 text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-gray-800">Batal</button>
             <button type="button" @click="bulkUpdateKelas(document.getElementById('bulk_kelas_id').value)" class="rounded-lg bg-brand-500 px-4 py-2 text-white hover:bg-brand-600">Simpan Perubahan</button>
         </div>
@@ -230,14 +230,14 @@
 </x-ui.modal>
 
 <!-- Modal Bulk Hapus -->
-<x-ui.modal id="modalBulkHapusSiswa" :is-open="false">
+<x-ui.modal id="modalBulkHapusSiswa" :is-open="false" class="max-w-md">
     <div class="p-6">
         <div class="flex items-center justify-between mb-5">
             <h3 class="text-xl font-bold text-error-500">Hapus Masal Siswa</h3>
             <button @click="open = false" class="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white"><i class="fas fa-times"></i></button>
         </div>
         <p class="text-gray-700 dark:text-gray-300 mb-6">Yakin ingin menghapus secara permanen <span x-text="selected.length" class="font-bold text-error-500"></span> siswa yang dipilih?</p>
-        <div class="flex justify-end gap-3">
+        <div class="flex justify-end gap-3 pt-4 border-t border-gray-100 dark:border-gray-800">
             <button type="button" @click="open = false" class="rounded-lg border border-gray-200 px-4 py-2 text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-gray-800">Batal</button>
             <button type="button" @click="bulkDelete()" class="rounded-lg bg-error-500 px-4 py-2 text-white hover:bg-error-600">Hapus</button>
         </div>
@@ -245,7 +245,7 @@
 </x-ui.modal>
 
 <!-- Modal Tambah -->
-<x-ui.modal id="modalTambahSiswa" :is-open="false">
+<x-ui.modal id="modalTambahSiswa" :is-open="false" class="max-w-2xl">
     <div class="p-6">
         <div class="flex items-center justify-between mb-5">
             <h3 class="text-xl font-bold text-gray-800 dark:text-white/90">Tambah Siswa</h3>
@@ -253,13 +253,13 @@
         </div>
         <form action="{{ route('siswa.store') }}" method="POST">
             @csrf
-            <div class="space-y-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Nama Siswa</label>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Nama Siswa <span class="text-error-500">*</span></label>
                     <input type="text" name="nama" required class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
                 </div>
                 <div>
-                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">NIS</label>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">NIS <span class="text-error-500">*</span></label>
                     <input type="text" name="nis" required class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
                 </div>
                 <div>
@@ -267,7 +267,7 @@
                     <input type="date" name="tgl_lahir" class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
                 </div>
                 <div>
-                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Kelas</label>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Kelas <span class="text-error-500">*</span></label>
                     <select name="kelas_id" required class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
                         <option value="">-- Pilih Kelas --</option>
                         @foreach ($kelas as $k)
@@ -275,7 +275,7 @@
                         @endforeach
                     </select>
                 </div>
-                <div>
+                <div class="sm:col-span-2">
                     <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Alamat <span class="text-gray-400 font-normal">(opsional)</span></label>
                     <textarea name="alamat" rows="2" placeholder="Masukkan alamat siswa..." class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white"></textarea>
                 </div>
@@ -297,51 +297,55 @@
                     <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Telegram Chat ID Ortu <span class="text-gray-400 font-normal">(opsional)</span></label>
                     <input type="text" name="telegram_ortu_chat_id" placeholder="Contoh: 987654321" class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
                 </div>
-                <div class="flex items-center gap-2 mt-2">
-                    <input type="checkbox" name="is_khusus" id="is_khusus" value="1" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800">
-                    <label for="is_khusus" class="text-sm font-medium text-gray-700 dark:text-gray-300">Siswa PKL</label>
-                </div>
-                <div x-data="{ isSiswaKhusus: false }">
-                    <div class="flex items-center gap-2 mt-2">
-                        <input type="checkbox" name="is_siswa_khusus" id="is_siswa_khusus" value="1" x-model="isSiswaKhusus" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800">
-                        <label for="is_siswa_khusus" class="text-sm font-medium text-gray-700 dark:text-gray-300">Siswa Khusus</label>
-                    </div>
-                    <div x-show="isSiswaKhusus" x-transition class="mt-3 space-y-2">
-                        <label class="block text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Hari Masuk Tertentu</label>
-                        <div class="grid grid-cols-4 gap-2">
-                            <label class="flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
-                                <input type="checkbox" name="hari_masuk[]" value="1" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800">
-                                <span>Senin</span>
+                <div class="sm:col-span-2">
+                    <div class="flex flex-wrap items-center gap-6 mt-1">
+                        <label class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer">
+                            <input type="checkbox" name="is_khusus" id="is_khusus" value="1" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800">
+                            <span>Siswa PKL</span>
+                        </label>
+                        <div x-data="{ isSiswaKhusus: false }">
+                            <label class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer">
+                                <input type="checkbox" name="is_siswa_khusus" id="is_siswa_khusus" value="1" x-model="isSiswaKhusus" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800">
+                                <span>Siswa Khusus</span>
                             </label>
-                            <label class="flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
-                                <input type="checkbox" name="hari_masuk[]" value="2" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800">
-                                <span>Selasa</span>
-                            </label>
-                            <label class="flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
-                                <input type="checkbox" name="hari_masuk[]" value="3" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800">
-                                <span>Rabu</span>
-                            </label>
-                            <label class="flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
-                                <input type="checkbox" name="hari_masuk[]" value="4" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800">
-                                <span>Kamis</span>
-                            </label>
-                            <label class="flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
-                                <input type="checkbox" name="hari_masuk[]" value="5" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800">
-                                <span>Jumat</span>
-                            </label>
-                            <label class="flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
-                                <input type="checkbox" name="hari_masuk[]" value="6" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800">
-                                <span>Sabtu</span>
-                            </label>
-                            <label class="flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
-                                <input type="checkbox" name="hari_masuk[]" value="7" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800">
-                                <span>Minggu</span>
-                            </label>
+                            <div x-show="isSiswaKhusus" x-transition class="mt-3 space-y-2">
+                                <label class="block text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Hari Masuk Tertentu</label>
+                                <div class="grid grid-cols-4 sm:grid-cols-7 gap-2">
+                                    <label class="flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                                        <input type="checkbox" name="hari_masuk[]" value="1" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800">
+                                        <span>Senin</span>
+                                    </label>
+                                    <label class="flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                                        <input type="checkbox" name="hari_masuk[]" value="2" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800">
+                                        <span>Selasa</span>
+                                    </label>
+                                    <label class="flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                                        <input type="checkbox" name="hari_masuk[]" value="3" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800">
+                                        <span>Rabu</span>
+                                    </label>
+                                    <label class="flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                                        <input type="checkbox" name="hari_masuk[]" value="4" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800">
+                                        <span>Kamis</span>
+                                    </label>
+                                    <label class="flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                                        <input type="checkbox" name="hari_masuk[]" value="5" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800">
+                                        <span>Jumat</span>
+                                    </label>
+                                    <label class="flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                                        <input type="checkbox" name="hari_masuk[]" value="6" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800">
+                                        <span>Sabtu</span>
+                                    </label>
+                                    <label class="flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                                        <input type="checkbox" name="hari_masuk[]" value="7" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800">
+                                        <span>Minggu</span>
+                                    </label>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
-            <div class="mt-6 flex justify-end gap-3">
+            <div class="mt-6 flex justify-end gap-3 pt-4 border-t border-gray-100 dark:border-gray-800">
                 <button type="button" @click="open = false" class="rounded-lg border border-gray-200 px-4 py-2 text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-gray-800">Batal</button>
                 <button type="submit" class="rounded-lg bg-brand-500 px-4 py-2 text-white hover:bg-brand-600">Simpan</button>
             </div>
@@ -350,7 +354,7 @@
 </x-ui.modal>
 
 <!-- Modal Edit -->
-<x-ui.modal id="modalEditSiswa" :is-open="false">
+<x-ui.modal id="modalEditSiswa" :is-open="false" class="max-w-2xl">
     <div class="p-6">
         <div class="flex items-center justify-between mb-5">
             <h3 class="text-xl font-bold text-gray-800 dark:text-white/90">Edit Siswa</h3>
@@ -359,13 +363,13 @@
         <form action="#" method="POST" id="formEditSiswa">
             @csrf
             @method('PUT')
-            <div class="space-y-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Nama Siswa</label>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Nama Siswa <span class="text-error-500">*</span></label>
                     <input type="text" name="nama" id="edit_nama" required class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
                 </div>
                 <div>
-                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">NISN</label>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">NISN <span class="text-error-500">*</span></label>
                     <input type="text" name="nis" id="edit_nis" required class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
                 </div>
                 <div>
@@ -373,7 +377,7 @@
                     <input type="date" name="tgl_lahir" id="edit_tgl_lahir" class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
                 </div>
                 <div>
-                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Kelas</label>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Kelas <span class="text-error-500">*</span></label>
                     <select name="kelas_id" id="edit_kelas_id" required class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
                         <option value="">-- Pilih Kelas --</option>
                         @foreach ($kelas as $k)
@@ -381,17 +385,19 @@
                         @endforeach
                     </select>
                 </div>
-                <div>
+                <div class="sm:col-span-2">
                     <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Alamat <span class="text-gray-400 font-normal">(opsional)</span></label>
                     <textarea name="alamat" id="edit_alamat" rows="2" placeholder="Masukkan alamat siswa..." class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white"></textarea>
                 </div>
                 <div>
                     <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">No WhatsApp Siswa</label>
                     <input type="text" name="no_wa" id="edit_no_wa" placeholder="08xxx atau 628xxx" pattern="^(08|628)[0-9]{8,13}$" class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                    <p class="mt-1 text-xs text-gray-500">Format: 08xxx atau 628xxx (8-13 digit)</p>
                 </div>
                 <div>
                     <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">No WhatsApp Ortu</label>
                     <input type="text" name="wa_ortu" id="edit_wa_ortu" placeholder="08xxx atau 628xxx" pattern="^(08|628)[0-9]{8,13}$" class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                    <p class="mt-1 text-xs text-gray-500">Format: 08xxx atau 628xxx (8-13 digit)</p>
                 </div>
                 <div>
                     <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Telegram Chat ID Siswa <span class="text-gray-400 font-normal">(opsional)</span></label>
@@ -401,23 +407,27 @@
                     <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Telegram Chat ID Ortu <span class="text-gray-400 font-normal">(opsional)</span></label>
                     <input type="text" name="telegram_ortu_chat_id" id="edit_telegram_ortu_chat_id" placeholder="Contoh: 987654321" class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
                 </div>
-                <div>
+                <div class="sm:col-span-2">
                     <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">UID RFID (readonly)</label>
                     <input type="text" name="uid_rfid" id="edit_uid_rfid" readonly class="w-full rounded-lg border border-gray-200 bg-gray-100 px-4 py-2 outline-none dark:border-gray-800 dark:bg-gray-800 dark:text-gray-400">
                 </div>
-                <div class="flex items-center gap-2 mt-2">
-                    <input type="checkbox" name="is_khusus" id="edit_is_khusus" value="1" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800">
-                    <label for="edit_is_khusus" class="text-sm font-medium text-gray-700 dark:text-gray-300">Siswa PKL</label>
-                </div>
-                <div>
-                    <div class="flex items-center gap-2 mt-2">
-                        <input type="checkbox" name="is_siswa_khusus" id="edit_is_siswa_khusus" value="1" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800">
-                        <label for="edit_is_siswa_khusus" class="text-sm font-medium text-gray-700 dark:text-gray-300">Siswa Khusus</label>
+                <div class="sm:col-span-2">
+                    <div class="flex flex-wrap items-center gap-6 mt-1">
+                        <label class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer">
+                            <input type="checkbox" name="is_khusus" id="edit_is_khusus" value="1" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800">
+                            <span>Siswa PKL</span>
+                        </label>
+                        <div>
+                            <label class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer">
+                                <input type="checkbox" name="is_siswa_khusus" id="edit_is_siswa_khusus" value="1" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800">
+                                <span>Siswa Khusus</span>
+                            </label>
+                        </div>
                     </div>
                     
                     <div id="edit_hari_masuk_container" class="mt-3 space-y-2" style="display: none;">
                         <label class="block text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Hari Masuk Tertentu</label>
-                        <div class="grid grid-cols-4 gap-2">
+                        <div class="grid grid-cols-4 sm:grid-cols-7 gap-2">
                             <label class="flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
                                 <input type="checkbox" name="hari_masuk[]" id="edit_hari_masuk_1" value="1" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800">
                                 <span>Senin</span>
@@ -450,7 +460,7 @@
                     </div>
                 </div>
             </div>
-            <div class="mt-6 flex justify-end gap-3">
+            <div class="mt-6 flex justify-end gap-3 pt-4 border-t border-gray-100 dark:border-gray-800">
                 <button type="button" @click="open = false" class="rounded-lg border border-gray-200 px-4 py-2 text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-gray-800">Batal</button>
                 <button type="submit" class="rounded-lg bg-brand-500 px-4 py-2 text-white hover:bg-brand-600">Update</button>
             </div>
@@ -459,7 +469,7 @@
 </x-ui.modal>
 
 <!-- Modal Hapus -->
-<x-ui.modal id="modalHapusSiswa" :is-open="false">
+<x-ui.modal id="modalHapusSiswa" :is-open="false" class="max-w-md">
     <div class="p-6">
         <div class="flex items-center justify-between mb-5">
             <h3 class="text-xl font-bold text-error-500">Hapus Siswa</h3>
@@ -469,7 +479,7 @@
             @csrf
             @method('DELETE')
             <p class="text-gray-700 dark:text-gray-300 mb-6">Yakin ingin menghapus siswa: <strong id="hapus_nama" class="text-gray-900 dark:text-white"></strong>?</p>
-            <div class="flex justify-end gap-3">
+            <div class="flex justify-end gap-3 pt-4 border-t border-gray-100 dark:border-gray-800">
                 <button type="button" @click="open = false" class="rounded-lg border border-gray-200 px-4 py-2 text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-gray-800">Batal</button>
                 <button type="submit" class="rounded-lg bg-error-500 px-4 py-2 text-white hover:bg-error-600">Hapus</button>
             </div>
@@ -478,7 +488,7 @@
 </x-ui.modal>
 
 <!-- Modal Import -->
-<x-ui.modal id="modalImportSiswa" :is-open="false">
+<x-ui.modal id="modalImportSiswa" :is-open="false" class="max-w-lg">
     <div class="p-6" x-data="importFormSiswa()">
         <div class="flex items-center justify-between mb-5">
             <h3 class="text-xl font-bold text-gray-800 dark:text-white/90">Import Data Siswa</h3>
@@ -499,7 +509,7 @@
                     <a href="{{ route('siswa.template') }}" class="text-sm font-medium text-brand-500 hover:underline"><i class="fas fa-download mr-1"></i> Download Template Excel</a>
                 </div>
             </div>
-            <div class="mt-6 flex justify-end gap-3">
+            <div class="mt-6 flex justify-end gap-3 pt-4 border-t border-gray-100 dark:border-gray-800">
                 <button type="button" @click="open = false" class="rounded-lg border border-gray-200 px-4 py-2 text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-gray-800">Batal</button>
                 <button type="submit" class="rounded-lg bg-success-500 px-4 py-2 text-white hover:bg-success-600">Import Data</button>
             </div>
@@ -532,7 +542,7 @@
 </x-ui.modal>
 
 <!-- Modal Enroll RFID -->
-<x-ui.modal id="modalEnrollRFID" :is-open="false">
+<x-ui.modal id="modalEnrollRFID" :is-open="false" class="max-w-md">
     <div class="p-6 text-center">
         <div class="flex justify-end mb-2">
             <button @click="open = false" class="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white"><i class="fas fa-times"></i></button>
@@ -561,7 +571,7 @@
 </x-ui.modal>
 
 <!-- Modal Enroll Fingerprint -->
-<x-ui.modal id="modalEnrollFinger" :is-open="false">
+<x-ui.modal id="modalEnrollFinger" :is-open="false" class="max-w-md">
     <div class="p-6 text-center">
         <div class="flex justify-end mb-2">
             <button @click="open = false" class="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white"><i class="fas fa-times"></i></button>

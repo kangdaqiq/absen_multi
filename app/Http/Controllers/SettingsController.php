@@ -111,9 +111,7 @@ class SettingsController extends Controller
         $checkboxSettings = [
             'enable_checkout_attendance',
             'enable_checkout_teacher',
-            'absence_notification_enabled',
             'enable_birthday_greeting',
-            'telegram_enabled',
             'notification_wa_siswa',
             'notification_wa_ortu',
             'notification_tele_siswa',
@@ -147,21 +145,11 @@ class SettingsController extends Controller
             if ($schoolId && $schoolId > 0) {
                 if ($key === 'nama_sekolah') {
                     \App\Models\School::where('id', $schoolId)->update(['name' => $value]);
-                } elseif ($key === 'telegram_bot_token') {
-                    \App\Models\School::where('id', $schoolId)->update(['telegram_bot_token' => $value]);
-                } elseif ($key === 'telegram_enabled') {
-                    \App\Models\School::where('id', $schoolId)->update(['telegram_enabled' => $value === 'true']);
                 }
             } elseif (config('app.mode') === 'self_hosted') {
                 $school = \App\Models\School::first();
-                if ($school) {
-                    if ($key === 'nama_sekolah') {
-                        $school->update(['name' => $value]);
-                    } elseif ($key === 'telegram_bot_token') {
-                        $school->update(['telegram_bot_token' => $value]);
-                    } elseif ($key === 'telegram_enabled') {
-                        $school->update(['telegram_enabled' => $value === 'true']);
-                    }
+                if ($school && $key === 'nama_sekolah') {
+                    $school->update(['name' => $value]);
                 }
             }
         }

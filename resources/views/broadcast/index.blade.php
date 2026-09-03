@@ -199,12 +199,17 @@
                                 </ul>
                             </div>
 
-                            <div class="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-3.5 shadow-sm">
-                                <h6 class="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5 flex items-center gap-1.5">
-                                    <i class="fas fa-eye text-brand-500"></i> Preview Tampilan Pesan:
-                                </h6>
-                                <div id="messagePreview" class="text-xs text-gray-600 dark:text-gray-400 whitespace-pre-line font-mono bg-gray-50 dark:bg-gray-800/80 p-2.5 rounded border border-gray-100 dark:border-gray-800 max-h-36 overflow-y-auto">
-                                    [Tulis pesan di atas untuk melihat preview]
+                            <div class="rounded-xl border border-gray-200 dark:border-gray-700/80 bg-white dark:bg-gray-900 p-3.5 shadow-sm">
+                                <div class="flex items-center justify-between mb-2">
+                                    <h6 class="text-xs font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+                                        <i class="fas fa-eye text-brand-500"></i> Preview Tampilan Pesan:
+                                    </h6>
+                                    <span class="text-[10px] text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded font-medium">Simulasi Penerima</span>
+                                </div>
+                                <div class="rounded-lg bg-gray-50 dark:bg-gray-800/60 p-2.5 border border-gray-150 dark:border-gray-800">
+                                    <div id="messagePreview" class="text-xs text-gray-700 dark:text-gray-200 font-sans leading-relaxed bg-white dark:bg-gray-900 p-3 rounded border border-gray-200 dark:border-gray-700 shadow-2xs max-h-48 overflow-y-auto" style="white-space: pre-wrap; word-break: break-word;">
+[Tulis pesan di atas untuk melihat preview]
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -363,7 +368,9 @@
         }
 
         let recipientLabel = (targetRec === 'ortu') ? 'Orang Tua / Wali dari Ahmad' : (targetRec === 'siswa' ? 'Ahmad' : 'Ahmad / Orang Tua');
-        let rendered = "📢 PENGUMUMAN SEKOLAH\nKepada: " + recipientLabel + "\nKelas: X-A\n\n";
+        let rendered = "📢 *PENGUMUMAN SEKOLAH*\n" +
+                       "Kepada: *" + recipientLabel + "*\n" +
+                       "Kelas: X-A\n\n";
         
         let body = msg
             .replace(/\{nama\}/g, 'Ahmad')

@@ -3,6 +3,8 @@
 @section('title', 'Super Admin Dashboard')
 
 @section('content')
+<x-announcement-modal :announcements="$popupAnnouncements ?? collect()" />
+
 <div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
   <h2 class="text-title-md2 font-semibold text-gray-800 dark:text-white/90">
     <i class="fas fa-crown text-warning-500 mr-2"></i> Super Admin Dashboard

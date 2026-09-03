@@ -28,6 +28,12 @@ class DashboardController extends Controller
             ->where('is_active', true)
             ->get();
 
+        $popupAnnouncements = \App\Models\Announcement::where('is_active', true)
+            ->where('is_popup', true)
+            ->latest()
+            ->take(5)
+            ->get();
+
         return view('super-admin.dashboard', compact(
             'totalSchools',
             'activeSchools',
@@ -35,7 +41,8 @@ class DashboardController extends Controller
             'totalStudents',
             'totalTeachers',
             'recentSchools',
-            'schoolsWithStats'
+            'schoolsWithStats',
+            'popupAnnouncements'
         ));
     }
 }

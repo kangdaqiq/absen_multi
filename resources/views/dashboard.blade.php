@@ -3,6 +3,8 @@
 @section('title', 'Dashboard')
 
 @section('content')
+<x-announcement-modal :announcements="$popupAnnouncements ?? collect()" />
+
 <div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
   <h2 class="text-title-md2 font-semibold text-gray-800 dark:text-white/90">
     Dashboard

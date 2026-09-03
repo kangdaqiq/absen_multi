@@ -145,11 +145,13 @@ class DashboardController extends Controller
             $chartData['A'][] = $aCount;
         }
 
-        // Fetch active announcements ONLY if user is admin
-        $announcements = collect();
-        if ($user->role === 'admin') {
-            $announcements = Announcement::where('is_active', true)->latest()->get();
-        }
+        // Fetch active announcements and popup announcements
+        $announcements = Announcement::where('is_active', true)->latest()->get();
+        $popupAnnouncements = Announcement::where('is_active', true)
+            ->where('is_popup', true)
+            ->latest()
+            ->take(5)
+            ->get();
 
         // 5. Kegiatan Hari Ini
         $kegiatanHariIni = collect();
@@ -175,6 +177,7 @@ class DashboardController extends Controller
             'dates',
             'chartData',
             'announcements',
+            'popupAnnouncements',
             'kegiatanHariIni'
         ));
     }

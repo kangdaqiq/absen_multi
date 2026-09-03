@@ -15,6 +15,9 @@
     },
     toggleDropdown() {
         this.dropdownOpen = !this.dropdownOpen;
+        if (this.dropdownOpen) {
+            this.markRead();
+        }
     },
     markRead() {
         if (this.notifying) {
@@ -31,14 +34,16 @@
         class="relative flex items-center justify-center text-gray-500 transition-colors bg-white border border-gray-200 rounded-full hover:text-dark-900 h-11 w-11 hover:bg-gray-100 hover:text-gray-700 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-white"
         @click="toggleDropdown()"
         type="button"
+        title="Pengumuman & Update Rilis"
     >
         <!-- Notification Badge -->
         <span
             x-show="notifying"
-            class="absolute right-0 top-0.5 z-1 h-2 w-2 rounded-full bg-orange-400"
+            class="absolute right-0 top-0.5 z-1 h-2.5 w-2.5 rounded-full bg-brand-500"
+            style="display: none;"
         >
             <span
-                class="absolute inline-flex w-full h-full bg-orange-400 rounded-full opacity-75 -z-1 animate-ping"
+                class="absolute inline-flex w-full h-full bg-brand-500 rounded-full opacity-75 -z-1 animate-ping"
             ></span>
         </span>
 
@@ -69,72 +74,92 @@
         x-transition:leave="transition ease-in duration-75"
         x-transition:leave-start="transform opacity-100 scale-100"
         x-transition:leave-end="transform opacity-0 scale-95"
-        class="absolute -right-[240px] mt-[17px] flex h-[480px] w-[350px] flex-col rounded-2xl border border-gray-200 bg-white p-3 shadow-theme-lg dark:border-gray-800 dark:bg-gray-dark sm:w-[361px] lg:right-0"
+        class="absolute -right-[200px] mt-[17px] flex h-[500px] w-[360px] flex-col rounded-2xl border border-gray-200 bg-white p-3 shadow-theme-lg dark:border-gray-800 dark:bg-gray-dark sm:w-[380px] lg:right-0 z-50"
         style="display: none;"
     >
         <!-- Dropdown Header -->
-        <div class="flex items-center justify-between pb-3 mb-3 border-b border-gray-100 dark:border-gray-800">
-            <h5 class="text-lg font-semibold text-gray-800 dark:text-white/90">Pengumuman</h5>
+        <div class="flex items-center justify-between pb-3 px-2 border-b border-gray-100 dark:border-gray-800">
+            <div class="flex items-center gap-2">
+                <i class="fas fa-bullhorn text-brand-500"></i>
+                <h5 class="text-base font-semibold text-gray-800 dark:text-white/90">Pengumuman & Update</h5>
+            </div>
 
-            <button @click="closeDropdown()" class="text-gray-500 dark:text-gray-400" type="button">
-                <svg
-                    class="fill-current"
-                    width="24"
-                    height="24"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                >
-                    <path
-                        fill-rule="evenodd"
-                        clip-rule="evenodd"
-                        d="M6.21967 7.28131C5.92678 6.98841 5.92678 6.51354 6.21967 6.22065C6.51256 5.92775 6.98744 5.92775 7.28033 6.22065L11.999 10.9393L16.7176 6.22078C17.0105 5.92789 17.4854 5.92788 17.7782 6.22078C18.0711 6.51367 18.0711 6.98855 17.7782 7.28144L13.0597 12L17.7782 16.7186C18.0711 17.0115 18.0711 17.4863 17.7782 17.7792C17.4854 18.0721 17.0105 18.0721 16.7176 17.7792L11.999 13.0607L7.28033 17.7794C6.98744 18.0722 6.51256 18.0722 6.21967 17.7794C5.92678 17.4865 5.92678 17.0116 6.21967 16.7187L10.9384 12L6.21967 7.28131Z"
-                        fill=""
-                    />
-                </svg>
+            <button @click="closeDropdown()" class="text-gray-400 hover:text-gray-600 dark:hover:text-white transition" type="button">
+                <i class="fas fa-times"></i>
             </button>
         </div>
 
         <!-- Notification List -->
-        <ul class="flex flex-col h-auto max-h-[350px] overflow-y-auto custom-scrollbar" x-data="{ selected: null }">
+        <ul class="flex flex-col h-auto max-h-[420px] overflow-y-auto custom-scrollbar divide-y divide-gray-100 dark:divide-gray-800" x-data="{ selected: null }">
             @php
                 $announcements = \App\Models\Announcement::where('is_active', true)->latest()->take(10)->get();
             @endphp
 
             @if($announcements->count() > 0)
                 @foreach ($announcements as $index => $announcement)
-                    <li class="border-b border-gray-100 dark:border-gray-800 last:border-b-0">
-                        <button 
-                            @click="selected !== {{ $index }} ? (selected = {{ $index }}, markRead()) : selected = null"
-                            class="flex w-full flex-col gap-2 p-3 px-4.5 py-3 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
+                    <li class="p-2">
+                        <div 
+                            @click="selected !== {{ $index }} ? selected = {{ $index }} : selected = null"
+                            class="flex w-full flex-col gap-2 p-2.5 rounded-xl hover:bg-gray-50 dark:hover:bg-white/5 transition-colors cursor-pointer"
                         >
-                            <div class="flex items-start justify-between w-full">
-                                <div class="flex items-center gap-3">
-                                    <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-warning-50 text-warning-500 dark:bg-warning-500/15 dark:text-warning-400">
-                                        <i class="fas fa-bullhorn"></i>
+                            <div class="flex items-start justify-between w-full gap-2">
+                                <div class="flex items-start gap-2.5">
+                                    <div class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border {{ $announcement->type_badge_class }}">
+                                        <i class="fas {{ $announcement->type_icon }} text-xs"></i>
                                     </div>
                                     <div class="text-left">
-                                        <h6 class="text-sm font-medium text-gray-800 dark:text-white/90">
+                                        <div class="flex flex-wrap items-center gap-1.5 mb-1">
+                                            <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded border {{ $announcement->type_badge_class }}">
+                                                {{ $announcement->type_label }}
+                                            </span>
+                                            @if($announcement->version)
+                                                <span class="text-[10px] font-mono font-bold bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 px-1.5 py-0.5 rounded">
+                                                    {{ $announcement->version }}
+                                                </span>
+                                            @endif
+                                        </div>
+                                        <h6 class="text-xs font-semibold text-gray-800 dark:text-white/90 leading-tight">
                                             {{ $announcement->title }}
                                         </h6>
-                                        <p class="text-xs text-gray-500 dark:text-gray-400">
+                                        <p class="text-[10px] text-gray-400 dark:text-gray-500 mt-1">
                                             {{ $announcement->created_at->diffForHumans() }}
                                         </p>
                                     </div>
                                 </div>
-                                <i class="fas fa-chevron-down text-gray-400 transition-transform mt-2 text-xs" :class="selected === {{ $index }} ? 'rotate-180' : ''"></i>
+                                <i class="fas fa-chevron-down text-gray-400 transition-transform mt-1 text-xs" :class="selected === {{ $index }} ? 'rotate-180' : ''"></i>
                             </div>
                             
                             <!-- Expandable Content -->
-                            <div x-show="selected === {{ $index }}" x-collapse class="w-full text-left mt-2 pt-2 border-t border-gray-100 dark:border-gray-800 text-sm text-gray-600 dark:text-gray-400">
-                                {!! nl2br(e($announcement->content)) !!}
+                            <div x-show="selected === {{ $index }}" x-collapse class="w-full text-left mt-2 pt-2 border-t border-gray-100 dark:border-gray-800 text-xs text-gray-600 dark:text-gray-300 space-y-2">
+                                <div class="whitespace-pre-line leading-relaxed">
+                                    {!! nl2br(e($announcement->content)) !!}
+                                </div>
+                                <div class="flex items-center justify-between pt-2">
+                                    @if($announcement->action_url)
+                                        <a href="{{ $announcement->action_url }}" target="_blank" class="inline-flex items-center gap-1 text-[11px] font-medium text-brand-500 hover:underline">
+                                            <span>{{ $announcement->action_text ?: 'Pelajari Selengkapnya' }}</span>
+                                            <i class="fas fa-arrow-up-right-from-square text-[9px]"></i>
+                                        </a>
+                                    @else
+                                        <span></span>
+                                    @endif
+
+                                    <button
+                                        @click.stop="window.dispatchEvent(new CustomEvent('open-announcement-modal', { detail: { id: {{ $announcement->id }} } })); closeDropdown()"
+                                        type="button"
+                                        class="inline-flex items-center gap-1 text-[10px] font-medium text-gray-500 hover:text-brand-500 dark:text-gray-400"
+                                    >
+                                        <i class="fas fa-expand text-[9px]"></i> Buka Pop-up
+                                    </button>
+                                </div>
                             </div>
-                        </button>
+                        </div>
                     </li>
                 @endforeach
             @else
-                <li class="p-5 text-center">
-                    <p class="text-sm text-gray-500 dark:text-gray-400">Tidak ada pengumuman.</p>
+                <li class="p-6 text-center">
+                    <i class="fas fa-bell-slash text-2xl text-gray-300 dark:text-gray-600 mb-2 block"></i>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">Belum ada pengumuman saat ini.</p>
                 </li>
             @endif
         </ul>

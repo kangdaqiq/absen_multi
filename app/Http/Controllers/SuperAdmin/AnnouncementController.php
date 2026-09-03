@@ -32,16 +32,20 @@ class AnnouncementController extends Controller
     {
         $validated = $request->validate([
             'title' => 'required|string|max:255',
+            'type' => 'required|in:info,release,feature,warning,maintenance',
+            'version' => 'nullable|string|max:50',
             'content' => 'required|string',
-            'is_active' => 'boolean',
+            'action_url' => 'nullable|url|max:255',
+            'action_text' => 'nullable|string|max:100',
         ]);
 
-        $validated['is_active'] = $request->has('is_active');
+        $validated['is_active'] = $request->boolean('is_active');
+        $validated['is_popup'] = $request->boolean('is_popup');
 
         Announcement::create($validated);
 
         return redirect()->route('super-admin.announcements.index')
-            ->with('success', 'Pengumuman berhasil ditambahkan.');
+            ->with('success', 'Pengumuman / Update rilis berhasil ditambahkan.');
     }
 
     /**
@@ -59,16 +63,20 @@ class AnnouncementController extends Controller
     {
         $validated = $request->validate([
             'title' => 'required|string|max:255',
+            'type' => 'required|in:info,release,feature,warning,maintenance',
+            'version' => 'nullable|string|max:50',
             'content' => 'required|string',
-            'is_active' => 'boolean',
+            'action_url' => 'nullable|url|max:255',
+            'action_text' => 'nullable|string|max:100',
         ]);
 
-        $validated['is_active'] = $request->has('is_active');
+        $validated['is_active'] = $request->boolean('is_active');
+        $validated['is_popup'] = $request->boolean('is_popup');
 
         $announcement->update($validated);
 
         return redirect()->route('super-admin.announcements.index')
-            ->with('success', 'Pengumuman berhasil diperbarui.');
+            ->with('success', 'Pengumuman / Update rilis berhasil diperbarui.');
     }
 
     /**

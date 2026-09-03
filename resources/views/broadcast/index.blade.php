@@ -68,35 +68,23 @@
                                 <span class="flex h-6 w-6 items-center justify-center rounded-full bg-brand-500 text-xs font-bold text-white">1</span>
                                 Pilih Kelas Target
                             </label>
-                            <span class="text-xs text-gray-500 dark:text-gray-400" id="selectedCountText">0 kelas dipilih</span>
+                            <span class="text-xs font-medium px-2.5 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400" id="selectedCountText">0 kelas dipilih</span>
                         </div>
                         
-                        <div class="mb-4 rounded-xl border border-brand-200 bg-brand-50/70 p-3.5 dark:border-brand-500/20 dark:bg-brand-500/5 transition hover:bg-brand-50">
-                            <label class="flex items-center cursor-pointer select-none">
-                                <div class="relative">
-                                    <input type="checkbox" id="checkAll" class="sr-only">
-                                    <div class="box mr-3 flex h-5 w-5 items-center justify-center rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 transition">
-                                        <span class="opacity-0">
-                                            <i class="fas fa-check text-xs text-brand-500"></i>
-                                        </span>
-                                    </div>
-                                </div>
-                                <span class="font-bold text-brand-600 dark:text-brand-400 text-sm">📢 PILIH SEMUA KELAS</span>
+                        <div class="mb-3.5 rounded-xl border border-brand-200 bg-brand-50/60 p-3 dark:border-brand-500/20 dark:bg-brand-500/10 transition hover:bg-brand-50 dark:hover:bg-brand-500/15">
+                            <label class="flex items-center gap-3 cursor-pointer select-none">
+                                <input type="checkbox" id="checkAll" class="h-4.5 w-4.5 rounded border-gray-300 text-brand-600 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800 cursor-pointer">
+                                <span class="font-bold text-brand-600 dark:text-brand-400 text-sm flex items-center gap-1.5">
+                                    <i class="fas fa-bullhorn text-xs"></i> PILIH SEMUA KELAS
+                                </span>
                             </label>
                         </div>
 
-                        <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 max-h-60 overflow-y-auto p-1 rounded-xl border border-gray-100 dark:border-gray-800/80">
+                        <div class="grid grid-cols-2 gap-2.5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 max-h-60 overflow-y-auto p-1.5 rounded-xl border border-gray-100 dark:border-gray-800/80 bg-gray-50/40 dark:bg-gray-900/30">
                             @forelse($kelas as $k)
-                                <label class="flex items-center p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer select-none transition border border-transparent hover:border-gray-200 dark:hover:border-gray-700">
-                                    <div class="relative">
-                                        <input type="checkbox" name="target_class_ids[]" value="{{ $k->id }}" id="kelas_{{ $k->id }}" class="class-checkbox sr-only">
-                                        <div class="box mr-2.5 flex h-4.5 w-4.5 items-center justify-center rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 transition">
-                                            <span class="opacity-0">
-                                                <i class="fas fa-check text-[10px] text-brand-500"></i>
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <span class="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">{{ $k->nama_kelas }}</span>
+                                <label class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg border border-gray-200/80 dark:border-gray-800 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800/80 cursor-pointer select-none transition shadow-2xs has-[:checked]:border-brand-500 has-[:checked]:bg-brand-50/50 dark:has-[:checked]:border-brand-500/60 dark:has-[:checked]:bg-brand-500/15">
+                                    <input type="checkbox" name="target_class_ids[]" value="{{ $k->id }}" id="kelas_{{ $k->id }}" class="class-checkbox h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800 cursor-pointer">
+                                    <span class="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-200 truncate">{{ $k->nama_kelas }}</span>
                                 </label>
                             @empty
                                 <div class="col-span-full py-4 text-center text-sm text-gray-400">

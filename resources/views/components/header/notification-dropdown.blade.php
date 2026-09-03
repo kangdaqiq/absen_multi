@@ -74,23 +74,25 @@
         x-transition:leave="transition ease-in duration-75"
         x-transition:leave-start="transform opacity-100 scale-100"
         x-transition:leave-end="transform opacity-0 scale-95"
-        class="absolute -right-[200px] mt-[17px] flex h-[500px] w-[360px] flex-col rounded-2xl border border-gray-200 bg-white p-3 shadow-theme-lg dark:border-gray-800 dark:bg-gray-dark sm:w-[380px] lg:right-0 z-50"
+        class="absolute -right-[160px] mt-[17px] flex h-[480px] w-[340px] flex-col rounded-2xl border border-gray-200 bg-white p-3 shadow-theme-lg dark:border-gray-800 dark:bg-gray-dark sm:w-[360px] lg:right-0 z-50"
         style="display: none;"
     >
         <!-- Dropdown Header -->
         <div class="flex items-center justify-between pb-3 px-2 border-b border-gray-100 dark:border-gray-800">
             <div class="flex items-center gap-2">
-                <i class="fas fa-bullhorn text-brand-500"></i>
-                <h5 class="text-base font-semibold text-gray-800 dark:text-white/90">Pengumuman & Update</h5>
+                <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
+                    <i class="fas fa-bullhorn text-xs"></i>
+                </span>
+                <h5 class="text-sm font-bold text-gray-800 dark:text-white/90">Pengumuman & Update</h5>
             </div>
 
-            <button @click="closeDropdown()" class="text-gray-400 hover:text-gray-600 dark:hover:text-white transition" type="button">
-                <i class="fas fa-times"></i>
+            <button @click="closeDropdown()" class="flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-white transition" type="button" title="Tutup">
+                <i class="fas fa-times text-xs"></i>
             </button>
         </div>
 
         <!-- Notification List -->
-        <ul class="flex flex-col h-auto max-h-[420px] overflow-y-auto custom-scrollbar divide-y divide-gray-100 dark:divide-gray-800" x-data="{ selected: null }">
+        <ul class="flex flex-col h-auto max-h-[400px] overflow-y-auto custom-scrollbar divide-y divide-gray-100 dark:divide-gray-800" x-data="{ selected: null }">
             @php
                 $announcements = \App\Models\Announcement::where('is_active', true)->latest()->take(10)->get();
             @endphp

@@ -19,7 +19,7 @@
         <div class="rounded-2xl border border-gray-200 bg-white shadow-theme-sm dark:border-gray-800 dark:bg-gray-dark">
             <div class="border-b border-gray-200 px-6 py-4 dark:border-gray-800">
                 <h6 class="font-semibold text-gray-800 dark:text-white/90 flex items-center gap-2">
-                    <i class="fas fa-paper-plane text-brand-500"></i> Form Buat Pesan Broadcast
+                    <i class="fas fa-paper-plane text-brand-500"></i> Form Pesan Broadcast
                 </h6>
             </div>
             
@@ -363,24 +363,39 @@
         const targetRec = document.querySelector('input[name="target_recipient"]:checked')?.value || 'both';
 
         if (!msg.trim()) {
-            previewBox.textContent = '[Tulis pesan di atas untuk melihat preview]';
+            previewBox.innerHTML = '<span class="text-gray-400 italic">[Tulis pesan di atas untuk melihat preview]</span>';
             return;
         }
 
         let recipientLabel = (targetRec === 'ortu') ? 'Orang Tua / Wali dari Ahmad' : (targetRec === 'siswa' ? 'Ahmad' : 'Ahmad / Orang Tua');
-        let rendered = "📢 *PENGUMUMAN SEKOLAH*\n" +
-                       "Kepada: *" + recipientLabel + "*\n" +
-                       "Kelas: X-A\n\n";
-        
-        let body = msg
+        let raw = "📢 *PENGUMUMAN SEKOLAH*\n" +
+                  "Kepada: *" + recipientLabel + "*\n" +
+                  "Kelas: X-A\n\n" +
+                  msg +
+                  "\n\n_Dikirim otomatis oleh Sistem_";
+
+        // 1. Escape HTML
+        let escaped = raw
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;");
+
+        // 2. Replace Variables
+        escaped = escaped
             .replace(/\{nama\}/g, 'Ahmad')
             .replace(/\{penerima\}/g, recipientLabel)
             .replace(/\{kelas\}/g, 'X-A')
             .replace(/\{nis\}/g, '12345')
             .replace(/\{sekolah\}/g, 'Nama Sekolah');
 
-        rendered += body + "\n\n_Dikirim otomatis oleh Sistem_";
-        previewBox.textContent = rendered;
+        // 3. Format WhatsApp Markdown (*bold*, _italic_, ~strike~, ```code```)
+        escaped = escaped
+            .replace(/```([\s\S]*?)```/g, '<code class="bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded font-mono text-[11px]">$1</code>')
+            .replace(/\*([^\*\n]+)\*/g, '<strong class="font-bold text-gray-900 dark:text-white">$1</strong>')
+            .replace(/_([^_\n]+)_/g, '<em class="italic text-gray-600 dark:text-gray-400">$1</em>')
+            .replace(/~([^~\n]+)~/g, '<del class="line-through">$1</del>');
+
+        previewBox.innerHTML = escaped;
     }
 
     // 6. Confirm Submit Alert

@@ -67,8 +67,8 @@ class MenuHelper
             }
             $schoolItems[] = ['icon' => 'user-profile', 'name' => "Data $labelKaryawan", 'path' => route('guru.index', [], false)];
 
-            if ($school && $school->wa_enabled) {
-                $schoolItems[] = ['icon' => 'chat', 'name' => 'Broadcast WA', 'path' => route('broadcast.index', [], false)];
+            if ($school && ($school->wa_enabled || $school->telegram_enabled)) {
+                $schoolItems[] = ['icon' => 'chat', 'name' => 'Broadcast Pesan', 'path' => route('broadcast.index', [], false)];
             }
 
             if (!$isPesantren) {

@@ -276,11 +276,12 @@ Route::middleware('auth')->group(function () {
         // API Logs
         Route::get('/api-logs', [App\Http\Controllers\ApiLogController::class, 'index'])->name('api-logs.index');
 
+        // Broadcast Pesan (WhatsApp & Telegram)
+        Route::get('/broadcast', [App\Http\Controllers\BroadcastController::class, 'index'])->name('broadcast.index');
+        Route::post('/broadcast/send', [App\Http\Controllers\BroadcastController::class, 'send'])->name('broadcast.send');
+
         // WhatsApp Features (Protected by wa_enabled check)
         Route::middleware([\App\Http\Middleware\CheckWaFeature::class])->group(function () {
-            // Broadcast WA
-            Route::get('/broadcast', [App\Http\Controllers\BroadcastController::class, 'index'])->name('broadcast.index');
-            Route::post('/broadcast/send', [App\Http\Controllers\BroadcastController::class, 'send'])->name('broadcast.send');
 
             // WA Groups Proxy
             Route::get('/api/whatsapp/groups', [App\Http\Controllers\Api\WhatsappController::class, 'getGroups'])->name('api.whatsapp.groups');

@@ -179,6 +179,9 @@
                             <button type="button" onclick="insertTag('{nis}')" class="rounded-md bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-brand-50 hover:text-brand-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-brand-500/20 dark:hover:text-brand-400 transition">
                                 <code>{nis}</code> (NIS)
                             </button>
+                            <button type="button" onclick="insertTag('{alamat}')" class="rounded-md bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-brand-50 hover:text-brand-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-brand-500/20 dark:hover:text-brand-400 transition">
+                                <code>{alamat}</code> (Alamat)
+                            </button>
                             <button type="button" onclick="insertTag('{sekolah}')" class="rounded-md bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-brand-50 hover:text-brand-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-brand-500/20 dark:hover:text-brand-400 transition">
                                 <code>{sekolah}</code> (Nama Sekolah)
                             </button>
@@ -386,6 +389,7 @@
             .replace(/\{penerima\}/g, recipientLabel)
             .replace(/\{kelas\}/g, 'X-A')
             .replace(/\{nis\}/g, '12345')
+            .replace(/\{alamat\}/g, 'Jl. Mawar No. 123, RT 02/01')
             .replace(/\{sekolah\}/g, 'Nama Sekolah');
 
         // 3. Format WhatsApp Markdown (*bold*, _italic_, ~strike~, ```code```)

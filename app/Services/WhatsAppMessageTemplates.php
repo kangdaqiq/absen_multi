@@ -144,6 +144,21 @@ class WhatsAppMessageTemplates
                 $school = \App\Models\School::find($schoolId);
                 $variables['{nama_sekolah}'] = $school?->name ?? 'Sekolah';
             }
+            if (!isset($variables['{alamat}']) || !isset($variables['{nis}'])) {
+                $siswa = null;
+                if (!empty($variables['{nis}']) && $variables['{nis}'] !== '-') {
+                    $siswa = \App\Models\Siswa::where('school_id', $schoolId)->where('nis', $variables['{nis}'])->first();
+                }
+                if (!$siswa && !empty($nama)) {
+                    $siswa = \App\Models\Siswa::where('school_id', $schoolId)->where('nama', $nama)->first();
+                }
+                if (!isset($variables['{alamat}'])) {
+                    $variables['{alamat}'] = $siswa?->alamat ?? '-';
+                }
+                if (!isset($variables['{nis}'])) {
+                    $variables['{nis}'] = $siswa?->nis ?? '-';
+                }
+            }
 
             return strtr($chosen, $variables);
         } catch (\Throwable $e) {

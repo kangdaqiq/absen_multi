@@ -134,6 +134,7 @@ class BroadcastController extends Controller
                         '{penerima}'=> $recipient['label'],
                         '{kelas}'   => $className,
                         '{nis}'     => $student->nis ?? '-',
+                        '{alamat}'  => $student->alamat ?? '-',
                         '{sekolah}' => $schoolName,
                     ];
                     $personalizedMsg = str_replace(array_keys($replacements), array_values($replacements), $rawMessage);

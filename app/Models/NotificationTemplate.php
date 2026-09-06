@@ -55,6 +55,7 @@ class NotificationTemplate extends Model
         '{nama}'                => 'Nama Siswa / Guru',
         '{nis}'                 => 'NISN / NIP',
         '{kelas}'               => 'Nama Kelas / Jabatan',
+        '{alamat}'              => 'Alamat Siswa / Guru',
         '{tanggal}'             => 'Tanggal Hari Ini (contoh: 02/09/2026)',
         '{jam_masuk}'           => 'Jam Scan Masuk (contoh: 07:15)',
         '{jam_pulang}'          => 'Jam Scan Pulang (contoh: 15:30)',

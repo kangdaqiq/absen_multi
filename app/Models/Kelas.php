@@ -25,6 +25,11 @@ class Kelas extends Model
         return $this->hasMany(JadwalPelajaran::class, 'kelas_id');
     }
 
+    public function school()
+    {
+        return $this->belongsTo(School::class, 'school_id');
+    }
+
     public function jurusan()
     {
         return $this->belongsTo(Jurusan::class, 'jurusan_id');

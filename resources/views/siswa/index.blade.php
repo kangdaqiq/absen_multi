@@ -36,6 +36,19 @@
             <p class="text-sm font-medium text-error-800 dark:text-error-400">{!! session('error') !!}</p>
         </div>
     @endif
+    @if($errors->any())
+        <div class="m-5 rounded-xl border border-error-200 bg-error-50 p-4 text-sm text-error-800 dark:border-error-500/20 dark:bg-error-500/10 dark:text-error-400">
+            <div class="flex items-center gap-2 mb-2 font-semibold">
+                <i class="fas fa-exclamation-triangle text-error-500"></i>
+                <span>Gagal Menyimpan Data:</span>
+            </div>
+            <ul class="list-disc list-inside space-y-1">
+                @foreach($errors->all() as $err)
+                    <li>{{ $err }}</li>
+                @endforeach
+            </ul>
+        </div>
+    @endif
     <!-- Header & Search -->
     <div class="flex flex-col sm:flex-row justify-between items-center px-5 py-4 border-b border-gray-200 dark:border-gray-800 gap-4">
         <div class="flex items-center gap-3">

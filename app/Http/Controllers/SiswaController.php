@@ -77,14 +77,8 @@ class SiswaController extends Controller
             'tgl_lahir' => 'nullable|date',
             'alamat' => 'nullable|string|max:500',
             'kelas_id' => 'required|exists:kelas,id',
-            'no_wa' => [
-                'nullable',
-                'string',
-                'max:20',
-                'regex:/^(08|628)[0-9]{8,13}$/',
-                Rule::unique('siswa')->where(fn($q) => $q->where('school_id', $schoolId))
-            ],
-            'wa_ortu' => ['nullable', 'string', 'max:20', 'regex:/^(08|628)[0-9]{8,13}$/'],
+            'no_wa' => ['nullable', 'string', 'max:25', 'regex:/^(\+?62|08|628)[0-9\-\s]{7,18}$/'],
+            'wa_ortu' => ['nullable', 'string', 'max:25', 'regex:/^(\+?62|08|628)[0-9\-\s]{7,18}$/'],
             'telegram_chat_id' => 'nullable|string|max:50',
             'telegram_ortu_chat_id' => 'nullable|string|max:50',
             'user_id' => 'nullable|exists:users,id',
@@ -98,10 +92,16 @@ class SiswaController extends Controller
         // Force null if empty string to avoid unique constraint issues on empty strings
         if (empty($input['alamat']))
             $input['alamat'] = null;
-        if (empty($input['no_wa']))
+        if (!empty($input['no_wa'])) {
+            $input['no_wa'] = preg_replace('/[^0-9]/', '', $input['no_wa']);
+        } else {
             $input['no_wa'] = null;
-        if (empty($input['wa_ortu']))
+        }
+        if (!empty($input['wa_ortu'])) {
+            $input['wa_ortu'] = preg_replace('/[^0-9]/', '', $input['wa_ortu']);
+        } else {
             $input['wa_ortu'] = null;
+        }
         if (empty($input['telegram_chat_id']))
             $input['telegram_chat_id'] = null;
         if (empty($input['telegram_ortu_chat_id']))
@@ -117,16 +117,6 @@ class SiswaController extends Controller
 
         // Check Quota Limit
         $school = auth()->user()->isSuperAdmin() ? null : auth()->user()->school;
-        // If super admin adds, we assume they know to check limit? No, let's just bypass for super admin or check target school?
-        // Wait, if super admin creates student, school_id is passed?
-        // SiswaController index filters by school_id for non-super admin.
-        // For Super Admin, 'school_id' is NOT in the form input? $input['school_id'] is set from auth user only if NOT super admin.
-        // If Super Admin creates a student, they currently CANNOT select a school?!
-        // Let's check store method again.
-        // " $schoolId = auth()->user()->isSuperAdmin() ? null : auth()->user()->school_id;"
-        // "Rule::unique('siswa')->where(fn($q) => $q->where('school_id', $schoolId))"
-        // This implies Super Admin creates global students (school_id=null)?
-        // If so, limit applies to school. If global (system admin?), maybe unlimited.
 
         if (!auth()->user()->isSuperAdmin()) {
             if (!$school->hasStudentQuota()) {
@@ -141,8 +131,6 @@ class SiswaController extends Controller
         }
 
         $siswa = Siswa::create($input);
-
-
 
         return redirect()->route('siswa.index')->with('success', 'Siswa berhasil ditambahkan.');
     }
@@ -163,14 +151,8 @@ class SiswaController extends Controller
             'tgl_lahir' => 'nullable|date',
             'alamat' => 'nullable|string|max:500',
             'kelas_id' => 'required|exists:kelas,id',
-            'no_wa' => [
-                'nullable',
-                'string',
-                'max:20',
-                'regex:/^(08|628)[0-9]{8,13}$/',
-                Rule::unique('siswa')->ignore($siswa->id)->where(fn($q) => $q->where('school_id', $schoolId))
-            ],
-            'wa_ortu' => ['nullable', 'string', 'max:20', 'regex:/^(08|628)[0-9]{8,13}$/'],
+            'no_wa' => ['nullable', 'string', 'max:25', 'regex:/^(\+?62|08|628)[0-9\-\s]{7,18}$/'],
+            'wa_ortu' => ['nullable', 'string', 'max:25', 'regex:/^(\+?62|08|628)[0-9\-\s]{7,18}$/'],
             'telegram_chat_id' => 'nullable|string|max:50',
             'telegram_ortu_chat_id' => 'nullable|string|max:50',
             'uid_rfid' => 'nullable|string|max:50',
@@ -184,10 +166,16 @@ class SiswaController extends Controller
         $input = $request->all();
         if (empty($input['alamat']))
             $input['alamat'] = null;
-        if (empty($input['no_wa']))
+        if (!empty($input['no_wa'])) {
+            $input['no_wa'] = preg_replace('/[^0-9]/', '', $input['no_wa']);
+        } else {
             $input['no_wa'] = null;
-        if (empty($input['wa_ortu']))
+        }
+        if (!empty($input['wa_ortu'])) {
+            $input['wa_ortu'] = preg_replace('/[^0-9]/', '', $input['wa_ortu']);
+        } else {
             $input['wa_ortu'] = null;
+        }
         if (empty($input['telegram_chat_id']))
             $input['telegram_chat_id'] = null;
         if (empty($input['telegram_ortu_chat_id']))

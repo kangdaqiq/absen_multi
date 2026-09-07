@@ -479,20 +479,16 @@ class RfidController extends Controller
 
     private function hasEnrollmentRequest($schoolId)
     {
-        // Relaxed window to 60 minutes to avoid timezone issues
         $siswa = Siswa::where('enroll_status', 'requested')
             ->where('school_id', $schoolId)
-            ->where('updated_at', '>=', now()->subHour())
             ->exists();
 
         $guru = Guru::where('enroll_status', 'requested')
             ->where('school_id', $schoolId)
-            ->where('updated_at', '>=', now()->subHour())
             ->exists();
 
         $gate = GateCard::where('enroll_status', 'requested')
             ->where('school_id', $schoolId)
-            ->where('updated_at', '>=', now()->subHour())
             ->exists();
 
         return $siswa || $guru || $gate;
@@ -540,7 +536,6 @@ class RfidController extends Controller
             // 1. Check Siswa Request (Scoped to School)
             $siswa = Siswa::where('enroll_status', 'requested')
                 ->where('school_id', $device->school_id)
-                ->where('updated_at', '>=', now()->subHour())
                 ->orderBy('id', 'desc')
                 ->lockForUpdate()
                 ->first();
@@ -570,7 +565,6 @@ class RfidController extends Controller
             // 2. Check Guru Request (Scoped to School)
             $guru = Guru::where('enroll_status', 'requested')
                 ->where('school_id', $device->school_id)
-                ->where('updated_at', '>=', now()->subHour())
                 ->orderBy('id', 'desc')
                 ->lockForUpdate()
                 ->first();
@@ -600,7 +594,6 @@ class RfidController extends Controller
             // 3. Check Gate Card Request (Scoped to School)
             $gate = GateCard::where('enroll_status', 'requested')
                 ->where('school_id', $device->school_id)
-                ->where('updated_at', '>=', now()->subHour())
                 ->orderBy('id', 'desc')
                 ->lockForUpdate()
                 ->first();

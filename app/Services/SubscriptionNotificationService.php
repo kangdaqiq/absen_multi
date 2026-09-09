@@ -174,9 +174,9 @@ class SubscriptionNotificationService
             "• No. Invoice: `{$subscription->invoice_number}`\n" .
             "• Paket: *{$packageName}* ({$billingCycleText})\n" .
             "• Total Pembayaran: *{$totalFormatted}*\n\n" .
-            "💳 *Link Pembayaran Langsung (Tanpa Login):*\n" .
+            "💳 *Link Pembayaran:*\n" .
             "👉 {$invoiceUrl}\n\n" .
-            "_Pembayaran via QRIS (BCA, Mandiri, BRI, BNI, Dana, GoPay, OVO, ShopeePay) langsung diverifikasi dan mengaktifkan masa aktif sistem secara instan otomatis._\n\n" .
+            "_Pembayaran via QRIS (BCA, Mandiri, BRI, BNI, Dana, GoPay, OVO, ShopeePay) langsung diverifikasi sistem secara instan._\n\n" .
             "Terima kasih atas kerja samanya. 🙏";
 
         // Determine Sender WA Device (SuperAdmin vs School fallback)

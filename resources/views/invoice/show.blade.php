@@ -511,10 +511,8 @@
     <!-- Brand & Print Bar -->
     <div class="brand-header">
         <div class="brand-logo">
-            <div class="brand-icon">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-            </div>
-            <span>E-Invoice Tagihan</span>
+            <img src="{{ asset('images/logo/logo.svg') }}" alt="JagatTech" style="height: 36px; width: auto;">
+            <span style="border-left: 2px solid var(--gray-300); padding-left: 12px; margin-left: 4px; font-size: 1.05rem; font-weight: 700; color: var(--gray-700);">E-Invoice Tagihan</span>
         </div>
         <div class="action-btns">
             <button onclick="window.print()" class="btn-action">
@@ -585,11 +583,15 @@
                 </div>
                 <div class="bill-card">
                     <h3>Penyedia Layanan</h3>
-                    <div class="school-name">Sistem Informasi Absensi Sekolah</div>
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                        <img src="{{ asset('images/logo/logo.svg') }}" alt="Jagat Tech" style="height: 24px; width: auto;">
+                    </div>
+                    <div class="school-name" style="font-size: 1.1rem; color: var(--dark);">Jagat Tech</div>
                     <p>
-                        <strong>Layanan:</strong> Presensi RFID, Fingerprint & Notifikasi WhatsApp<br>
-                        <strong>Status Server:</strong> Cloud SaaS Aktif<br>
-                        <strong>Bantuan Teknis:</strong> Layanan Support 24/7
+                        <strong>Alamat:</strong> Jl. Murnijaya RT 03 RW 04, Tumijajar, Tulang Bawang Barat, Lampung, 34594<br>
+                        <strong>No. Telp / WA:</strong> 081524824563<br>
+                        <strong>Website:</strong> <a href="https://jagattech.my.id" target="_blank" style="color: var(--primary); text-decoration: none; font-weight: 600;">jagattech.my.id</a><br>
+                        <strong>Email Support:</strong> admin@jagattech.my.id
                     </p>
                 </div>
             </div>
@@ -608,10 +610,14 @@
                         <tr>
                             <td>
                                 <div class="item-name">{{ $package->name ?? 'Paket Langganan' }}</div>
+                                @php
+                                    $studentLimit = $package?->student_limit ?? ($school->student_limit ?? 0);
+                                    $teacherLimit = $package?->teacher_limit ?? ($school->teacher_limit ?? 0);
+                                    $studentText = $studentLimit > 0 ? 'Maks ' . number_format($studentLimit, 0, ',', '.') . ' Siswa' : 'Unlimited Siswa';
+                                    $teacherText = $teacherLimit > 0 ? number_format($teacherLimit, 0, ',', '.') . ' Guru & Staf' : 'Unlimited Guru & Staf';
+                                @endphp
                                 <div class="item-desc">
-                                    Kuota: Maks {{ number_format($package->student_limit ?? ($school->student_limit ?? 0)) }} Siswa, 
-                                    {{ number_format($package->teacher_limit ?? ($school->teacher_limit ?? 0)) }} Guru & Staf,
-                                    WhatsApp Gateway & Telegram Bot Otomatis
+                                    Kuota: {{ $studentText }}, {{ $teacherText }}, WhatsApp Gateway & Telegram Bot Otomatis
                                 </div>
                             </td>
                             <td style="text-align: center; font-weight: 600;">
@@ -660,13 +666,13 @@
             @elseif($subscription->status === 'unpaid' && !empty($qrisImage))
                 <div class="qris-section" id="qrisSection">
                     <span class="qris-badge">Pembayaran Instan Otomatis</span>
-                    <h2 style="font-size: 1.35rem; color: var(--dark); margin-bottom: 4px;">Scan QRIS Dinamis</h2>
+                    <h2 style="font-size: 1.35rem; color: var(--dark); margin-bottom: 4px;">Scan QRIS</h2>
                     <p style="font-size: 0.875rem; color: var(--gray-500);">
                         Dapat dibayar menggunakan BCA, Mandiri, BRI, BNI, Dana, GoPay, OVO, ShopeePay, LinkAja, atau seluruh aplikasi perbankan berlogo QRIS.
                     </p>
 
                     <div class="qris-box">
-                        <img src="{{ $qrisImage }}" alt="QRIS Dinamis Pembayaran">
+                        <img src="{{ $qrisImage }}" alt="QRIS Pembayaran">
                     </div>
 
                     <div>
@@ -701,7 +707,7 @@
 
     <!-- Footer -->
     <div class="footer">
-        <p>&copy; {{ date('Y') }} Sistem Informasi Absensi Sekolah. Dokumen tagihan ini sah dan diterbitkan secara elektronik.</p>
+        <p>&copy; {{ date('Y') }} <strong>JagatTech</strong> &bull; Sistem Informasi Absensi Sekolah. Dokumen tagihan ini sah dan diterbitkan secara elektronik.</p>
     </div>
 </div>
 

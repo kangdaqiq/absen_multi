@@ -53,6 +53,7 @@
                 isExpanded: window.innerWidth >= 1280, // true for desktop, false for mobile
                 isMobileOpen: false,
                 isHovered: false,
+                isFullScreen: false,
 
                 toggleExpanded() {
                     this.isExpanded = !this.isExpanded;
@@ -73,6 +74,17 @@
                     // Only allow hover effects on desktop when sidebar is collapsed
                     if (window.innerWidth >= 1280 && !this.isExpanded) {
                         this.isHovered = val;
+                    }
+                },
+
+                setFullScreen(val) {
+                    this.isFullScreen = !!val;
+                    if (this.isFullScreen) {
+                        document.documentElement.classList.add('is-fullscreen');
+                        document.body.classList.add('is-fullscreen');
+                    } else {
+                        document.documentElement.classList.remove('is-fullscreen');
+                        document.body.classList.remove('is-fullscreen');
                     }
                 }
             });
@@ -99,7 +111,73 @@
                 }
             });
         })();
+
+        // Fullscreen listener for global kiosk mode
+        ['fullscreenchange', 'webkitfullscreenchange', 'mozfullscreenchange', 'MSFullscreenChange'].forEach(evt => {
+            document.addEventListener(evt, () => {
+                const isFs = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement);
+                if (window.Alpine && Alpine.store('sidebar')) {
+                    Alpine.store('sidebar').setFullScreen(isFs);
+                } else {
+                    if (isFs) {
+                        document.documentElement.classList.add('is-fullscreen');
+                        document.body.classList.add('is-fullscreen');
+                    } else {
+                        document.documentElement.classList.remove('is-fullscreen');
+                        document.body.classList.remove('is-fullscreen');
+                    }
+                }
+            });
+        });
     </script>
+
+    <!-- Fullscreen Mode Global Styles (Hides Sidebar & Top Header) -->
+    <style>
+        :fullscreen aside#sidebar,
+        :-webkit-full-screen aside#sidebar,
+        :-moz-full-screen aside#sidebar,
+        :-ms-fullscreen aside#sidebar,
+        body.is-fullscreen aside#sidebar,
+        html.is-fullscreen aside#sidebar,
+        body.is-fullscreen #backdrop {
+            display: none !important;
+            visibility: hidden !important;
+            width: 0 !important;
+            height: 0 !important;
+            pointer-events: none !important;
+        }
+
+        :fullscreen header,
+        :-webkit-full-screen header,
+        :-moz-full-screen header,
+        :-ms-fullscreen header,
+        body.is-fullscreen header,
+        html.is-fullscreen header {
+            display: none !important;
+            visibility: hidden !important;
+            height: 0 !important;
+            pointer-events: none !important;
+        }
+
+        :fullscreen .flex-1,
+        :-webkit-full-screen .flex-1,
+        :-moz-full-screen .flex-1,
+        :-ms-fullscreen .flex-1,
+        body.is-fullscreen .flex-1,
+        html.is-fullscreen .flex-1 {
+            margin-left: 0 !important;
+            padding-left: 0 !important;
+            width: 100% !important;
+            max-width: 100% !important;
+        }
+
+        :fullscreen .max-w-\(--breakpoint-2xl\),
+        :-webkit-full-screen .max-w-\(--breakpoint-2xl\),
+        body.is-fullscreen .max-w-\(--breakpoint-2xl\),
+        html.is-fullscreen .max-w-\(--breakpoint-2xl\) {
+            max-width: 100% !important;
+        }
+    </style>
     
     @stack('styles')
 </head>
@@ -128,14 +206,16 @@
 
         <div class="flex-1 transition-all duration-300 ease-in-out"
             :class="{
-                'xl:ml-[290px]': $store.sidebar.isExpanded || $store.sidebar.isHovered,
-                'xl:ml-[90px]': !$store.sidebar.isExpanded && !$store.sidebar.isHovered,
+                '!ml-0': $store.sidebar.isFullScreen,
+                'xl:ml-[290px]': !$store.sidebar.isFullScreen && ($store.sidebar.isExpanded || $store.sidebar.isHovered),
+                'xl:ml-[90px]': !$store.sidebar.isFullScreen && (!$store.sidebar.isExpanded && !$store.sidebar.isHovered),
                 'ml-0': $store.sidebar.isMobileOpen
-            }">
+            }"
+            :style="$store.sidebar.isFullScreen ? 'margin-left: 0px !important;' : ''">
             <!-- app header start -->
             @include('layouts.app-header')
             <!-- app header end -->
-            <div class="p-4 mx-auto max-w-(--breakpoint-2xl) md:p-6">
+            <div class="p-4 mx-auto max-w-(--breakpoint-2xl) md:p-6" :class="{ '!max-w-none !w-full': $store.sidebar.isFullScreen }">
                 @yield('content')
             </div>
         </div>

@@ -14,10 +14,10 @@
                         <span class="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
                     </span>
                     LIVE Monitoring Absensi
-                    <a href="{{ route('live.fullscreen') }}" target="_blank"
-                        class="ml-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-gray-100 dark:bg-meta-4 text-xs font-bold text-gray-600 dark:text-gray-400 hover:bg-brand-500 hover:text-white transition-all">
-                        <i class="fas fa-expand"></i> Fullscreen
-                    </a>
+                    <button type="button" onclick="toggleDashboardFullscreen()" id="btn-fullscreen-toggle"
+                        class="ml-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-gray-100 dark:bg-gray-800 text-xs font-bold text-gray-600 dark:text-gray-300 hover:bg-brand-500 hover:text-white transition-all shadow-sm">
+                        <i class="fas fa-expand" id="icon-fs"></i> <span id="label-fs">Fullscreen</span>
+                    </button>
                 </h2>
             </div>
             <div
@@ -248,6 +248,57 @@
                 console.error('Failed to fetch live data:', error);
             }
         }
+
+        function updateDashboardFullscreenUi(isFs) {
+            const iconFs = document.getElementById('icon-fs');
+            const labelFs = document.getElementById('label-fs');
+            if (iconFs && labelFs) {
+                if (isFs) {
+                    iconFs.className = 'fas fa-compress';
+                    labelFs.innerText = 'Exit Fullscreen';
+                } else {
+                    iconFs.className = 'fas fa-expand';
+                    labelFs.innerText = 'Fullscreen';
+                }
+            }
+        }
+
+        function toggleDashboardFullscreen() {
+            const isCurrentlyFs = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement || (window.Alpine && Alpine.store('sidebar') && Alpine.store('sidebar').isFullScreen));
+            
+            if (!isCurrentlyFs) {
+                const docEl = document.documentElement;
+                const req = docEl.requestFullscreen || docEl.webkitRequestFullscreen || docEl.mozRequestFullScreen || docEl.msRequestFullscreen;
+                if (req) {
+                    req.call(docEl).catch(err => {
+                        console.warn('Native requestFullscreen failed:', err);
+                    });
+                }
+                if (window.Alpine && Alpine.store('sidebar')) {
+                    Alpine.store('sidebar').setFullScreen(true);
+                }
+                updateDashboardFullscreenUi(true);
+            } else {
+                const exit = document.exitFullscreen || document.webkitExitFullscreen || document.mozCancelFullScreen || document.msExitFullscreen;
+                if (exit && document.fullscreenElement) {
+                    exit.call(document).catch(err => console.warn(err));
+                }
+                if (window.Alpine && Alpine.store('sidebar')) {
+                    Alpine.store('sidebar').setFullScreen(false);
+                }
+                updateDashboardFullscreenUi(false);
+            }
+        }
+
+        ['fullscreenchange', 'webkitfullscreenchange', 'mozfullscreenchange', 'MSFullscreenChange'].forEach(evt => {
+            document.addEventListener(evt, () => {
+                const isFs = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement);
+                if (window.Alpine && Alpine.store('sidebar')) {
+                    Alpine.store('sidebar').setFullScreen(isFs);
+                }
+                updateDashboardFullscreenUi(isFs);
+            });
+        });
 
         // Initialize
         setInterval(updateClock, 1000);

@@ -59,7 +59,7 @@ class MenuHelper
         }
 
         // 3. MENU SEKOLAH / KANTOR
-        if (in_array($role, ['admin', 'teacher'])) {
+        if (in_array($role, ['admin', 'teacher', 'wali_kelas'])) {
             $schoolItems = [];
             
             if (!$isOffice) {
@@ -81,22 +81,16 @@ class MenuHelper
             ];
         }
 
-        // ABSENSI
+        // ABSENSI & REKAP
         if (in_array($role, ['admin', 'teacher', 'wali_kelas', 'waka_kurikulum'])) {
             $absensiSubItems = [];
             if (!$isOffice && !$isPesantren) {
                 $absensiSubItems[] = ['name' => 'Absensi Siswa', 'path' => route('absensi.index', [], false)];
+                $absensiSubItems[] = ['name' => 'Scanner Absensi', 'path' => route('absensi.scanner-usb', [], false)];
                 $absensiSubItems[] = ['name' => 'Pengajuan Izin', 'path' => route('student-leaves.index', [], false)];
             }
             if (in_array($role, ['admin', 'teacher']) && !$isPesantren) {
                 $absensiSubItems[] = ['name' => "Absensi $labelKaryawan", 'path' => route('absensi-guru.index', [], false)];
-            }
-            if (!$isOffice && !$isPesantren) {
-                $absensiSubItems[] = ['name' => 'Rekap Siswa', 'path' => route('rekap.index', [], false)];
-                $absensiSubItems[] = ['name' => 'Rekap Kelas', 'path' => route('rekap-kelas.index', [], false)];
-            }
-            if (in_array($role, ['admin', 'teacher']) && !$isPesantren) {
-                $absensiSubItems[] = ['name' => "Rekap $labelKaryawan", 'path' => route('rekap-guru.index', [], false)];
             }
             if (in_array($role, ['admin', 'teacher']) && !$isPesantren) {
                 if (!$isOffice) {
@@ -104,6 +98,15 @@ class MenuHelper
                 }
                 $absensiSubItems[] = ['name' => "Shift $labelKaryawan", 'path' => route('shifts.index', [], false)];
                 $absensiSubItems[] = ['name' => "Plotting Shift $labelKaryawan", 'path' => route('shifts.mapping', [], false)];
+            }
+
+            $rekapSubItems = [];
+            if (!$isOffice && !$isPesantren) {
+                $rekapSubItems[] = ['name' => 'Rekap Siswa', 'path' => route('rekap.index', [], false)];
+                $rekapSubItems[] = ['name' => 'Rekap Kelas', 'path' => route('rekap-kelas.index', [], false)];
+            }
+            if (in_array($role, ['admin', 'teacher']) && !$isPesantren) {
+                $rekapSubItems[] = ['name' => "Rekap $labelKaryawan", 'path' => route('rekap-guru.index', [], false)];
             }
 
             $kehadiranItems = [
@@ -119,6 +122,14 @@ class MenuHelper
                     'name' => 'Absensi',
                     'icon' => 'calendar',
                     'subItems' => $absensiSubItems
+                ];
+            }
+
+            if (!empty($rekapSubItems)) {
+                $kehadiranItems[] = [
+                    'name' => 'Rekap Absensi',
+                    'icon' => 'pages',
+                    'subItems' => $rekapSubItems
                 ];
             }
 

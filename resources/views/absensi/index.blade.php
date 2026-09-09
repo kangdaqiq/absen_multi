@@ -4,9 +4,18 @@
 
 @section('content')
 <div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-    <h2 class="text-title-md2 font-semibold text-gray-800 dark:text-white/90">
-        Absensi Harian
-    </h2>
+    <div>
+        <h2 class="text-title-md2 font-semibold text-gray-800 dark:text-white/90">
+            Absensi Harian
+        </h2>
+        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Kelola dan pantau kehadiran siswa & guru harian</p>
+    </div>
+    <div class="flex items-center gap-3">
+        <a href="{{ route('absensi.scanner-usb') }}" class="inline-flex items-center gap-2.5 rounded-xl bg-gradient-to-r from-brand-500 via-indigo-500 to-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-theme-sm hover:from-brand-600 hover:to-indigo-700 transition active:scale-95">
+            <i class="fas fa-id-card-clip text-lg animate-pulse"></i>
+            <span>Buka Scanner USB</span>
+        </a>
+    </div>
 </div>
 
 <!-- Filter Card -->

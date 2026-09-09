@@ -34,4 +34,9 @@ class Kelas extends Model
     {
         return $this->belongsTo(Jurusan::class, 'jurusan_id');
     }
+
+    public function getNamaAttribute()
+    {
+        return $this->nama_kelas;
+    }
 }

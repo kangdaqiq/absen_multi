@@ -42,3 +42,21 @@ Route::get('/debug-db-full', function () {
         'port' => config('database.connections.mysql.port')
     ]);
 });
+
+// Mobile App REST API Routes
+use App\Http\Controllers\Api\MobileAttendanceController;
+
+Route::post('/mobile/login', [MobileAttendanceController::class, 'login']);
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/mobile/today', [MobileAttendanceController::class, 'today']);
+    Route::post('/mobile/checkin', [MobileAttendanceController::class, 'checkIn']);
+    Route::post('/mobile/checkout', [MobileAttendanceController::class, 'checkOut']);
+    Route::get('/mobile/history', [MobileAttendanceController::class, 'history']);
+    Route::get('/mobile/rekap', [MobileAttendanceController::class, 'recap']);
+    Route::get('/mobile/rekap-kelas', [MobileAttendanceController::class, 'classRecap']);
+    Route::get('/mobile/students-attendance', [MobileAttendanceController::class, 'getStudentsForAttendance']);
+    Route::post('/mobile/students-attendance', [MobileAttendanceController::class, 'submitStudentsAttendance']);
+    Route::post('/mobile/student-attendance-single', [MobileAttendanceController::class, 'updateSingleStudentAttendance']);
+    Route::post('/mobile/logout', [MobileAttendanceController::class, 'logout']);
+});

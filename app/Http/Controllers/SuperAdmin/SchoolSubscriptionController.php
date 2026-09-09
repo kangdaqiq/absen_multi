@@ -63,12 +63,24 @@ class SchoolSubscriptionController extends Controller
             'amount' => $amount,
         ]);
 
-        $school->update([
-            'expired_at' => $expiredAt
-        ]);
+        $updateSchool = [
+            'expired_at' => $expiredAt,
+        ];
+        if ($package) {
+            $updateSchool['student_limit'] = $package->student_limit;
+            $updateSchool['teacher_limit'] = $package->teacher_limit;
+            $updateSchool['bot_user_limit'] = $package->bot_user_limit;
+            $updateSchool['history_quota_months'] = $package->history_quota_months;
+            $updateSchool['wa_enabled'] = $package->wa_enabled;
+            if ($package->bot_enabled) {
+                $updateSchool['bot_enabled'] = true;
+            }
+        }
+
+        $school->update($updateSchool);
 
         return redirect()->route('super-admin.schools.subscriptions.index', $school)
-            ->with('success', "Berhasil memperpanjang {$months} bulan!");
+            ->with('success', "Berhasil memperpanjang {$months} bulan dan mengaktifkan kembali seluruh fitur!");
     }
 
     public function create(School $school)
@@ -178,11 +190,23 @@ class SchoolSubscriptionController extends Controller
         ]);
 
         if ($subscription->expired_at) {
-            $school->update([
+            $updateSchool = [
                 'expired_at' => $subscription->expired_at
-            ]);
+            ];
+            $package = $subscription->package;
+            if ($package) {
+                $updateSchool['student_limit'] = $package->student_limit;
+                $updateSchool['teacher_limit'] = $package->teacher_limit;
+                $updateSchool['bot_user_limit'] = $package->bot_user_limit;
+                $updateSchool['history_quota_months'] = $package->history_quota_months;
+                $updateSchool['wa_enabled'] = $package->wa_enabled;
+                if ($package->bot_enabled) {
+                    $updateSchool['bot_enabled'] = true;
+                }
+            }
+            $school->update($updateSchool);
         }
 
-        return redirect()->route('super-admin.schools.subscriptions.index', $school)->with('success', 'Pembayaran berhasil dikonfirmasi dan langganan diaktifkan.');
+        return redirect()->route('super-admin.schools.subscriptions.index', $school)->with('success', 'Pembayaran berhasil dikonfirmasi dan seluruh fitur langganan aktif kembali.');
     }
 }

@@ -54,6 +54,11 @@ Route::get('/log-request/data', [App\Http\Controllers\PublicLogController::class
 Route::post('/log-request/test', [App\Http\Controllers\PublicLogController::class, 'testPing'])->name('public-logs.test');
 Route::post('/log-request/clear', [App\Http\Controllers\PublicLogController::class, 'clearLogs'])->name('public-logs.clear');
 
+// ── Public E-Invoice & Payment Gateway (Tanpa Login) ────────────
+use App\Http\Controllers\PublicInvoiceController;
+Route::get('/invoice/{token}', [PublicInvoiceController::class, 'show'])->name('invoice.show');
+Route::get('/invoice/{token}/status', [PublicInvoiceController::class, 'checkStatus'])->name('invoice.status');
+
 // Super Admin Routes
 Route::middleware(['auth', 'self_hosted_guard'])->prefix('super-admin')->name('super-admin.')->group(function () {
     Route::middleware('role:super_admin')->group(function () {
@@ -63,6 +68,10 @@ Route::middleware(['auth', 'self_hosted_guard'])->prefix('super-admin')->name('s
         // Schools Management
         Route::resource('schools', App\Http\Controllers\SuperAdmin\SchoolController::class);
         Route::patch('schools/{school}/toggle-bot', [App\Http\Controllers\SuperAdmin\SchoolController::class, 'toggleBot'])->name('schools.toggle-bot');
+        Route::post('schools/{school}/send-invoice-wa', function (\App\Models\School $school, \App\Services\SubscriptionNotificationService $service) {
+            $res = $service->sendRenewalInvoiceWhatsApp($school);
+            return back()->with($res['success'] ? 'success' : 'error', $res['message']);
+        })->name('schools.send-invoice-wa');
 
         // School Admins Management (nested resource)
         Route::resource('schools.admins', App\Http\Controllers\SuperAdmin\SchoolAdminController::class);

@@ -11,9 +11,17 @@
         <h2 class="text-title-md2 font-semibold text-gray-800 dark:text-white/90">
             <i class="fas fa-file-invoice-dollar text-brand-500 mr-2"></i> Langganan: {{ $school->name }}
         </h2>
-        <a href="{{ route('super-admin.schools.subscriptions.create', $school) }}" class="inline-flex items-center justify-center gap-2.5 rounded-md bg-gray-100 dark:bg-meta-4 px-6 py-2.5 text-center font-medium text-gray-700 dark:text-white hover:bg-opacity-90 transition">
-            <i class="fas fa-cog"></i> Form Manual Lanjutan
-        </a>
+        <div class="flex items-center gap-3">
+            <form action="{{ route('super-admin.schools.send-invoice-wa', $school) }}" method="POST" onsubmit="return confirm('Kirim link tagihan invoice perpanjangan ke WhatsApp Admin sekolah ini?')">
+                @csrf
+                <button type="submit" class="inline-flex items-center justify-center gap-2 rounded-md bg-green-600 hover:bg-green-700 px-5 py-2.5 text-center font-medium text-white shadow-sm transition">
+                    <i class="fab fa-whatsapp text-lg"></i> Kirim Invoice WA
+                </button>
+            </form>
+            <a href="{{ route('super-admin.schools.subscriptions.create', $school) }}" class="inline-flex items-center justify-center gap-2.5 rounded-md bg-gray-100 dark:bg-meta-4 px-6 py-2.5 text-center font-medium text-gray-700 dark:text-white hover:bg-opacity-90 transition">
+                <i class="fas fa-cog"></i> Form Manual Lanjutan
+            </a>
+        </div>
     </div>
 </div>
 

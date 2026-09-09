@@ -49,6 +49,7 @@ use App\Http\Controllers\Api\MobileAttendanceController;
 Route::post('/mobile/login', [MobileAttendanceController::class, 'login']);
 
 Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/mobile/user', [MobileAttendanceController::class, 'user']);
     Route::get('/mobile/today', [MobileAttendanceController::class, 'today']);
     Route::post('/mobile/checkin', [MobileAttendanceController::class, 'checkIn']);
     Route::post('/mobile/checkout', [MobileAttendanceController::class, 'checkOut']);

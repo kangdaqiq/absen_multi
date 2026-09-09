@@ -110,6 +110,35 @@ class MobileAttendanceController extends Controller
         ]);
     }
 
+    public function user(Request $request)
+    {
+        $user = $request->user();
+
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthenticated'
+            ], 401);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'id' => $user->id,
+                'full_name' => $user->full_name,
+                'username' => $user->username,
+                'email' => $user->email,
+                'role' => $user->role,
+                'school_id' => $user->school_id,
+                'guru' => $user->guru ? [
+                    'id' => $user->guru->id,
+                    'nama' => $user->guru->nama,
+                    'nip' => $user->guru->nip,
+                ] : null
+            ]
+        ]);
+    }
+
     public function today(Request $request)
     {
         $user = $request->user();
@@ -329,7 +358,13 @@ class MobileAttendanceController extends Controller
 
             // Jika ada filter range tanggal
             if ($startDate && $endDate) {
-                $query->whereBetween('tanggal', [$startDate, $endDate]);
+                try {
+                    $startFormatted = Carbon::parse($startDate)->format('Y-m-d');
+                    $endFormatted = Carbon::parse($endDate)->format('Y-m-d');
+                    $query->whereBetween('tanggal', [$startFormatted, $endFormatted]);
+                } catch (\Exception $e) {
+                    $query->whereBetween('tanggal', [$startDate, $endDate]);
+                }
             }
 
             $history = $query->orderBy('tanggal', 'desc')
@@ -355,12 +390,22 @@ class MobileAttendanceController extends Controller
     public function recap(Request $request)
     {
         $user = $request->user();
-        // Pilihan rentang bulan (1, 3, 6, 12 bulan)
+        // Pilihan rentang bulan (1, 3, 6, 12 bulan) atau start_date & end_date
         $months = (int) $request->query('months', 1);
+        $startDate = $request->query('start_date');
+        $endDate = $request->query('end_date');
 
-        // Hitung tanggal mundur 30 hari * jumlah bulan (Sama seperti Web)
-        $endDate = Carbon::now()->format('Y-m-d');
-        $startDate = Carbon::now()->subDays(30 * $months)->format('Y-m-d');
+        if ($startDate && $endDate) {
+            try {
+                $startDate = Carbon::parse($startDate)->format('Y-m-d');
+                $endDate = Carbon::parse($endDate)->format('Y-m-d');
+            } catch (\Exception $e) {
+                // Keep as is if parsing fails
+            }
+        } else {
+            $endDate = Carbon::now()->format('Y-m-d');
+            $startDate = Carbon::now()->subDays(30 * $months)->format('Y-m-d');
+        }
 
         if ($user && (in_array($user->role, ['guru', 'teacher', 'wali_kelas', 'admin']) || $user->role === 'guru') && $user->guru) {
             // Query absensi harian guru (Sama seperti RekapGuruController.php)
@@ -430,6 +475,13 @@ class MobileAttendanceController extends Controller
         $startDate = $request->query('start_date', Carbon::today()->format('Y-m-d'));
         $endDate = $request->query('end_date', Carbon::today()->format('Y-m-d'));
 
+        try {
+            $startDate = Carbon::parse($startDate)->format('Y-m-d');
+            $endDate = Carbon::parse($endDate)->format('Y-m-d');
+        } catch (\Exception $e) {
+            // Keep default
+        }
+
         // Ambil daftar siswa di kelas tersebut
         $siswaList = Siswa::where('kelas_id', $kelas->id)->get();
 
@@ -450,10 +502,13 @@ class MobileAttendanceController extends Controller
             ];
         });
 
+        $namaKelas = $kelas->nama_kelas ?? $kelas->nama;
+        $formattedKelasName = str_starts_with($namaKelas, 'Kelas') ? "{$namaKelas} (Wali Kelas)" : "Kelas {$namaKelas} (Wali Kelas)";
+
         return response()->json([
             'success' => true,
             'data' => [
-                'kelas_name' => "Kelas " . $kelas->nama,
+                'kelas_name' => $formattedKelasName,
                 'total_siswa' => $siswaList->count(),
                 'start_date' => $startDate,
                 'end_date' => $endDate,
@@ -470,7 +525,13 @@ class MobileAttendanceController extends Controller
             return response()->json(['success' => false, 'message' => 'Akses khusus dewan guru'], 403);
         }
 
-        $tanggal = $request->query('tanggal', Carbon::today()->format('Y-m-d'));
+        $rawTanggal = $request->query('tanggal', Carbon::today()->format('Y-m-d'));
+        try {
+            $tanggal = Carbon::parse($rawTanggal)->format('Y-m-d');
+        } catch (\Exception $e) {
+            $tanggal = Carbon::today()->format('Y-m-d');
+        }
+
         $queryStr = $request->query('q');
 
         // Jika kata kunci pencarian kurang dari 2 karakter, kembalikan array kosong
@@ -496,11 +557,16 @@ class MobileAttendanceController extends Controller
                 ->where('tanggal', $tanggal)
                 ->first();
 
+            $kelasName = $siswa->kelas ? ($siswa->kelas->nama_kelas ?? $siswa->kelas->nama) : 'Siswa';
+            if ($siswa->kelas && !str_starts_with($kelasName, 'Kelas')) {
+                $kelasName = 'Kelas ' . $kelasName;
+            }
+
             return [
                 'student_id' => $siswa->id,
                 'nama' => $siswa->nama,
                 'nis' => $siswa->nis,
-                'kelas_name' => $siswa->kelas ? "Kelas " . ($siswa->kelas->nama_kelas ?? $siswa->kelas->nama) : 'Siswa',
+                'kelas_name' => $kelasName,
                 'status' => $absen ? $absen->status : 'H',
                 'keterangan' => $absen ? $absen->keterangan : null
             ];
@@ -518,13 +584,17 @@ class MobileAttendanceController extends Controller
         }
 
         $request->validate([
-            'tanggal' => 'required|date',
+            'tanggal' => 'required',
             'attendances' => 'required|array',
             'attendances.*.student_id' => 'required|integer',
             'attendances.*.status' => 'required|string',
         ]);
 
-        $tanggal = $request->tanggal;
+        try {
+            $tanggal = Carbon::parse($request->tanggal)->format('Y-m-d');
+        } catch (\Exception $e) {
+            $tanggal = $request->tanggal;
+        }
 
         foreach ($request->attendances as $item) {
             $status = $item['status'];
@@ -536,6 +606,7 @@ class MobileAttendanceController extends Controller
                     'tanggal' => $tanggal
                 ],
                 [
+                    'school_id' => $user->school_id,
                     'status' => $status,
                     'keterangan' => $item['keterangan'] ?? null,
                     'jam_masuk' => $isHadir ? now()->format('H:i:s') : null,
@@ -568,10 +639,16 @@ class MobileAttendanceController extends Controller
         }
 
         $request->validate([
-            'tanggal' => 'required|date',
+            'tanggal' => 'required',
             'student_id' => 'required|integer',
             'status' => 'required|string',
         ]);
+
+        try {
+            $tanggal = Carbon::parse($request->tanggal)->format('Y-m-d');
+        } catch (\Exception $e) {
+            $tanggal = $request->tanggal;
+        }
 
         $status = $request->status;
         $isHadir = in_array($status, ['H', 'Hadir', 'T', 'Terlambat']);
@@ -579,7 +656,7 @@ class MobileAttendanceController extends Controller
         Attendance::updateOrCreate(
             [
                 'student_id' => $request->student_id,
-                'tanggal' => $request->tanggal
+                'tanggal' => $tanggal
             ],
             [
                 'school_id' => $user->school_id,
@@ -620,7 +697,14 @@ class MobileAttendanceController extends Controller
         $startDate = $request->query('start_date');
         $endDate = $request->query('end_date');
 
-        if (!$startDate || !$endDate) {
+        if ($startDate && $endDate) {
+            try {
+                $startDate = Carbon::parse($startDate)->format('Y-m-d');
+                $endDate = Carbon::parse($endDate)->format('Y-m-d');
+            } catch (\Exception $e) {
+                // Keep as is
+            }
+        } else {
             $endDate = Carbon::now()->format('Y-m-d');
             $startDate = Carbon::now()->subDays(30 * $months)->format('Y-m-d');
         }

@@ -593,6 +593,74 @@ class MobileAttendanceController extends Controller
         return response()->json(['success' => true, 'message' => 'Absensi siswa tersimpan secara realtime']);
     }
 
+    public function getKelases(Request $request)
+    {
+        $user = $request->user();
+        $query = Kelas::query();
+        if ($user && $user->school_id) {
+            $query->where('school_id', $user->school_id);
+        }
+        $kelases = $query->orderBy('nama_kelas', 'asc')->get();
+
+        $data = $kelases->map(function ($k) {
+            return [
+                'id' => $k->id,
+                'nama' => $k->nama_kelas ?? $k->nama,
+            ];
+        });
+
+        return response()->json(['success' => true, 'data' => $data]);
+    }
+
+    public function schoolStudentsRecap(Request $request)
+    {
+        $user = $request->user();
+        $kelasId = $request->query('kelas_id');
+        $months = (int) $request->query('months', 1);
+        $startDate = $request->query('start_date');
+        $endDate = $request->query('end_date');
+
+        if (!$startDate || !$endDate) {
+            $endDate = Carbon::now()->format('Y-m-d');
+            $startDate = Carbon::now()->subDays(30 * $months)->format('Y-m-d');
+        }
+
+        // Ambil daftar ID siswa (seluruh sekolah atau kelas tertentu)
+        $siswaQuery = Siswa::where('school_id', $user->school_id);
+        if ($kelasId) {
+            $siswaQuery->where('kelas_id', $kelasId);
+        }
+        $siswaIds = $siswaQuery->pluck('id');
+
+        // Query akumulasi absensi siswa
+        $attendances = Attendance::whereIn('student_id', $siswaIds)
+            ->whereBetween('tanggal', [$startDate, $endDate])
+            ->get();
+
+        $totalHadir = $attendances->whereIn('status', ['H', 'Hadir'])->count();
+        $totalTerlambat = $attendances->whereIn('status', ['T', 'Terlambat'])->count();
+        $totalIzin = $attendances->whereIn('status', ['I', 'Izin'])->count();
+        $totalSakit = $attendances->whereIn('status', ['S', 'Sakit'])->count();
+        $totalAlpha = $attendances->whereIn('status', ['A', 'Alpha'])->count();
+
+        $totalRecord = $attendances->count();
+        $totalAbsenOk = $totalHadir + $totalTerlambat;
+        $persentase = $totalRecord > 0 ? round(($totalAbsenOk / $totalRecord) * 100, 1) : 0;
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'total_hadir' => $totalHadir,
+                'total_terlambat' => $totalTerlambat,
+                'total_izin' => $totalIzin,
+                'total_sakit' => $totalSakit,
+                'total_alpha' => $totalAlpha,
+                'total_hari_kerja' => $totalRecord,
+                'persentase_kehadiran' => $persentase,
+            ]
+        ]);
+    }
+
     public function logout(Request $request)
     {
         if ($request->user() && $request->user()->currentAccessToken()) {

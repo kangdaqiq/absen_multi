@@ -58,5 +58,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/mobile/students-attendance', [MobileAttendanceController::class, 'getStudentsForAttendance']);
     Route::post('/mobile/students-attendance', [MobileAttendanceController::class, 'submitStudentsAttendance']);
     Route::post('/mobile/student-attendance-single', [MobileAttendanceController::class, 'updateSingleStudentAttendance']);
+    Route::get('/mobile/kelases', [MobileAttendanceController::class, 'getKelases']);
+    Route::get('/mobile/rekap-siswa-sekolah', [MobileAttendanceController::class, 'schoolStudentsRecap']);
     Route::post('/mobile/logout', [MobileAttendanceController::class, 'logout']);
 });

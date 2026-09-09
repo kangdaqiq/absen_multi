@@ -512,7 +512,7 @@
     <div class="brand-header">
         <div class="brand-logo">
             <img src="{{ asset('images/logo/logo.svg') }}" alt="JagatTech" style="height: 36px; width: auto;">
-            <span style="border-left: 2px solid var(--gray-300); padding-left: 12px; margin-left: 4px; font-size: 1.05rem; font-weight: 700; color: var(--gray-700);">E-Invoice Tagihan</span>
+            <span style="border-left: 2px solid var(--gray-300); padding-left: 12px; margin-left: 4px; font-size: 1.05rem; font-weight: 700; color: var(--gray-700);">Invoice</span>
         </div>
         <div class="action-btns">
             <button onclick="window.print()" class="btn-action">
@@ -590,7 +590,6 @@
                     <p>
                         <strong>Alamat:</strong> Jl. Murnijaya RT 03 RW 04, Tumijajar, Tulang Bawang Barat, Lampung, 34594<br>
                         <strong>No. Telp / WA:</strong> 081524824563<br>
-                        <strong>Website:</strong> <a href="https://jagattech.my.id" target="_blank" style="color: var(--primary); text-decoration: none; font-weight: 600;">jagattech.my.id</a><br>
                         <strong>Email Support:</strong> admin@jagattech.my.id
                     </p>
                 </div>

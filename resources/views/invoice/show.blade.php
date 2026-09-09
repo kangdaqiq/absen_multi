@@ -683,7 +683,7 @@
 
                     <div class="pulse-indicator">
                         <span class="pulse-dot"></span>
-                        <span id="statusText">Sistem mendeteksi pembayaran realtime secara otomatis...</span>
+                        <span id="statusText">Menunggu pembayaran...</span>
                     </div>
                 </div>
 

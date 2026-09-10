@@ -41,6 +41,8 @@ class Siswa extends Model
         'created_at',
         'updated_at',
         'school_id',
+        'user_id',
+        'fcm_token',
         'is_khusus',
         'is_siswa_khusus',
         'hari_masuk',

@@ -118,6 +118,21 @@ class WhatsAppService
             }
             $this->queueMessage($phoneOrtu, $msgOrtu, $schoolId);
         }
+
+        // Send push notification via FCM if device is registered
+        try {
+            $siswa = \App\Models\Siswa::where('nama', $name)->when($schoolId, fn($q) => $q->where('school_id', $schoolId))->first();
+            if ($siswa) {
+                FcmNotificationService::sendToSiswa($siswa, "Presensi Masuk Tercatat", "Halo {$name}, absensi masuk Anda berhasil dicatat pukul {$time} (Status: {$readableStatus}).", [
+                    'type' => 'checkin_siswa',
+                    'student_id' => (string) $siswa->id,
+                    'time' => (string) $time,
+                    'status' => (string) $readableStatus
+                ]);
+            }
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::warning("FCM checkin error: " . $e->getMessage());
+        }
     }
 
     /**
@@ -190,6 +205,20 @@ class WhatsAppService
                 schoolId: $schoolId
             );
             $this->queueMessage($phoneOrtu, $msgOrtu, $schoolId);
+        }
+
+        // Send push notification via FCM if device is registered
+        try {
+            $siswa = \App\Models\Siswa::where('nama', $name)->when($schoolId, fn($q) => $q->where('school_id', $schoolId))->first();
+            if ($siswa) {
+                FcmNotificationService::sendToSiswa($siswa, "Presensi Pulang Tercatat", "Halo {$name}, absensi pulang Anda berhasil dicatat pukul {$time}.", [
+                    'type' => 'checkout_siswa',
+                    'student_id' => (string) $siswa->id,
+                    'time' => (string) $time
+                ]);
+            }
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::warning("FCM checkout error: " . $e->getMessage());
         }
     }
 

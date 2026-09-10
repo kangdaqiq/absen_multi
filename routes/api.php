@@ -61,5 +61,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/mobile/student-attendance-single', [MobileAttendanceController::class, 'updateSingleStudentAttendance']);
     Route::get('/mobile/kelases', [MobileAttendanceController::class, 'getKelases']);
     Route::get('/mobile/rekap-siswa-sekolah', [MobileAttendanceController::class, 'schoolStudentsRecap']);
+    Route::post('/mobile/fcm-token', [MobileAttendanceController::class, 'updateFcmToken']);
     Route::post('/mobile/logout', [MobileAttendanceController::class, 'logout']);
 });

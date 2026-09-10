@@ -78,7 +78,29 @@ Mengambil data detail profil pengguna yang sedang login.
 
 ---
 
-### 1.3 Logout (`POST /api/mobile/logout`)
+### 1.3 Registrasi / Update FCM Token Device (`POST /api/mobile/fcm-token`)
+Menyimpan token Firebase Cloud Messaging (FCM) perangkat pengguna agar dapat menerima Push Notification real-time saat scan RFID/Fingerprint atau pengumuman.
+
+- **URL**: `/api/mobile/fcm-token`
+- **Method**: `POST`
+- **Auth**: Bearer Token
+- **Body Request (JSON)**:
+```json
+{
+  "fcm_token": "eXample_fcm_token_dari_firebase_sdk_android..."
+}
+```
+- **Response Success (200 OK)**:
+```json
+{
+  "success": true,
+  "message": "FCM Token berhasil diperbarui"
+}
+```
+
+---
+
+### 1.4 Logout (`POST /api/mobile/logout`)
 Menghapus/revokasi token Sanctum aktif.
 
 - **URL**: `/api/mobile/logout`

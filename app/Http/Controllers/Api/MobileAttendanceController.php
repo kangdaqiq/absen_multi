@@ -56,6 +56,12 @@ class MobileAttendanceController extends Controller
                 ]);
             }
 
+            // Save FCM token if provided
+            if ($request->filled('fcm_token')) {
+                $user->fcm_token = $request->fcm_token;
+                $user->save();
+            }
+
             ApiLog::create([
                 'school_id' => $user->school_id,
                 'api_key' => 'MOBILE_APP',
@@ -160,6 +166,16 @@ class MobileAttendanceController extends Controller
                     if (\Illuminate\Support\Facades\Schema::hasColumn('siswa', 'user_id')) {
                         if ($siswa->user_id !== $user->id) {
                             $siswa->user_id = $user->id;
+                            $siswa->save();
+                        }
+                    }
+
+                    // Save FCM token if provided
+                    if ($request->filled('fcm_token')) {
+                        $user->fcm_token = $request->fcm_token;
+                        $user->save();
+                        if (\Illuminate\Support\Facades\Schema::hasColumn('siswa', 'fcm_token')) {
+                            $siswa->fcm_token = $request->fcm_token;
                             $siswa->save();
                         }
                     }
@@ -977,6 +993,36 @@ class MobileAttendanceController extends Controller
                 'total_hari_kerja' => $totalRecord,
                 'persentase_kehadiran' => $persentase,
             ]
+        ]);
+    }
+
+    public function updateFcmToken(Request $request)
+    {
+        $request->validate([
+            'fcm_token' => 'required|string',
+        ]);
+
+        $user = $request->user();
+        if ($user) {
+            $user->fcm_token = $request->fcm_token;
+            $user->save();
+
+            if ($user->student) {
+                $user->student->fcm_token = $request->fcm_token;
+                $user->student->save();
+            } elseif (in_array($user->role, ['student', 'siswa'])) {
+                $cleanNis = str_replace('siswa_', '', $user->username);
+                $siswa = Siswa::where('user_id', $user->id)->orWhere('nis', $cleanNis)->first();
+                if ($siswa) {
+                    $siswa->fcm_token = $request->fcm_token;
+                    $siswa->save();
+                }
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'FCM Token berhasil diperbarui'
         ]);
     }
 

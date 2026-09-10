@@ -23,6 +23,7 @@ class User extends Authenticatable
         'password_hash',
         'role',
         'school_id',
+        'fcm_token',
     ];
 
     protected $hidden = [

@@ -14,8 +14,11 @@ use App\Models\Jadwal;
 use App\Models\Guru;
 use App\Models\Siswa;
 use App\Models\Attendance;
+use App\Models\AbsensiGuru;
 use App\Models\MessageQueue;
 use App\Models\GateCard;
+use App\Models\TeacherCheckoutSession;
+use App\Models\Setting;
 use App\Services\FcmNotificationService;
 
 class RfidController extends Controller

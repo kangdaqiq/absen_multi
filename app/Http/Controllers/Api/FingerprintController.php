@@ -14,6 +14,11 @@ use App\Models\Siswa;
 use App\Models\SiswaFingerprint;
 use App\Models\GateCard;
 use App\Models\GateCardFingerprint;
+use App\Models\TeacherCheckoutSession;
+use App\Models\Attendance;
+use App\Models\AbsensiGuru;
+use App\Models\Setting;
+use App\Models\Jadwal;
 use App\Services\FcmNotificationService;
 
 class FingerprintController extends Controller

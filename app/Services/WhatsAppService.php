@@ -43,42 +43,6 @@ class WhatsAppService
 
     public function sendCheckIn($name, $phone, $time, $status, $schoolId, $keterangan = null, $phoneOrtu = null, $kelas = '-')
     {
-        // Map short status to readable status
-        $statusMap = [
-            'H' => 'Hadir',
-            'A' => 'Alpha',
-            'I' => 'Izin',
-            'S' => 'Sakit',
-            'B' => 'Bolos',
-            'T' => 'Terlambat'
-        ];
-        $readableStatus = $statusMap[strtoupper($status)] ?? $status;
-
-        // Send push notification via FCM if device is registered (unconditionally, even without WA phone)
-        try {
-            $siswa = \App\Models\Siswa::where('nama', $name)->when($schoolId, fn($q) => $q->where('school_id', $schoolId))->first();
-            if ($siswa) {
-                FcmNotificationService::sendToSiswa($siswa, "Presensi Masuk Tercatat", "Halo {$name}, absensi masuk Anda berhasil dicatat pukul {$time} (Status: {$readableStatus}).", [
-                    'type' => 'checkin_siswa',
-                    'student_id' => (string) $siswa->id,
-                    'time' => (string) $time,
-                    'status' => (string) $readableStatus
-                ]);
-            } else {
-                $guru = \App\Models\Guru::where('nama', $name)->when($schoolId, fn($q) => $q->where('school_id', $schoolId))->first();
-                if ($guru) {
-                    FcmNotificationService::sendToGuru($guru, "Presensi Masuk Tercatat", "Halo {$name}, absensi masuk Anda berhasil dicatat pukul {$time} (Status: {$readableStatus}).", [
-                        'type' => 'checkin_guru',
-                        'guru_id' => (string) $guru->id,
-                        'time' => (string) $time,
-                        'status' => (string) $readableStatus
-                    ]);
-                }
-            }
-        } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::warning("FCM checkin error: " . $e->getMessage());
-        }
-
         // Skip WhatsApp if both phone numbers are empty
         if (!$phone && !$phoneOrtu)
             return;
@@ -180,29 +144,6 @@ class WhatsAppService
 
     public function sendCheckOut($name, $phone, $time, $hours, $mins, $authorizer, $schoolId, $jamMasuk = '-', $phoneOrtu = null, $tanggal = null)
     {
-        // Send push notification via FCM if device is registered (unconditionally)
-        try {
-            $siswa = \App\Models\Siswa::where('nama', $name)->when($schoolId, fn($q) => $q->where('school_id', $schoolId))->first();
-            if ($siswa) {
-                FcmNotificationService::sendToSiswa($siswa, "Presensi Pulang Tercatat", "Halo {$name}, absensi pulang Anda berhasil dicatat pukul {$time}.", [
-                    'type' => 'checkout_siswa',
-                    'student_id' => (string) $siswa->id,
-                    'time' => (string) $time
-                ]);
-            } else {
-                $guru = \App\Models\Guru::where('nama', $name)->when($schoolId, fn($q) => $q->where('school_id', $schoolId))->first();
-                if ($guru) {
-                    FcmNotificationService::sendToGuru($guru, "Presensi Pulang Tercatat", "Halo {$name}, absensi pulang Anda berhasil dicatat pukul {$time}.", [
-                        'type' => 'checkout_guru',
-                        'guru_id' => (string) $guru->id,
-                        'time' => (string) $time
-                    ]);
-                }
-            }
-        } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::warning("FCM checkout error: " . $e->getMessage());
-        }
-
         // Skip WhatsApp if both phone numbers are empty
         if (!$phone && !$phoneOrtu)
             return;

@@ -87,6 +87,15 @@ class FcmNotificationService
         }
 
         foreach ($tokens as $token) {
+            // Anti-duplicate lock: cegah notifikasi ganda ke token yang sama dalam rentang 5 detik
+            $dedupKey = 'fcm_dedup_' . md5($token . '_' . $title . '_' . ($data['type'] ?? ''));
+            if (Cache::has($dedupKey)) {
+                Log::info("FCM duplicate ignored (debounced) for token: " . substr($token, 0, 15) . "...");
+                $successCount++;
+                continue;
+            }
+            Cache::put($dedupKey, true, now()->addSeconds(5));
+
             try {
                 $payload = [
                     'message' => [

@@ -12,10 +12,9 @@ use App\Models\Guru;
 use App\Models\GuruFingerprint;
 use App\Models\Siswa;
 use App\Models\SiswaFingerprint;
-use App\Models\Attendance;
-use App\Models\TeacherCheckoutSession;
 use App\Models\GateCard;
 use App\Models\GateCardFingerprint;
+use App\Services\FcmNotificationService;
 
 class FingerprintController extends Controller
 {
@@ -796,6 +795,18 @@ $guru = Guru::where('enroll_finger_status', 'requested')
                         Log::error("Telegram Guru Checkin Error: " . $e->getMessage());
                     }
 
+                    // Send FCM Push Notification
+                    try {
+                        FcmNotificationService::sendToGuru($guru, "Presensi Masuk Tercatat", "Halo {$guru->nama}, absensi masuk Anda berhasil dicatat pukul {$now->format('H:i')} (Status: {$status}).", [
+                            'type' => 'checkin_guru',
+                            'guru_id' => (string) $guru->id,
+                            'time' => (string) $now->format('H:i'),
+                            'status' => (string) $status,
+                        ]);
+                    } catch (\Exception $e) {
+                        Log::error("FCM Guru Checkin Error: " . $e->getMessage());
+                    }
+
                     $msgLog = "Guru Masuk: {$guru->nama} ({$shift->nama_shift} - {$status})";
                     ApiLog::create([
                         'school_id' => $this->currentSchoolId,
@@ -1273,6 +1284,19 @@ $guru = Guru::where('enroll_finger_status', 'requested')
                 $this->telegram->sendCheckIn($siswa->nama, $siswa->telegram_chat_id, $now->format('H:i'), $status, $device->school_id, $keterangan, $siswa->telegram_ortu_chat_id, $siswa->kelas->nama_kelas ?? '-');
             } catch (\Exception $e) {
                 Log::error("Telegram CheckIn Error: " . $e->getMessage());
+            }
+
+            // Send FCM Push Notification
+            try {
+                $readableStatus = ($status === 'T' || $status === 'Terlambat') ? 'Terlambat' : 'Hadir';
+                FcmNotificationService::sendToSiswa($siswa, "Presensi Masuk Tercatat", "Halo {$siswa->nama}, absensi masuk Anda berhasil dicatat pukul {$now->format('H:i')} (Status: {$readableStatus}).", [
+                    'type' => 'checkin_siswa',
+                    'student_id' => (string) $siswa->id,
+                    'time' => (string) $now->format('H:i'),
+                    'status' => (string) $readableStatus,
+                ]);
+            } catch (\Exception $e) {
+                Log::error("FCM Siswa Checkin Error: " . $e->getMessage());
             }
 
             ApiLog::create([

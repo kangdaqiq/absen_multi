@@ -90,6 +90,12 @@ class DailyReportCommand extends Command
             return;
         }
 
+        // Mark done for this school immediately to prevent duplicate runs on next minute cron
+        Setting::updateOrCreate(
+            ['school_id' => $schoolId, 'setting_key' => 'last_daily_report_date'],
+            ['setting_value' => $today]
+        );
+
         // 4. Get classes with WhatsApp Group ID (Per School)
         $kelasWithGroupId = Kelas::where('school_id', $schoolId)
             ->whereNotNull('wa_group_id')

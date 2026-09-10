@@ -52,6 +52,12 @@ class AutoBolosCommand extends Command
             return;
         }
 
+        // Mark done for this school immediately to prevent duplicate runs on next minute cron
+        Setting::updateOrCreate(
+            ['school_id' => $schoolId, 'setting_key' => 'last_daily_process_date'],
+            ['setting_value' => $today]
+        );
+
         // 2. Check Weekly Holiday via Schedule (Jadwal)
         // If today has NO active schedule, skip process
         $dayIndex = $now->dayOfWeekIso; // 1-7

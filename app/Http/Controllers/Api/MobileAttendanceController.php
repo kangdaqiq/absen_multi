@@ -97,120 +97,126 @@ class MobileAttendanceController extends Controller
         }
 
         // 2. Cek apakah login sebagai Siswa (NIS/NISN sebagai username, Tanggal Lahir sebagai password)
-        $siswa = Siswa::with(['kelas', 'school'])
-            ->where(function ($q) use ($loginInput) {
-                $q->where('nis', $loginInput);
-                if (\Illuminate\Support\Facades\Schema::hasColumn('siswa', 'nisn')) {
-                    $q->orWhere('nisn', $loginInput);
-                }
-            })
-            ->first();
+        try {
+            $siswa = Siswa::with(['kelas', 'school'])
+                ->where(function ($q) use ($loginInput) {
+                    $q->where('nis', $loginInput);
+                    if (\Illuminate\Support\Facades\Schema::hasColumn('siswa', 'nisn')) {
+                        $q->orWhere('nisn', $loginInput);
+                    }
+                })
+                ->first();
 
-        if ($siswa && !empty($siswa->tgl_lahir)) {
-            $isBirthDateValid = false;
-            try {
-                $birthDate = Carbon::parse($siswa->tgl_lahir);
-                $cleanInputPass = preg_replace('/[^0-9]/', '', $passwordInput);
-
-                $validFormats = [
-                    $birthDate->format('Y-m-d'),   // 2008-05-15
-                    $birthDate->format('d-m-Y'),   // 15-05-2008
-                    $birthDate->format('Y/m/d'),   // 2008/05/15
-                    $birthDate->format('d/m/Y'),   // 15/05/2008
-                    $birthDate->format('Ymd'),     // 20080515
-                    $birthDate->format('dmY'),     // 15052008
-                ];
-
-                $isBirthDateValid = in_array($passwordInput, $validFormats) ||
-                                    in_array($cleanInputPass, [$birthDate->format('Ymd'), $birthDate->format('dmY')]);
-            } catch (\Exception $e) {
+            if ($siswa && !empty($siswa->tgl_lahir)) {
                 $isBirthDateValid = false;
-            }
+                try {
+                    $birthDate = Carbon::parse($siswa->tgl_lahir);
+                    $cleanInputPass = preg_replace('/[^0-9]/', '', $passwordInput);
 
-            if ($isBirthDateValid) {
-                // Temukan atau buatkan shadow User untuk siswa agar memiliki token Sanctum
-                $user = null;
-                if ($siswa->user_id) {
-                    $user = User::find($siswa->user_id);
+                    $validFormats = [
+                        $birthDate->format('Y-m-d'),   // 2008-05-15
+                        $birthDate->format('d-m-Y'),   // 15-05-2008
+                        $birthDate->format('Y/m/d'),   // 2008/05/15
+                        $birthDate->format('d/m/Y'),   // 15/05/2008
+                        $birthDate->format('Ymd'),     // 20080515
+                        $birthDate->format('dmY'),     // 15052008
+                    ];
+
+                    $isBirthDateValid = in_array($passwordInput, $validFormats) ||
+                                        in_array($cleanInputPass, [$birthDate->format('Ymd'), $birthDate->format('dmY')]);
+                } catch (\Exception $e) {
+                    $isBirthDateValid = false;
                 }
 
-                if (!$user) {
-                    $user = User::where('username', 'siswa_' . $siswa->nis)
-                        ->orWhere('username', $siswa->nis)
-                        ->first();
-                }
+                if ($isBirthDateValid) {
+                    // Temukan atau buatkan shadow User untuk siswa agar memiliki token Sanctum
+                    $user = null;
+                    if (\Illuminate\Support\Facades\Schema::hasColumn('siswa', 'user_id') && $siswa->user_id) {
+                        $user = User::find($siswa->user_id);
+                    }
 
-                if (!$user) {
-                    $user = User::create([
-                        'full_name' => $siswa->nama,
-                        'username' => 'siswa_' . $siswa->nis,
-                        'email' => $siswa->nis . '@siswa.local',
-                        'password_hash' => Hash::make($passwordInput),
-                        'role' => 'siswa',
+                    if (!$user) {
+                        $user = User::where('username', 'siswa_' . $siswa->nis)
+                            ->orWhere('username', $siswa->nis)
+                            ->first();
+                    }
+
+                    if (!$user) {
+                        $user = User::create([
+                            'full_name' => $siswa->nama,
+                            'username' => 'siswa_' . $siswa->nis,
+                            'email' => $siswa->nis . '@siswa.local',
+                            'password_hash' => Hash::make($passwordInput),
+                            'role' => 'student',
+                            'school_id' => $siswa->school_id,
+                        ]);
+                    } else {
+                        $user->role = 'student';
+                        $user->school_id = $siswa->school_id;
+                        $user->password_hash = Hash::make($passwordInput);
+                        $user->save();
+                    }
+
+                    if (\Illuminate\Support\Facades\Schema::hasColumn('siswa', 'user_id')) {
+                        if ($siswa->user_id !== $user->id) {
+                            $siswa->user_id = $user->id;
+                            $siswa->save();
+                        }
+                    }
+
+                    $token = $user->createToken('android-app-siswa')->plainTextToken;
+
+                    ApiLog::create([
                         'school_id' => $siswa->school_id,
+                        'api_key' => 'MOBILE_APP',
+                        'action' => 'mobile_login_student',
+                        'uid' => $siswa->nis,
+                        'success' => true,
+                        'message' => "Login siswa berhasil: {$siswa->nama} (NIS: {$siswa->nis})",
+                        'ip_address' => $request->ip(),
+                        'user_agent' => $request->userAgent() ?? 'Android Mobile App',
+                        'created_at' => now(),
                     ]);
-                } else {
-                    $user->role = 'siswa';
-                    $user->school_id = $siswa->school_id;
-                    $user->password_hash = Hash::make($passwordInput);
-                    $user->save();
-                }
 
-                if ($siswa->user_id !== $user->id) {
-                    $siswa->user_id = $user->id;
-                    $siswa->save();
-                }
-
-                $token = $user->createToken('android-app-siswa')->plainTextToken;
-
-                ApiLog::create([
-                    'school_id' => $siswa->school_id,
-                    'api_key' => 'MOBILE_APP',
-                    'action' => 'mobile_login_student',
-                    'uid' => $siswa->nis,
-                    'success' => true,
-                    'message' => "Login siswa berhasil: {$siswa->nama} (NIS: {$siswa->nis})",
-                    'ip_address' => $request->ip(),
-                    'user_agent' => $request->userAgent() ?? 'Android Mobile App',
-                    'created_at' => now(),
-                ]);
-
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Login siswa berhasil',
-                    'token' => $token,
-                    'user' => [
-                        'id' => $user->id,
-                        'full_name' => $siswa->nama,
-                        'username' => $siswa->nis,
-                        'email' => $user->email,
-                        'role' => 'siswa',
-                        'school_id' => $siswa->school_id,
+                    return response()->json([
+                        'success' => true,
+                        'message' => 'Login siswa berhasil',
+                        'token' => $token,
+                        'user' => [
+                            'id' => $user->id,
+                            'full_name' => $siswa->nama,
+                            'username' => $siswa->nis,
+                            'email' => $user->email,
+                            'role' => 'student',
+                            'school_id' => $siswa->school_id,
+                            'is_wali_kelas' => false,
+                            'wali_kelas' => false,
+                            'guru' => null,
+                            'student' => [
+                                'id' => $siswa->id,
+                                'nama' => $siswa->nama,
+                                'nis' => $siswa->nis,
+                                'tgl_lahir' => $siswa->tgl_lahir ? Carbon::parse($siswa->tgl_lahir)->format('Y-m-d') : null,
+                                'kelas_id' => $siswa->kelas_id,
+                                'kelas_name' => $siswa->kelas ? ($siswa->kelas->nama_kelas ?? $siswa->kelas->nama) : null,
+                                'kelas' => $siswa->kelas ? [
+                                    'id' => $siswa->kelas->id,
+                                    'nama' => $siswa->kelas->nama_kelas ?? $siswa->kelas->nama,
+                                    'nama_kelas' => $siswa->kelas->nama_kelas ?? $siswa->kelas->nama,
+                                ] : null,
+                            ]
+                        ],
                         'is_wali_kelas' => false,
-                        'wali_kelas' => false,
-                        'guru' => null,
-                        'student' => [
-                            'id' => $siswa->id,
-                            'nama' => $siswa->nama,
-                            'nis' => $siswa->nis,
-                            'tgl_lahir' => $siswa->tgl_lahir ? Carbon::parse($siswa->tgl_lahir)->format('Y-m-d') : null,
-                            'kelas_id' => $siswa->kelas_id,
-                            'kelas_name' => $siswa->kelas ? ($siswa->kelas->nama_kelas ?? $siswa->kelas->nama) : null,
-                            'kelas' => $siswa->kelas ? [
-                                'id' => $siswa->kelas->id,
-                                'nama' => $siswa->kelas->nama_kelas ?? $siswa->kelas->nama,
-                                'nama_kelas' => $siswa->kelas->nama_kelas ?? $siswa->kelas->nama,
-                            ] : null,
-                        ]
-                    ],
-                    'is_wali_kelas' => false,
-                    'school' => $siswa->school ? [
-                        'id' => $siswa->school->id,
-                        'nama' => $siswa->school->name ?? $siswa->school->nama,
-                        'domain' => $siswa->school->domain ?? null,
-                    ] : null
-                ]);
+                        'school' => $siswa->school ? [
+                            'id' => $siswa->school->id,
+                            'nama' => $siswa->school->name ?? $siswa->school->nama,
+                            'domain' => $siswa->school->domain ?? null,
+                        ] : null
+                    ]);
+                }
             }
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error("Student login error: " . $e->getMessage());
         }
 
         // 3. Jika gagal autentikasi
@@ -296,8 +302,8 @@ class MobileAttendanceController extends Controller
             $isWaliKelas = true;
         }
 
-        if ($user && ($user->student || $user->role === 'siswa')) {
-            $student = $user->student ?? Siswa::with('kelas')->where('user_id', $user->id)->first();
+        if ($user && ($user->student || in_array($user->role, ['student', 'siswa']))) {
+            $student = $user->student ?? Siswa::with('kelas')->where('user_id', $user->id)->orWhere('nis', str_replace('siswa_', '', $user->username))->first();
             if ($student) {
                 $absen = Attendance::where('student_id', $student->id)
                     ->where('tanggal', $today)
@@ -518,8 +524,8 @@ class MobileAttendanceController extends Controller
         $startDate = $request->query('start_date');
         $endDate = $request->query('end_date');
 
-        if ($user && ($user->student || $user->role === 'siswa')) {
-            $student = $user->student ?? Siswa::where('user_id', $user->id)->first();
+        if ($user && ($user->student || in_array($user->role, ['student', 'siswa']))) {
+            $student = $user->student ?? Siswa::where('user_id', $user->id)->orWhere('nis', str_replace('siswa_', '', $user->username))->first();
             if ($student) {
                 $query = Attendance::where('student_id', $student->id);
 
@@ -606,8 +612,8 @@ class MobileAttendanceController extends Controller
             $startDate = Carbon::now()->subDays(30 * $months)->format('Y-m-d');
         }
 
-        if ($user && ($user->student || $user->role === 'siswa')) {
-            $student = $user->student ?? Siswa::where('user_id', $user->id)->first();
+        if ($user && ($user->student || in_array($user->role, ['student', 'siswa']))) {
+            $student = $user->student ?? Siswa::where('user_id', $user->id)->orWhere('nis', str_replace('siswa_', '', $user->username))->first();
             if ($student) {
                 $query = Attendance::where('student_id', $student->id)
                     ->whereBetween('tanggal', [$startDate, $endDate]);

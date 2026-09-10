@@ -55,7 +55,7 @@ class AuthController extends Controller
             $user = Auth::user();
 
             // Cegah akun siswa login melalui web (khusus aplikasi mobile)
-            if ($user->role === 'siswa' || $user->student()->exists()) {
+            if (in_array($user->role, ['student', 'siswa']) || $user->student()->exists()) {
                 Auth::logout();
                 $request->session()->invalidate();
                 $request->session()->regenerateToken();
@@ -91,7 +91,7 @@ class AuthController extends Controller
             $user = Auth::user();
 
             // Cegah akun siswa login melalui web (khusus aplikasi mobile)
-            if ($user->role === 'siswa' || $user->student()->exists()) {
+            if (in_array($user->role, ['student', 'siswa']) || $user->student()->exists()) {
                 Auth::logout();
                 $request->session()->invalidate();
                 $request->session()->regenerateToken();

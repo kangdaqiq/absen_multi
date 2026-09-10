@@ -57,7 +57,7 @@ class TestFcmCommand extends Command
             return 1;
         }
 
-        $this->info("\n3. Sending Test Push Notification to token: " . substr($token, 0, 20) . "...");
+        $this->info("\n3. Sending Test Push Notification to token: " . substr($token, 0, 25) . "...");
         $res = FcmNotificationService::send(
             $token,
             "🔔 Uji Coba Push Notifikasi - Jagat Absen",
@@ -66,9 +66,13 @@ class TestFcmCommand extends Command
         );
 
         if ($res) {
-            $this->info("✅ Push Notifikasi BERHASIL dikirimkan ke Google Firebase!");
+            $this->info("\n✅ Push Notifikasi BERHASIL dikirimkan ke Google Firebase!");
         } else {
-            $this->error("❌ Gagal mengirimkan push notifikasi. Cek storage/logs/laravel.log untuk detailnya.");
+            $this->error("\n❌ Gagal mengirimkan push notifikasi.");
+            if (FcmNotificationService::$lastError) {
+                $this->warn("\nDetail Error dari Google / Server:");
+                $this->line(FcmNotificationService::$lastError);
+            }
         }
 
         return 0;

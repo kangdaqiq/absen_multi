@@ -11,6 +11,9 @@ use App\Models\Guru;
 
 class FcmNotificationService
 {
+    public static ?array $lastResponse = null;
+    public static ?string $lastError = null;
+
     /**
      * Send push notification to one or multiple device tokens
      * Supports both FCM HTTP v1 (Service Account JSON) and Legacy Server Key.
@@ -23,13 +26,18 @@ class FcmNotificationService
      */
     public static function send($fcmTokens, string $title, string $message, array $data = []): bool
     {
+        self::$lastResponse = null;
+        self::$lastError = null;
+
         if (empty($fcmTokens)) {
-            Log::info("FCM Notification skipped: No FCM device token provided.");
+            self::$lastError = "No FCM device token provided.";
+            Log::info("FCM Notification skipped: " . self::$lastError);
             return false;
         }
 
         $tokens = is_array($fcmTokens) ? array_filter($fcmTokens) : [$fcmTokens];
         if (empty($tokens)) {
+            self::$lastError = "FCM device tokens array is empty.";
             return false;
         }
 
@@ -45,7 +53,8 @@ class FcmNotificationService
             return self::sendViaLegacy($tokens, $title, $message, $data, $serverKey);
         }
 
-        Log::warning("FCM Notification skipped: Neither FIREBASE_CREDENTIALS JSON nor FCM_SERVER_KEY is configured in .env");
+        self::$lastError = "Neither FIREBASE_CREDENTIALS / FIREBASE_PRIVATE_KEY nor FCM_SERVER_KEY is configured in .env";
+        Log::warning("FCM Notification skipped: " . self::$lastError);
         return false;
     }
 
@@ -56,13 +65,15 @@ class FcmNotificationService
     {
         $accessToken = self::getGoogleAccessToken($serviceAccount);
         if (!$accessToken) {
-            Log::error("FCM HTTP v1: Failed to obtain Google OAuth2 access token.");
+            self::$lastError = "Failed to obtain Google OAuth2 access token. Check your private key.";
+            Log::error("FCM HTTP v1: " . self::$lastError);
             return false;
         }
 
         $projectId = $serviceAccount['project_id'] ?? null;
         if (!$projectId) {
-            Log::error("FCM HTTP v1: project_id not found in service account JSON.");
+            self::$lastError = "project_id not found in service account configuration.";
+            Log::error("FCM HTTP v1: " . self::$lastError);
             return false;
         }
 
@@ -100,14 +111,21 @@ class FcmNotificationService
                     'Content-Type' => 'application/json',
                 ])->timeout(10)->post($url, $payload);
 
+                self::$lastResponse = [
+                    'status' => $response->status(),
+                    'body' => $response->json() ?: $response->body()
+                ];
+
                 if ($response->successful()) {
                     $successCount++;
                     Log::info("FCM HTTP v1 sent successfully to token: " . substr($token, 0, 15) . "...");
                 } else {
-                    Log::warning("FCM HTTP v1 error: HTTP " . $response->status() . " - " . $response->body());
+                    self::$lastError = "Google FCM HTTP " . $response->status() . ": " . $response->body();
+                    Log::warning("FCM HTTP v1 error: " . self::$lastError);
                 }
             } catch (\Exception $e) {
-                Log::error("FCM HTTP v1 Exception: " . $e->getMessage());
+                self::$lastError = "FCM HTTP v1 Exception: " . $e->getMessage();
+                Log::error(self::$lastError);
             }
         }
 

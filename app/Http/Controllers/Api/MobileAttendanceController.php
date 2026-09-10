@@ -595,80 +595,69 @@ class MobileAttendanceController extends Controller
     public function recap(Request $request)
     {
         $user = $request->user();
-        // Pilihan rentang bulan (1, 3, 6, 12 bulan) atau start_date & end_date
         $months = (int) $request->query('months', 1);
-        $startDate = $request->query('start_date');
-        $endDate = $request->query('end_date');
+        $startDateParam = $request->query('start_date');
+        $endDateParam = $request->query('end_date');
 
-        if ($startDate && $endDate) {
+        // Format tanggal ke Y-m-d agar cocok dengan kolom tanggal di database MySQL
+        if ($startDateParam && $endDateParam) {
             try {
-                $startDate = Carbon::parse($startDate)->format('Y-m-d');
-                $endDate = Carbon::parse($endDate)->format('Y-m-d');
+                $startDate = Carbon::parse($startDateParam)->format('Y-m-d');
+                $endDate = Carbon::parse($endDateParam)->format('Y-m-d');
             } catch (\Exception $e) {
-                // Keep as is if parsing fails
+                $startDate = Carbon::now()->subDays(30 * $months)->format('Y-m-d');
+                $endDate = Carbon::now()->format('Y-m-d');
             }
         } else {
-            $endDate = Carbon::now()->format('Y-m-d');
             $startDate = Carbon::now()->subDays(30 * $months)->format('Y-m-d');
+            $endDate = Carbon::now()->format('Y-m-d');
         }
 
-        if ($user && ($user->student || in_array($user->role, ['student', 'siswa']))) {
-            $student = $user->student ?? Siswa::where('user_id', $user->id)->orWhere('nis', str_replace('siswa_', '', $user->username))->first();
-            if ($student) {
-                $query = Attendance::where('student_id', $student->id)
-                    ->whereBetween('tanggal', [$startDate, $endDate]);
+        // Rekap Siswa
+        $student = $user ? ($user->student ?? Siswa::where('user_id', $user->id)->orWhere('nis', str_replace('siswa_', '', $user->username))->first()) : null;
+        if ($student) {
+            $allStats = Attendance::where('student_id', $student->id)
+                ->whereBetween('tanggal', [$startDate, $endDate])
+                ->get();
 
-                $allStats = $query->get();
+            $totalCatatan = $allStats->count();
+            $totalHadir = $allStats->whereIn('status', ['H', 'Hadir'])->count();
+            $totalTerlambat = $allStats->whereIn('status', ['T', 'Terlambat'])->count();
+            $totalIzin = $allStats->whereIn('status', ['I', 'Izin'])->count();
+            $totalSakit = $allStats->whereIn('status', ['S', 'Sakit'])->count();
+            $totalAlpha = $allStats->whereIn('status', ['A', 'Alpha', 'B', 'Bolos', 'Tidak Hadir'])->count();
 
-                $totalCatatan = $allStats->count();
-                $totalHadir = $allStats->where('status', 'Hadir')->count();
-                $totalTerlambat = $allStats->where('status', 'Terlambat')->count();
-                $totalIzin = $allStats->where('status', 'Izin')->count();
-                $totalSakit = $allStats->where('status', 'Sakit')->count();
-                $totalAlpha = $allStats->whereIn('status', ['Tidak Hadir', 'Alpha'])->count();
-                $totalBolos = $allStats->where('status', 'Bolos')->count();
+            $totalHadirDanTerlambat = $totalHadir + $totalTerlambat;
+            $persentase = $totalCatatan > 0 ? round(($totalHadirDanTerlambat / $totalCatatan) * 100, 1) : 0;
 
-                $totalHadirDanTerlambat = $totalHadir + $totalTerlambat;
-                $persentase = $totalCatatan > 0 ? round(($totalHadirDanTerlambat / $totalCatatan) * 100, 1) : 0;
-
-                return response()->json([
-                    'success' => true,
-                    'data' => [
-                        'total_hadir' => $totalHadir,
-                        'total_terlambat' => $totalTerlambat,
-                        'total_izin' => $totalIzin,
-                        'total_sakit' => $totalSakit,
-                        'total_alpha' => $totalAlpha,
-                        'total_bolos' => $totalBolos,
-                        'total_hari_sekolah' => $totalCatatan,
-                        'total_hari_kerja' => $totalCatatan,
-                        'persentase_kehadiran' => $persentase,
-                        'range' => [
-                            'start_date' => $startDate,
-                            'end_date' => $endDate,
-                            'months' => $months
-                        ]
-                    ]
-                ]);
-            }
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'total_hadir' => $totalHadir,
+                    'total_terlambat' => $totalTerlambat,
+                    'total_izin' => $totalIzin,
+                    'total_sakit' => $totalSakit,
+                    'total_alpha' => $totalAlpha,
+                    'total_hari_kerja' => $totalCatatan,
+                    'persentase_kehadiran' => $persentase,
+                ]
+            ]);
         }
 
-        if ($user && (in_array($user->role, ['guru', 'teacher', 'wali_kelas', 'admin']) || $user->role === 'guru') && $user->guru) {
-            // Query absensi harian guru (Sama seperti RekapGuruController.php)
-            $query = AbsensiGuru::where('guru_id', $user->guru->id)
+        // Rekap Guru / Karyawan
+        if ($user && (in_array($user->role, ['guru', 'teacher', 'wali_kelas', 'admin']) || $user->guru) && $user->guru) {
+            $allStats = AbsensiGuru::where('guru_id', $user->guru->id)
                 ->whereNull('jadwal_pelajaran_id')
-                ->whereBetween('tanggal', [$startDate, $endDate]);
+                ->whereBetween('tanggal', [$startDate, $endDate])
+                ->get();
 
-            $allStats = $query->get();
-
-            $totalCatatan = $allStats->count(); // Total di Web
-            $totalHadir = $allStats->where('status', 'Hadir')->count(); // Hadir Tepat Waktu
-            $totalTerlambat = $allStats->where('status', 'Terlambat')->count(); // Terlambat
+            $totalCatatan = $allStats->count();
+            $totalHadir = $allStats->where('status', 'Hadir')->count();
+            $totalTerlambat = $allStats->where('status', 'Terlambat')->count();
             $totalIzin = $allStats->where('status', 'Izin')->count();
-            $totalSakit = $allStats->where('status', 'Sakit')->count(); // Izin & Sakit
+            $totalSakit = $allStats->where('status', 'Sakit')->count();
             $totalAlpha = $allStats->whereIn('status', ['Tidak Hadir', 'Alpha'])->count();
 
-            // Hitung persentase kehadiran (Hadir + Terlambat)
             $totalHadirDanTerlambat = $totalHadir + $totalTerlambat;
             $persentase = $totalCatatan > 0 ? round(($totalHadirDanTerlambat / $totalCatatan) * 100, 1) : 0;
 

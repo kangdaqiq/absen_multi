@@ -696,7 +696,8 @@ class WhatsAppMessageTemplates
         int $totalTidakMasuk,
         array $absentByStatus,
         array $statsByJurusan = [],
-        array $listKegiatan = []
+        array $listKegiatan = [],
+        array $rekapGuru = []
     ): string {
         $msg = "📊 *Laporan Absensi Harian*\n";
         $msg .= "📅 Tanggal: " . now()->format('d/m/Y') . "\n";
@@ -708,6 +709,54 @@ class WhatsAppMessageTemplates
         }
         $msg .= "❌ Siswa Tidak Masuk: {$totalTidakMasuk}\n";
         $msg .= str_repeat("─", 30) . "\n\n";
+
+        if (!empty($rekapGuru) && !empty($rekapGuru['total'])) {
+            $msg .= "👨‍🏫 *Rekap Kehadiran Guru & Karyawan:*\n";
+            $msg .= "• Total Guru/Staf : {$rekapGuru['total']}\n";
+            $msg .= "• Hadir           : {$rekapGuru['hadir']} (Tepat: {$rekapGuru['tepat_waktu']}, Telat: {$rekapGuru['terlambat']})\n";
+            
+            $tidakHadirGuru = [];
+            if (!empty($rekapGuru['izin'])) $tidakHadirGuru[] = "Izin: {$rekapGuru['izin']}";
+            if (!empty($rekapGuru['sakit'])) $tidakHadirGuru[] = "Sakit: {$rekapGuru['sakit']}";
+            if (!empty($rekapGuru['alpha'])) $tidakHadirGuru[] = "Alpha: {$rekapGuru['alpha']}";
+            if (!empty($rekapGuru['belum_absen'])) $tidakHadirGuru[] = "Belum Absen: {$rekapGuru['belum_absen']}";
+            
+            if (!empty($tidakHadirGuru)) {
+                $msg .= "• Belum/Tidak Hadir: " . implode(' | ', $tidakHadirGuru) . "\n";
+            }
+            
+            if (!empty($rekapGuru['list_terlambat'])) {
+                $msg .= "\n⚠️ *Guru/Staf Terlambat:*\n";
+                foreach ($rekapGuru['list_terlambat'] as $lt) {
+                    $jamStr = $lt['jam_masuk'] ?? '-';
+                    $menitStr = !empty($lt['menit']) ? "+{$lt['menit']}m" : "Telat";
+                    $shiftStr = !empty($lt['shift']) && $lt['shift'] !== '-' ? " ({$lt['shift']})" : '';
+                    $msg .= "  • {$lt['nama']}: {$jamStr} [{$menitStr}]{$shiftStr}\n";
+                }
+            }
+
+            $listTidakHadirDetail = [];
+            if (!empty($rekapGuru['list_izin'])) {
+                $listTidakHadirDetail[] = "  • Izin: " . implode(', ', $rekapGuru['list_izin']);
+            }
+            if (!empty($rekapGuru['list_sakit'])) {
+                $listTidakHadirDetail[] = "  • Sakit: " . implode(', ', $rekapGuru['list_sakit']);
+            }
+            if (!empty($rekapGuru['list_alpha'])) {
+                $listTidakHadirDetail[] = "  • Alpha: " . implode(', ', $rekapGuru['list_alpha']);
+            }
+            if (!empty($rekapGuru['list_belum_absen']) && count($rekapGuru['list_belum_absen']) <= 10) {
+                $listTidakHadirDetail[] = "  • Belum Absen: " . implode(', ', $rekapGuru['list_belum_absen']);
+            } elseif (!empty($rekapGuru['list_belum_absen'])) {
+                $listTidakHadirDetail[] = "  • Belum Absen: " . count($rekapGuru['list_belum_absen']) . " orang";
+            }
+
+            if (!empty($listTidakHadirDetail)) {
+                $msg .= "\n📋 *Keterangan Guru/Staf:*\n" . implode("\n", $listTidakHadirDetail) . "\n";
+            }
+
+            $msg .= str_repeat("─", 30) . "\n\n";
+        }
 
         if (!empty($listKegiatan)) {
             $msg .= "🎯 *Rekap Kehadiran Kegiatan Hari Ini:*\n";
@@ -738,7 +787,7 @@ class WhatsAppMessageTemplates
                 $msg .= "*{$statusLabels[$status]}*: {$count} siswa\n";
             }
         } else {
-            $msg .= "🎉 *Nihil (Semua Masuk)*\n";
+            $msg .= "🎉 *Nihil (Semua Siswa Masuk)*\n";
         }
 
         if (!empty($statsByJurusan)) {
@@ -826,7 +875,8 @@ class WhatsAppMessageTemplates
         int $totalPresent,
         int $totalAbsent,
         iterable $absentStudentsGrouped,
-        array $statsByJurusan = []
+        array $statsByJurusan = [],
+        array $rekapGuru = []
     ): string {
         $msg = "📋 *LAPORAN FINAL ABSENSI*\n";
         $msg .= "📅 Tanggal: " . now()->format('d/m/Y') . "\n";
@@ -838,6 +888,54 @@ class WhatsAppMessageTemplates
         }
         $msg .= "❌ Siswa Tidak Hadir: *{$totalAbsent}*\n";
         $msg .= str_repeat("─", 30) . "\n\n";
+
+        if (!empty($rekapGuru) && !empty($rekapGuru['total'])) {
+            $msg .= "👨‍🏫 *Rekap Kehadiran Guru & Karyawan:*\n";
+            $msg .= "• Total Guru/Staf : {$rekapGuru['total']}\n";
+            $msg .= "• Hadir           : {$rekapGuru['hadir']} (Tepat: {$rekapGuru['tepat_waktu']}, Telat: {$rekapGuru['terlambat']})\n";
+            
+            $tidakHadirGuru = [];
+            if (!empty($rekapGuru['izin'])) $tidakHadirGuru[] = "Izin: {$rekapGuru['izin']}";
+            if (!empty($rekapGuru['sakit'])) $tidakHadirGuru[] = "Sakit: {$rekapGuru['sakit']}";
+            if (!empty($rekapGuru['alpha'])) $tidakHadirGuru[] = "Alpha: {$rekapGuru['alpha']}";
+            if (!empty($rekapGuru['belum_absen'])) $tidakHadirGuru[] = "Belum Absen: {$rekapGuru['belum_absen']}";
+            
+            if (!empty($tidakHadirGuru)) {
+                $msg .= "• Belum/Tidak Hadir: " . implode(' | ', $tidakHadirGuru) . "\n";
+            }
+            
+            if (!empty($rekapGuru['list_terlambat'])) {
+                $msg .= "\n⚠️ *Guru/Staf Terlambat:*\n";
+                foreach ($rekapGuru['list_terlambat'] as $lt) {
+                    $jamStr = $lt['jam_masuk'] ?? '-';
+                    $menitStr = !empty($lt['menit']) ? "+{$lt['menit']}m" : "Telat";
+                    $shiftStr = !empty($lt['shift']) && $lt['shift'] !== '-' ? " ({$lt['shift']})" : '';
+                    $msg .= "  • {$lt['nama']}: {$jamStr} [{$menitStr}]{$shiftStr}\n";
+                }
+            }
+
+            $listTidakHadirDetail = [];
+            if (!empty($rekapGuru['list_izin'])) {
+                $listTidakHadirDetail[] = "  • Izin: " . implode(', ', $rekapGuru['list_izin']);
+            }
+            if (!empty($rekapGuru['list_sakit'])) {
+                $listTidakHadirDetail[] = "  • Sakit: " . implode(', ', $rekapGuru['list_sakit']);
+            }
+            if (!empty($rekapGuru['list_alpha'])) {
+                $listTidakHadirDetail[] = "  • Alpha: " . implode(', ', $rekapGuru['list_alpha']);
+            }
+            if (!empty($rekapGuru['list_belum_absen']) && count($rekapGuru['list_belum_absen']) <= 10) {
+                $listTidakHadirDetail[] = "  • Belum Absen: " . implode(', ', $rekapGuru['list_belum_absen']);
+            } elseif (!empty($rekapGuru['list_belum_absen'])) {
+                $listTidakHadirDetail[] = "  • Belum Absen: " . count($rekapGuru['list_belum_absen']) . " orang";
+            }
+
+            if (!empty($listTidakHadirDetail)) {
+                $msg .= "\n📋 *Keterangan Guru/Staf:*\n" . implode("\n", $listTidakHadirDetail) . "\n";
+            }
+
+            $msg .= str_repeat("─", 30) . "\n\n";
+        }
 
         $statusLabels = [
             'T' => '⚠️ Terlambat',
@@ -883,6 +981,120 @@ class WhatsAppMessageTemplates
         }
 
         $msg .= "Generated by System\n\n";
+
+        return $msg;
+    }
+
+    /**
+     * Dedicated Teacher & Staff Attendance Report with full name details
+     */
+    public static function teacherAttendanceReport(
+        array $rekapGuru,
+        ?string $tanggal = null,
+        ?string $schoolName = null,
+        bool $isFinal = false
+    ): string {
+        $tgl = $tanggal ?: now()->format('d/m/Y');
+        $title = $isFinal ? "📋 *LAPORAN FINAL ABSENSI GURU & KARYAWAN*" : "👨‍🏫 *LAPORAN ABSENSI GURU & KARYAWAN*";
+
+        $msg = "{$title}\n";
+        if (!empty($schoolName)) {
+            $msg .= "🏫 *" . trim($schoolName) . "*\n";
+        }
+        $msg .= "📅 Tanggal: {$tgl}\n";
+        $msg .= str_repeat("─", 32) . "\n";
+        $msg .= "📊 *RINGKASAN KEHADIRAN:*\n";
+        $msg .= "• Total Guru & Staf  : *{$rekapGuru['total']} Orang*\n";
+        $msg .= "• ✅ Hadir Tepat Waktu : *{$rekapGuru['tepat_waktu']} Orang*\n";
+        $msg .= "• ⚠️ Terlambat        : *{$rekapGuru['terlambat']} Orang*\n";
+        $msg .= "• 📝 Izin             : *{$rekapGuru['izin']} Orang*\n";
+        $msg .= "• 🤒 Sakit            : *{$rekapGuru['sakit']} Orang*\n";
+        $msg .= "• ❌ Alpha            : *{$rekapGuru['alpha']} Orang*\n";
+        $msg .= "• ⏳ Belum Absen      : *{$rekapGuru['belum_absen']} Orang*\n";
+        $msg .= str_repeat("─", 32) . "\n\n";
+
+        // 1. Detail Hadir Tepat Waktu
+        if (!empty($rekapGuru['list_tepat_waktu'])) {
+            $count = count($rekapGuru['list_tepat_waktu']);
+            $msg .= "✅ *Hadir Tepat Waktu ({$count}):*\n";
+            $no = 1;
+            foreach ($rekapGuru['list_tepat_waktu'] as $item) {
+                $shiftStr = ($item['shift'] && $item['shift'] !== '-') ? " - {$item['shift']}" : '';
+                $pulangStr = !empty($item['jam_pulang']) ? " s/d {$item['jam_pulang']}" : '';
+                $msg .= "{$no}. *{$item['nama']}* ({$item['jam_masuk']}{$pulangStr}{$shiftStr})\n";
+                $no++;
+            }
+            $msg .= "\n";
+        }
+
+        // 2. Detail Terlambat
+        if (!empty($rekapGuru['list_terlambat'])) {
+            $count = count($rekapGuru['list_terlambat']);
+            $msg .= "⚠️ *Terlambat ({$count}):*\n";
+            $no = 1;
+            foreach ($rekapGuru['list_terlambat'] as $item) {
+                $shiftStr = ($item['shift'] && $item['shift'] !== '-') ? " - {$item['shift']}" : '';
+                $menitStr = !empty($item['menit']) ? "+{$item['menit']} menit" : "Terlambat";
+                $pulangStr = !empty($item['jam_pulang']) ? " s/d {$item['jam_pulang']}" : '';
+                $msg .= "{$no}. *{$item['nama']}* (Masuk: {$item['jam_masuk']}{$pulangStr} | {$menitStr}{$shiftStr})\n";
+                $no++;
+            }
+            $msg .= "\n";
+        }
+
+        // 3. Detail Izin
+        if (!empty($rekapGuru['list_izin'])) {
+            $count = count($rekapGuru['list_izin']);
+            $msg .= "📝 *Izin ({$count}):*\n";
+            $no = 1;
+            foreach ($rekapGuru['list_izin'] as $item) {
+                $ket = !empty($item['keterangan']) && $item['keterangan'] !== 'Izin' ? " ({$item['keterangan']})" : '';
+                $msg .= "{$no}. *{$item['nama']}*{$ket}\n";
+                $no++;
+            }
+            $msg .= "\n";
+        }
+
+        // 4. Detail Sakit
+        if (!empty($rekapGuru['list_sakit'])) {
+            $count = count($rekapGuru['list_sakit']);
+            $msg .= "🤒 *Sakit ({$count}):*\n";
+            $no = 1;
+            foreach ($rekapGuru['list_sakit'] as $item) {
+                $ket = !empty($item['keterangan']) && $item['keterangan'] !== 'Sakit' ? " ({$item['keterangan']})" : '';
+                $msg .= "{$no}. *{$item['nama']}*{$ket}\n";
+                $no++;
+            }
+            $msg .= "\n";
+        }
+
+        // 5. Detail Alpha
+        if (!empty($rekapGuru['list_alpha'])) {
+            $count = count($rekapGuru['list_alpha']);
+            $msg .= "❌ *Alpha ({$count}):*\n";
+            $no = 1;
+            foreach ($rekapGuru['list_alpha'] as $item) {
+                $msg .= "{$no}. *{$item['nama']}*\n";
+                $no++;
+            }
+            $msg .= "\n";
+        }
+
+        // 6. Detail Belum Absen
+        if (!empty($rekapGuru['list_belum_absen'])) {
+            $count = count($rekapGuru['list_belum_absen']);
+            $msg .= "⏳ *Belum Absen Masuk ({$count}):*\n";
+            $no = 1;
+            foreach ($rekapGuru['list_belum_absen'] as $item) {
+                $shiftStr = ($item['shift'] && $item['shift'] !== '-') ? " ({$item['shift']})" : '';
+                $msg .= "{$no}. *{$item['nama']}*{$shiftStr}\n";
+                $no++;
+            }
+            $msg .= "\n";
+        }
+
+        $msg .= str_repeat("─", 32) . "\n";
+        $msg .= "_Laporan otomatis sistem absensi_\n\n";
 
         return $msg;
     }

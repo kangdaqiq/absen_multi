@@ -377,6 +377,9 @@ class DailyReportCommand extends Command
             }
         }
 
+        // Fetch Teacher Attendance Recap Today for this school
+        $rekapGuru = $this->getTeacherRecap($schoolId, $today);
+
         // --- SEND GLOBAL REPORT ---
         $guruGlobal = \App\Models\Guru::where('school_id', $schoolId)
             ->where('is_global_report', true)
@@ -390,7 +393,8 @@ class DailyReportCommand extends Command
                 totalTidakMasuk: $totalTidakMasuk,
                 absentByStatus: $absentByStatus,
                 statsByJurusan: $statsByJurusan,
-                listKegiatan: $listKegiatanGlobal
+                listKegiatan: $listKegiatanGlobal,
+                rekapGuru: $rekapGuru
             );
 
             if ($targetJid) {
@@ -443,6 +447,67 @@ class DailyReportCommand extends Command
                         }
 
                         \App\Jobs\SendTelegramMessageJob::dispatch($telegramToken, $guru->telegram_chat_id, $msgGlobalTelegram, $schoolId);
+                    }
+                }
+            }
+
+            // Send dedicated Teacher & Employee Report to Global Recipients
+            if (!empty($rekapGuru) && !empty($rekapGuru['total'])) {
+                $msgGuru = WhatsAppMessageTemplates::teacherAttendanceReport(
+                    rekapGuru: $rekapGuru,
+                    tanggal: $today,
+                    schoolName: $school->name ?? 'Sekolah',
+                    isFinal: false
+                );
+
+                if ($targetJid) {
+                    MessageQueue::create([
+                        'school_id' => $schoolId,
+                        'phone_number' => $targetJid,
+                        'message' => $msgGuru,
+                        'status' => 'pending',
+                        'priority' => 10,
+                        'created_at' => now()
+                    ]);
+                    $this->info("Queued teacher report to legacy admin ($targetJid)");
+                }
+
+                foreach ($guruGlobal as $guru) {
+                    if (!$guru->isWithinLastSeen(168)) {
+                        continue;
+                    }
+
+                    $noWa = $guru->no_wa;
+                    if (!str_contains($noWa, '@')) {
+                        $noWa = preg_replace('/^0/', '62', $noWa);
+                    }
+
+                    $mqGuru = new MessageQueue([
+                        'school_id' => $schoolId,
+                        'phone_number' => $noWa,
+                        'message' => $msgGuru,
+                        'status' => 'pending',
+                        'priority' => 10,
+                        'created_at' => now()
+                    ]);
+                    $mqGuru->bypass_last_seen = true;
+                    $mqGuru->save();
+                    $this->info("Queued dedicated teacher report to Guru: {$guru->nama}");
+                }
+
+                if ($telegramEnabled && $telegramToken) {
+                    foreach ($guruGlobal as $guru) {
+                        if (!empty($guru->telegram_chat_id)) {
+                            $msgGuruTele = $msgGuru;
+                            $msgGuruTele = preg_replace('/\*([^*]+)\*/', '<b>$1</b>', $msgGuruTele);
+                            $msgGuruTele = preg_replace('/\_([^_]+)\_/', '<i>$1</i>', $msgGuruTele);
+
+                            if (!empty($school->name)) {
+                                $msgGuruTele = rtrim($msgGuruTele) . "\n\n<b>" . trim($school->name) . "</b>";
+                            }
+
+                            \App\Jobs\SendTelegramMessageJob::dispatch($telegramToken, $guru->telegram_chat_id, $msgGuruTele, $schoolId);
+                        }
                     }
                 }
             }
@@ -709,5 +774,144 @@ class DailyReportCommand extends Command
                 \App\Jobs\SendTelegramMessageJob::dispatch($telegramToken, $student->telegram_ortu_chat_id, $msgParentTelegram, $schoolId);
             }
         }
+    }
+
+    private function getTeacherRecap(int $schoolId, string $today): array
+    {
+        $gurus = \App\Models\Guru::where('school_id', $schoolId)->orderBy('nama')->get();
+        if ($gurus->isEmpty()) {
+            return [];
+        }
+
+        $guruAttendances = \App\Models\AbsensiGuru::with('shift')
+            ->where('school_id', $schoolId)
+            ->where('tanggal', $today)
+            ->whereNull('jadwal_pelajaran_id')
+            ->get()
+            ->keyBy('guru_id');
+
+        $guruHadir = 0;
+        $guruTepatWaktu = 0;
+        $guruTerlambat = 0;
+        $guruIzin = 0;
+        $guruSakit = 0;
+        $guruAlpha = 0;
+        $guruBelumAbsen = 0;
+
+        $listTepatWaktu = [];
+        $listTerlambat = [];
+        $listIzin = [];
+        $listSakit = [];
+        $listAlpha = [];
+        $listBelumAbsen = [];
+
+        foreach ($gurus as $g) {
+            $att = $guruAttendances->get($g->id);
+            $shift = $att?->shift ?: $g->getShiftForDate($today);
+            $shiftName = $shift->nama_shift ?? '-';
+
+            if (!$att) {
+                $guruBelumAbsen++;
+                $listBelumAbsen[] = [
+                    'nama' => $g->nama,
+                    'nip' => $g->nip,
+                    'shift' => $shiftName,
+                ];
+            } else {
+                $st = strtoupper(trim($att->status));
+                $jamMasukStr = $att->jam_masuk ? \Carbon\Carbon::parse($att->jam_masuk)->format('H:i') : '-';
+                $jamPulangStr = $att->jam_pulang ? \Carbon\Carbon::parse($att->jam_pulang)->format('H:i') : null;
+
+                if ($st === 'HADIR' || $st === 'H') {
+                    $guruHadir++;
+                    if ($att->menit_terlambat > 0) {
+                        $guruTerlambat++;
+                        $listTerlambat[] = [
+                            'nama' => $g->nama,
+                            'nip' => $g->nip,
+                            'jam_masuk' => $jamMasukStr,
+                            'jam_pulang' => $jamPulangStr,
+                            'menit' => $att->menit_terlambat,
+                            'shift' => $shiftName,
+                            'keterangan' => $att->keterangan
+                        ];
+                    } else {
+                        $guruTepatWaktu++;
+                        $listTepatWaktu[] = [
+                            'nama' => $g->nama,
+                            'nip' => $g->nip,
+                            'jam_masuk' => $jamMasukStr,
+                            'jam_pulang' => $jamPulangStr,
+                            'shift' => $shiftName,
+                            'keterangan' => $att->keterangan
+                        ];
+                    }
+                } elseif ($st === 'TERLAMBAT' || $st === 'T') {
+                    $guruHadir++;
+                    $guruTerlambat++;
+                    $listTerlambat[] = [
+                        'nama' => $g->nama,
+                        'nip' => $g->nip,
+                        'jam_masuk' => $jamMasukStr,
+                        'jam_pulang' => $jamPulangStr,
+                        'menit' => $att->menit_terlambat,
+                        'shift' => $shiftName,
+                        'keterangan' => $att->keterangan
+                    ];
+                } elseif ($st === 'IZIN' || $st === 'I') {
+                    $guruIzin++;
+                    $listIzin[] = [
+                        'nama' => $g->nama,
+                        'nip' => $g->nip,
+                        'shift' => $shiftName,
+                        'keterangan' => $att->keterangan ?: 'Izin'
+                    ];
+                } elseif ($st === 'SAKIT' || $st === 'S') {
+                    $guruSakit++;
+                    $listSakit[] = [
+                        'nama' => $g->nama,
+                        'nip' => $g->nip,
+                        'shift' => $shiftName,
+                        'keterangan' => $att->keterangan ?: 'Sakit'
+                    ];
+                } elseif ($st === 'ALPHA' || $st === 'A') {
+                    $guruAlpha++;
+                    $listAlpha[] = [
+                        'nama' => $g->nama,
+                        'nip' => $g->nip,
+                        'shift' => $shiftName,
+                        'keterangan' => $att->keterangan ?: 'Alpha'
+                    ];
+                } else {
+                    $guruHadir++;
+                    $guruTepatWaktu++;
+                    $listTepatWaktu[] = [
+                        'nama' => $g->nama,
+                        'nip' => $g->nip,
+                        'jam_masuk' => $jamMasukStr,
+                        'jam_pulang' => $jamPulangStr,
+                        'shift' => $shiftName,
+                        'keterangan' => $att->keterangan
+                    ];
+                }
+            }
+        }
+
+        return [
+            'total' => $gurus->count(),
+            'hadir' => $guruHadir,
+            'tepat_waktu' => $guruTepatWaktu,
+            'terlambat' => $guruTerlambat,
+            'izin' => $guruIzin,
+            'sakit' => $guruSakit,
+            'alpha' => $guruAlpha,
+            'belum_absen' => $guruBelumAbsen,
+            'list_tepat_waktu' => $listTepatWaktu,
+            'list_terlambat' => $listTerlambat,
+            'list_izin' => $listIzin,
+            'list_sakit' => $listSakit,
+            'list_alpha' => $listAlpha,
+            'list_belum_absen' => $listBelumAbsen,
+        ];
     }
 }

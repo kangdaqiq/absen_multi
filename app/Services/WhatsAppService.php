@@ -61,13 +61,17 @@ class WhatsAppService
         ];
         $readableStatus = $statusMap[strtoupper($status)] ?? $status;
 
-        // Determine if late based on keterangan
-        $isLate = !empty($keterangan);
+        // Determine if late based on status and keterangan
+        $isLate = (
+            strtoupper($status) === 'T' ||
+            strtoupper($status) === 'TERLAMBAT' ||
+            (!empty($keterangan) && (stripos($keterangan, 'telat') !== false || stripos($keterangan, 'terlambat') !== false))
+        );
 
-        // Send to student if phone exists
+        // Send to student/teacher if phone exists
         if ($phone && $siswaEnabled) {
             if ($isLate) {
-                // Parse durasi dari keterangan: "Telat 1 jam 30 menit" atau "Telat 30 menit"
+                // Parse durasi dari keterangan: "Telat 1 jam 30 menit", "Telat 30 menit", "Terlambat 15 m (Shift Pagi)"
                 [$lateHours, $lateMinutes] = $this->parseLateDuration($keterangan);
 
                 $msg = WhatsAppMessageTemplates::checkInLate(
@@ -120,6 +124,7 @@ class WhatsAppService
      * Parse durasi keterlambatan dari string keterangan.
      * Contoh: "Telat 1 jam 30 menit" -> [1, 30]
      *         "Telat 30 menit"        -> [0, 30]
+     *         "Terlambat 75 m"        -> [1, 15]
      *
      * @return array [hours, minutes]
      */
@@ -130,12 +135,19 @@ class WhatsAppService
         $hours   = 0;
         $minutes = 0;
 
-        if (preg_match('/(\d+)\s*jam/', $keterangan, $m)) {
+        if (preg_match('/(\d+)\s*jam/i', $keterangan, $m)) {
             $hours = (int) $m[1];
         }
 
-        if (preg_match('/(\d+)\s*menit/', $keterangan, $m)) {
+        if (preg_match('/(\d+)\s*menit/i', $keterangan, $m)) {
             $minutes = (int) $m[1];
+        }
+
+        // Handle pattern like "Terlambat 15 m" or "Telat 75 m"
+        if ($hours === 0 && $minutes === 0 && preg_match('/(?:telat|terlambat)\s*(\d+)\s*m\b/i', $keterangan, $m)) {
+            $totalMinutes = (int) $m[1];
+            $hours = intdiv($totalMinutes, 60);
+            $minutes = $totalMinutes % 60;
         }
 
         return [$hours, $minutes];

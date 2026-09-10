@@ -72,27 +72,37 @@ class TelegramService
             'T' => 'Terlambat'
         ];
         $readableStatus = $statusMap[strtoupper($status)] ?? $status;
-        $isLate = !empty($keterangan);
+        $isLate = (
+            strtoupper($status) === 'T' ||
+            strtoupper($status) === 'TERLAMBAT' ||
+            (!empty($keterangan) && (stripos($keterangan, 'telat') !== false || stripos($keterangan, 'terlambat') !== false))
+        );
 
-        // Student message
+        // Student / Teacher message
         if ($chatId && $siswaEnabled) {
             if ($isLate) {
                 [$lateHours, $lateMinutes] = $this->parseLateDuration($keterangan);
-                $durationText = $lateHours > 0 ? "{$lateHours} jam {$lateMinutes} menit" : "{$lateMinutes} menit";
+                if ($lateHours > 0 && $lateMinutes > 0) {
+                    $durationText = "{$lateHours} jam {$lateMinutes} menit";
+                } elseif ($lateHours > 0) {
+                    $durationText = "{$lateHours} jam";
+                } else {
+                    $durationText = "{$lateMinutes} menit";
+                }
                 
                 $msg = "⚠️ <b>ANDA TERLAMBAT</b> ⚠️\n\n" .
                     "Halo, <b>{$name}</b> 👋,\n" .
-                    "Kelas: {$kelas}\n\n" .
+                    "Kelas/Shift: {$kelas}\n\n" .
                     "Anda terdeteksi melakukan check-in pada pukul <b>{$time}</b>.\n" .
                     "Status: Terlambat selama <b>{$durationText}</b>.\n\n" .
-                    "<i>Tetap semangat belajar dan harap perhatikan waktu kehadiran.</i> 👍";
+                    "<i>Tetap semangat dan harap perhatikan waktu kehadiran.</i> 👍";
             } else {
                 $msg = "✅ <b>ABSEN MASUK BERHASIL</b> ✅\n\n" .
                     "Halo, <b>{$name}</b> 👋,\n" .
-                    "Kelas: {$kelas}\n\n" .
+                    "Kelas/Shift: {$kelas}\n\n" .
                     "Anda telah berhasil absen masuk pada pukul <b>{$time}</b>.\n" .
                     "Status: <b>{$readableStatus}</b>.\n\n" .
-                    "<i>Selamat belajar!</i> 📚";
+                    "<i>Selamat beraktivitas!</i> 📚";
             }
             $this->dispatchJob($token, $chatId, $msg, $schoolId);
         }
@@ -101,7 +111,13 @@ class TelegramService
         if ($chatIdOrtu && $ortuEnabled) {
             if ($isLate) {
                 [$lateHours, $lateMinutes] = $this->parseLateDuration($keterangan);
-                $durationText = $lateHours > 0 ? "{$lateHours} jam {$lateMinutes} menit" : "{$lateMinutes} menit";
+                if ($lateHours > 0 && $lateMinutes > 0) {
+                    $durationText = "{$lateHours} jam {$lateMinutes} menit";
+                } elseif ($lateHours > 0) {
+                    $durationText = "{$lateHours} jam";
+                } else {
+                    $durationText = "{$lateMinutes} menit";
+                }
 
                 $msgOrtu = "⚠️ <b>Pemberitahuan Keterlambatan</b> ⚠️\n\n" .
                     "Bapak/Ibu Orang Tua/Wali dari <b>{$name}</b> (Kelas: {$kelas}),\n\n" .
@@ -155,7 +171,8 @@ class TelegramService
                 "• Jam Masuk: {$jamMasuk}\n" .
                 "• Jam Pulang: {$time}\n" .
                 "• Durasi Hadir: {$hours} jam {$mins} menit\n" .
-                "• Izin Gerbang Oleh: {$authorizer}";
+                "• Izin Gerbang Oleh: {$authorizer}\n\n" .
+                "<i>Terima kasih atas perhatiannya.</i> 🤝";
             $this->dispatchJob($token, $chatIdOrtu, $msgOrtu, $schoolId);
         }
     }
@@ -169,10 +186,6 @@ class TelegramService
         ?string $chatIdSiswa = null,
         ?string $chatIdOrtu = null
     ): void {
-        if (!$chatIdSiswa && !$chatIdOrtu) {
-            return;
-        }
-
         $school = School::find($schoolId);
         if (!$school || !$school->telegram_enabled || !$school->telegram_bot_token) {
             return;
@@ -183,20 +196,20 @@ class TelegramService
         $ortuEnabled = $schoolId ? (\App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'notification_tele_ortu')->value('setting_value') !== 'false') : true;
 
         if ($chatIdSiswa && $siswaEnabled) {
-            $msg = "✨ <b>KEHADIRAN KEGIATAN BERHASIL</b> ✨\n\n" .
+            $msgSiswa = "🎯 <b>KEGIATAN SEKOLAH TERCATAT</b> 🎯\n\n" .
                 "Halo, <b>{$namaSiswa}</b> 👋,\n\n" .
-                "Anda terdaftar hadir dalam kegiatan berikut:\n" .
+                "Kehadiran Anda pada kegiatan sekolah telah berhasil dicatat:\n\n" .
                 "• Kegiatan: <b>{$namaKegiatan}</b>\n" .
                 "• Waktu: {$jam}\n" .
                 "• Tanggal: {$tanggal}\n\n" .
-                "<i>Terima kasih telah mengikuti kegiatan dengan tertib.</i> 👍";
-            $this->dispatchJob($token, $chatIdSiswa, $msg, $schoolId);
+                "<i>Tetap semangat mengikuti kegiatan!</i> ✨";
+            $this->dispatchJob($token, $chatIdSiswa, $msgSiswa, $schoolId);
         }
 
         if ($chatIdOrtu && $ortuEnabled) {
             $msgOrtu = "🔔 <b>Laporan Kehadiran Kegiatan</b> 🔔\n\n" .
                 "Bapak/Ibu Orang Tua/Wali dari <b>{$namaSiswa}</b>,\n\n" .
-                "Menginfokan bahwa putra/putri Anda telah terdaftar hadir mengikuti kegiatan sekolah:\n" .
+                "Menginfokan bahwa putra/putri Anda telah tercatat hadir dalam kegiatan sekolah:\n\n" .
                 "• Kegiatan: <b>{$namaKegiatan}</b>\n" .
                 "• Waktu: {$jam}\n" .
                 "• Tanggal: {$tanggal}";
@@ -225,12 +238,19 @@ class TelegramService
         $hours   = 0;
         $minutes = 0;
 
-        if (preg_match('/(\d+)\s*jam/', $keterangan, $m)) {
+        if (preg_match('/(\d+)\s*jam/i', $keterangan, $m)) {
             $hours = (int) $m[1];
         }
 
-        if (preg_match('/(\d+)\s*menit/', $keterangan, $m)) {
+        if (preg_match('/(\d+)\s*menit/i', $keterangan, $m)) {
             $minutes = (int) $m[1];
+        }
+
+        // Handle pattern like "Terlambat 15 m" or "Telat 75 m"
+        if ($hours === 0 && $minutes === 0 && preg_match('/(?:telat|terlambat)\s*(\d+)\s*m\b/i', $keterangan, $m)) {
+            $totalMinutes = (int) $m[1];
+            $hours = intdiv($totalMinutes, 60);
+            $minutes = $totalMinutes % 60;
         }
 
         return [$hours, $minutes];

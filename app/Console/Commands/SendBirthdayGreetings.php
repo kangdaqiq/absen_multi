@@ -21,11 +21,7 @@ class SendBirthdayGreetings extends Command
 
     public function handle(): void
     {
-        $today = now();
-        $month = $today->month;
-        $day   = $today->day;
-
-        $this->info("=== Kirim Ucapan Ulang Tahun [{$today->format('d/m/Y')}] ===");
+        $this->info("=== Kirim Ucapan Ulang Tahun ===");
 
         // Pilih sekolah: semua yang aktif, atau yang diminta via opsi
         $schoolIdOption = $this->option('school');
@@ -43,16 +39,22 @@ class SendBirthdayGreetings extends Command
         }
 
         foreach ($schools as $school) {
-            $this->processSchool($school, $month, $day);
+            $this->processSchool($school);
         }
 
         $this->info('=== Selesai ===');
     }
 
-    private function processSchool(School $school, int $month, int $day): void
+    private function processSchool(School $school): void
     {
         $schoolId   = $school->id;
         $schoolName = $school->name ?? 'Sekolah';
+        $schoolTz   = Setting::where('school_id', $schoolId)->where('setting_key', 'timezone')->value('setting_value') ?: config('app.timezone', 'Asia/Jakarta');
+        $today      = Carbon::now($schoolTz);
+        $month      = $today->month;
+        $day        = $today->day;
+
+        $this->info("--- Memproses {$schoolName} (ID: {$schoolId}) [{$today->format('d/m/Y')} {$schoolTz}] ---");
 
         // 1. Cek apakah fitur ucapan ulang tahun diaktifkan untuk sekolah ini
         $enabled = Setting::where('school_id', $schoolId)

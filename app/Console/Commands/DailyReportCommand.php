@@ -20,24 +20,25 @@ class DailyReportCommand extends Command
     public function handle()
     {
         $targetJid = $this->argument('targetJid');
-        $today = now()->format('Y-m-d');
-
-        // Global Sunday check REMOVED to support per-school schedules
-        // if (now()->isSunday()) { ... }
 
         // Iterate through ALL Active Schools
         $schools = \App\Models\School::where('is_active', true)->get();
 
         foreach ($schools as $school) {
-            $this->processSchoolReport($school, $today, $targetJid);
+            $this->processSchoolReport($school, $targetJid);
         }
     }
 
-    private function processSchoolReport($school, $today, $targetJidOverride = null)
+    private function processSchoolReport($school, $targetJidOverride = null)
     {
         $schoolId = $school->id;
+        $schoolTz = Setting::where('school_id', $schoolId)->where('setting_key', 'timezone')->value('setting_value') ?: config('app.timezone', 'Asia/Jakarta');
+        $now = Carbon::now($schoolTz);
+        $today = $now->format('Y-m-d');
+        $nowTimeStr = $now->format('H:i');
+
         $this->info("------------------------------------------------");
-        $this->info("Processing Daily Report for School: {$school->name} (ID: $schoolId)");
+        $this->info("Processing Daily Report for School: {$school->name} (ID: $schoolId) for $today [$schoolTz - $nowTimeStr]");
 
         $telegramEnabled = $school->telegram_enabled;
         $telegramToken = $school->telegram_bot_token;
@@ -54,7 +55,7 @@ class DailyReportCommand extends Command
         }
 
         // 2. Check Weekly Holiday via Schedule (Jadwal)
-        $dayIndex = now()->dayOfWeekIso; // 1-7
+        $dayIndex = $now->dayOfWeekIso; // 1-7
         $isSchoolDay = \App\Models\Jadwal::where('school_id', $schoolId)
             ->where('index_hari', $dayIndex)
             ->where('is_active', true) // Only active days
@@ -71,10 +72,8 @@ class DailyReportCommand extends Command
             ->where('setting_key', 'schedule_daily_report')
             ->value('setting_value') ?? '08:15';
 
-        $nowTimeStr = now()->format('H:i');
-
         if ($nowTimeStr < $scheduleTime && !$this->option('force')) {
-            $this->info("Too early for school ID $schoolId. Schedule: $scheduleTime. Skipped.");
+            $this->info("Too early for school ID $schoolId. Schedule: $scheduleTime ($nowTimeStr). Skipped.");
             return;
         }
 

@@ -27,17 +27,20 @@ class AutoBolosCommand extends Command
 
     private function processSchool($school)
     {
-        $today = now()->format('Y-m-d');
         $schoolId = $school->id;
+        $schoolTz = Setting::where('school_id', $schoolId)->where('setting_key', 'timezone')->value('setting_value') ?: config('app.timezone', 'Asia/Jakarta');
+        $now = Carbon::now($schoolTz);
+        $today = $now->format('Y-m-d');
+        $nowTime = $now->format('H:i');
 
-        $this->info("Processing School: {$school->name} (ID: $schoolId) for $today");
+        $this->info("Processing School: {$school->name} (ID: $schoolId) for $today [$schoolTz - $nowTime]");
 
         // 0. Check Schedule Time (Per School)
         $scheduleTime = Setting::where('school_id', $schoolId)
             ->where('setting_key', 'schedule_process_daily')
             ->value('setting_value') ?? '13:30';
 
-        if (now()->format('H:i') < $scheduleTime) {
+        if ($nowTime < $scheduleTime && !$this->option('force')) {
             // Too early
             return;
         }
@@ -51,7 +54,7 @@ class AutoBolosCommand extends Command
 
         // 2. Check Weekly Holiday via Schedule (Jadwal)
         // If today has NO active schedule, skip process
-        $dayIndex = \Carbon\Carbon::parse($today)->dayOfWeekIso; // 1-7
+        $dayIndex = $now->dayOfWeekIso; // 1-7
         $isSchoolDay = \App\Models\Jadwal::where('school_id', $schoolId)
             ->where('index_hari', $dayIndex)
             ->where('is_active', true)

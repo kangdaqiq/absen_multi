@@ -12,6 +12,7 @@ use App\Models\Guru;
 use App\Models\Setting;
 use App\Models\MessageQueue;
 use App\Services\WhatsAppMessageTemplates;
+use Carbon\Carbon;
 
 class KegiatanReportCommand extends Command
 {
@@ -20,19 +21,20 @@ class KegiatanReportCommand extends Command
 
     public function handle()
     {
-        $today = now()->format('Y-m-d');
-        $nowTime = now()->format('H:i');
-
         $schools = School::where('is_active', true)->get();
 
         foreach ($schools as $school) {
-            $this->processSchoolKegiatanReports($school, $today, $nowTime);
+            $this->processSchoolKegiatanReports($school);
         }
     }
 
-    private function processSchoolKegiatanReports(School $school, string $today, string $nowTime)
+    private function processSchoolKegiatanReports(School $school)
     {
         $schoolId = $school->id;
+        $schoolTz = Setting::where('school_id', $schoolId)->where('setting_key', 'timezone')->value('setting_value') ?: config('app.timezone', 'Asia/Jakarta');
+        $now = Carbon::now($schoolTz);
+        $today = $now->format('Y-m-d');
+        $nowTime = $now->format('H:i');
 
         // Fetch active activities
         $activeKegiatans = Kegiatan::where('school_id', $schoolId)
@@ -58,13 +60,13 @@ class KegiatanReportCommand extends Command
             if ($kegiatan->frekuensi === 'sekali') {
                 $isToday = ($today === $startDateStr);
             } elseif ($kegiatan->frekuensi === 'mingguan') {
-                $isToday = (now()->dayOfWeek === $kegiatan->tanggal_mulai->dayOfWeek);
+                $isToday = ($now->dayOfWeek === $kegiatan->tanggal_mulai->dayOfWeek);
             } elseif ($kegiatan->frekuensi === 'bulanan') {
-                $isToday = (now()->day === $kegiatan->tanggal_mulai->day);
+                $isToday = ($now->day === $kegiatan->tanggal_mulai->day);
             } else {
                 // harian
                 if (!empty($kegiatan->hari) && is_array($kegiatan->hari)) {
-                    $dayIndex = now()->dayOfWeekIso; // 1 (Mon) - 7 (Sun)
+                    $dayIndex = $now->dayOfWeekIso; // 1 (Mon) - 7 (Sun)
                     $isToday = in_array($dayIndex, array_map('intval', $kegiatan->hari));
                 } else {
                     $isToday = true;
@@ -77,7 +79,7 @@ class KegiatanReportCommand extends Command
 
             // Check if jam_selesai has passed
             if ($kegiatan->jam_selesai) {
-                $jamSelesaiStr = \Carbon\Carbon::parse($kegiatan->jam_selesai)->format('H:i');
+                $jamSelesaiStr = Carbon::parse($kegiatan->jam_selesai)->format('H:i');
                 if ($nowTime < $jamSelesaiStr && !$this->option('force')) {
                     continue; // activity is still ongoing
                 }

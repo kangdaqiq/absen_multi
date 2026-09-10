@@ -77,7 +77,12 @@
             <!-- Bulk Actions Toolbar -->
             <div x-show="selected.length > 0" x-cloak class="flex items-center gap-2 border-l border-gray-200 pl-3 dark:border-gray-700" style="display: none;">
                 <span class="text-sm font-medium text-brand-500" x-text="selected.length + ' terpilih'"></span>
-                <button @click="$dispatch('open-modal', 'modalBulkEditAbsensi')" class="rounded bg-brand-50 px-2 py-1 text-xs font-medium text-brand-600 hover:bg-brand-100 dark:bg-brand-500/15 dark:text-brand-500 dark:hover:bg-brand-500/25">Update Status</button>
+                <button type="button" @click="$dispatch('open-modal', 'modalBulkEditAbsensi')" class="rounded bg-brand-50 px-2 py-1 text-xs font-medium text-brand-600 hover:bg-brand-100 dark:bg-brand-500/15 dark:text-brand-500 dark:hover:bg-brand-500/25 flex items-center gap-1">
+                    <i class="fas fa-edit text-[10px]"></i> Update Status
+                </button>
+                <button type="button" @click="$dispatch('open-modal', 'modalBulkHapusAbsensi')" class="rounded bg-error-50 px-2 py-1 text-xs font-medium text-error-600 hover:bg-error-100 dark:bg-error-500/15 dark:text-error-500 dark:hover:bg-error-500/25 flex items-center gap-1">
+                    <i class="fas fa-trash-alt text-[10px]"></i> Hapus Terpilih
+                </button>
             </div>
         </div>
     </div>
@@ -220,6 +225,34 @@
                 <div class="mt-6 flex justify-end gap-3">
                     <button type="button" @click="open = false" class="rounded-lg border border-gray-200 px-4 py-2 text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-gray-800">Batal</button>
                     <button type="submit" class="rounded-lg bg-brand-500 px-4 py-2 text-white hover:bg-brand-600">Simpan Perubahan</button>
+                </div>
+            </form>
+        </div>
+    </x-ui.modal>
+
+    <!-- Modal Bulk Hapus Absensi -->
+    <x-ui.modal id="modalBulkHapusAbsensi" :is-open="false">
+        <div class="p-6">
+            <div class="flex items-center justify-between mb-5">
+                <h3 class="text-xl font-bold text-error-500">Hapus Data Absensi Terpilih</h3>
+                <button @click="open = false" class="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white"><i class="fas fa-times"></i></button>
+            </div>
+            <form action="{{ route('absensi.bulkDestroy') }}" method="POST">
+                @csrf
+                @method('DELETE')
+                <input type="hidden" name="tanggal" value="{{ $tanggal }}">
+                <input type="hidden" name="student_ids" x-bind:value="selected.join(',')">
+                
+                <div class="mb-6">
+                    <p class="text-gray-700 dark:text-gray-300 mb-2">Yakin ingin menghapus data absensi untuk <span class="font-bold text-error-500" x-text="selected.length"></span> siswa terpilih pada tanggal <span class="font-bold">{{ \Carbon\Carbon::parse($tanggal)->format('d-m-Y') }}</span>?</p>
+                    <div class="mt-3 p-3 bg-warning-50 text-warning-700 rounded-lg text-sm dark:bg-warning-500/15 dark:text-warning-500">
+                        <i class="fas fa-exclamation-triangle mr-1"></i> Data absensi yang dihapus akan kembali berstatus default (Alpha) pada tanggal ini.
+                    </div>
+                </div>
+                
+                <div class="flex justify-end gap-3">
+                    <button type="button" @click="open = false" class="rounded-lg border border-gray-200 px-4 py-2 text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-gray-800">Batal</button>
+                    <button type="submit" class="rounded-lg bg-error-500 px-4 py-2 text-white hover:bg-error-600">Hapus Terpilih</button>
                 </div>
             </form>
         </div>

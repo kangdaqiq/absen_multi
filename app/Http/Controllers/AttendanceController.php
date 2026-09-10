@@ -286,6 +286,28 @@ class AttendanceController extends Controller
         return back()->with('success', count($studentIds) . ' status absensi berhasil diperbarui.');
     }
 
+    // Bulk Destroy
+    public function bulkDestroy(Request $request)
+    {
+        $request->validate([
+            'student_ids' => 'required|string',
+            'tanggal' => 'required|date',
+        ]);
+
+        $studentIds = array_filter(explode(',', $request->student_ids));
+        $date = $request->tanggal;
+
+        if (empty($studentIds)) {
+            return back()->with('error', 'Tidak ada siswa yang dipilih.');
+        }
+
+        $deletedCount = Attendance::whereIn('student_id', $studentIds)
+            ->where('tanggal', $date)
+            ->delete();
+
+        return back()->with('success', count($studentIds) . ' data absensi siswa berhasil dihapus.');
+    }
+
     /**
      * Process Scan from USB RFID Reader connected directly to PC/Browser.
      */

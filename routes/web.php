@@ -146,6 +146,7 @@ Route::middleware('auth')->group(function () {
         Route::delete('/absensi/guru/destroy', [App\Http\Controllers\TeacherAttendanceReportController::class, 'destroy'])->name('absensi-guru.destroy');
         Route::post('/absensi/update', [App\Http\Controllers\AttendanceController::class, 'update'])->name('absensi.update');
         Route::post('/absensi/bulk-update', [App\Http\Controllers\AttendanceController::class, 'bulkUpdate'])->name('absensi.bulkUpdate');
+        Route::delete('/absensi/bulk-destroy', [App\Http\Controllers\AttendanceController::class, 'bulkDestroy'])->name('absensi.bulkDestroy');
         Route::delete('/absensi/destroy', [App\Http\Controllers\AttendanceController::class, 'destroy'])->name('absensi.destroy');
 
         // Pengajuan Izin & Sakit Siswa

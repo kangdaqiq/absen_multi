@@ -53,6 +53,14 @@ Digunakan untuk autentikasi awal pegawai, guru, wali kelas, maupun **siswa**.
 }
 ```
 
+- **Response Error (401 Unauthorized)**:
+```json
+{
+  "success": false,
+  "message": "Email/Username/NIS atau password salah."
+}
+```
+
 ---
 
 ### 1.2 Profil User (`GET /api/mobile/user`)
@@ -78,8 +86,8 @@ Mengambil data detail profil pengguna yang sedang login.
 
 ---
 
-### 1.3 Registrasi / Update FCM Token Device (`POST /api/mobile/fcm-token`)
-Menyimpan token Firebase Cloud Messaging (FCM) perangkat pengguna agar dapat menerima Push Notification real-time saat scan RFID/Fingerprint atau pengumuman.
+### 1.3 Update FCM Token (`POST /api/mobile/fcm-token`)
+Memperbarui FCM Device Registration Token untuk push notification.
 
 - **URL**: `/api/mobile/fcm-token`
 - **Method**: `POST`
@@ -87,7 +95,7 @@ Menyimpan token Firebase Cloud Messaging (FCM) perangkat pengguna agar dapat men
 - **Body Request (JSON)**:
 ```json
 {
-  "fcm_token": "eXample_fcm_token_dari_firebase_sdk_android..."
+  "fcm_token": "fcm_device_token_string_here"
 }
 ```
 - **Response Success (200 OK)**:
@@ -142,7 +150,7 @@ Mengambil jam masuk, jam pulang, dan status presensi hari ini.
 ---
 
 ### 2.2 Absen Masuk (`POST /api/mobile/checkin`)
-Mencatat absen masuk dengan lokasi GPS dan foto selfie.
+Mencatat absen masuk berbasis verifikasi koordinat GPS.
 
 - **URL**: `/api/mobile/checkin`
 - **Method**: `POST`
@@ -151,7 +159,7 @@ Mencatat absen masuk dengan lokasi GPS dan foto selfie.
 - **Body Request**:
   - `latitude` (text): `-6.175392`
   - `longitude` (text): `106.827153`
-  - `photo` (file image): `selfie_checkin.jpg`
+  - `photo` (optional, file image): `selfie_checkin.jpg`
 - **Response Success (200 OK)**:
 ```json
 {
@@ -163,6 +171,40 @@ Mencatat absen masuk dengan lokasi GPS dan foto selfie.
     "status_kehadiran": "Hadir",
     "is_checked_in": true
   }
+}
+```
+
+#### ⚠️ Respon Gagal / Validasi Absen Masuk:
+
+1. **Gagal: Di Luar Radius Sekolah (400 Bad Request / 422)**:
+```json
+{
+  "success": false,
+  "message": "Gagal absen: Posisi Anda berada di luar radius lokasi sekolah (Jarak: 250 meter, Maksimal: 100 meter)."
+}
+```
+
+2. **Gagal: Di Luar Jam Operasional / Belum Jam Masuk (400 Bad Request)**:
+```json
+{
+  "success": false,
+  "message": "Gagal absen: Jam absen masuk belum dibuka. Jam masuk dibuka mulai pukul 06:00 WIB."
+}
+```
+
+3. **Gagal: Sudah Absen Masuk Hari Ini (400 Bad Request)**:
+```json
+{
+  "success": false,
+  "message": "Gagal absen: Anda sudah melakukan absen masuk hari ini pada pukul 06:55:41 WIB."
+}
+```
+
+4. **Gagal: Fake GPS / Lokasi Palsu Terdeteksi (400 Bad Request)**:
+```json
+{
+  "success": false,
+  "message": "Gagal absen: Lokasi palsu / Fake GPS terdeteksi. Mohon matikan aplikasi lokasi palsu."
 }
 ```
 
@@ -178,7 +220,7 @@ Mencatat jam pulang pengguna.
 - **Body Request**:
   - `latitude` (text): `-6.175392`
   - `longitude` (text): `106.827153`
-  - `photo` (file image): `selfie_checkout.jpg`
+  - `photo` (optional, file image): `selfie_checkout.jpg`
 - **Response Success (200 OK)**:
 ```json
 {
@@ -189,6 +231,40 @@ Mencatat jam pulang pengguna.
     "jam_pulang": "15:40:40",
     "is_checked_out": true
   }
+}
+```
+
+#### ⚠️ Respon Gagal / Validasi Absen Pulang:
+
+1. **Gagal: Belum Absen Masuk Hari Ini (400 Bad Request)**:
+```json
+{
+  "success": false,
+  "message": "Gagal absen pulang: Anda belum melakukan absen masuk hari ini."
+}
+```
+
+2. **Gagal: Belum Waktunya Jam Pulang (400 Bad Request)**:
+```json
+{
+  "success": false,
+  "message": "Gagal absen pulang: Jam pulang dibuka mulai pukul 15:00 WIB."
+}
+```
+
+3. **Gagal: Sudah Absen Pulang Hari Ini (400 Bad Request)**:
+```json
+{
+  "success": false,
+  "message": "Gagal absen pulang: Anda sudah melakukan absen pulang hari ini pada pukul 15:40:40 WIB."
+}
+```
+
+4. **Gagal: Di Luar Radius Sekolah (400 Bad Request)**:
+```json
+{
+  "success": false,
+  "message": "Gagal absen pulang: Posisi Anda berada di luar radius sekolah."
 }
 ```
 

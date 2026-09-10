@@ -13,6 +13,7 @@ use App\Models\Kelas;
 use App\Models\Siswa;
 use App\Models\ApiLog;
 use App\Models\Setting;
+use App\Models\Jadwal;
 use Carbon\Carbon;
 
 class MobileAttendanceController extends Controller
@@ -472,14 +473,17 @@ class MobileAttendanceController extends Controller
         ]);
 
         $user = $request->user();
-        $today = Carbon::today()->format('Y-m-d');
-        $nowTime = Carbon::now()->format('H:i:s');
+        $schoolId = $user?->school_id ?? 0;
+        $schoolTz = Setting::where('school_id', $schoolId)->where('setting_key', 'timezone')->value('setting_value') ?: config('app.timezone', 'Asia/Jakarta');
+        $now = Carbon::now($schoolTz);
+        $today = $now->format('Y-m-d');
+        $nowTime = $now->format('H:i:s');
 
-        // Geofence Radius Validation
-        [$isValidGeo, $geoError, $distance, $maxRadius] = $this->validateGeofence($user?->school_id, $request->latitude, $request->longitude);
+        // 1. Geofence Radius Validation
+        [$isValidGeo, $geoError, $distance, $maxRadius] = $this->validateGeofence($schoolId, $request->latitude, $request->longitude);
         if (!$isValidGeo) {
             ApiLog::create([
-                'school_id' => $user?->school_id,
+                'school_id' => $schoolId,
                 'api_key' => 'MOBILE_APP',
                 'action' => 'mobile_checkin_geofence_rejected',
                 'uid' => $user?->username ?? $user?->email,
@@ -507,28 +511,90 @@ class MobileAttendanceController extends Controller
 
         // Case 1: Guru / Admin / Wali Kelas
         if ($user && ($user->role === 'guru' || $user->guru) && $user->guru) {
+            $teacher = $user->guru;
+
+            // CEK SHIFT GURU
+            $shift = $teacher->getShiftForDate($now);
+            if (!$shift) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Tidak ada jadwal shift kerja aktif untuk Anda hari ini.'
+                ], 422);
+            }
+
+            // CEK RENTANG JAM SCAN MASUK SHIFT
+            if (!$shift->isInCheckInWindow($nowTime)) {
+                $windowStr = ($shift->awal_absen_masuk && $shift->akhir_absen_masuk)
+                    ? Carbon::parse($shift->awal_absen_masuk)->format('H:i') . ' - ' . Carbon::parse($shift->akhir_absen_masuk)->format('H:i')
+                    : '-';
+
+                $msg = $nowTime < $shift->awal_absen_masuk
+                    ? "Absen masuk belum dibuka (Jadwal masuk: {$windowStr})"
+                    : "Batas waktu absen masuk sudah ditutup (Jadwal masuk: {$windowStr})";
+
+                return response()->json([
+                    'success' => false,
+                    'message' => $msg,
+                    'window' => $windowStr
+                ], 422);
+            }
+
+            // Cek apakah sudah absen masuk hari ini
+            $existingAbsen = AbsensiGuru::where('guru_id', $teacher->id)
+                ->where('tanggal', $today)
+                ->whereNull('jadwal_pelajaran_id')
+                ->first();
+
+            if ($existingAbsen && $existingAbsen->jam_masuk) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Anda sudah melakukan absen masuk hari ini',
+                    'data' => [
+                        'tanggal' => $today,
+                        'jam_masuk' => $existingAbsen->jam_masuk,
+                        'jam_pulang' => $existingAbsen->jam_pulang,
+                        'status_kehadiran' => $existingAbsen->status_kehadiran,
+                        'is_checked_in' => true,
+                        'is_checked_out' => !empty($existingAbsen->jam_pulang)
+                    ]
+                ]);
+            }
+
+            // Hitung Keterlambatan
+            $isLate = $shift->isLate($nowTime);
+            $menitTerlambat = $isLate ? $shift->calculateLateMinutes($nowTime) : 0;
+            $status = $isLate ? 'Terlambat' : 'Hadir';
+            $statusKehadiran = $isLate ? 'terlambat' : 'tepat_waktu';
+            $keterangan = $isLate
+                ? "Terlambat {$menitTerlambat} m ({$shift->nama_shift}) - Mobile App"
+                : "Tepat Waktu ({$shift->nama_shift}) - Mobile App";
+
             $absen = AbsensiGuru::updateOrCreate(
                 [
-                    'guru_id' => $user->guru->id,
+                    'guru_id' => $teacher->id,
                     'tanggal' => $today,
+                    'jadwal_pelajaran_id' => null,
                 ],
                 [
-                    'school_id' => $user->school_id,
-                    'waktu_hadir' => now(),
+                    'school_id' => $schoolId,
+                    'shift_id' => $shift->id,
+                    'waktu_hadir' => $now,
                     'jam_masuk' => $nowTime,
-                    'status_kehadiran' => 'Hadir',
-                    'status' => 'Hadir',
-                    'keterangan' => "Absen via Mobile App (Lat: {$request->latitude}, Lng: {$request->longitude})"
+                    'menit_terlambat' => $menitTerlambat,
+                    'status_kehadiran' => $statusKehadiran,
+                    'status' => $status,
+                    'keterangan' => $keterangan,
+                    'created_at' => $now
                 ]
             );
 
             ApiLog::create([
-                'school_id' => $user->school_id,
+                'school_id' => $schoolId,
                 'api_key' => 'MOBILE_APP',
                 'action' => 'mobile_checkin',
-                'uid' => $user->guru->nip ?? ($user->username ?? $user->email),
+                'uid' => $teacher->nip ?? ($user->username ?? $user->email),
                 'success' => true,
-                'message' => "Absen Masuk: {$user->full_name} (Lat: {$request->latitude}, Lng: {$request->longitude})",
+                'message' => "Absen Masuk: {$user->full_name} ({$shift->nama_shift} - {$status})",
                 'ip_address' => $request->ip(),
                 'user_agent' => $request->userAgent() ?? 'Android Mobile App',
                 'created_at' => now(),
@@ -536,12 +602,15 @@ class MobileAttendanceController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Absen masuk berhasil dicatat',
+                'message' => "Absen masuk berhasil dicatat ({$status})",
                 'data' => [
                     'tanggal' => $today,
                     'jam_masuk' => $absen->jam_masuk,
                     'jam_pulang' => $absen->jam_pulang,
-                    'status_kehadiran' => $absen->status_kehadiran,
+                    'status' => $status,
+                    'status_kehadiran' => $statusKehadiran,
+                    'menit_terlambat' => $menitTerlambat,
+                    'shift' => $shift->nama_shift,
                     'is_checked_in' => true,
                     'is_checked_out' => !empty($absen->jam_pulang)
                 ]
@@ -552,6 +621,46 @@ class MobileAttendanceController extends Controller
         if ($user && ($user->student || in_array($user->role, ['student', 'siswa']))) {
             $student = $user->student ?? Siswa::where('user_id', $user->id)->orWhere('nis', str_replace('siswa_', '', $user->username))->first();
             if ($student) {
+                // CHECK: Kelas Aktif
+                if ($student->kelas && !$student->kelas->is_active_attendance) {
+                    return response()->json(['success' => false, 'message' => 'Absensi dinonaktifkan untuk kelas Anda.'], 422);
+                }
+
+                // CHECK: Jadwal Harian Sekolah
+                $indexHari = (int) $now->format('N'); // 1 (Senin) - 7 (Minggu)
+                $jadwal = Jadwal::where('index_hari', $indexHari)
+                    ->where('is_active', 1)
+                    ->where('school_id', $schoolId)
+                    ->first();
+
+                if (!$jadwal) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Hari ini adalah hari libur sekolah (tidak ada jadwal aktif).'
+                    ], 422);
+                }
+
+                // Cek Rentang Jam Masuk
+                $awalAbsenMasuk = $jadwal->awal_absen_masuk;
+                $akhirAbsenMasuk = $jadwal->akhir_absen_masuk;
+                $jamMasuk = $jadwal->jam_masuk;
+
+                if ($nowTime < $awalAbsenMasuk) {
+                    $jamBuka = Carbon::parse($awalAbsenMasuk)->format('H:i');
+                    return response()->json([
+                        'success' => false,
+                        'message' => "Absen masuk belum dibuka (Dibuka pukul {$jamBuka})"
+                    ], 422);
+                }
+
+                if ($nowTime > $akhirAbsenMasuk) {
+                    $jamTutup = Carbon::parse($akhirAbsenMasuk)->format('H:i');
+                    return response()->json([
+                        'success' => false,
+                        'message' => "Batas waktu absen masuk sudah ditutup (Pukul {$jamTutup})"
+                    ], 422);
+                }
+
                 $att = Attendance::where('student_id', $student->id)->where('tanggal', $today)->first();
                 if ($att && $att->jam_masuk) {
                     return response()->json([
@@ -568,6 +677,18 @@ class MobileAttendanceController extends Controller
                     ]);
                 }
 
+                // Hitung Terlambat
+                $status = 'H';
+                $keterangan = "Tepat Waktu - Mobile App";
+                if ($nowTime > $jamMasuk) {
+                    $status = 'T';
+                    $diffSeconds = Carbon::parse($today . ' ' . $nowTime)->diffInSeconds(Carbon::parse($today . ' ' . $jamMasuk));
+                    $jam = floor($diffSeconds / 3600);
+                    $menit = floor(($diffSeconds % 3600) / 60);
+                    $durasi = $jam > 0 ? "{$jam} jam {$menit} menit" : "{$menit} menit";
+                    $keterangan = "Telat {$durasi} - Mobile App";
+                }
+
                 $att = Attendance::updateOrCreate(
                     [
                         'student_id' => $student->id,
@@ -575,18 +696,19 @@ class MobileAttendanceController extends Controller
                     ],
                     [
                         'jam_masuk' => $nowTime,
-                        'status' => 'H',
-                        'keterangan' => "Absen via Mobile App (Lat: {$request->latitude}, Lng: {$request->longitude})"
+                        'status' => $status,
+                        'keterangan' => $keterangan,
+                        'created_at' => $now
                     ]
                 );
 
                 ApiLog::create([
-                    'school_id' => $user->school_id,
+                    'school_id' => $schoolId,
                     'api_key' => 'MOBILE_APP',
                     'action' => 'mobile_checkin_student',
                     'uid' => $student->nis,
                     'success' => true,
-                    'message' => "Absen Masuk Siswa: {$student->nama} (Lat: {$request->latitude}, Lng: {$request->longitude})",
+                    'message' => "Absen Masuk Siswa: {$student->nama} ({$status} - {$keterangan})",
                     'ip_address' => $request->ip(),
                     'user_agent' => $request->userAgent() ?? 'Android Mobile App',
                     'created_at' => now(),
@@ -594,12 +716,14 @@ class MobileAttendanceController extends Controller
 
                 return response()->json([
                     'success' => true,
-                    'message' => 'Absen masuk siswa berhasil dicatat',
+                    'message' => "Absen masuk berhasil dicatat (" . ($status === 'T' ? 'Terlambat' : 'Hadir') . ")",
                     'data' => [
                         'tanggal' => $today,
                         'jam_masuk' => $att->jam_masuk,
                         'jam_pulang' => $att->jam_pulang,
-                        'status_kehadiran' => $att->status,
+                        'status' => $status,
+                        'status_kehadiran' => $status === 'T' ? 'terlambat' : 'hadir',
+                        'keterangan' => $keterangan,
                         'is_checked_in' => true,
                         'is_checked_out' => !empty($att->jam_pulang)
                     ]
@@ -608,7 +732,7 @@ class MobileAttendanceController extends Controller
         }
 
         ApiLog::create([
-            'school_id' => $user?->school_id,
+            'school_id' => $schoolId,
             'api_key' => 'MOBILE_APP',
             'action' => 'mobile_checkin_failed',
             'uid' => $user?->username ?? $user?->email,
@@ -631,14 +755,17 @@ class MobileAttendanceController extends Controller
         ]);
 
         $user = $request->user();
-        $today = Carbon::today()->format('Y-m-d');
-        $nowTime = Carbon::now()->format('H:i:s');
+        $schoolId = $user?->school_id ?? 0;
+        $schoolTz = Setting::where('school_id', $schoolId)->where('setting_key', 'timezone')->value('setting_value') ?: config('app.timezone', 'Asia/Jakarta');
+        $now = Carbon::now($schoolTz);
+        $today = $now->format('Y-m-d');
+        $nowTime = $now->format('H:i:s');
 
-        // Geofence Radius Validation
-        [$isValidGeo, $geoError, $distance, $maxRadius] = $this->validateGeofence($user?->school_id, $request->latitude, $request->longitude);
+        // 1. Geofence Radius Validation
+        [$isValidGeo, $geoError, $distance, $maxRadius] = $this->validateGeofence($schoolId, $request->latitude, $request->longitude);
         if (!$isValidGeo) {
             ApiLog::create([
-                'school_id' => $user?->school_id,
+                'school_id' => $schoolId,
                 'api_key' => 'MOBILE_APP',
                 'action' => 'mobile_checkout_geofence_rejected',
                 'uid' => $user?->username ?? $user?->email,
@@ -661,35 +788,45 @@ class MobileAttendanceController extends Controller
 
         // Case 1: Guru
         if ($user && ($user->role === 'guru' || $user->guru) && $user->guru) {
-            $absen = AbsensiGuru::where('guru_id', $user->guru->id)
+            $teacher = $user->guru;
+
+            $absen = AbsensiGuru::where('guru_id', $teacher->id)
                 ->where('tanggal', $today)
+                ->whereNull('jadwal_pelajaran_id')
                 ->first();
 
-            if (!$absen) {
-                ApiLog::create([
-                    'school_id' => $user->school_id,
-                    'api_key' => 'MOBILE_APP',
-                    'action' => 'mobile_checkout_failed',
-                    'uid' => $user->guru->nip ?? ($user->username ?? $user->email),
-                    'success' => false,
-                    'message' => "Absen Pulang Gagal: {$user->full_name} belum absen masuk hari ini",
-                    'ip_address' => $request->ip(),
-                    'user_agent' => $request->userAgent() ?? 'Android Mobile App',
-                    'created_at' => now(),
-                ]);
+            if (!$absen || !$absen->jam_masuk) {
+                return response()->json(['success' => false, 'message' => 'Anda belum melakukan absen masuk hari ini'], 422);
+            }
 
-                return response()->json(['success' => false, 'message' => 'Anda belum melakukan absen masuk hari ini'], 400);
+            // CEK SHIFT & RENTANG JAM PULANG
+            $shift = $teacher->getShiftForDate($now);
+            if ($shift && !$shift->isInCheckOutWindow($nowTime)) {
+                $windowStr = ($shift->awal_absen_pulang && $shift->akhir_absen_pulang)
+                    ? Carbon::parse($shift->awal_absen_pulang)->format('H:i') . ' - ' . Carbon::parse($shift->akhir_absen_pulang)->format('H:i')
+                    : '-';
+
+                $msg = $nowTime < $shift->awal_absen_pulang
+                    ? "Belum masuk waktu absen pulang (Jadwal pulang: {$windowStr})"
+                    : "Batas waktu absen pulang sudah ditutup (Jadwal pulang: {$windowStr})";
+
+                return response()->json([
+                    'success' => false,
+                    'message' => $msg,
+                    'window' => $windowStr
+                ], 422);
             }
 
             $absen->update([
                 'jam_pulang' => $nowTime,
+                'updated_at' => $now
             ]);
 
             ApiLog::create([
-                'school_id' => $user->school_id,
+                'school_id' => $schoolId,
                 'api_key' => 'MOBILE_APP',
                 'action' => 'mobile_checkout',
-                'uid' => $user->guru->nip ?? ($user->username ?? $user->email),
+                'uid' => $teacher->nip ?? ($user->username ?? $user->email),
                 'success' => true,
                 'message' => "Absen Pulang: {$user->full_name} (Lat: {$request->latitude}, Lng: {$request->longitude})",
                 'ip_address' => $request->ip(),
@@ -717,15 +854,57 @@ class MobileAttendanceController extends Controller
             if ($student) {
                 $att = Attendance::where('student_id', $student->id)->where('tanggal', $today)->first();
                 if (!$att || !$att->jam_masuk) {
-                    return response()->json(['success' => false, 'message' => 'Anda belum melakukan absen masuk hari ini'], 400);
+                    return response()->json(['success' => false, 'message' => 'Anda belum melakukan absen masuk hari ini'], 422);
+                }
+
+                // CHECK: Jadwal Harian Pulang Siswa
+                $indexHari = (int) $now->format('N');
+                $jadwal = Jadwal::where('index_hari', $indexHari)
+                    ->where('is_active', 1)
+                    ->where('school_id', $schoolId)
+                    ->first();
+
+                if ($jadwal) {
+                    $jamPulang = $jadwal->jam_pulang;
+                    $akhirAbsenPulang = $jadwal->akhir_absen_pulang;
+
+                    if ($nowTime < $jamPulang) {
+                        $jamBuka = Carbon::parse($jamPulang)->format('H:i');
+                        return response()->json([
+                            'success' => false,
+                            'message' => "Belum masuk waktu absen pulang (Dibuka pukul {$jamBuka})"
+                        ], 422);
+                    }
+
+                    if ($nowTime > $akhirAbsenPulang) {
+                        $jamTutup = Carbon::parse($akhirAbsenPulang)->format('H:i');
+                        return response()->json([
+                            'success' => false,
+                            'message' => "Batas waktu absen pulang sudah ditutup (Pukul {$jamTutup})"
+                        ], 422);
+                    }
+                }
+
+                $masuk = Carbon::parse($att->tanggal . ' ' . $att->jam_masuk);
+                $totalSeconds = abs($masuk->diffInSeconds($now, false));
+
+                $newStatus = $att->status;
+                $newKeterangan = $att->keterangan;
+                if ($att->status === 'B') {
+                    $newStatus = ($att->jam_masuk > ($jadwal->jam_masuk ?? '07:30')) ? 'T' : 'H';
+                    $newKeterangan = trim(str_replace('[Auto: Tidak Absen Pulang]', '', $newKeterangan ?? ''));
                 }
 
                 $att->update([
                     'jam_pulang' => $nowTime,
+                    'total_seconds' => $totalSeconds,
+                    'status' => $newStatus,
+                    'keterangan' => $newKeterangan,
+                    'updated_at' => $now
                 ]);
 
                 ApiLog::create([
-                    'school_id' => $user->school_id,
+                    'school_id' => $schoolId,
                     'api_key' => 'MOBILE_APP',
                     'action' => 'mobile_checkout_student',
                     'uid' => $student->nis,
@@ -743,7 +922,8 @@ class MobileAttendanceController extends Controller
                         'tanggal' => $today,
                         'jam_masuk' => $att->jam_masuk,
                         'jam_pulang' => $att->jam_pulang,
-                        'status_kehadiran' => $att->status,
+                        'status' => $newStatus,
+                        'status_kehadiran' => $newStatus === 'T' ? 'terlambat' : 'hadir',
                         'is_checked_in' => true,
                         'is_checked_out' => true
                     ]
@@ -752,7 +932,7 @@ class MobileAttendanceController extends Controller
         }
 
         ApiLog::create([
-            'school_id' => $user?->school_id,
+            'school_id' => $schoolId,
             'api_key' => 'MOBILE_APP',
             'action' => 'mobile_checkout_failed',
             'uid' => $user?->username ?? $user?->email,

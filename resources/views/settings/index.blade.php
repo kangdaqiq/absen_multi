@@ -28,6 +28,11 @@
                         class="border-b-2 py-4 px-2 text-sm font-medium transition-colors">
                         Otomatisasi & Notifikasi
                     </button>
+                    <button @click.prevent="activeTab = 'geofence'; setTimeout(() => { if (window.initGeofenceMap) window.initGeofenceMap(); }, 150);"
+                        :class="activeTab === 'geofence' ? 'border-brand-500 text-brand-500' : 'border-transparent text-gray-500 hover:text-gray-800 dark:hover:text-white'"
+                        class="border-b-2 py-4 px-2 text-sm font-medium transition-colors flex items-center gap-1.5">
+                        <i class="fas fa-map-marker-alt text-xs"></i> Lokasi & Geofence (Mobile)
+                    </button>
                     @if(config('app.mode') === 'self_hosted' && (auth()->user()->isSuperAdmin() || auth()->user()->isAdmin()))
                     <button @click.prevent="activeTab = 'license'"
                         :class="activeTab === 'license' ? 'border-brand-500 text-brand-500' : 'border-transparent text-gray-500 hover:text-gray-800 dark:hover:text-white'"
@@ -443,6 +448,115 @@
                 </div>
                 @endif
 
+                <!-- Tab Lokasi & Geofencing (Mobile) -->
+                <div x-show="activeTab === 'geofence'" x-transition:enter="transition ease-out duration-200"
+                    x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" class="space-y-6">
+
+                    <div class="border-b border-gray-200 dark:border-gray-800 pb-4">
+                        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                            <div>
+                                <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90">
+                                    Pengaturan Lokasi & Geofencing Presensi Mobile
+                                </h3>
+                                <p class="text-sm text-gray-500 mt-1">
+                                    Batasi absensi via aplikasi mobile Android agar hanya dapat dilakukan jika pengguna berada di dalam radius area sekolah.
+                                </p>
+                            </div>
+                            <div class="flex items-center">
+                                <label class="relative inline-flex cursor-pointer items-center">
+                                    <input type="checkbox" name="geofence_enabled" value="true" class="sr-only"
+                                        {{ ($settings['geofence_enabled'] ?? 'false') === 'true' ? 'checked' : '' }}>
+                                    <div class="toggle-bg h-6 w-11 rounded-full bg-gray-200 transition-colors dark:bg-gray-700"></div>
+                                    <div class="toggle-dot absolute left-1 top-1 h-4 w-4 rounded-full bg-white transition-transform"></div>
+                                </label>
+                                <span class="ml-3 text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    Aktifkan Geofence
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                        <!-- Left: Inputs & GPS Helper -->
+                        <div class="lg:col-span-5 space-y-5">
+                            <div>
+                                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    Latitude Titik Sekolah <span class="text-danger">*</span>
+                                </label>
+                                <div class="relative">
+                                    <input type="text" id="school_latitude" name="school_latitude"
+                                        value="{{ $settings['school_latitude'] ?? '-6.175392' }}"
+                                        placeholder="-6.175392"
+                                        class="w-full rounded-lg border border-gray-200 bg-transparent pl-10 pr-4 py-2.5 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white text-sm font-mono">
+                                    <i class="fas fa-map-pin absolute left-3.5 top-3.5 text-gray-400 text-xs"></i>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    Longitude Titik Sekolah <span class="text-danger">*</span>
+                                </label>
+                                <div class="relative">
+                                    <input type="text" id="school_longitude" name="school_longitude"
+                                        value="{{ $settings['school_longitude'] ?? '106.827153' }}"
+                                        placeholder="106.827153"
+                                        class="w-full rounded-lg border border-gray-200 bg-transparent pl-10 pr-4 py-2.5 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white text-sm font-mono">
+                                    <i class="fas fa-map-pin absolute left-3.5 top-3.5 text-gray-400 text-xs"></i>
+                                </div>
+                            </div>
+
+                            <div>
+                                <div class="flex justify-between items-center mb-2">
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                        Radius Toleransi Jarak (Meter) <span class="text-danger">*</span>
+                                    </label>
+                                    <span id="radius_display" class="inline-flex items-center rounded-full bg-brand-500/10 px-2.5 py-0.5 text-xs font-semibold text-brand-500">
+                                        {{ $settings['geofence_radius'] ?? '100' }} m
+                                    </span>
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <input type="number" id="geofence_radius" name="geofence_radius" min="10" max="5000" step="5"
+                                        value="{{ $settings['geofence_radius'] ?? '100' }}"
+                                        class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2.5 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white text-sm">
+                                </div>
+                                <p class="mt-1.5 text-xs text-gray-500">
+                                    Jarak maksimal (dalam meter) dari titik pusat sekolah yang diperbolehkan untuk melakukan absensi mobile.
+                                </p>
+                            </div>
+
+                            <!-- Action buttons -->
+                            <div class="pt-2 flex flex-col sm:flex-row gap-2">
+                                <button type="button" id="btn-get-current-loc"
+                                    class="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-xs font-semibold text-white hover:bg-emerald-700 transition shadow-sm">
+                                    <i class="fas fa-crosshairs"></i> Ambil Lokasi Saya Saat Ini
+                                </button>
+                                <a id="btn-open-gmaps" href="https://maps.google.com/?q={{ $settings['school_latitude'] ?? '-6.175392' }},{{ $settings['school_longitude'] ?? '106.827153' }}" target="_blank"
+                                    class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 transition">
+                                    <i class="fas fa-external-link-alt"></i> Buka Google Maps
+                                </a>
+                            </div>
+
+                            <div class="rounded-xl border border-amber-200 bg-amber-50/50 p-3.5 dark:border-amber-900/30 dark:bg-amber-900/10">
+                                <div class="flex gap-2.5 text-amber-800 dark:text-amber-300 text-xs leading-relaxed">
+                                    <i class="fas fa-info-circle text-amber-600 dark:text-amber-400 mt-0.5"></i>
+                                    <div>
+                                        <strong>Petunjuk Peta:</strong> Anda dapat menggeser (drag) pin merah pada peta di samping atau mengklik area peta untuk menentukan titik koordinat sekolah secara presisi.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Right: Interactive Leaflet Map -->
+                        <div class="lg:col-span-7">
+                            <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                Visualisasi Area Radius Sekolah
+                            </label>
+                            <div id="geofence-map" class="w-full h-[380px] rounded-xl border border-gray-200 dark:border-gray-800 shadow-inner z-0"></div>
+                        </div>
+                    </div>
+                </div>
+                @endif
+
                 <div class="mt-8 border-t border-gray-200 pt-6 dark:border-gray-800">
                     <button type="submit"
                         class="flex w-full md:w-auto items-center justify-center gap-2 rounded-lg bg-brand-500 px-6 py-3 font-medium text-white hover:bg-brand-600 transition">
@@ -466,13 +580,15 @@
             transform: translateX(100%);
         }
     </style>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 @endsection
 
 @push('scripts')
     <script src="{{ asset('vendor/jquery/jquery.min.js') }}"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
         // Logo preview
-        document.getElementById('logo-input').addEventListener('change', function (e) {
+        document.getElementById('logo-input')?.addEventListener('change', function (e) {
             const file = e.target.files[0];
             if (file) {
                 const reader = new FileReader();
@@ -484,7 +600,7 @@
         });
 
         // Kop Surat preview
-        document.getElementById('kop-input').addEventListener('change', function (e) {
+        document.getElementById('kop-input')?.addEventListener('change', function (e) {
             const file = e.target.files[0];
             if (file) {
                 const reader = new FileReader();
@@ -493,6 +609,144 @@
                 };
                 reader.readAsDataURL(file);
             }
+        });
+
+        // Geofence Map Integration
+        let map = null;
+        let marker = null;
+        let circle = null;
+
+        window.initGeofenceMap = function() {
+            const mapContainer = document.getElementById('geofence-map');
+            if (!mapContainer) return;
+
+            let lat = parseFloat(document.getElementById('school_latitude')?.value) || -6.175392;
+            let lng = parseFloat(document.getElementById('school_longitude')?.value) || 106.827153;
+            let radius = parseFloat(document.getElementById('geofence_radius')?.value) || 100;
+
+            if (!map) {
+                map = L.map('geofence-map').setView([lat, lng], 16);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '© OpenStreetMap contributors',
+                    maxZoom: 19
+                }).addTo(map);
+
+                // Custom Red Pin Icon
+                const redIcon = L.icon({
+                    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+                    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+                    iconSize: [25, 41],
+                    iconAnchor: [12, 41],
+                    popupAnchor: [1, -34],
+                    shadowSize: [41, 41]
+                });
+
+                marker = L.marker([lat, lng], { draggable: true, icon: redIcon }).addTo(map);
+                circle = L.circle([lat, lng], {
+                    color: '#3C50E0',
+                    fillColor: '#3C50E0',
+                    fillOpacity: 0.25,
+                    radius: radius
+                }).addTo(map);
+
+                marker.on('drag', function(e) {
+                    const pos = e.latlng;
+                    document.getElementById('school_latitude').value = pos.lat.toFixed(6);
+                    document.getElementById('school_longitude').value = pos.lng.toFixed(6);
+                    circle.setLatLng(pos);
+                    updateGmapsLink(pos.lat, pos.lng);
+                });
+
+                map.on('click', function(e) {
+                    const pos = e.latlng;
+                    marker.setLatLng(pos);
+                    circle.setLatLng(pos);
+                    document.getElementById('school_latitude').value = pos.lat.toFixed(6);
+                    document.getElementById('school_longitude').value = pos.lng.toFixed(6);
+                    updateGmapsLink(pos.lat, pos.lng);
+                });
+            } else {
+                map.invalidateSize();
+                map.setView([lat, lng], 16);
+                marker.setLatLng([lat, lng]);
+                circle.setLatLng([lat, lng]);
+                circle.setRadius(radius);
+            }
+        };
+
+        function updateGmapsLink(lat, lng) {
+            const btn = document.getElementById('btn-open-gmaps');
+            if (btn) {
+                btn.href = `https://maps.google.com/?q=${lat},${lng}`;
+            }
+        }
+
+        // Event listener for inputs
+        document.getElementById('school_latitude')?.addEventListener('input', function() {
+            let lat = parseFloat(this.value);
+            let lng = parseFloat(document.getElementById('school_longitude')?.value);
+            if (!isNaN(lat) && !isNaN(lng) && marker && circle) {
+                marker.setLatLng([lat, lng]);
+                circle.setLatLng([lat, lng]);
+                map.panTo([lat, lng]);
+                updateGmapsLink(lat, lng);
+            }
+        });
+
+        document.getElementById('school_longitude')?.addEventListener('input', function() {
+            let lat = parseFloat(document.getElementById('school_latitude')?.value);
+            let lng = parseFloat(this.value);
+            if (!isNaN(lat) && !isNaN(lng) && marker && circle) {
+                marker.setLatLng([lat, lng]);
+                circle.setLatLng([lat, lng]);
+                map.panTo([lat, lng]);
+                updateGmapsLink(lat, lng);
+            }
+        });
+
+        document.getElementById('geofence_radius')?.addEventListener('input', function() {
+            let r = parseFloat(this.value) || 100;
+            const display = document.getElementById('radius_display');
+            if (display) display.textContent = r + ' m';
+            if (circle) {
+                circle.setRadius(r);
+            }
+        });
+
+        // GPS Current Location Button
+        document.getElementById('btn-get-current-loc')?.addEventListener('click', function() {
+            const btn = this;
+            if (!navigator.geolocation) {
+                alert('Browser Anda tidak mendukung deteksi lokasi (Geolocation).');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Mendeteksi Lokasi...';
+
+            navigator.geolocation.getCurrentPosition(
+                function(pos) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-crosshairs"></i> Ambil Lokasi Saya Saat Ini';
+
+                    const lat = pos.coords.latitude.toFixed(6);
+                    const lng = pos.coords.longitude.toFixed(6);
+
+                    document.getElementById('school_latitude').value = lat;
+                    document.getElementById('school_longitude').value = lng;
+
+                    if (window.initGeofenceMap) {
+                        window.initGeofenceMap();
+                    }
+                    updateGmapsLink(lat, lng);
+                },
+                function(err) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-crosshairs"></i> Ambil Lokasi Saya Saat Ini';
+                    alert('Gagal mendapatkan lokasi GPS: ' + err.message + '. Pastikan izin akses lokasi aktif pada browser.');
+                },
+                { enableHighAccuracy: true, timeout: 10000 }
+            );
         });
     </script>
 @endpush

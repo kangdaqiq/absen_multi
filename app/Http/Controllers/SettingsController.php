@@ -116,6 +116,7 @@ class SettingsController extends Controller
             'notification_wa_ortu',
             'notification_tele_siswa',
             'notification_tele_ortu',
+            'geofence_enabled',
         ];
 
         foreach ($checkboxSettings as $checkbox) {

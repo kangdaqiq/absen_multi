@@ -12,6 +12,7 @@ use App\Models\Attendance;
 use App\Models\Kelas;
 use App\Models\Siswa;
 use App\Models\ApiLog;
+use App\Models\Setting;
 use Carbon\Carbon;
 
 class MobileAttendanceController extends Controller
@@ -382,6 +383,86 @@ class MobileAttendanceController extends Controller
         ]);
     }
 
+    /**
+     * Calculate distance between two GPS coordinates using Haversine formula (in meters)
+     */
+    private function calculateDistanceInMeters($lat1, $lon1, $lat2, $lon2): float
+    {
+        $earthRadius = 6371000; // Radius of Earth in meters
+
+        $latFrom = deg2rad((float) $lat1);
+        $lonFrom = deg2rad((float) $lon1);
+        $latTo = deg2rad((float) $lat2);
+        $lonTo = deg2rad((float) $lon2);
+
+        $latDelta = $latTo - $latFrom;
+        $lonDelta = $lonTo - $lonFrom;
+
+        $angle = 2 * asin(sqrt(pow(sin($latDelta / 2), 2) +
+            cos($latFrom) * cos($latTo) * pow(sin($lonDelta / 2), 2)));
+
+        return $angle * $earthRadius;
+    }
+
+    /**
+     * Validate geofence radius if enabled
+     * @return array [bool $isValid, string|null $errorMessage, float|null $distanceMeters, float|null $maxRadius]
+     */
+    private function validateGeofence($schoolId, $userLat, $userLng): array
+    {
+        $schoolId = $schoolId ?? 0;
+        $enabled = Setting::where('school_id', $schoolId)->where('setting_key', 'geofence_enabled')->value('setting_value') ?? 'false';
+
+        // Fallback to global setting if school setting not found
+        if ($enabled === 'false' && $schoolId > 0) {
+            $enabled = Setting::where('school_id', 0)->where('setting_key', 'geofence_enabled')->value('setting_value') ?? 'false';
+        }
+
+        if ($enabled !== 'true' && $enabled !== '1') {
+            return [true, null, null, null];
+        }
+
+        $schoolLat = Setting::where('school_id', $schoolId)->where('setting_key', 'school_latitude')->value('setting_value');
+        $schoolLng = Setting::where('school_id', $schoolId)->where('setting_key', 'school_longitude')->value('setting_value');
+        $radius = (float) (Setting::where('school_id', $schoolId)->where('setting_key', 'geofence_radius')->value('setting_value') ?? 100);
+
+        if (!$schoolLat || !$schoolLng) {
+            // Coordinate not configured yet, don't block
+            return [true, null, null, null];
+        }
+
+        $distance = $this->calculateDistanceInMeters($userLat, $userLng, $schoolLat, $schoolLng);
+        $distanceRound = round($distance, 1);
+
+        if ($distance > $radius) {
+            $msg = "Anda berada di luar radius area sekolah. Jarak Anda saat ini: {$distanceRound} meter (Radius maksimal: {$radius} meter).";
+            return [false, $msg, $distanceRound, $radius];
+        }
+
+        return [true, null, $distanceRound, $radius];
+    }
+
+    public function getGeofenceSetting(Request $request)
+    {
+        $user = $request->user();
+        $schoolId = $user?->school_id ?? 0;
+
+        $enabled = Setting::where('school_id', $schoolId)->where('setting_key', 'geofence_enabled')->value('setting_value') ?? 'false';
+        $schoolLat = Setting::where('school_id', $schoolId)->where('setting_key', 'school_latitude')->value('setting_value');
+        $schoolLng = Setting::where('school_id', $schoolId)->where('setting_key', 'school_longitude')->value('setting_value');
+        $radius = (float) (Setting::where('school_id', $schoolId)->where('setting_key', 'geofence_radius')->value('setting_value') ?? 100);
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'geofence_enabled' => ($enabled === 'true' || $enabled === '1'),
+                'latitude' => $schoolLat ? (float) $schoolLat : null,
+                'longitude' => $schoolLng ? (float) $schoolLng : null,
+                'radius_meters' => $radius,
+            ]
+        ]);
+    }
+
     public function checkIn(Request $request)
     {
         $request->validate([
@@ -394,11 +475,37 @@ class MobileAttendanceController extends Controller
         $today = Carbon::today()->format('Y-m-d');
         $nowTime = Carbon::now()->format('H:i:s');
 
+        // Geofence Radius Validation
+        [$isValidGeo, $geoError, $distance, $maxRadius] = $this->validateGeofence($user?->school_id, $request->latitude, $request->longitude);
+        if (!$isValidGeo) {
+            ApiLog::create([
+                'school_id' => $user?->school_id,
+                'api_key' => 'MOBILE_APP',
+                'action' => 'mobile_checkin_geofence_rejected',
+                'uid' => $user?->username ?? $user?->email,
+                'success' => false,
+                'message' => "Absen Ditolak (Di Luar Radius): {$user?->full_name} ({$distance}m > {$maxRadius}m)",
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent() ?? 'Android Mobile App',
+                'created_at' => now(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => $geoError,
+                'data' => [
+                    'distance_meters' => $distance,
+                    'max_radius_meters' => $maxRadius
+                ]
+            ], 422);
+        }
+
         $photoPath = null;
         if ($request->hasFile('photo')) {
             $photoPath = $request->file('photo')->store('absensi_photos', 'public');
         }
 
+        // Case 1: Guru / Admin / Wali Kelas
         if ($user && ($user->role === 'guru' || $user->guru) && $user->guru) {
             $absen = AbsensiGuru::updateOrCreate(
                 [
@@ -441,13 +548,72 @@ class MobileAttendanceController extends Controller
             ]);
         }
 
+        // Case 2: Siswa (Student)
+        if ($user && ($user->student || in_array($user->role, ['student', 'siswa']))) {
+            $student = $user->student ?? Siswa::where('user_id', $user->id)->orWhere('nis', str_replace('siswa_', '', $user->username))->first();
+            if ($student) {
+                $att = Attendance::where('student_id', $student->id)->where('tanggal', $today)->first();
+                if ($att && $att->jam_masuk) {
+                    return response()->json([
+                        'success' => true,
+                        'message' => 'Anda sudah melakukan absen masuk hari ini',
+                        'data' => [
+                            'tanggal' => $today,
+                            'jam_masuk' => $att->jam_masuk,
+                            'jam_pulang' => $att->jam_pulang,
+                            'status_kehadiran' => $att->status,
+                            'is_checked_in' => true,
+                            'is_checked_out' => !empty($att->jam_pulang)
+                        ]
+                    ]);
+                }
+
+                $att = Attendance::updateOrCreate(
+                    [
+                        'student_id' => $student->id,
+                        'tanggal' => $today,
+                    ],
+                    [
+                        'jam_masuk' => $nowTime,
+                        'status' => 'H',
+                        'keterangan' => "Absen via Mobile App (Lat: {$request->latitude}, Lng: {$request->longitude})"
+                    ]
+                );
+
+                ApiLog::create([
+                    'school_id' => $user->school_id,
+                    'api_key' => 'MOBILE_APP',
+                    'action' => 'mobile_checkin_student',
+                    'uid' => $student->nis,
+                    'success' => true,
+                    'message' => "Absen Masuk Siswa: {$student->nama} (Lat: {$request->latitude}, Lng: {$request->longitude})",
+                    'ip_address' => $request->ip(),
+                    'user_agent' => $request->userAgent() ?? 'Android Mobile App',
+                    'created_at' => now(),
+                ]);
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Absen masuk siswa berhasil dicatat',
+                    'data' => [
+                        'tanggal' => $today,
+                        'jam_masuk' => $att->jam_masuk,
+                        'jam_pulang' => $att->jam_pulang,
+                        'status_kehadiran' => $att->status,
+                        'is_checked_in' => true,
+                        'is_checked_out' => !empty($att->jam_pulang)
+                    ]
+                ]);
+            }
+        }
+
         ApiLog::create([
             'school_id' => $user?->school_id,
             'api_key' => 'MOBILE_APP',
             'action' => 'mobile_checkin_failed',
             'uid' => $user?->username ?? $user?->email,
             'success' => false,
-            'message' => 'Absen Masuk Gagal: Role tidak didukung untuk absen guru',
+            'message' => 'Absen Masuk Gagal: Role tidak didukung untuk absen',
             'ip_address' => $request->ip(),
             'user_agent' => $request->userAgent() ?? 'Android Mobile App',
             'created_at' => now(),
@@ -468,6 +634,32 @@ class MobileAttendanceController extends Controller
         $today = Carbon::today()->format('Y-m-d');
         $nowTime = Carbon::now()->format('H:i:s');
 
+        // Geofence Radius Validation
+        [$isValidGeo, $geoError, $distance, $maxRadius] = $this->validateGeofence($user?->school_id, $request->latitude, $request->longitude);
+        if (!$isValidGeo) {
+            ApiLog::create([
+                'school_id' => $user?->school_id,
+                'api_key' => 'MOBILE_APP',
+                'action' => 'mobile_checkout_geofence_rejected',
+                'uid' => $user?->username ?? $user?->email,
+                'success' => false,
+                'message' => "Absen Pulang Ditolak (Di Luar Radius): {$user?->full_name} ({$distance}m > {$maxRadius}m)",
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent() ?? 'Android Mobile App',
+                'created_at' => now(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => $geoError,
+                'data' => [
+                    'distance_meters' => $distance,
+                    'max_radius_meters' => $maxRadius
+                ]
+            ], 422);
+        }
+
+        // Case 1: Guru
         if ($user && ($user->role === 'guru' || $user->guru) && $user->guru) {
             $absen = AbsensiGuru::where('guru_id', $user->guru->id)
                 ->where('tanggal', $today)
@@ -517,6 +709,46 @@ class MobileAttendanceController extends Controller
                     'is_checked_out' => true
                 ]
             ]);
+        }
+
+        // Case 2: Siswa (Student)
+        if ($user && ($user->student || in_array($user->role, ['student', 'siswa']))) {
+            $student = $user->student ?? Siswa::where('user_id', $user->id)->orWhere('nis', str_replace('siswa_', '', $user->username))->first();
+            if ($student) {
+                $att = Attendance::where('student_id', $student->id)->where('tanggal', $today)->first();
+                if (!$att || !$att->jam_masuk) {
+                    return response()->json(['success' => false, 'message' => 'Anda belum melakukan absen masuk hari ini'], 400);
+                }
+
+                $att->update([
+                    'jam_pulang' => $nowTime,
+                ]);
+
+                ApiLog::create([
+                    'school_id' => $user->school_id,
+                    'api_key' => 'MOBILE_APP',
+                    'action' => 'mobile_checkout_student',
+                    'uid' => $student->nis,
+                    'success' => true,
+                    'message' => "Absen Pulang Siswa: {$student->nama} (Lat: {$request->latitude}, Lng: {$request->longitude})",
+                    'ip_address' => $request->ip(),
+                    'user_agent' => $request->userAgent() ?? 'Android Mobile App',
+                    'created_at' => now(),
+                ]);
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Absen pulang siswa berhasil dicatat',
+                    'data' => [
+                        'tanggal' => $today,
+                        'jam_masuk' => $att->jam_masuk,
+                        'jam_pulang' => $att->jam_pulang,
+                        'status_kehadiran' => $att->status,
+                        'is_checked_in' => true,
+                        'is_checked_out' => true
+                    ]
+                ]);
+            }
         }
 
         ApiLog::create([

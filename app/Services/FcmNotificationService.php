@@ -318,11 +318,37 @@ class FcmNotificationService
         if ($siswa->user && !empty($siswa->user->fcm_token)) {
             $tokens[] = $siswa->user->fcm_token;
         }
+        if (empty($tokens) && !empty($siswa->user_id)) {
+            $user = User::find($siswa->user_id);
+            if ($user && !empty($user->fcm_token)) {
+                $tokens[] = $user->fcm_token;
+            }
+        }
+        if (empty($tokens) && !empty($siswa->nis)) {
+            $user = User::where('username', 'siswa_' . $siswa->nis)
+                ->orWhere('username', $siswa->nis)
+                ->orWhere('email', $siswa->nis . '@siswa.local')
+                ->first();
+            if ($user && !empty($user->fcm_token)) {
+                $tokens[] = $user->fcm_token;
+            }
+        }
+        if (empty($tokens) && !empty($siswa->nama)) {
+            $user = User::where('full_name', $siswa->nama)
+                ->when($siswa->school_id, fn($q) => $q->where('school_id', $siswa->school_id))
+                ->first();
+            if ($user && !empty($user->fcm_token)) {
+                $tokens[] = $user->fcm_token;
+            }
+        }
 
-        $tokens = array_unique($tokens);
+        $tokens = array_values(array_unique(array_filter($tokens)));
         if (!empty($tokens)) {
+            Log::info("FCM -> Siswa {$siswa->nama} (tokens: " . count($tokens) . ")");
             return self::send($tokens, $title, $message, $data);
         }
+
+        Log::info("FCM -> No token found for Siswa {$siswa->nama} (ID: {$siswa->id}, NIS: {$siswa->nis})");
         return false;
     }
 
@@ -331,9 +357,32 @@ class FcmNotificationService
      */
     public static function sendToGuru(Guru $guru, string $title, string $message, array $data = []): bool
     {
+        $tokens = [];
         if ($guru->user && !empty($guru->user->fcm_token)) {
-            return self::send($guru->user->fcm_token, $title, $message, $data);
+            $tokens[] = $guru->user->fcm_token;
         }
+        if (empty($tokens) && !empty($guru->user_id)) {
+            $user = User::find($guru->user_id);
+            if ($user && !empty($user->fcm_token)) {
+                $tokens[] = $user->fcm_token;
+            }
+        }
+        if (empty($tokens) && !empty($guru->nama)) {
+            $user = User::where('full_name', $guru->nama)
+                ->when($guru->school_id, fn($q) => $q->where('school_id', $guru->school_id))
+                ->first();
+            if ($user && !empty($user->fcm_token)) {
+                $tokens[] = $user->fcm_token;
+            }
+        }
+
+        $tokens = array_values(array_unique(array_filter($tokens)));
+        if (!empty($tokens)) {
+            Log::info("FCM -> Guru {$guru->nama} (tokens: " . count($tokens) . ")");
+            return self::send($tokens, $title, $message, $data);
+        }
+
+        Log::info("FCM -> No token found for Guru {$guru->nama} (ID: {$guru->id})");
         return false;
     }
 }

@@ -14,9 +14,9 @@ use App\Models\Jadwal;
 use App\Models\Guru;
 use App\Models\Siswa;
 use App\Models\Attendance;
-use App\Models\TeacherCheckoutSession;
 use App\Models\MessageQueue;
 use App\Models\GateCard;
+use App\Services\FcmNotificationService;
 
 class RfidController extends Controller
 {
@@ -181,6 +181,18 @@ class RfidController extends Controller
                     Log::error("WA Guru Checkin Error: " . $e->getMessage());
                 }
 
+                // Send FCM Push Notification
+                try {
+                    FcmNotificationService::sendToGuru($teacher, "Presensi Masuk Tercatat", "Halo {$teacher->nama}, absensi masuk Anda berhasil dicatat pukul {$now->format('H:i')} (Status: {$status}).", [
+                        'type' => 'checkin_guru',
+                        'guru_id' => (string) $teacher->id,
+                        'time' => (string) $now->format('H:i'),
+                        'status' => (string) $status,
+                    ]);
+                } catch (\Exception $e) {
+                    Log::error("FCM Guru Checkin Error: " . $e->getMessage());
+                }
+
                 $msgLog = "Guru Masuk: {$teacher->nama} ({$shift->nama_shift} - {$status})";
                 $this->logRequest($apiKey, 'checkin_success', $uid, true, $msgLog);
 
@@ -280,6 +292,17 @@ class RfidController extends Controller
                     $this->wa->sendCheckOut($teacher->nama, $teacher->no_wa, $now->format('H:i'), $hours, $mins, $authorizedBy, $device->school_id, $masuk->format('H:i'), null, $now->format('d/m/Y'));
                 } catch (\Exception $e) {
                     Log::error("WA Guru Checkout Error: " . $e->getMessage());
+                }
+
+                // Send FCM Push Notification
+                try {
+                    FcmNotificationService::sendToGuru($teacher, "Presensi Pulang Tercatat", "Halo {$teacher->nama}, absensi pulang Anda berhasil dicatat pukul {$now->format('H:i')}.", [
+                        'type' => 'checkout_guru',
+                        'guru_id' => (string) $teacher->id,
+                        'time' => (string) $now->format('H:i'),
+                    ]);
+                } catch (\Exception $e) {
+                    Log::error("FCM Guru Checkout Error: " . $e->getMessage());
                 }
 
                 $this->logRequest($apiKey, 'checkout_success', $uid, true, 'Guru Pulang: ' . $teacher->nama);
@@ -812,6 +835,17 @@ class RfidController extends Controller
                 $authorizedBy = $teacherSession ? $teacherSession->teacher_name : 'Sistem Otomatis';
                 $this->wa->sendCheckOut($siswa->nama, $siswa->no_wa, $now->format('H:i'), $hours, $mins, $authorizedBy, $device->school_id, $masuk->format('H:i'), $siswa->wa_ortu, $now->format('d/m/Y'));
 
+                // Send FCM Push Notification
+                try {
+                    FcmNotificationService::sendToSiswa($siswa, "Presensi Pulang Tercatat", "Halo {$siswa->nama}, absensi pulang Anda berhasil dicatat pukul {$now->format('H:i')}.", [
+                        'type' => 'checkout_siswa',
+                        'student_id' => (string) $siswa->id,
+                        'time' => (string) $now->format('H:i'),
+                    ]);
+                } catch (\Exception $e) {
+                    Log::error("FCM Siswa Checkout Error: " . $e->getMessage());
+                }
+
                 $this->logRequest($apiKey, 'checkout_success', $uid, true, 'Pulang: ' . $siswa->nama);
                 return $this->response(true, 'success', 'Absen Berhasil', 'ok', [
                     'type' => 'absen_pulang',
@@ -885,6 +919,19 @@ class RfidController extends Controller
                 DB::commit();
 
                 $this->wa->sendCheckIn($siswa->nama, $siswa->no_wa, $now->format('H:i'), $status, $device->school_id, $keterangan, $siswa->wa_ortu, $siswa->kelas->nama_kelas ?? '-');
+
+                // Send FCM Push Notification
+                try {
+                    $readableStatus = ($status === 'T' || $status === 'Terlambat') ? 'Terlambat' : 'Hadir';
+                    FcmNotificationService::sendToSiswa($siswa, "Presensi Masuk Tercatat", "Halo {$siswa->nama}, absensi masuk Anda berhasil dicatat pukul {$now->format('H:i')} (Status: {$readableStatus}).", [
+                        'type' => 'checkin_siswa',
+                        'student_id' => (string) $siswa->id,
+                        'time' => (string) $now->format('H:i'),
+                        'status' => (string) $readableStatus,
+                    ]);
+                } catch (\Exception $e) {
+                    Log::error("FCM Siswa Checkin Error: " . $e->getMessage());
+                }
 
                 $this->logRequest($apiKey, 'checkin_success', $uid, true, 'Masuk: ' . $siswa->nama);
                 return $this->response(true, 'success', 'Absen Berhasil', 'ok', [

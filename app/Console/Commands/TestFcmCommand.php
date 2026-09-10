@@ -9,8 +9,8 @@ use App\Models\Siswa;
 
 class TestFcmCommand extends Command
 {
-    protected $signature = 'fcm:test {token?} {--reset : Reset/hapus seluruh fcm_token di database}';
-    protected $description = 'Test sending an FCM Push Notification to a device or reset tokens';
+    protected $signature = 'fcm:test {token?} {--reset : Reset/hapus seluruh fcm_token di database} {--siswa= : Test kirim ke Siswa tertentu via nama/NIS} {--guru= : Test kirim ke Guru tertentu via nama}';
+    protected $description = 'Test sending an FCM Push Notification to a device, student, or teacher';
 
     public function handle()
     {
@@ -22,6 +22,27 @@ class TestFcmCommand extends Command
             Siswa::query()->update(['fcm_token' => null]);
 
             $this->info("✅ Berhasil mereset seluruh fcm_token di database ({$userCount} User, {$siswaCount} Siswa).");
+            return 0;
+        }
+
+        if ($siswaTarget = $this->option('siswa')) {
+            $siswa = Siswa::where('nama', 'like', "%{$siswaTarget}%")->orWhere('nis', $siswaTarget)->first();
+            if (!$siswa) {
+                $this->error("❌ Siswa '{$siswaTarget}' tidak ditemukan.");
+                return 1;
+            }
+            $this->info("Mengirim push notifikasi uji coba ke Siswa: {$siswa->nama} (NIS: {$siswa->nis})...");
+            $res = FcmNotificationService::sendToSiswa(
+                $siswa,
+                "🔔 Uji Presensi Siswa",
+                "Halo {$siswa->nama}, ini adalah tes notifikasi langsung ke akun siswa Anda.",
+                ['type' => 'test_siswa', 'student_id' => (string) $siswa->id]
+            );
+            if ($res) {
+                $this->info("✅ Push notifikasi BERHASIL dikirimkan ke perangkat siswa!");
+            } else {
+                $this->error("❌ Gagal mengirimkan ke siswa. Pastikan siswa telah login di aplikasi mobile / token terdaftar.");
+            }
             return 0;
         }
 

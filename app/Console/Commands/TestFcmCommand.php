@@ -9,11 +9,22 @@ use App\Models\Siswa;
 
 class TestFcmCommand extends Command
 {
-    protected $signature = 'fcm:test {token?}';
-    protected $description = 'Test sending an FCM Push Notification to a device';
+    protected $signature = 'fcm:test {token?} {--reset : Reset/hapus seluruh fcm_token di database}';
+    protected $description = 'Test sending an FCM Push Notification to a device or reset tokens';
 
     public function handle()
     {
+        if ($this->option('reset')) {
+            $userCount = User::whereNotNull('fcm_token')->count();
+            $siswaCount = Siswa::whereNotNull('fcm_token')->count();
+
+            User::query()->update(['fcm_token' => null]);
+            Siswa::query()->update(['fcm_token' => null]);
+
+            $this->info("✅ Berhasil mereset seluruh fcm_token di database ({$userCount} User, {$siswaCount} Siswa).");
+            return 0;
+        }
+
         $token = $this->argument('token');
 
         $this->info("=== FCM Diagnostic & Test ===");

@@ -52,10 +52,21 @@ class AuthController extends Controller
 
         // Try to login with email first
         if (Auth::attempt(['email' => $loginField, 'password' => $password])) {
+            $user = Auth::user();
+
+            // Cegah akun siswa login melalui web (khusus aplikasi mobile)
+            if ($user->role === 'siswa' || $user->student()->exists()) {
+                Auth::logout();
+                $request->session()->invalidate();
+                $request->session()->regenerateToken();
+                return back()->withErrors([
+                    'email' => 'Akun siswa hanya dapat digunakan untuk login pada aplikasi mobile.',
+                ])->onlyInput('email');
+            }
+
             $request->session()->regenerate();
 
             // Check if user's school is active (skip for super admin)
-            $user = Auth::user();
             if ($user->school_id && $user->school) {
                 if (!$user->school->is_active) {
                     Auth::logout();
@@ -77,10 +88,21 @@ class AuthController extends Controller
 
         // If email login fails, try with username
         if (Auth::attempt(['username' => $loginField, 'password' => $password])) {
+            $user = Auth::user();
+
+            // Cegah akun siswa login melalui web (khusus aplikasi mobile)
+            if ($user->role === 'siswa' || $user->student()->exists()) {
+                Auth::logout();
+                $request->session()->invalidate();
+                $request->session()->regenerateToken();
+                return back()->withErrors([
+                    'email' => 'Akun siswa hanya dapat digunakan untuk login pada aplikasi mobile.',
+                ])->onlyInput('email');
+            }
+
             $request->session()->regenerate();
 
             // Check if user's school is active (skip for super admin)
-            $user = Auth::user();
             if ($user->school_id && $user->school) {
                 if (!$user->school->is_active) {
                     Auth::logout();

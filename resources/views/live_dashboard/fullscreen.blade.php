@@ -676,11 +676,16 @@
                     ? '<i class="fas fa-check-circle icon-ok"></i>'
                     : '<i class="fas fa-times-circle icon-fail"></i>';
 
+                let msgDisplay = log.message || '';
+                if (msgDisplay.includes('[Sync]')) {
+                    msgDisplay = `<span style="display:inline-flex;align-items:center;gap:4px;background:#1e3a8a;color:#93c5fd;border:1px solid #1d4ed8;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:bold;margin-right:6px;"><i class="fas fa-sync-alt"></i> Sync</span>` + msgDisplay.replace('[Sync]', '').trim();
+                }
+
                 return `<div class="log-row">
                     <div class="log-time">${log.time}</div>
                     <div><span class="log-badge ${b.cls}">${b.label}</span></div>
                     <div class="log-message">
-                        <div class="log-name">${log.message}</div>
+                        <div class="log-name">${msgDisplay}</div>
                         <div class="log-uid">${log.uid || '-'}</div>
                     </div>
                     <div class="log-icon">${icon}</div>

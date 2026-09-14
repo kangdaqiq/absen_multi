@@ -230,12 +230,17 @@
                             ? '<i class="fas fa-check-circle text-green-500"></i>'
                             : '<i class="fas fa-exclamation-circle text-red-500"></i>';
 
+                        let msgDisplay = log.message || '';
+                        if (msgDisplay.includes('[Sync]')) {
+                            msgDisplay = `<span class="inline-flex items-center gap-1 rounded bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 border border-blue-200 dark:border-blue-800 px-1.5 py-0.5 text-[10px] font-bold mr-1.5"><i class="fas fa-sync-alt"></i> Sync</span>` + msgDisplay.replace('[Sync]', '').trim();
+                        }
+
                         const row = `
                                 <tr class="border-t border-stroke dark:border-strokedark hover:bg-gray-50 dark:hover:bg-meta-4/20 transition-colors animate-fade-in">
                                     <td class="px-6 py-4 text-sm font-mono text-gray-600 dark:text-gray-400">${log.time}</td>
                                     <td class="px-6 py-4">${actionBadge}</td>
                                     <td class="px-6 py-4">
-                                        <p class="text-sm font-medium text-gray-800 dark:text-white">${log.message}</p>
+                                        <p class="text-sm font-medium text-gray-800 dark:text-white">${msgDisplay}</p>
                                         <p class="text-[10px] text-gray-400 font-mono">${log.uid || '-'}</p>
                                     </td>
                                     <td class="px-6 py-4 text-center text-xl">${statusIcon}</td>

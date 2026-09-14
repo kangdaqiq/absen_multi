@@ -369,7 +369,16 @@
                                         <span class="text-rose-600 dark:text-rose-400 font-bold"><i class="fas fa-times-circle"></i> NO</span>
                                     @endif
                                 </td>
-                                <td class="py-3.5 px-5 text-xs">{{ $log->message }}</td>
+                                <td class="py-3.5 px-5 text-xs">
+                                    @if(str_contains($log->message, '[Sync]'))
+                                        <span class="inline-flex items-center gap-1 rounded bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800 px-1.5 py-0.5 text-[10px] font-bold mr-1">
+                                            <i class="fas fa-sync-alt text-[9px]"></i> Sync
+                                        </span>
+                                        {{ trim(str_replace('[Sync]', '', $log->message)) }}
+                                    @else
+                                        {{ $log->message }}
+                                    @endif
+                                </td>
                                 <td class="py-3.5 px-5 text-[10px] text-gray-500 max-w-[200px] truncate" title="IP: {{ $log->ip_address }} | UA: {{ $log->user_agent }}">
                                     IP: {{ $log->ip_address }}<br>
                                     UA: {{ substr($log->user_agent, 0, 25) }}...

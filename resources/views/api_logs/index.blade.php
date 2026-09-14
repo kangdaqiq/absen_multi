@@ -38,6 +38,11 @@
                   {{ $tab === 'failed' ? 'border-orange-500 text-orange-500' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400' }}">
             Gagal Proses
         </a>
+        <a href="{{ request()->fullUrlWithQuery(['tab' => 'sync', 'page' => 1]) }}"
+           class="px-4 py-2 text-sm font-medium rounded-t border-b-2 transition flex items-center gap-1.5
+                  {{ $tab === 'sync' ? 'border-blue-500 text-blue-500' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400' }}">
+            <i class="fas fa-sync-alt text-xs"></i> Sync Offline
+        </a>
 
         {{-- Filter form --}}
         <form method="GET" class="ml-auto flex items-center gap-2 pb-2">
@@ -114,7 +119,14 @@
                         @endif
                     </td>
                     <td class="border-b border-[#eee] py-4 px-4 dark:border-strokedark align-top">
-                        <p class="text-gray-600 dark:text-gray-400 text-sm whitespace-pre-wrap">{{ \Illuminate\Support\Str::limit($log->message, 80) }}</p>
+                        <div class="flex items-start gap-1.5 flex-wrap">
+                            @if(str_contains($log->message, '[Sync]'))
+                            <span class="inline-flex items-center gap-1 rounded bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/60 px-2 py-0.5 text-xs font-semibold shadow-xs">
+                                <i class="fas fa-sync-alt text-[10px] text-blue-500"></i> Sync
+                            </span>
+                            @endif
+                            <p class="text-gray-600 dark:text-gray-400 text-sm whitespace-pre-wrap">{{ \Illuminate\Support\Str::limit(trim(str_replace('[Sync]', '', $log->message)), 80) }}</p>
+                        </div>
                     </td>
                     <td class="border-b border-[#eee] py-4 px-4 dark:border-strokedark align-top">
                         <code class="rounded bg-gray-100 px-1 py-0.5 text-xs text-brand-500 dark:bg-gray-800">

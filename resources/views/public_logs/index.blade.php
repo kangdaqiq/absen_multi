@@ -359,7 +359,14 @@
 
                                     <!-- Message & UID -->
                                     <td class="px-4 py-3 font-sans">
-                                        <div class="font-medium text-slate-800 dark:text-slate-200 leading-snug" x-text="log.message || '-'"></div>
+                                        <div class="font-medium text-slate-800 dark:text-slate-200 leading-snug flex items-center gap-1.5 flex-wrap">
+                                            <template x-if="log.message && log.message.includes('[Sync]')">
+                                                <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800/60 text-[10px] font-bold">
+                                                    <i class="fas fa-sync-alt text-[9px]"></i> Sync
+                                                </span>
+                                            </template>
+                                            <span x-text="log.message ? log.message.replace('[Sync]', '').trim() : '-'"></span>
+                                        </div>
                                         <div class="flex items-center gap-2 mt-1">
                                             <template x-if="log.uid">
                                                 <span class="inline-flex items-center gap-1 font-mono text-[10px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700">
@@ -452,7 +459,14 @@
 
                     <div class="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700/60 space-y-1">
                         <span class="text-slate-400 text-[10px] uppercase font-semibold">Pesan / Response Message</span>
-                        <p class="text-slate-800 dark:text-slate-100 font-medium" x-text="selectedLog?.message || '-'"></p>
+                        <p class="text-slate-800 dark:text-slate-100 font-medium flex items-center gap-2 flex-wrap">
+                            <template x-if="selectedLog?.message && selectedLog.message.includes('[Sync]')">
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-800/60 text-xs font-bold">
+                                    <i class="fas fa-sync-alt text-[10px]"></i> Sync
+                                </span>
+                            </template>
+                            <span x-text="selectedLog?.message ? selectedLog.message.replace('[Sync]', '').trim() : '-'"></span>
+                        </p>
                     </div>
 
                     <div class="grid grid-cols-2 gap-2">

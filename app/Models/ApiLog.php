@@ -16,6 +16,11 @@ class ApiLog extends Model
             if (empty($apiLog->api_key)) {
                 $apiLog->api_key = 'SYSTEM';
             }
+
+            // Tambahkan keterangan "[Sync]" jika request berasal dari sinkronisasi offline (membawa scanned_at)
+            if (function_exists('request') && request() && request()->filled('scanned_at') && !str_contains($apiLog->message ?? '', '[Sync]')) {
+                $apiLog->message = '[Sync] ' . ($apiLog->message ?? '');
+            }
         });
     }
 

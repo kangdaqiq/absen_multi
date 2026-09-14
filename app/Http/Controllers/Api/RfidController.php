@@ -34,6 +34,7 @@ class RfidController extends Controller
     private $currentUid = null;
     private $currentSchoolId = null;
     private $hasLogged = false;
+    private $isOfflineSync = false;
 
     public function __construct(\App\Services\WhatsAppService $wa)
     {
@@ -366,6 +367,7 @@ class RfidController extends Controller
                 $maxBack = now()->subDays(7);
                 if ($parsed->lte(now()) && $parsed->gte($maxBack)) {
                     $now = $parsed;
+                    $this->isOfflineSync = true;
                     Log::info("[OFFLINE SYNC] uid={$uid} scanned_at={$scannedAt}");
                 }
             } catch (\Exception $e) {
@@ -974,6 +976,10 @@ class RfidController extends Controller
     private function logRequest($apiKey, $action, $uid, $success, $message)
     {
         $this->hasLogged = true;
+
+        if ($this->isOfflineSync && !str_contains($message, '[Sync]')) {
+            $message = '[Sync] ' . $message;
+        }
 
         ApiLog::create([
             'school_id' => $this->currentSchoolId,

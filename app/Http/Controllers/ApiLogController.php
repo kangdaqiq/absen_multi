@@ -22,12 +22,14 @@ class ApiLogController extends Controller
             }
         }
 
-        // Filter: tab (auth_failed / semua)
+        // Filter: tab (auth_failed / failed / sync / all)
         $tab = $request->input('tab', 'all');
         if ($tab === 'auth_failed') {
             $query->where('action', 'auth_failed');
         } elseif ($tab === 'failed') {
             $query->where('success', false)->where('action', '!=', 'auth_failed');
+        } elseif ($tab === 'sync') {
+            $query->where('message', 'like', '%[Sync]%');
         }
 
         // Filter: IP Address

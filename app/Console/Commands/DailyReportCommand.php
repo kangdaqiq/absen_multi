@@ -796,6 +796,11 @@ class DailyReportCommand extends Command
             ->get()
             ->keyBy('guru_id');
 
+        // Jika tidak ada satu pun guru yang absen hari ini, lewati rekap guru
+        if ($guruAttendances->isEmpty()) {
+            return [];
+        }
+
         $guruHadir = 0;
         $guruTepatWaktu = 0;
         $guruTerlambat = 0;

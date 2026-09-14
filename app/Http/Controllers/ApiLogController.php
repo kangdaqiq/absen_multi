@@ -32,6 +32,11 @@ class ApiLogController extends Controller
             $query->where('message', 'like', '%[Sync]%');
         }
 
+        // Filter: UID
+        if ($request->filled('uid')) {
+            $query->where('uid', 'like', '%' . trim($request->uid) . '%');
+        }
+
         // Filter: IP Address
         if ($request->filled('ip')) {
             $query->where('ip_address', $request->ip);

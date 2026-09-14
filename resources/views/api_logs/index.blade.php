@@ -45,14 +45,17 @@
         </a>
 
         {{-- Filter form --}}
-        <form method="GET" class="ml-auto flex items-center gap-2 pb-2">
+        <form method="GET" class="ml-auto flex flex-wrap items-center gap-2 pb-2">
             <input type="hidden" name="tab" value="{{ $tab }}">
+            <input type="text" name="uid" value="{{ request('uid') }}"
+                   placeholder="Filter UID..."
+                   class="rounded border border-stroke px-3 py-1.5 text-sm dark:border-strokedark dark:bg-meta-4 dark:text-white focus:border-brand-500 focus:outline-none uppercase font-mono w-32 sm:w-36">
             <input type="text" name="ip" value="{{ request('ip') }}"
                    placeholder="Filter IP..."
-                   class="rounded border border-stroke px-3 py-1.5 text-sm dark:border-strokedark dark:bg-meta-4 dark:text-white focus:border-brand-500 focus:outline-none">
+                   class="rounded border border-stroke px-3 py-1.5 text-sm dark:border-strokedark dark:bg-meta-4 dark:text-white focus:border-brand-500 focus:outline-none w-32 sm:w-36">
             <input type="date" name="date" value="{{ request('date') }}"
                    class="rounded border border-stroke px-3 py-1.5 text-sm dark:border-strokedark dark:bg-meta-4 dark:text-white focus:border-brand-500 focus:outline-none">
-            <button type="submit" class="rounded bg-brand-500 px-3 py-1.5 text-sm text-white hover:bg-brand-600 transition">
+            <button type="submit" class="rounded bg-brand-500 px-3 py-1.5 text-sm text-white hover:bg-brand-600 transition" title="Cari">
                 <i class="fas fa-search"></i>
             </button>
             <a href="{{ route('api-logs.index') }}" class="rounded border border-stroke px-3 py-1.5 text-sm text-gray-500 hover:text-gray-700 transition dark:border-strokedark dark:text-gray-400">
@@ -96,7 +99,15 @@
                         @endif
                     </td>
                     <td class="border-b border-[#eee] py-4 px-4 dark:border-strokedark align-top">
-                        <p class="text-gray-500 dark:text-gray-400 font-mono text-xs">{{ $log->uid ?? '-' }}</p>
+                        @if($log->uid)
+                        <a href="{{ request()->fullUrlWithQuery(['uid' => $log->uid, 'page' => 1]) }}"
+                           class="text-brand-500 hover:text-brand-600 hover:underline font-mono text-xs font-semibold"
+                           title="Klik untuk filter UID ini">
+                            {{ $log->uid }}
+                        </a>
+                        @else
+                        <p class="text-gray-400 font-mono text-xs">-</p>
+                        @endif
                     </td>
                     @if($isSuperAdmin)
                     <td class="border-b border-[#eee] py-4 px-4 dark:border-strokedark align-top">

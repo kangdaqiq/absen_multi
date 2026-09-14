@@ -22,6 +22,13 @@ class Siswa extends Model
     protected static function booted()
     {
         static::deleting(function ($siswa) {
+            $fingerIds = $siswa->fingerprints()->pluck('finger_id')->toArray();
+            if ($siswa->id_finger && !in_array($siswa->id_finger, $fingerIds)) {
+                $fingerIds[] = (int)$siswa->id_finger;
+            }
+            if (!empty($fingerIds) && $siswa->school_id) {
+                Device::queueFingerDeletion($siswa->school_id, $fingerIds);
+            }
             $siswa->fingerprints()->delete();
         });
     }

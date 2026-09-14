@@ -194,11 +194,25 @@ return $this->response(false, 'gagal', 'Finger ID required');
             return $this->response(false, 'gagal', 'Auth Failed');
         }
 
-        // Cek apakah ada perintah delete di cache
-        $deleteId = \Illuminate\Support\Facades\Cache::pull('delete_finger_' . $device->id);
+        // Cek apakah ada perintah delete di cache (mendukung antrean delete_finger_queue)
+        $deleteQueue = \Illuminate\Support\Facades\Cache::get('delete_finger_queue_' . $device->id, []);
+        $deleteId = null;
+        if (!empty($deleteQueue) && is_array($deleteQueue)) {
+            $deleteId = array_shift($deleteQueue);
+            if (!empty($deleteQueue)) {
+                \Illuminate\Support\Facades\Cache::put('delete_finger_queue_' . $device->id, $deleteQueue, now()->addMinutes(30));
+                \Illuminate\Support\Facades\Cache::put('delete_finger_' . $device->id, $deleteQueue[0], now()->addMinutes(30));
+            } else {
+                \Illuminate\Support\Facades\Cache::forget('delete_finger_queue_' . $device->id);
+                \Illuminate\Support\Facades\Cache::forget('delete_finger_' . $device->id);
+            }
+        }
+        if (!$deleteId) {
+            $deleteId = \Illuminate\Support\Facades\Cache::pull('delete_finger_' . $device->id);
+        }
         if ($deleteId) {
             return $this->response(true, 'delete_mode', 'Delete Mode Active', 'ok', [
-                'enroll_id' => $deleteId, // reuse parameter enroll_id untuk id yang akan dihapus
+                'enroll_id' => (int)$deleteId, // reuse parameter enroll_id untuk id yang akan dihapus
                 'type' => 'delete'
             ]);
         }

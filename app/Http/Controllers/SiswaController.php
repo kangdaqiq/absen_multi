@@ -584,30 +584,8 @@ class SiswaController extends Controller
             $fingerIds[] = (int)$targetId;
         }
 
-        // Ambil semua perangkat terdaftar di sekolah ini
-        $schoolDevices = Device::where('school_id', $siswa->school_id)->get();
-
-        foreach ($schoolDevices as $device) {
-            foreach ($fingerIds as $fId) {
-                // Set cache delete untuk di-poll oleh ESP8266
-                \Illuminate\Support\Facades\Cache::put('delete_finger_' . $device->id, $fId, now()->addMinutes(15));
-            }
-
-            // HTTP Push jika IP tersedia
-            $lastLog = ApiLog::where('api_key', $device->api_key)
-                ->whereNotNull('ip_address')
-                ->orderBy('created_at', 'desc')
-                ->first();
-
-            if ($lastLog && $lastLog->ip_address) {
-                foreach ($fingerIds as $fId) {
-                    try {
-                        Http::timeout(2)->get("http://{$lastLog->ip_address}/delete-finger?id=" . $fId);
-                    } catch (\Exception $e) {
-                        \Log::warning("Failed to push delete to ESP {$lastLog->ip_address}: " . $e->getMessage());
-                    }
-                }
-            }
+        if (!empty($fingerIds) && $siswa->school_id) {
+            Device::queueFingerDeletion($siswa->school_id, $fingerIds);
         }
 
         // Hapus dari database
@@ -628,11 +606,12 @@ class SiswaController extends Controller
             $query->where('school_id', auth()->user()->school_id);
         }
         
-        $targetIds = $query->pluck('id')->toArray();
-        if (!empty($targetIds)) {
-            SiswaFingerprint::whereIn('student_id', $targetIds)->delete();
+        $targetSiswas = $query->get();
+        $count = 0;
+        foreach ($targetSiswas as $siswa) {
+            $siswa->delete();
+            $count++;
         }
-        $count = Siswa::whereIn('id', $targetIds)->delete();
 
         return response()->json([
             'success' => true,

@@ -14,6 +14,13 @@ class GateCard extends Model
     protected static function booted()
     {
         static::deleting(function ($gateCard) {
+            $fingerIds = $gateCard->fingerprints()->pluck('finger_id')->toArray();
+            if ($gateCard->id_finger && !in_array($gateCard->id_finger, $fingerIds)) {
+                $fingerIds[] = (int)$gateCard->id_finger;
+            }
+            if (!empty($fingerIds) && $gateCard->school_id) {
+                Device::queueFingerDeletion($gateCard->school_id, $fingerIds);
+            }
             $gateCard->fingerprints()->delete();
         });
     }

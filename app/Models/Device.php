@@ -45,4 +45,46 @@ class Device extends Model
             $model->created_at = $model->created_at ?? now();
         });
     }
+
+    /**
+     * Antrekan ID sidik jari untuk dihapus dari fisik sensor perangkat di sekolah terkait
+     */
+    public static function queueFingerDeletion($schoolId, array $fingerIds)
+    {
+        $fingerIds = array_values(array_unique(array_filter(array_map('intval', $fingerIds))));
+        if (empty($fingerIds) || !$schoolId) {
+            return;
+        }
+
+        $devices = static::where('school_id', $schoolId)->get();
+        foreach ($devices as $device) {
+            // 1. Antrekan di cache untuk di-poll oleh perangkat
+            $queueKey = 'delete_finger_queue_' . $device->id;
+            $existingQueue = \Illuminate\Support\Facades\Cache::get($queueKey, []);
+            if (!is_array($existingQueue)) {
+                $existingQueue = [];
+            }
+            $mergedQueue = array_values(array_unique(array_merge($existingQueue, $fingerIds)));
+            \Illuminate\Support\Facades\Cache::put($queueKey, $mergedQueue, now()->addMinutes(30));
+
+            // Simpan juga single key legacy
+            \Illuminate\Support\Facades\Cache::put('delete_finger_' . $device->id, $mergedQueue[0], now()->addMinutes(30));
+
+            // 2. HTTP Push langsung jika IP perangkat tercatat di log terakhir
+            $lastLog = \App\Models\ApiLog::where('api_key', $device->api_key)
+                ->whereNotNull('ip_address')
+                ->orderBy('created_at', 'desc')
+                ->first();
+
+            if ($lastLog && $lastLog->ip_address) {
+                foreach ($fingerIds as $fId) {
+                    try {
+                        \Illuminate\Support\Facades\Http::timeout(2)->get("http://{$lastLog->ip_address}/delete-finger?id=" . $fId);
+                    } catch (\Throwable $e) {
+                        // Abaikan jika perangkat sedang offline / unreachable
+                    }
+                }
+            }
+        }
+    }
 }

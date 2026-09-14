@@ -14,6 +14,13 @@ class Guru extends Model
     protected static function booted()
     {
         static::deleting(function ($guru) {
+            $fingerIds = $guru->fingerprints()->pluck('finger_id')->toArray();
+            if ($guru->id_finger && !in_array($guru->id_finger, $fingerIds)) {
+                $fingerIds[] = (int)$guru->id_finger;
+            }
+            if (!empty($fingerIds) && $guru->school_id) {
+                Device::queueFingerDeletion($guru->school_id, $fingerIds);
+            }
             $guru->fingerprints()->delete();
         });
     }

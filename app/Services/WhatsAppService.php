@@ -50,6 +50,16 @@ class WhatsAppService
         $siswaEnabled = $schoolId ? (\App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'notification_wa_siswa')->value('setting_value') !== 'false') : true;
         $ortuEnabled = $schoolId ? (\App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'notification_wa_ortu')->value('setting_value') !== 'false') : true;
 
+        $statusMap = [
+            'H' => 'Hadir',
+            'T' => 'Terlambat',
+            'S' => 'Sakit',
+            'I' => 'Izin',
+            'A' => 'Alpha',
+            'B' => 'Bolos',
+        ];
+        $readableStatus = $statusMap[strtoupper($status)] ?? ($status ?: 'Hadir');
+
         // Determine if late based on status and keterangan
         $isLate = (
             strtoupper($status) === 'T' ||

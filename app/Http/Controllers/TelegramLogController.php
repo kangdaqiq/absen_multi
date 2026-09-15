@@ -7,9 +7,10 @@ use App\Models\TelegramLog;
 
 class TelegramLogController extends Controller
 {
-    public function index(Request $request)
+    public function index(Request $request, \App\Services\NotificationDeliveryService $deliveryService)
     {
         $query = TelegramLog::orderBy('created_at', 'desc');
+        $schoolId = null;
 
         if (!auth()->user()->isSuperAdmin()) {
             $schoolId = auth()->user()->school_id;
@@ -26,7 +27,9 @@ class TelegramLogController extends Controller
                   ->orWhere('message', 'like', "%{$search}%");
         }
 
+        $deliveryStats = $deliveryService->getTodayDeliveryStats($schoolId);
+
         $logs = $query->paginate(20)->withQueryString();
-        return view('telegram.logs', compact('logs'));
+        return view('telegram.logs', compact('logs', 'deliveryStats'));
     }
 }

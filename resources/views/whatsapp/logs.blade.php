@@ -35,6 +35,141 @@
     </div>
 @endif
 
+<!-- Delivery Notification Stats Today -->
+<div class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <!-- Card 1: WA Delivery vs Absen Terkini -->
+    <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-sm dark:border-gray-800 dark:bg-gray-dark">
+        <div class="flex items-center justify-between">
+            <div>
+                <span class="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                    Delivery WA vs Absen
+                </span>
+                <div class="mt-2 flex items-baseline gap-2">
+                    <h3 class="text-2xl font-bold text-gray-800 dark:text-white">
+                        {{ $deliveryStats['wa']['percent_of_absen'] }}%
+                    </h3>
+                    <span class="text-xs font-medium text-gray-500 dark:text-gray-400">
+                        ({{ $deliveryStats['wa']['sent'] }}/{{ $deliveryStats['absen_count'] }} absen)
+                    </span>
+                </div>
+            </div>
+            <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400">
+                <i class="fab fa-whatsapp text-2xl"></i>
+            </div>
+        </div>
+
+        <!-- Progress Bar -->
+        <div class="mt-4">
+            <div class="h-2 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
+                <div class="h-full rounded-full bg-emerald-500 transition-all duration-500"
+                     style="width: {{ min(100, $deliveryStats['wa']['percent_of_absen']) }}%;"></div>
+            </div>
+            <div class="mt-2 flex items-center justify-between text-[11px] text-gray-500 dark:text-gray-400">
+                <span>Sukses: {{ $deliveryStats['wa']['sent'] }}</span>
+                <span>Absen: {{ $deliveryStats['absen_count'] }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Card 2: Queue Status WhatsApp -->
+    <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-sm dark:border-gray-800 dark:bg-gray-dark">
+        <div class="flex items-center justify-between">
+            <div>
+                <span class="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                    Status Antrean WA Hari Ini
+                </span>
+                <div class="mt-2 flex items-baseline gap-2">
+                    <h3 class="text-2xl font-bold text-gray-800 dark:text-white">
+                        {{ $deliveryStats['wa']['total'] }}
+                    </h3>
+                    <span class="text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                        {{ $deliveryStats['wa']['success_rate'] }}% terkirim
+                    </span>
+                </div>
+            </div>
+            <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-brand-50 text-brand-500 dark:bg-brand-500/15 dark:text-brand-400">
+                <i class="fas fa-paper-plane text-xl"></i>
+            </div>
+        </div>
+
+        <div class="mt-4 flex flex-wrap gap-1.5 pt-1">
+            <span class="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400">
+                <span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                Sent: {{ $deliveryStats['wa']['sent'] }}
+            </span>
+            <span class="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700 dark:bg-amber-500/15 dark:text-amber-400">
+                <span class="h-1.5 w-1.5 rounded-full bg-amber-500"></span>
+                Antrean: {{ $deliveryStats['wa']['pending'] }}
+            </span>
+            <span class="inline-flex items-center gap-1 rounded-md bg-rose-50 px-2 py-1 text-xs font-medium text-rose-700 dark:bg-rose-500/15 dark:text-rose-400">
+                <span class="h-1.5 w-1.5 rounded-full bg-rose-500"></span>
+                Gagal: {{ $deliveryStats['wa']['failed'] }}
+            </span>
+        </div>
+    </div>
+
+    <!-- Card 3: Absen Terkini Hari Ini -->
+    <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-sm dark:border-gray-800 dark:bg-gray-dark">
+        <div class="flex items-center justify-between">
+            <div>
+                <span class="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                    Absen Terkini Hari Ini
+                </span>
+                <div class="mt-2 flex items-baseline gap-2">
+                    <h3 class="text-2xl font-bold text-gray-800 dark:text-white">
+                        {{ $deliveryStats['absen_count'] }}
+                    </h3>
+                    <span class="text-xs font-medium text-gray-500 dark:text-gray-400">
+                        orang
+                    </span>
+                </div>
+            </div>
+            <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-purple-50 text-purple-600 dark:bg-purple-500/15 dark:text-purple-400">
+                <i class="fas fa-user-check text-xl"></i>
+            </div>
+        </div>
+
+        <div class="mt-4 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 pt-1">
+            <span>Siswa: <strong class="text-gray-700 dark:text-gray-200">{{ $deliveryStats['absen_detail']['siswa'] ?? 0 }}</strong></span>
+            <span>&bull;</span>
+            <span>Guru: <strong class="text-gray-700 dark:text-gray-200">{{ $deliveryStats['absen_detail']['guru'] ?? 0 }}</strong></span>
+            <span>&bull;</span>
+            <span>Total: <strong class="text-gray-700 dark:text-gray-200">{{ $deliveryStats['absen_count'] }}</strong></span>
+        </div>
+    </div>
+
+    <!-- Card 4: Pembanding Telegram Delivery -->
+    <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-sm dark:border-gray-800 dark:bg-gray-dark">
+        <div class="flex items-center justify-between">
+            <div>
+                <span class="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                    Delivery Telegram vs Absen
+                </span>
+                <div class="mt-2 flex items-baseline gap-2">
+                    <h3 class="text-2xl font-bold text-sky-600 dark:text-sky-400">
+                        {{ $deliveryStats['telegram']['percent_of_absen'] }}%
+                    </h3>
+                    <span class="text-xs font-medium text-gray-500 dark:text-gray-400">
+                        ({{ $deliveryStats['telegram']['sent'] }}/{{ $deliveryStats['absen_count'] }})
+                    </span>
+                </div>
+            </div>
+            <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-sky-50 text-sky-600 dark:bg-sky-500/15 dark:text-sky-400">
+                <i class="fab fa-telegram-plane text-2xl"></i>
+            </div>
+        </div>
+
+        <div class="mt-4 flex items-center justify-between pt-1">
+            <span class="text-xs text-gray-500 dark:text-gray-400">
+                Sent: <strong>{{ $deliveryStats['telegram']['sent'] }}</strong> | Gagal: <strong>{{ $deliveryStats['telegram']['failed'] }}</strong>
+            </span>
+            <a href="{{ route('telegram-logs.index') }}" class="text-xs font-semibold text-sky-600 hover:text-sky-700 dark:text-sky-400 dark:hover:text-sky-300">
+                Log Telegram &rarr;
+            </a>
+        </div>
+    </div>
+</div>
+
 <div class="rounded-2xl border border-gray-200 bg-white shadow-theme-sm dark:border-gray-800 dark:bg-gray-dark">
     <!-- Header & Search -->
     <div class="flex flex-col sm:flex-row justify-between items-center px-5 py-4 border-b border-gray-200 dark:border-gray-800 gap-4">

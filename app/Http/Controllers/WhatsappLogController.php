@@ -7,9 +7,10 @@ use App\Models\MessageQueue;
 
 class WhatsappLogController extends Controller
 {
-    public function index(Request $request)
+    public function index(Request $request, \App\Services\NotificationDeliveryService $deliveryService)
     {
         $query = MessageQueue::orderBy('created_at', 'desc');
+        $schoolId = null;
 
         if (!auth()->user()->isSuperAdmin()) {
             $schoolId = auth()->user()->school_id;
@@ -28,8 +29,10 @@ class WhatsappLogController extends Controller
             });
         }
 
+        $deliveryStats = $deliveryService->getTodayDeliveryStats($schoolId);
+
         $logs = $query->paginate(20)->withQueryString();
-        return view('whatsapp.logs', compact('logs'));
+        return view('whatsapp.logs', compact('logs', 'deliveryStats'));
     }
 
     public function clearPending()

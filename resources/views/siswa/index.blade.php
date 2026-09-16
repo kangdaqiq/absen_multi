@@ -502,6 +502,14 @@
 
 <!-- Modal Import -->
 <x-ui.modal id="modalImportSiswa" :is-open="false" class="max-w-xl">
+    <style>
+        .custom-scroll-box::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scroll-box::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
+        .dark .custom-scroll-box::-webkit-scrollbar-track { background: #1e293b; }
+        .custom-scroll-box::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .custom-scroll-box::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        .dark .custom-scroll-box::-webkit-scrollbar-thumb { background: #475569; }
+    </style>
     <div class="p-6" x-data="importFormSiswa()">
         <div class="flex items-center justify-between mb-5">
             <h3 class="text-xl font-bold text-gray-800 dark:text-white/90">Import Data Siswa</h3>
@@ -594,9 +602,9 @@
                     </div>
 
                     <!-- Scrollable List -->
-                    <div class="max-h-56 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
+                    <div class="custom-scroll-box rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900" style="max-height: 280px; overflow-y: auto; display: block;">
                         <table class="w-full text-left text-xs text-gray-600 dark:text-gray-300">
-                            <thead class="sticky top-0 bg-gray-100 dark:bg-gray-800 font-semibold text-gray-700 dark:text-gray-200 border-b border-gray-200 dark:border-gray-700">
+                            <thead class="bg-gray-100 dark:bg-gray-800 font-semibold text-gray-700 dark:text-gray-200 border-b border-gray-200 dark:border-gray-700" style="position: sticky; top: 0; z-index: 10;">
                                 <tr>
                                     <th class="px-3 py-2 w-20">Baris</th>
                                     <th class="px-3 py-2 w-36">Nama / NIS</th>

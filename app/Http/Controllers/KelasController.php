@@ -141,7 +141,8 @@ class KelasController extends Controller
             $rows = $sheet->toArray();
 
             $countSuccess = 0;
-            $countSkip = 0;
+            $failures = [];
+            $excelRowIndex = 0;
             $firstRow = true;
             $schoolId = auth()->user()->isSuperAdmin() ? null : auth()->user()->school_id;
 
@@ -156,23 +157,44 @@ class KelasController extends Controller
             })->toArray();
 
             foreach ($rows as $row) {
+                $excelRowIndex++;
                 if ($firstRow) {
                     $firstRow = false;
                     continue;
                 }
 
-                $namaKelas = trim($row[0] ?? '');
-                $namaWali = trim($row[1] ?? '');
-                $namaWali2 = trim($row[2] ?? '');
+                // Skip pure blank rows
+                $hasContent = false;
+                foreach ($row as $cell) {
+                    if ($cell !== null && trim((string)$cell) !== '') {
+                        $hasContent = true;
+                        break;
+                    }
+                }
+                if (!$hasContent) {
+                    continue;
+                }
+
+                $namaKelas = trim((string)($row[0] ?? ''));
+                $namaWali = trim((string)($row[1] ?? ''));
+                $namaWali2 = trim((string)($row[2] ?? ''));
 
                 if ($namaKelas === '') {
-                    $countSkip++;
+                    $failures[] = [
+                        'row' => $excelRowIndex,
+                        'nama' => '-',
+                        'reason' => 'Nama kelas (Kolom A) kosong.'
+                    ];
                     continue;
                 }
 
                 // Skip if class already exists
                 if (in_array(strtolower($namaKelas), $existingClasses)) {
-                    $countSkip++;
+                    $failures[] = [
+                        'row' => $excelRowIndex,
+                        'nama' => $namaKelas,
+                        'reason' => "Nama kelas '{$namaKelas}' sudah terdaftar dalam sistem (duplikat)."
+                    ];
                     continue;
                 }
 
@@ -186,20 +208,36 @@ class KelasController extends Controller
                     $waliKelas2Id = $gurus[strtolower($namaWali2)] ?? null;
                 }
 
-                Kelas::create([
-                    'nama_kelas' => $namaKelas,
-                    'wali_kelas_id' => $waliKelasId,
-                    'wali_kelas_2_id' => $waliKelas2Id,
-                    'school_id' => $schoolId,
-                    'is_active_attendance' => true,
-                    'is_active_report' => false,
-                ]);
+                try {
+                    Kelas::create([
+                        'nama_kelas' => $namaKelas,
+                        'wali_kelas_id' => $waliKelasId,
+                        'wali_kelas_2_id' => $waliKelas2Id,
+                        'school_id' => $schoolId,
+                        'is_active_attendance' => true,
+                        'is_active_report' => false,
+                    ]);
 
-                $existingClasses[] = strtolower($namaKelas);
-                $countSuccess++;
+                    $existingClasses[] = strtolower($namaKelas);
+                    $countSuccess++;
+                } catch (\Throwable $e) {
+                    $failures[] = [
+                        'row' => $excelRowIndex,
+                        'nama' => $namaKelas,
+                        'reason' => 'Error simpan: ' . \Illuminate\Support\Str::limit($e->getMessage(), 100)
+                    ];
+                }
             }
 
-            return redirect()->route('kelas.index')->with('success', "Import selesai. Berhasil: $countSuccess. Dilewati/Gagal: $countSkip.");
+            $countSkip = count($failures);
+            $message = "Import selesai. Berhasil: {$countSuccess}. Dilewati/Gagal: {$countSkip}.";
+            if ($countSuccess === 0 && $countSkip > 0) {
+                $message = "Import gagal: 0 kelas berhasil diimpor, {$countSkip} data dilewati/gagal.";
+            }
+
+            return redirect()->route('kelas.index')
+                ->with($countSuccess > 0 ? 'success' : 'error', $message)
+                ->with('import_errors', $failures);
         } catch (\Throwable $e) {
             \Log::error('Import Kelas Error: ' . $e->getMessage());
             return redirect()->route('kelas.index')->with('error', 'Gagal import: ' . $e->getMessage());

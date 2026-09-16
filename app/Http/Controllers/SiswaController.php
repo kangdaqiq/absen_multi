@@ -216,7 +216,8 @@ class SiswaController extends Controller
             $rows = $sheet->toArray();
 
             $countSuccess = 0;
-            $countSkip = 0;
+            $failures = [];
+            $excelRowIndex = 0;
             $firstRow = true;
             $schoolId = auth()->user()->isSuperAdmin() ? null : auth()->user()->school_id;
 
@@ -233,27 +234,40 @@ class SiswaController extends Controller
                 return [strtolower(trim($nama)) => $id];
             })->toArray();
 
-            // Scope Existing NIS by School
+            // Scope Existing NIS by School (convert all to string for strict comparison)
             $existingNisQuery = Siswa::query();
             if ($schoolId) {
                 $existingNisQuery->where('school_id', $schoolId);
             }
-            $existingNis = $existingNisQuery->pluck('nis')->toArray();
+            $existingNis = $existingNisQuery->pluck('nis')->map(fn($v) => trim((string)$v))->toArray();
 
             foreach ($rows as $row) {
+                $excelRowIndex++;
                 if ($firstRow) {
                     $firstRow = false;
                     continue;
                 }
 
-                try {
-                    $nama = trim($row[0] ?? '');
-                    $nis = trim($row[1] ?? '');
+                // Cek jika seluruh kolom dalam baris ini kosong (baris kosong tak terpakai di Excel)
+                $hasContent = false;
+                foreach ($row as $cell) {
+                    if ($cell !== null && trim((string)$cell) !== '') {
+                        $hasContent = true;
+                        break;
+                    }
+                }
+                if (!$hasContent) {
+                    continue; // Lewati baris kosong murni tanpa dicatat error
+                }
 
+                $nama = trim((string)($row[0] ?? ''));
+                $nis = trim((string)($row[1] ?? ''));
+
+                try {
                     // Column C (Index 2): Tgl Lahir
-                    $tglLahirRaw = trim($row[2] ?? '');
+                    $tglLahirRaw = trim((string)($row[2] ?? ''));
                     $tglLahir = null;
-                    if ($tglLahirRaw) {
+                    if ($tglLahirRaw !== '') {
                         try {
                             // Support dd/mm/yyyy (primary), yyyy/mm/dd, yyyy-mm-dd, and other Carbon-parseable formats
                             if (preg_match('/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/', $tglLahirRaw, $m)) {
@@ -274,24 +288,54 @@ class SiswaController extends Controller
                     }
 
                     // Column D (Index 3): Kelas
-                    $namaKelas = trim($row[3] ?? '');
+                    $namaKelas = trim((string)($row[3] ?? ''));
 
                     // Column E (Index 4): WA Siswa
-                    $wa = isset($row[4]) ? trim($row[4]) : null;
+                    $wa = isset($row[4]) ? trim((string)$row[4]) : null;
 
                     // Column F (Index 5): WA Ortu
-                    $waOrtu = isset($row[5]) ? trim($row[5]) : null;
+                    $waOrtu = isset($row[5]) ? trim((string)$row[5]) : null;
 
                     // Column G (Index 6): Alamat
-                    $alamat = isset($row[6]) ? trim($row[6]) : null;
+                    $alamat = isset($row[6]) ? trim((string)$row[6]) : null;
 
-                    if ($nama === '' || $nis === '') {
-                        $countSkip++;
+                    if ($nama === '' && $nis === '') {
+                        $failures[] = [
+                            'row' => $excelRowIndex,
+                            'nama' => '-',
+                            'nis' => '-',
+                            'reason' => 'Kolom Nama (A) dan NIS (B) kosong. Pastikan urutan kolom sesuai template.'
+                        ];
                         continue;
                     }
 
-                    if (in_array($nis, $existingNis)) {
-                        $countSkip++;
+                    if ($nama === '') {
+                        $failures[] = [
+                            'row' => $excelRowIndex,
+                            'nama' => '-',
+                            'nis' => $nis,
+                            'reason' => 'Nama siswa (Kolom A) kosong.'
+                        ];
+                        continue;
+                    }
+
+                    if ($nis === '') {
+                        $failures[] = [
+                            'row' => $excelRowIndex,
+                            'nama' => $nama,
+                            'nis' => '-',
+                            'reason' => 'NIS siswa (Kolom B) kosong.'
+                        ];
+                        continue;
+                    }
+
+                    if (in_array($nis, $existingNis, true)) {
+                        $failures[] = [
+                            'row' => $excelRowIndex,
+                            'nama' => $nama,
+                            'nis' => $nis,
+                            'reason' => "NIS '{$nis}' sudah terdaftar dalam sistem (duplikat)."
+                        ];
                         continue;
                     }
 
@@ -309,20 +353,24 @@ class SiswaController extends Controller
 
                     // Check Quota Limit before creating
                     if ($school && !$school->hasStudentQuota()) {
-                        if ($request->wantsJson()) {
-                            return response()->json(['success' => false, 'message' => "Import dihentikan: Kuota siswa penuh ({$school->student_limit} siswa). Berhasil diimpor: {$countSuccess} siswa."]);
-                        }
-                        return redirect()->route('siswa.index')
-                            ->with('error', "Import dihentikan: Kuota siswa penuh ({$school->student_limit} siswa). Berhasil diimpor: {$countSuccess} siswa.");
+                        $failures[] = [
+                            'row' => $excelRowIndex,
+                            'nama' => $nama,
+                            'nis' => $nis,
+                            'reason' => "Kuota siswa penuh (Batas: {$school->student_limit} siswa)."
+                        ];
+                        break;
                     }
 
                     // Check global license quota for self_hosted
                     if ($licenseService && !$licenseService->hasGlobalStudentQuota()) {
-                        if ($request->wantsJson()) {
-                            return response()->json(['success' => false, 'message' => "Import dihentikan: Kuota global siswa lisensi penuh. Berhasil diimpor: {$countSuccess} siswa."]);
-                        }
-                        return redirect()->route('siswa.index')
-                            ->with('error', "Import dihentikan: Kuota global siswa lisensi penuh. Berhasil diimpor: {$countSuccess} siswa.");
+                        $failures[] = [
+                            'row' => $excelRowIndex,
+                            'nama' => $nama,
+                            'nis' => $nis,
+                            'reason' => "Kuota global siswa lisensi penuh."
+                        ];
+                        break;
                     }
 
                     $siswa = Siswa::create([
@@ -337,24 +385,57 @@ class SiswaController extends Controller
                         'created_at' => now()
                     ]);
 
-
                     $existingNis[] = $nis;
                     $countSuccess++;
                 } catch (\Throwable $e) {
-                    \Illuminate\Support\Facades\Log::error("Import Row Error (NIS: " . ($row[1] ?? 'unknown') . "): " . $e->getMessage());
-                    $countSkip++;
+                    \Illuminate\Support\Facades\Log::error("Import Row Error (Baris {$excelRowIndex}, NIS: " . ($row[1] ?? 'unknown') . "): " . $e->getMessage());
+                    $errMsg = $e->getMessage();
+                    if (str_contains($errMsg, 'Duplicate entry')) {
+                        $reason = "Data duplikat di database (NIS atau data unik lainnya sudah ada).";
+                    } elseif (str_contains($errMsg, 'Data truncated') || str_contains($errMsg, 'Incorrect date')) {
+                        $reason = "Format tanggal lahir atau tipe data kolom tidak valid.";
+                    } else {
+                        $reason = "Error database: " . \Illuminate\Support\Str::limit($errMsg, 100);
+                    }
+                    $failures[] = [
+                        'row' => $excelRowIndex,
+                        'nama' => $nama ?: '-',
+                        'nis' => $nis ?: '-',
+                        'reason' => $reason
+                    ];
                 }
             }
 
-            if ($request->wantsJson()) {
-                return response()->json(['success' => true, 'message' => "Import selesai. Berhasil: $countSuccess. Dilewati/Gagal: $countSkip."]);
+            $countSkip = count($failures);
+            if ($countSuccess > 0 && $countSkip === 0) {
+                $message = "Import berhasil! Seluruh {$countSuccess} data siswa berhasil diimpor.";
+                $status = 'success';
+            } elseif ($countSuccess > 0 && $countSkip > 0) {
+                $message = "Import selesai sebagian: {$countSuccess} berhasil, {$countSkip} dilewati/gagal.";
+                $status = 'partial';
+            } else {
+                $message = "Import gagal: 0 siswa berhasil diimpor, {$countSkip} data dilewati/gagal.";
+                $status = 'failed';
             }
-            return redirect()->route('siswa.index')->with('success', "Import selesai. Berhasil: $countSuccess. Dilewati/Gagal: $countSkip.");
+
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'success' => $countSuccess > 0,
+                    'status' => $status,
+                    'count_success' => $countSuccess,
+                    'count_skip' => $countSkip,
+                    'message' => $message,
+                    'errors' => $failures
+                ]);
+            }
+            return redirect()->route('siswa.index')
+                ->with($countSuccess > 0 ? 'success' : 'error', $message)
+                ->with('import_errors', $failures);
 
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::error('Import Siswa Error: ' . $e->getMessage());
             if ($request->wantsJson()) {
-                return response()->json(['success' => false, 'message' => 'Gagal import: ' . $e->getMessage()]);
+                return response()->json(['success' => false, 'status' => 'failed', 'message' => 'Gagal membaca/memproses file Excel: ' . $e->getMessage(), 'errors' => []]);
             }
             return redirect()->route('siswa.index')->with('error', 'Gagal import: ' . $e->getMessage());
         }

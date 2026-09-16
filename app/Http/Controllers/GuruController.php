@@ -423,83 +423,146 @@ class GuruController extends Controller
             $rows = $sheet->toArray();
 
             $countSuccess = 0;
-            $countSkip = 0;
+            $failures = [];
+            $excelRowIndex = 0;
             $firstRow = true;
+            $schoolId = auth()->user()->isSuperAdmin() ? null : auth()->user()->school_id;
+
+            // Scope existing NIP and WA
+            $existingNipsQuery = Guru::query();
+            if ($schoolId) $existingNipsQuery->where('school_id', $schoolId);
+            $existingNips = $existingNipsQuery->whereNotNull('nip')->pluck('nip')->map(fn($v) => trim((string)$v))->toArray();
+
+            $existingWasQuery = Guru::query();
+            if ($schoolId) $existingWasQuery->where('school_id', $schoolId);
+            $existingWas = $existingWasQuery->whereNotNull('no_wa')->pluck('no_wa')->map(fn($v) => trim((string)$v))->toArray();
 
             foreach ($rows as $row) {
+                $excelRowIndex++;
                 if ($firstRow) {
                     $firstRow = false;
                     continue;
                 }
 
-                $nama = trim($row[0] ?? '');
-                $nip = trim($row[1] ?? '');
+                // Skip pure blank rows
+                $hasContent = false;
+                foreach ($row as $cell) {
+                    if ($cell !== null && trim((string)$cell) !== '') {
+                        $hasContent = true;
+                        break;
+                    }
+                }
+                if (!$hasContent) {
+                    continue;
+                }
 
+                $nama = trim((string)($row[0] ?? ''));
+                $nip = trim((string)($row[1] ?? ''));
                 if ($nip === '') {
                     $nip = null;
                 }
-
-                $wa = isset($row[2]) ? trim($row[2]) : null;
+                $wa = isset($row[2]) ? trim((string)$row[2]) : null;
 
                 if ($nama === '') {
-                    $countSkip++;
+                    $failures[] = [
+                        'row' => $excelRowIndex,
+                        'nama' => '-',
+                        'nip' => $nip ?: '-',
+                        'reason' => 'Nama guru/karyawan (Kolom A) kosong.'
+                    ];
                     continue;
                 }
 
                 $normalizedWa = $this->normalizeWa($wa);
 
-                $schoolId = auth()->user()->isSuperAdmin() ? null : auth()->user()->school_id;
-
-                // Check duplicate by WA or NIP if present - SCOPED
-                $exists = false;
-                if ($normalizedWa) {
-                    $queryWa = Guru::where('no_wa', $normalizedWa);
-                    if ($schoolId)
-                        $queryWa->where('school_id', $schoolId);
-                    $exists = $queryWa->exists();
+                // Check duplicate by WA or NIP
+                $isDuplicate = false;
+                $dupReason = '';
+                if ($nip && in_array($nip, $existingNips, true)) {
+                    $isDuplicate = true;
+                    $dupReason = "NIP '{$nip}' sudah terdaftar dalam sistem (duplikat).";
+                } elseif ($normalizedWa && in_array($normalizedWa, $existingWas, true)) {
+                    $isDuplicate = true;
+                    $dupReason = "No. WA '{$normalizedWa}' sudah terdaftar pada guru lain (duplikat).";
                 }
 
-                if (!$exists && $nip) {
-                    $queryNip = Guru::where('nip', $nip);
-                    if ($schoolId)
-                        $queryNip->where('school_id', $schoolId);
-                    $exists = $queryNip->exists();
-                }
-
-                if ($exists) {
-                    $countSkip++;
+                if ($isDuplicate) {
+                    $failures[] = [
+                        'row' => $excelRowIndex,
+                        'nama' => $nama,
+                        'nip' => $nip ?: '-',
+                        'reason' => $dupReason
+                    ];
                     continue;
                 }
 
-                // Check quota before each insert
+                // Check quota before insert
                 if ($schoolId) {
                     $school = $school ?? \App\Models\School::find($schoolId);
                     if ($school && !$school->hasTeacherQuota()) {
-                        if ($request->wantsJson()) {
-                            return response()->json(['success' => false, 'message' => "Import dihentikan: Kuota guru/staff penuh ({$school->teacher_limit} guru). Berhasil diimpor: {$countSuccess} guru."]);
-                        }
-                        return redirect()->route('guru.index')->with('error', "Import dihentikan: Kuota guru/staff penuh ({$school->teacher_limit} guru). Berhasil diimpor: {$countSuccess} guru.");
+                        $failures[] = [
+                            'row' => $excelRowIndex,
+                            'nama' => $nama,
+                            'nip' => $nip ?: '-',
+                            'reason' => "Batas kuota guru/staff sekolah penuh ({$school->teacher_limit} guru)."
+                        ];
+                        break;
                     }
                 }
 
-                Guru::create([
-                    'nama'      => $nama,
-                    'nip'       => $nip,
-                    'no_wa'     => $normalizedWa,
-                    'school_id' => $schoolId,
+                try {
+                    Guru::create([
+                        'nama'      => $nama,
+                        'nip'       => $nip,
+                        'no_wa'     => $normalizedWa,
+                        'school_id' => $schoolId,
+                    ]);
+
+                    if ($nip) $existingNips[] = $nip;
+                    if ($normalizedWa) $existingWas[] = $normalizedWa;
+                    $countSuccess++;
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::error("Import Guru Row Error (Baris {$excelRowIndex}, NIP: {$nip}): " . $e->getMessage());
+                    $errMsg = $e->getMessage();
+                    $failures[] = [
+                        'row' => $excelRowIndex,
+                        'nama' => $nama,
+                        'nip' => $nip ?: '-',
+                        'reason' => 'Error simpan database: ' . \Illuminate\Support\Str::limit($errMsg, 100)
+                    ];
+                }
+            }
+
+            $countSkip = count($failures);
+            if ($countSuccess > 0 && $countSkip === 0) {
+                $message = "Import berhasil! Seluruh {$countSuccess} data guru berhasil diimpor.";
+                $status = 'success';
+            } elseif ($countSuccess > 0 && $countSkip > 0) {
+                $message = "Import selesai sebagian: {$countSuccess} berhasil, {$countSkip} dilewati/gagal.";
+                $status = 'partial';
+            } else {
+                $message = "Import gagal: 0 guru berhasil diimpor, {$countSkip} data dilewati/gagal.";
+                $status = 'failed';
+            }
+
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'success' => $countSuccess > 0,
+                    'status' => $status,
+                    'count_success' => $countSuccess,
+                    'count_skip' => $countSkip,
+                    'message' => $message,
+                    'errors' => $failures
                 ]);
-
-                $countSuccess++;
             }
+            return redirect()->route('guru.index')
+                ->with($countSuccess > 0 ? 'success' : 'error', $message)
+                ->with('import_errors', $failures);
 
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Import Guru Error: ' . $e->getMessage());
             if ($request->wantsJson()) {
-                return response()->json(['success' => true, 'message' => "Import selesai. Berhasil: $countSuccess. Dilewati (Duplikat/Kosong): $countSkip."]);
-            }
-            return redirect()->route('guru.index')->with('success', "Import selesai. Berhasil: $countSuccess. Dilewati (Duplikat/Kosong): $countSkip.");
-
-        } catch (\Exception $e) {
-            if ($request->wantsJson()) {
-                return response()->json(['success' => false, 'message' => 'Gagal import file: ' . $e->getMessage()]);
+                return response()->json(['success' => false, 'status' => 'failed', 'message' => 'Gagal membaca/memproses file Excel: ' . $e->getMessage(), 'errors' => []]);
             }
             return redirect()->route('guru.index')->with('error', 'Gagal import file: ' . $e->getMessage());
         }

@@ -340,7 +340,7 @@
 </x-ui.modal>
 
 <!-- Modal Import -->
-<x-ui.modal id="modalImportGuru" :is-open="false" class="max-w-lg">
+<x-ui.modal id="modalImportGuru" :is-open="false" class="max-w-xl">
     <div class="p-6" x-data="importFormGuru()">
         <div class="flex items-center justify-between mb-5">
             <h3 class="text-xl font-bold text-gray-800 dark:text-white/90">Import Data {{ $labelKaryawan }}</h3>
@@ -379,16 +379,105 @@
             <p class="mt-3 text-center text-xs text-gray-500 dark:text-gray-400">Mohon tunggu, memproses data bisa memakan waktu.</p>
         </div>
 
-        <!-- Success/Error Message -->
-        <div x-show="isFinished" class="py-4 text-center" style="display: none;">
-            <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full" :class="isSuccess ? 'bg-success-100 text-success-500' : 'bg-error-100 text-error-500'">
-                <i class="fas fa-2x" :class="isSuccess ? 'fa-check' : 'fa-times'"></i>
+        <!-- Success/Partial/Error Result Area -->
+        <div x-show="isFinished" class="py-2 text-center" style="display: none;">
+            <!-- Icon State -->
+            <div class="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full"
+                 :class="{
+                    'bg-success-100 text-success-600 dark:bg-success-500/20 dark:text-success-400': status === 'success',
+                    'bg-amber-100 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400': status === 'partial',
+                    'bg-error-100 text-error-600 dark:bg-error-500/20 dark:text-error-400': status === 'failed'
+                 }">
+                <i class="fas fa-2x"
+                   :class="{
+                    'fa-check': status === 'success',
+                    'fa-exclamation-triangle': status === 'partial',
+                    'fa-times': status === 'failed'
+                   }"></i>
             </div>
-            <h4 class="mb-2 text-lg font-bold text-gray-800 dark:text-white/90" x-text="isSuccess ? 'Selesai' : 'Terjadi Kesalahan'"></h4>
-            <p class="text-sm text-gray-500 dark:text-gray-400 mb-6" x-text="message"></p>
-            <button type="button" @click="if(isSuccess) location.reload(); else { isFinished = false; progress = 0; }" class="rounded-lg bg-brand-500 px-6 py-2 text-white hover:bg-brand-600">
-                <span x-text="isSuccess ? 'Kembali' : 'Coba Lagi'"></span>
-            </button>
+
+            <!-- Title -->
+            <h4 class="mb-1.5 text-lg font-bold text-gray-800 dark:text-white/90"
+                x-text="status === 'success' ? 'Import Berhasil' : (status === 'partial' ? 'Import Selesai dengan Catatan' : 'Import Gagal')"></h4>
+
+            <!-- Summary Message -->
+            <p class="text-sm text-gray-600 dark:text-gray-300 mb-3" x-text="message"></p>
+
+            <!-- Badges if there are counts -->
+            <template x-if="countSuccess > 0 || countSkip > 0">
+                <div class="flex items-center justify-center gap-2 mb-4 flex-wrap">
+                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-success-50 text-success-700 border border-success-200 dark:bg-success-500/10 dark:text-success-400 dark:border-success-500/20">
+                        <i class="fas fa-check-circle"></i> <span x-text="countSuccess"></span> Berhasil
+                    </span>
+                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold"
+                          :class="countSkip > 0 ? 'bg-error-50 text-error-700 border border-error-200 dark:bg-error-500/10 dark:text-error-400 dark:border-error-500/20' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'">
+                        <i class="fas fa-times-circle"></i> <span x-text="countSkip"></span> Gagal / Dilewati
+                    </span>
+                </div>
+            </template>
+
+            <!-- Detailed Error Table Box -->
+            <template x-if="failures && failures.length > 0">
+                <div class="mt-4 text-left border border-error-200 dark:border-error-800/60 rounded-xl bg-error-50/40 dark:bg-error-950/20 p-3.5 mb-5 shadow-xs">
+                    <div class="flex items-center justify-between mb-2.5">
+                        <div class="flex items-center gap-2">
+                            <i class="fas fa-exclamation-circle text-error-500"></i>
+                            <span class="text-xs font-bold text-gray-800 dark:text-gray-200">
+                                Rincian Penyebab Gagal (<span x-text="failures.length"></span> Baris):
+                            </span>
+                        </div>
+                        <button type="button" @click="copyErrors" class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 shadow-xs transition">
+                            <i class="fas" :class="copied ? 'fa-check text-success-500' : 'fa-copy'"></i>
+                            <span x-text="copied ? 'Tersalin!' : 'Salin Detail'"></span>
+                        </button>
+                    </div>
+
+                    <!-- Scrollable List -->
+                    <div class="max-h-56 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
+                        <table class="w-full text-left text-xs text-gray-600 dark:text-gray-300">
+                            <thead class="sticky top-0 bg-gray-100 dark:bg-gray-800 font-semibold text-gray-700 dark:text-gray-200 border-b border-gray-200 dark:border-gray-700">
+                                <tr>
+                                    <th class="px-3 py-2 w-20">Baris</th>
+                                    <th class="px-3 py-2 w-36">Nama / {{ $labelNIP }}</th>
+                                    <th class="px-3 py-2">Penyebab Gagal</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                                <template x-for="(item, i) in failures" :key="i">
+                                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/40 transition">
+                                        <td class="px-3 py-2 font-mono text-brand-600 dark:text-brand-400 font-medium whitespace-nowrap align-top">
+                                            Baris <span x-text="item.row"></span>
+                                        </td>
+                                        <td class="px-3 py-2 align-top">
+                                            <div class="font-medium text-gray-800 dark:text-gray-200" x-text="item.nama"></div>
+                                            <div class="text-[11px] text-gray-500 dark:text-gray-400 font-mono" x-text="item.nip ? '{{ $labelNIP }}: ' + item.nip : ''"></div>
+                                        </td>
+                                        <td class="px-3 py-2 text-error-600 dark:text-error-400 font-medium align-top">
+                                            <span x-text="item.reason"></span>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="mt-2 text-[11px] text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
+                        <i class="fas fa-lightbulb text-amber-500"></i>
+                        <span>Silakan koreksi data pada baris Excel di atas lalu upload kembali.</span>
+                    </div>
+                </div>
+            </template>
+
+            <!-- Buttons Action -->
+            <div class="flex items-center justify-center gap-3">
+                <template x-if="countSuccess > 0">
+                    <button type="button" @click="location.reload()" class="rounded-lg bg-brand-500 px-5 py-2 text-sm font-medium text-white hover:bg-brand-600 transition shadow-xs">
+                        <i class="fas fa-check mr-1.5"></i> Selesai & Muat Ulang
+                    </button>
+                </template>
+                <button type="button" @click="reset()" class="rounded-lg border border-gray-300 dark:border-gray-700 px-5 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition">
+                    <i class="fas fa-redo mr-1.5"></i> <span x-text="countSuccess > 0 ? 'Upload File Lain' : 'Coba Lagi'"></span>
+                </button>
+            </div>
         </div>
     </div>
 </x-ui.modal>
@@ -758,20 +847,42 @@
                 isImporting: false,
                 isFinished: false,
                 isSuccess: false,
+                status: '',
                 progress: 0,
                 message: '',
+                countSuccess: 0,
+                countSkip: 0,
+                failures: [],
+                copied: false,
                 interval: null,
                 reset() {
                     this.isImporting = false;
                     this.isFinished = false;
+                    this.isSuccess = false;
+                    this.status = '';
                     this.progress = 0;
+                    this.message = '';
+                    this.countSuccess = 0;
+                    this.countSkip = 0;
+                    this.failures = [];
+                    this.copied = false;
                     if(this.$refs.fileInput) this.$refs.fileInput.value = '';
+                },
+                copyErrors() {
+                    if (!this.failures || !this.failures.length) return;
+                    const text = "Rincian Gagal Import Data Guru:\n" + 
+                        this.failures.map(f => `- Baris ${f.row}: ${f.nama} (NIP: ${f.nip || '-'}) => ${f.reason}`).join('\n');
+                    navigator.clipboard.writeText(text).then(() => {
+                        this.copied = true;
+                        setTimeout(() => this.copied = false, 2000);
+                    });
                 },
                 submitForm() {
                     const fileInput = this.$refs.fileInput;
                     if (!fileInput.files.length) return;
 
                     this.isImporting = true;
+                    this.isFinished = false;
                     this.progress = 0;
 
                     const formData = new FormData();
@@ -796,7 +907,7 @@
                         body: formData
                     })
                     .then(response => {
-                        if (!response.ok) throw new Error('Network response was not ok');
+                        if (!response.ok && response.status !== 422) throw new Error('Network response was not ok');
                         return response.json();
                     })
                     .then(data => {
@@ -805,8 +916,12 @@
                         setTimeout(() => {
                             this.isImporting = false;
                             this.isFinished = true;
-                            this.isSuccess = data.success;
-                            this.message = data.message;
+                            this.isSuccess = !!data.success;
+                            this.status = data.status || (data.success ? 'success' : 'failed');
+                            this.message = data.message || 'Proses import selesai.';
+                            this.countSuccess = data.count_success || 0;
+                            this.countSkip = data.count_skip || (data.errors ? data.errors.length : 0);
+                            this.failures = data.errors || [];
                         }, 500);
                     })
                     .catch(error => {
@@ -816,7 +931,11 @@
                             this.isImporting = false;
                             this.isFinished = true;
                             this.isSuccess = false;
-                            this.message = 'Terjadi kesalahan sistem saat memproses file.';
+                            this.status = 'failed';
+                            this.message = 'Terjadi kesalahan sistem saat memproses file Excel.';
+                            this.countSuccess = 0;
+                            this.countSkip = 0;
+                            this.failures = [];
                         }, 500);
                     });
                 }

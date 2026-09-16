@@ -15,6 +15,8 @@ class OtaController extends Controller
         'FingerprintV2' => 'Fingerprint Versi 2',
         'FingerprintV3' => 'Fingerprint Versi 3',
         'Fingerprint608' => 'Fingerprint Sensor AS608',
+        'Fingerprint307' => 'Fingerprint Sensor R307 Standar',
+        'Fingerprint307_DbSync' => 'Fingerprint Sensor R307 Multi-Device Sync',
     ];
 
     public function index()

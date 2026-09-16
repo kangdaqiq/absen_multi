@@ -26,6 +26,29 @@ class AbsensiGuru extends Model
         'keterangan'
     ];
 
+    protected static function booted()
+    {
+        static::creating(function ($absensi) {
+            if (empty($absensi->waktu_hadir)) {
+                if (!empty($absensi->tanggal) && !empty($absensi->jam_masuk)) {
+                    try {
+                        $absensi->waktu_hadir = \Carbon\Carbon::parse($absensi->tanggal . ' ' . $absensi->jam_masuk);
+                    } catch (\Exception $e) {
+                        $absensi->waktu_hadir = now();
+                    }
+                } elseif (!empty($absensi->tanggal)) {
+                    try {
+                        $absensi->waktu_hadir = \Carbon\Carbon::parse($absensi->tanggal . ' ' . now()->format('H:i:s'));
+                    } catch (\Exception $e) {
+                        $absensi->waktu_hadir = now();
+                    }
+                } else {
+                    $absensi->waktu_hadir = now();
+                }
+            }
+        });
+    }
+
     public function guru()
     {
         return $this->belongsTo(Guru::class, 'guru_id');

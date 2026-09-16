@@ -131,8 +131,13 @@ class TeacherAttendanceReportController extends Controller
             'school_id' => auth()->user()->school_id ?? null,
         ];
 
+        $waktuHadir = $request->jam_masuk
+            ? Carbon::parse($request->tanggal . ' ' . $request->jam_masuk)
+            : Carbon::parse($request->tanggal . ' ' . now()->format('H:i:s'));
+
         $updateData = [
             'shift_id' => $shiftId,
+            'waktu_hadir' => $waktuHadir,
             'status' => $status,
             'status_kehadiran' => $statusKehadiran,
             'menit_terlambat' => $menitTerlambat,

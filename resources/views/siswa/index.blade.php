@@ -70,6 +70,7 @@
                     <select name="kelas_id" onchange="this.form.submit()" 
                         class="appearance-none w-full sm:w-48 rounded-lg border border-gray-200 bg-transparent py-2 pl-4 pr-10 text-sm outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:focus:border-brand-500 text-gray-800 dark:text-white/90 cursor-pointer">
                         <option value="">Semua Kelas</option>
+                        <option value="tidak_ada" {{ request('kelas_id') === 'tidak_ada' ? 'selected' : '' }}>Tidak Ada Kelas</option>
                         @foreach ($kelas as $k)
                             <option value="{{ $k->id }}" {{ request('kelas_id') == $k->id ? 'selected' : '' }}>{{ $k->nama_kelas }}</option>
                         @endforeach
@@ -138,7 +139,11 @@
                             <p class="text-gray-500 dark:text-gray-400">{{ $s->tgl_lahir ? \Carbon\Carbon::parse($s->tgl_lahir)->format('d-m-Y') : '-' }}</p>
                         </td>
                         <td class="border-b border-gray-100 px-4 py-4 dark:border-gray-800">
-                            <p class="text-gray-500 dark:text-gray-400">{{ $s->kelas->nama_kelas ?? '-' }}</p>
+                            @if($s->kelas)
+                                <p class="text-gray-500 dark:text-gray-400">{{ $s->kelas->nama_kelas }}</p>
+                            @else
+                                <span class="inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-500/15 dark:text-amber-400">Tidak Ada Kelas</span>
+                            @endif
                         </td>
                         <td class="border-b border-gray-100 px-4 py-4 dark:border-gray-800">
                             <p class="text-gray-500 dark:text-gray-400 max-w-[180px] truncate" title="{{ $s->alamat }}">{{ $s->alamat ?: '-' }}</p>

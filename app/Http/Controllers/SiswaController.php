@@ -36,8 +36,12 @@ class SiswaController extends Controller
         }
 
         // Filter by kelas
-        if ($request->has('kelas_id') && !empty($request->kelas_id)) {
-            $query->where('kelas_id', $request->kelas_id);
+        if ($request->filled('kelas_id')) {
+            if (in_array($request->kelas_id, ['tidak_ada', 'none', 'tanpa_kelas', 'null', '0'])) {
+                $query->whereNull('kelas_id');
+            } else {
+                $query->where('kelas_id', $request->kelas_id);
+            }
         }
 
         $siswa = $query->paginate(20)->withQueryString();

@@ -49,7 +49,9 @@ class DatabaseSeeder extends Seeder
         
         $this->command->info('User Admin created/verified: admin@gmail.com / password');
 
-        require_once __DIR__ . '/DummyAttendanceSeeder.php';
-        $this->call(DummyAttendanceSeeder::class);
+        // Untuk mengisi data dummy contoh, jalankan manual:
+        // php artisan db:seed --class=DummyAttendanceSeeder
+        // require_once __DIR__ . '/DummyAttendanceSeeder.php';
+        // $this->call(DummyAttendanceSeeder::class);
     }
 }

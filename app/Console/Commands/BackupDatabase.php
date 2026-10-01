@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Carbon\Carbon;
 
 class BackupDatabase extends Command
@@ -13,14 +14,14 @@ class BackupDatabase extends Command
      *
      * @var string
      */
-    protected $signature = 'db:backup';
+    protected $signature = 'db:backup {--client= : Override client name for self-hosted backup} {--selfhosted : Force self-hosted mode}';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Backup database to storage/app/backups';
+    protected $description = 'Backup database to storage/app/backups and Cloudflare R2';
 
     /**
      * Execute the console command.
@@ -29,7 +30,26 @@ class BackupDatabase extends Command
     {
         $this->info('Starting database backup...');
 
-        $filename = "backup-" . Carbon::now()->format('Y-m-d-H-i-s') . ".sql";
+        $isSelfHosted = (config('app.mode') === 'self_hosted') || $this->option('selfhosted');
+        $keepDays = $isSelfHosted ? 2 : 7;
+
+        if ($isSelfHosted) {
+            $clientName = $this->getClientName();
+            $clientSlug = Str::slug($clientName, '-');
+            if (empty($clientSlug)) {
+                $clientSlug = 'client';
+            }
+            // Format file: client-name_tgl-bckup (contoh: sman1-jakarta_01-10-2026.sql)
+            $filename = "{$clientSlug}_" . Carbon::now()->format('d-m-Y') . ".sql";
+            $cloudFolder = 'Client';
+            $this->info("Self-hosted mode detected. Client: '{$clientSlug}', Retention: {$keepDays} days");
+        } else {
+            $clientSlug = null;
+            $filename = "backup-" . Carbon::now()->format('Y-m-d-H-i-s') . ".sql";
+            $cloudFolder = 'backups';
+            $this->info("Hosted mode detected. Retention: {$keepDays} days");
+        }
+
         $path = storage_path("app/backups");
 
         if (!file_exists($path)) {
@@ -38,7 +58,7 @@ class BackupDatabase extends Command
 
         $filePath = "$path/$filename";
         
-        // Config
+        // Database Config
         $host = config('database.connections.mysql.host');
         $username = config('database.connections.mysql.username');
         $password = config('database.connections.mysql.password');
@@ -50,7 +70,10 @@ class BackupDatabase extends Command
              if (!file_exists($mysqldumpPath)) {
                  $mysqldumpPath = 'd:\xampp\mysql\bin\mysqldump.exe'; // Check D: drive XAMPP
                  if (!file_exists($mysqldumpPath)) {
-                     $mysqldumpPath = 'mysqldump'; // Try global if not found
+                     $mysqldumpPath = 'e:\xampp\mysql\bin\mysqldump.exe'; // Check E: drive XAMPP
+                     if (!file_exists($mysqldumpPath)) {
+                         $mysqldumpPath = 'mysqldump'; // Try global if not found
+                     }
                  }
              }
         } else {
@@ -67,8 +90,7 @@ class BackupDatabase extends Command
         // Use 2>&1 to capture errors
         $command = "\"$mysqldumpPath\" --user=\"$username\" $passwordArg --host=\"$host\" \"$database\" > \"$filePath\" 2>&1";
 
-        $this->info("Executing backup...");
-        // $this->info("Command: $command"); // Debug only, hides password
+        $this->info("Executing mysqldump backup to {$filename}...");
         
         $output = [];
         $returnVar = null;
@@ -78,69 +100,234 @@ class BackupDatabase extends Command
             $this->info("Backup successful: $filename");
             
             // Upload to Cloudflare R2 if configured
-            if (env('CLOUDFLARE_R2_ENDPOINT')) {
-                $this->info("Uploading backup to Cloudflare R2...");
+            $r2Endpoint = config('filesystems.disks.r2.endpoint') ?: env('CLOUDFLARE_R2_ENDPOINT');
+            $r2Key = config('filesystems.disks.r2.key') ?: env('CLOUDFLARE_R2_ACCESS_KEY_ID');
+            $r2Bucket = config('filesystems.disks.r2.bucket') ?: env('CLOUDFLARE_R2_BUCKET');
+
+            if (!empty($r2Endpoint) && !empty($r2Key) && !empty($r2Bucket)) {
+                $cloudPath = "{$cloudFolder}/{$filename}";
+                $this->info("Uploading backup to Cloudflare R2 ({$cloudPath})...");
                 try {
-                    Storage::disk('r2')->put("backups/$filename", file_get_contents($filePath));
-                    $this->info("Backup successfully uploaded to Cloudflare R2.");
+                    $stream = fopen($filePath, 'r');
+                    $uploaded = Storage::disk('r2')->put($cloudPath, $stream);
+                    if (is_resource($stream)) {
+                        fclose($stream);
+                    }
+
+                    if ($uploaded !== false) {
+                        $this->info("Backup successfully uploaded to Cloudflare R2: {$cloudPath}");
+                    } else {
+                        $this->warn("Upload to Cloudflare R2 returned false. Check permissions or credentials.");
+                    }
                     
-                    // Clean old backups in Cloudflare R2 (Keep last 7 days)
-                    $this->cleanOldCloudBackups();
+                    // Clean old backups in Cloudflare R2
+                    $this->cleanOldCloudBackups($cloudFolder, $keepDays, $clientSlug);
                 } catch (\Exception $e) {
                     $this->error("Failed to upload to Cloudflare R2: " . $e->getMessage());
                 }
+            } else {
+                $this->line("Cloudflare R2 is not configured. Skipping cloud upload.");
             }
 
-            // Clean old backups locally (Keep last 7 days)
-            $this->cleanOldBackups($path);
+            // Clean old backups locally
+            $this->cleanOldBackups($path, $keepDays);
             
         } else {
             $this->error("Backup failed with exit code $returnVar");
         }
     }
 
-    private function cleanOldBackups($path)
+    /**
+     * Resolve the client name for self-hosted installations.
+     */
+    private function getClientName(): string
+    {
+        // 1. Explicit CLI option
+        if ($this->option('client')) {
+            return trim($this->option('client'));
+        }
+
+        // 2. Explicit config / env
+        $configured = config('app.client_name') ?: env('CLIENT_NAME');
+        if (!empty($configured)) {
+            return trim($configured);
+        }
+
+        // 3. License validation result
+        try {
+            $licenseService = app(\App\Services\LicenseService::class);
+            $licenseData = $licenseService->validate();
+            if (!empty($licenseData['client_name']) && $licenseData['client_name'] !== 'Hosted') {
+                return trim($licenseData['client_name']);
+            }
+        } catch (\Throwable $e) {
+            // Ignore license check error
+        }
+
+        // 4. Setting nama_sekolah
+        try {
+            $schoolName = \App\Models\Setting::where('setting_key', 'nama_sekolah')
+                ->where('setting_value', '!=', '')
+                ->value('setting_value');
+            if (!empty($schoolName)) {
+                return trim($schoolName);
+            }
+        } catch (\Throwable $e) {
+            // Ignore
+        }
+
+        // 5. Active School model
+        try {
+            $school = \App\Models\School::where('is_active', true)->first();
+            if ($school && !empty($school->name)) {
+                return trim($school->name);
+            }
+        } catch (\Throwable $e) {
+            // Ignore
+        }
+
+        // 6. Fallback
+        return config('app.name', 'client');
+    }
+
+    /**
+     * Clean old backups locally from storage/app/backups.
+     */
+    private function cleanOldBackups(string $path, int $keepDays)
     {
         $files = glob("$path/*.sql");
         $now = time();
-        $keepDays = 7;
+        $today = Carbon::today();
+        $cutoffDate = $today->copy()->subDays($keepDays - 1);
         
         foreach ($files as $file) {
-            if (is_file($file)) {
-                if ($now - filemtime($file) >= 60 * 60 * 24 * $keepDays) {
-                    unlink($file);
-                    $this->info("Deleted old backup: " . basename($file));
+            if (!is_file($file)) {
+                continue;
+            }
+
+            $basename = basename($file);
+            $shouldDelete = false;
+
+            // 1. Try parsing date in format: *_DD-MM-YYYY.sql
+            if (preg_match('/_(\d{2}-\d{2}-\d{4})\.sql$/i', $basename, $matches)) {
+                try {
+                    $fileDate = Carbon::createFromFormat('d-m-Y', $matches[1])->startOfDay();
+                    if ($fileDate->lt($cutoffDate)) {
+                        $shouldDelete = true;
+                    }
+                } catch (\Throwable $e) {
+                    // fallback to filemtime
                 }
+            } elseif (preg_match('/backup-(\d{4}-\d{2}-\d{2})/i', $basename, $matches)) {
+                // Format: backup-YYYY-MM-DD-*.sql
+                try {
+                    $fileDate = Carbon::createFromFormat('Y-m-d', $matches[1])->startOfDay();
+                    if ($fileDate->lt($cutoffDate)) {
+                        $shouldDelete = true;
+                    }
+                } catch (\Throwable $e) {
+                    // fallback to filemtime
+                }
+            }
+
+            // 2. Fallback to file modification time
+            if (!$shouldDelete && ($now - filemtime($file) >= 60 * 60 * 24 * $keepDays)) {
+                $shouldDelete = true;
+            }
+
+            if ($shouldDelete) {
+                unlink($file);
+                $this->info("Deleted old local backup: " . $basename);
             }
         }
     }
 
     /**
-     * Clean old backups from Cloudflare R2 storage (Keep last 7 days).
+     * Clean old backups from Cloudflare R2 storage.
+     *
+     * @param string $folder Folder in bucket (e.g. 'Client' or 'backups')
+     * @param int $keepDays Number of days to keep
+     * @param string|null $clientSlug If set, only clean this client's files in 'Client' folder
      */
-    private function cleanOldCloudBackups()
+    private function cleanOldCloudBackups(string $folder, int $keepDays, ?string $clientSlug = null)
     {
-        $this->info("Cleaning old backups from Cloudflare R2 (older than 7 days)...");
+        $this->info("Cleaning old backups from Cloudflare R2 in '{$folder}' (older than {$keepDays} days)...");
         try {
             $disk = Storage::disk('r2');
-            $files = $disk->files('backups');
+            $files = $disk->files($folder);
             $now = time();
-            $keepDays = 7;
+            $today = Carbon::today();
+            $cutoffDate = $today->copy()->subDays($keepDays - 1);
 
             foreach ($files as $file) {
-                // Skip if it doesn't match our backup naming pattern (e.g. backups/backup-*.sql)
-                if (!preg_match('/^backups\/backup-.*\.sql$/', $file)) {
-                    continue;
+                $basename = basename($file);
+                $matches = [];
+
+                // Determine pattern match
+                if ($folder === 'Client') {
+                    // Self-hosted client backup:
+                    // If clientSlug is provided, only clean this client's backups
+                    if ($clientSlug) {
+                        $pattern = '/^' . preg_quote($clientSlug, '/') . '_(\d{2}-\d{2}-\d{4})\.sql$/i';
+                        if (!preg_match($pattern, $basename, $matches)) {
+                            // If doesn't match this client's exact prefix, skip to protect other clients' data
+                            continue;
+                        }
+                    } else {
+                        // General client pattern
+                        if (!preg_match('/^.+_(\d{2}-\d{2}-\d{4})\.sql$/i', $basename, $matches)) {
+                            continue;
+                        }
+                    }
+                } else {
+                    // Hosted backup (default: backups/backup-*.sql)
+                    if (!preg_match('/^backup-.*\.sql$/i', $basename)) {
+                        continue;
+                    }
                 }
 
-                try {
-                    $lastModified = $disk->lastModified($file);
-                    if ($now - $lastModified >= 60 * 60 * 24 * $keepDays) {
-                        $disk->delete($file);
-                        $this->info("Deleted old cloud backup: " . basename($file));
+                $shouldDelete = false;
+
+                // 1. Try parsing date from filename
+                if (isset($matches[1])) {
+                    try {
+                        $fileDate = Carbon::createFromFormat('d-m-Y', $matches[1])->startOfDay();
+                        if ($fileDate->lt($cutoffDate)) {
+                            $shouldDelete = true;
+                        }
+                    } catch (\Throwable $e) {
+                        // ignore and fall back to lastModified
                     }
-                } catch (\Exception $e) {
-                    $this->error("Failed to process cloud file " . basename($file) . ": " . $e->getMessage());
+                } elseif (preg_match('/backup-(\d{4}-\d{2}-\d{2})/i', $basename, $dateMatches)) {
+                    try {
+                        $fileDate = Carbon::createFromFormat('Y-m-d', $dateMatches[1])->startOfDay();
+                        if ($fileDate->lt($cutoffDate)) {
+                            $shouldDelete = true;
+                        }
+                    } catch (\Throwable $e) {
+                        // ignore and fall back to lastModified
+                    }
+                }
+
+                // 2. Fallback to S3 lastModified
+                if (!$shouldDelete) {
+                    try {
+                        $lastModified = $disk->lastModified($file);
+                        if ($now - $lastModified >= 60 * 60 * 24 * $keepDays) {
+                            $shouldDelete = true;
+                        }
+                    } catch (\Throwable $e) {
+                        $this->warn("Could not retrieve lastModified for cloud file {$basename}: " . $e->getMessage());
+                    }
+                }
+
+                if ($shouldDelete) {
+                    try {
+                        $disk->delete($file);
+                        $this->info("Deleted old cloud backup: {$file}");
+                    } catch (\Throwable $e) {
+                        $this->error("Failed to delete cloud file {$file}: " . $e->getMessage());
+                    }
                 }
             }
         } catch (\Exception $e) {
@@ -148,3 +335,4 @@ class BackupDatabase extends Command
         }
     }
 }
+

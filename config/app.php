@@ -139,5 +139,6 @@ return [
     'mode'               => env('APP_MODE', 'hosted'),
     'license_key'        => env('LICENSE_KEY', ''),
     'license_server_url' => env('LICENSE_SERVER_URL', ''),
+    'client_name'        => env('CLIENT_NAME', ''),
 
 ];

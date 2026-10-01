@@ -227,11 +227,16 @@ Sistem akan melakukan backup database secara otomatis menggunakan `mysqldump` se
 
 **Fitur utama:**
 - Otomatis menyimpan file `.sql` di folder lokal `storage/app/backups/`.
-- Otomatis menghapus file backup lokal yang berusia lebih dari 7 hari.
-- **[BARU]** Integrasi langsung dengan **Cloudflare R2** (S3 Compatible Cloud Storage). Jika konfigurasi `CLOUDFLARE_R2_ENDPOINT` di `.env` telah diisi, sistem akan otomatis mengunggah file `.sql` tersebut ke cloud storage.
+- **Mode Self-Hosted (`APP_MODE=self_hosted`):**
+  - File backup diberi nama berformat: `{client-name}_{tgl-bckup}.sql` (contoh: `sma-negeri-1-jakarta_01-10-2026.sql`). Nama client diambil secara otomatis dari `CLIENT_NAME` di `.env`, status lisensi client, atau setting sekolah.
+  - Backup otomatis diunggah ke Cloudflare R2 di folder **`Client/`** (`Client/{client-name}_{tgl-bckup}.sql`).
+  - **Retensi 2 Hari:** File backup lokal maupun di Cloudflare R2 hanya disimpan selama 2 hari (file yang berusia lebih dari 2 hari otomatis dihapus dan pembersihan cloud hanya menargetkan prefix file client yang bersangkutan).
+- **Mode Hosted / SaaS:**
+  - File backup bernama `backup-{Y-m-d-H-i-s}.sql` dan disimpan di folder `backups/` R2 dengan retensi 7 hari.
+- Integrasi langsung dengan **Cloudflare R2** (S3 Compatible Cloud Storage). Jika konfigurasi `CLOUDFLARE_R2_ENDPOINT` di `.env` telah diisi, sistem akan otomatis mengunggah file `.sql` tersebut ke cloud storage.
 
 **Kebutuhan Server:**
-- Pastikan server terinstal `mysql-client` (Ubuntu) atau `mysqldump` dapat diakses dari PATH.
+- Pastikan server terinstal `mysql-client` (Ubuntu) atau `mysqldump` dapat diakses dari PATH (atau XAMPP default).
 - *Package* `league/flysystem-aws-s3-v3` harus sudah terinstal (`composer install`).
 
 ### 9. Persyaratan Server

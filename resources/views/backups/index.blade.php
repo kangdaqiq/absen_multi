@@ -25,8 +25,12 @@
     <div class="p-6.5 pb-0">
         <div class="mb-6 flex w-full border-l-6 border-info bg-info/10 px-7 py-3 shadow-md">
             <p class="text-sm text-info">
-                <strong>Info:</strong> Backup otomatis berjalan setiap hari pukul 02:00 AM. File disimpan di folder server
-                <code class="bg-white/50 px-1 py-0.5 rounded">storage/app/backups</code>.
+                <strong>Info:</strong> Backup otomatis berjalan setiap hari pukul 02:00 AM.
+                @if(config('app.mode') === 'self_hosted')
+                    File disimpan di server lokal <code class="bg-white/50 px-1 py-0.5 rounded">storage/app/backups</code> dan Cloudflare R2 (folder <code class="bg-white/50 px-1 py-0.5 rounded">Client/</code>) selama <strong>2 hari</strong> (file lebih dari 2 hari otomatis dihapus).
+                @else
+                    File disimpan di server lokal <code class="bg-white/50 px-1 py-0.5 rounded">storage/app/backups</code> dan Cloudflare R2 selama <strong>7 hari</strong>.
+                @endif
             </p>
         </div>
     </div>

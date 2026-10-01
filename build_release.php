@@ -118,10 +118,20 @@ APP_KEY=                                # ← WAJIB: jalankan: php artisan key:g
 APP_DEBUG=false
 APP_URL=http://localhost                 # ← ganti dengan IP/domain server kamu
 APP_MODE=self_hosted
+CLIENT_NAME=                           # ← nama client/sekolah (opsional, otomatis dari lisensi jika kosong)
 
 # ── License ───────────────────────────────────────────────────────────────────
 LICENSE_KEY=XXXX-XXXX-XXXX-XXXX        # ← isi dengan license key dari provider
 LICENSE_SERVER_URL=https://absen.kangdaqiq.com
+
+# ── Cloudflare R2 (Auto Backup Database) ──────────────────────────────────────
+# Backup otomatis akan diunggah ke Cloudflare R2 di folder Client/
+# Nama file: client-name_tgl-bckup (disimpan selama 2 hari)
+CLOUDFLARE_R2_ACCESS_KEY_ID=
+CLOUDFLARE_R2_SECRET_ACCESS_KEY=
+CLOUDFLARE_R2_BUCKET=
+CLOUDFLARE_R2_ENDPOINT=https://<ACCOUNT_ID>.r2.cloudflarestorage.com
+CLOUDFLARE_R2_USE_PATH_STYLE_ENDPOINT=true
 
 # ── Database ──────────────────────────────────────────────────────────────────
 DB_CONNECTION=mysql

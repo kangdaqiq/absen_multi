@@ -69,6 +69,7 @@ class LicenseValidateController extends Controller
                 'max_students'         => $license->max_students,
                 'max_teachers'         => $license->max_teachers,
                 'max_bot_users'        => $license->max_bot_users,
+                'photo_enabled'        => (bool) ($license->photo_enabled ?? true),
                 'history_quota_months' => $license->history_quota_months,
                 'message'              => 'Lisensi telah expired pada ' . $license->expired_at->format('d M Y') . '. Hubungi KangDaQiQ untuk perpanjangan.',
             ]);
@@ -81,6 +82,7 @@ class LicenseValidateController extends Controller
             'max_students'         => $license->max_students,
             'max_teachers'         => $license->max_teachers,
             'max_bot_users'        => $license->max_bot_users,
+            'photo_enabled'        => (bool) ($license->photo_enabled ?? true),
             'history_quota_months' => $license->history_quota_months,
             'expired_at'           => $license->expired_at?->format('Y-m-d'),
             'message'              => 'Lisensi aktif.',

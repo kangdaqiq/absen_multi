@@ -411,18 +411,17 @@
                 {{-- Login Form --}}
                 <form method="POST" action="{{ route('login') }}" class="space-y-6">
                     @csrf
-
                     {{-- Username / Email Field --}}
                     <div class="space-y-2">
                         <label for="email" class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-widest">
-                            Email / Username
+                            Email / Username / NIS
                         </label>
                         <div class="relative rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white/70 dark:bg-slate-900/60 input-box overflow-hidden flex items-center">
                             <span class="pl-4.5 pr-2.5 text-slate-400 dark:text-slate-500 flex items-center justify-center transition-colors">
                                 <i class="fas fa-user text-sm"></i>
                             </span>
                             <input type="text" id="email" name="email" value="{{ old('email') }}"
-                                   placeholder="nama@email.com atau username" required autofocus
+                                   placeholder="Email, Username, atau NIS / NISN" required autofocus
                                    class="w-full py-3.5 pr-4 bg-transparent border-none outline-none text-sm text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 font-semibold">
                         </div>
                     </div>
@@ -431,7 +430,7 @@
                     <div class="space-y-2">
                         <div class="flex items-center justify-between">
                             <label for="password" class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-widest">
-                                Password
+                                Password / Tanggal Lahir
                             </label>
                         </div>
                         <div class="relative rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white/70 dark:bg-slate-900/60 input-box overflow-hidden flex items-center">
@@ -439,7 +438,7 @@
                                 <i class="fas fa-lock text-sm"></i>
                             </span>
                             <input :type="showPass ? 'text' : 'password'" id="password" name="password"
-                                   placeholder="Masukkan kata sandi Anda" required
+                                   placeholder="Kata sandi atau Tanggal Lahir siswa" required
                                    class="w-full py-3.5 pr-12 bg-transparent border-none outline-none text-sm text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 font-semibold">
                             <button type="button" @click="showPass = !showPass"
                                     class="absolute inset-y-0 right-0 pr-4.5 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"

@@ -17,13 +17,15 @@ class License extends Model
         'history_quota_months',
         'expired_at',
         'is_active',
+        'photo_enabled',
         'allowed_hostname',
         'notes',
         'last_ping_at',
     ];
 
     protected $casts = [
-        'is_active'    => 'boolean',
+        'is_active'     => 'boolean',
+        'photo_enabled' => 'boolean',
         'expired_at'   => 'date',
         'last_ping_at' => 'datetime',
         'max_schools'  => 'integer',

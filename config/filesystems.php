@@ -90,4 +90,16 @@ return [
         public_path('storage') => storage_path('app/public'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Path Folder / Drive Eksternal Foto Siswa
+    |--------------------------------------------------------------------------
+    |
+    | Jika diisi (misal: "D:/foto_siswa"), foto siswa akan disimpan
+    | dan disajikan dari path direktori/drive eksternal tersebut.
+    | Jika kosong / null, otomatis menggunakan storage lokal Laravel (storage/app/public/siswa).
+    |
+    */
+    'siswa_photo_path' => env('SISWA_PHOTO_PATH', null),
+
 ];

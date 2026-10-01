@@ -86,6 +86,20 @@
                         </td>
                         <td class="border-b border-gray-100 px-4 py-4 dark:border-gray-800">
                             <p class="font-medium text-gray-800 dark:text-white/90">{{ $g->nama }}</p>
+                            @if($g->is_global_report || $g->is_teacher_report)
+                                <div class="flex flex-wrap gap-1 mt-1">
+                                    @if($g->is_global_report)
+                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" title="Terima Laporan Global Siswa">
+                                            Laporan Global
+                                        </span>
+                                    @endif
+                                    @if($g->is_teacher_report)
+                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300" title="Terima Laporan Absensi Guru">
+                                            Laporan Guru
+                                        </span>
+                                    @endif
+                                </div>
+                            @endif
                         </td>
                         <td class="border-b border-gray-100 px-4 py-4 dark:border-gray-800">
                             <p class="text-gray-500 dark:text-gray-400">{{ $g->nip ?: '-' }}</p>
@@ -172,7 +186,7 @@
                                 
                                 <!-- Edit -->
                                 <button class="btnEdit text-warning-500 hover:text-warning-700 hover:bg-warning-50 p-2 rounded-lg transition" 
-                                    data-id="{{ $g->id }}" data-nama="{{ $g->nama }}" data-nip="{{ $g->nip }}" data-wa="{{ $g->no_wa }}" data-rfid="{{ $g->uid_rfid }}" data-shift="{{ $g->default_shift_id }}" data-is-global="{{ $g->is_global_report ? 1 : 0 }}" data-tgl_lahir="{{ $g->tgl_lahir }}" data-telegram="{{ $g->telegram_chat_id }}"
+                                    data-id="{{ $g->id }}" data-nama="{{ $g->nama }}" data-nip="{{ $g->nip }}" data-wa="{{ $g->no_wa }}" data-rfid="{{ $g->uid_rfid }}" data-shift="{{ $g->default_shift_id }}" data-is-global="{{ $g->is_global_report ? 1 : 0 }}" data-is-teacher="{{ $g->is_teacher_report ? 1 : 0 }}" data-tgl_lahir="{{ $g->tgl_lahir }}" data-telegram="{{ $g->telegram_chat_id }}"
                                     @click="$dispatch('open-modal', 'modalEditGuru')" title="Edit">
                                     <i class="fas fa-edit"></i>
                                 </button>
@@ -245,10 +259,14 @@
                         @endforeach
                     </select>
                 </div>
-                <div class="sm:col-span-2">
-                    <label class="mb-1.5 flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer">
+                <div class="sm:col-span-2 space-y-2">
+                    <label class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer">
                         <input type="checkbox" name="is_global_report" value="1" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-900">
                         Terima Laporan Global (Rekap Harian Semua Siswa)
+                    </label>
+                    <label class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer">
+                        <input type="checkbox" name="is_teacher_report" value="1" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-900">
+                        Laporan Guru (Rekap Harian Kehadiran Guru & Karyawan)
                     </label>
                 </div>
             </div>
@@ -305,10 +323,14 @@
                     <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">UID RFID (readonly)</label>
                     <input type="text" name="uid_rfid" id="edit_rfid" readonly class="w-full rounded-lg border border-gray-200 bg-gray-100 px-4 py-2 outline-none dark:border-gray-800 dark:bg-gray-800 dark:text-gray-400">
                 </div>
-                <div class="sm:col-span-2">
-                    <label class="mb-1.5 flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer">
+                <div class="sm:col-span-2 space-y-2">
+                    <label class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer">
                         <input type="checkbox" name="is_global_report" id="edit_global_report" value="1" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-900">
                         Terima Laporan Global (Rekap Harian Semua Siswa)
+                    </label>
+                    <label class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer">
+                        <input type="checkbox" name="is_teacher_report" id="edit_teacher_report" value="1" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-900">
+                        Laporan Guru (Rekap Harian Kehadiran Guru & Karyawan)
                     </label>
                 </div>
             </div>
@@ -574,6 +596,7 @@
                 var telegram = $(this).data('telegram');
                 var rfid = $(this).data('rfid');
                 var isGlobal = $(this).data('is-global');
+                var isTeacher = $(this).data('is-teacher');
                 var tglLahir = $(this).data('tgl_lahir');
                 var shift = $(this).data('shift');
 
@@ -585,6 +608,7 @@
                 $('#edit_rfid').val(rfid);
                 $('#edit_default_shift_id').val(shift || '');
                 $('#edit_global_report').prop('checked', isGlobal == 1);
+                $('#edit_teacher_report').prop('checked', isTeacher == 1);
 
                 $('#formEditGuru').attr('action', '{{ url('guru') }}/' + id);
             });

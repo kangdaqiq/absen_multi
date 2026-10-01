@@ -191,6 +191,7 @@
                                     data-is_khusus="{{ $s->is_khusus }}"
                                     data-is_siswa_khusus="{{ $s->is_siswa_khusus }}"
                                     data-hari_masuk="{{ json_encode($s->hari_masuk) }}"
+                                    data-foto="{{ $s->foto ? $s->foto_url : '' }}"
                                     @click="$dispatch('open-modal', 'modalEditSiswa')" title="Edit">
                                     <i class="fas fa-edit"></i>
                                 </button>
@@ -269,9 +270,23 @@
             <h3 class="text-xl font-bold text-gray-800 dark:text-white/90">Tambah Siswa</h3>
             <button @click="open = false" class="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white"><i class="fas fa-times"></i></button>
         </div>
-        <form action="{{ route('siswa.store') }}" method="POST">
+        <form action="{{ route('siswa.store') }}" method="POST" enctype="multipart/form-data">
             @csrf
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                @if($photoEnabled ?? true)
+                <div class="sm:col-span-2">
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Foto Siswa <span class="text-gray-400 font-normal">(opsional - otomatis dikompresi)</span></label>
+                    <div class="flex items-center gap-3">
+                        <div id="previewTambahWrapper" class="hidden w-14 h-18 aspect-[3/4] rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 shrink-0 bg-gray-50 dark:bg-gray-800 shadow-xs">
+                            <img id="previewTambahImg" src="" class="w-full h-full object-cover object-top">
+                        </div>
+                        <div class="flex-1">
+                            <input type="file" name="foto" id="inputFotoTambah" accept="image/*" onchange="handlePhotoUploadCompress(this, 'previewTambahImg', 'previewTambahWrapper')" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-brand-50 file:text-brand-600 hover:file:bg-brand-100 dark:file:bg-brand-900/30 dark:file:text-brand-400 cursor-pointer">
+                            <span class="text-[11px] text-gray-400 block mt-1"><i class="fas fa-magic text-brand-500 mr-1"></i>Foto akan dikompresi otomatis agar ukuran ringan & seragam</span>
+                        </div>
+                    </div>
+                </div>
+                @endif
                 <div>
                     <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Nama Siswa <span class="text-error-500">*</span></label>
                     <input type="text" name="nama" required class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
@@ -378,10 +393,24 @@
             <h3 class="text-xl font-bold text-gray-800 dark:text-white/90">Edit Siswa</h3>
             <button @click="open = false" class="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white"><i class="fas fa-times"></i></button>
         </div>
-        <form action="#" method="POST" id="formEditSiswa">
+        <form action="#" method="POST" id="formEditSiswa" enctype="multipart/form-data">
             @csrf
             @method('PUT')
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                @if($photoEnabled ?? true)
+                <div class="sm:col-span-2">
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Ganti Foto Siswa <span class="text-gray-400 font-normal">(opsional - biarkan kosong jika tidak ingin mengubah)</span></label>
+                    <div class="flex items-center gap-3">
+                        <div id="previewEditWrapper" class="hidden w-14 h-18 aspect-[3/4] rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 shrink-0 bg-gray-50 dark:bg-gray-800 shadow-xs">
+                            <img id="previewEditImg" src="" class="w-full h-full object-cover object-top">
+                        </div>
+                        <div class="flex-1">
+                            <input type="file" name="foto" id="inputFotoEdit" accept="image/*" onchange="handlePhotoUploadCompress(this, 'previewEditImg', 'previewEditWrapper')" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-brand-50 file:text-brand-600 hover:file:bg-brand-100 dark:file:bg-brand-900/30 dark:file:text-brand-400 cursor-pointer">
+                            <span class="text-[11px] text-gray-400 block mt-1"><i class="fas fa-magic text-brand-500 mr-1"></i>Foto akan dikompresi otomatis agar ukuran ringan & seragam</span>
+                        </div>
+                    </div>
+                </div>
+                @endif
                 <div>
                     <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Nama Siswa <span class="text-error-500">*</span></label>
                     <input type="text" name="nama" id="edit_nama" required class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
@@ -747,6 +776,16 @@
                 var is_khusus = $(this).data('is_khusus');
                 var is_siswa_khusus = $(this).data('is_siswa_khusus');
                 var hari_masuk = $(this).data('hari_masuk');
+                var foto = $(this).data('foto');
+
+                if (foto) {
+                    $('#previewEditImg').attr('src', foto);
+                    $('#previewEditWrapper').removeClass('hidden');
+                } else {
+                    $('#previewEditImg').attr('src', '');
+                    $('#previewEditWrapper').addClass('hidden');
+                }
+                $('#inputFotoEdit').val('');
 
                 $('#edit_nama').val(nama);
                 $('#edit_nis').val(nis);
@@ -1204,6 +1243,52 @@
                     });
                 }
             }
+        }
+
+        // Automatic Client-Side Photo Compression & Preview
+        function handlePhotoUploadCompress(input, imgId, wrapperId) {
+            if (!input.files || !input.files[0]) return;
+            const file = input.files[0];
+            const imgEl = document.getElementById(imgId);
+            const wrapperEl = document.getElementById(wrapperId);
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                if (imgEl && wrapperEl) {
+                    imgEl.src = e.target.result;
+                    wrapperEl.classList.remove('hidden');
+                }
+
+                // Compress on canvas to max 600px width / 800px height with 0.8 JPEG quality
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    const maxW = 600;
+                    const maxH = 800;
+                    let w = img.width;
+                    let h = img.height;
+
+                    const ratio = Math.min(maxW / w, maxH / h, 1.0);
+                    w = Math.round(w * ratio);
+                    h = Math.round(h * ratio);
+
+                    canvas.width = w;
+                    canvas.height = h;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, w, h);
+
+                    canvas.toBlob(function(blob) {
+                        if (blob && window.DataTransfer) {
+                            const dt = new DataTransfer();
+                            const newFile = new File([blob], file.name.replace(/\.[^/.]+$/, "") + ".jpg", { type: "image/jpeg" });
+                            dt.items.add(newFile);
+                            input.files = dt.files;
+                        }
+                    }, 'image/jpeg', 0.8);
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
         }
     </script>
 @endpush

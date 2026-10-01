@@ -23,12 +23,17 @@
         <!-- Header & Search -->
         <div
             class="flex flex-col sm:flex-row justify-between items-center px-5 py-4 border-b border-gray-200 dark:border-gray-800 gap-4">
-            <div class="flex items-center gap-3">
+            <div class="flex items-center gap-2">
                 <h4 class="font-semibold text-gray-800 dark:text-white/90">Daftar Kelas</h4>
                 <button type="button" id="btnBulkEdit"
                     class="hidden rounded-lg bg-brand-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-600 transition"
                     @click="$dispatch('open-modal', 'modalBulkEdit')">
                     <i class="fas fa-edit mr-1"></i> Edit Masal
+                </button>
+                <button type="button" id="btnBulkDelete"
+                    class="hidden rounded-lg bg-error-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-error-600 transition"
+                    @click="$dispatch('open-modal', 'modalBulkDelete')">
+                    <i class="fas fa-trash-alt mr-1"></i> Hapus Terpilih
                 </button>
             </div>
 
@@ -492,6 +497,38 @@
         </div>
     </x-ui.modal>
 
+    <!-- Modal Bulk Delete -->
+    <x-ui.modal id="modalBulkDelete" :is-open="false">
+        <div class="p-6">
+            <div class="flex items-center justify-between mb-5">
+                <h3 class="text-xl font-bold text-gray-800 dark:text-white/90">Hapus Masal Kelas</h3>
+                <button @click="open = false"
+                    class="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white"><i
+                        class="fas fa-times"></i></button>
+            </div>
+            <form action="{{ route('kelas.bulk-destroy') }}" method="POST" id="formBulkDelete">
+                @csrf
+                @method('DELETE')
+                <div id="bulkDeleteIdsContainer"></div>
+
+                <div class="mb-4 rounded-lg bg-error-50 p-4 text-sm text-error-700 dark:bg-error-500/15 dark:text-error-500">
+                    <p class="font-semibold"><i class="fas fa-exclamation-triangle mr-1"></i> Perhatian:</p>
+                    <p class="mt-1">Yakin ingin menghapus <strong id="bulkDeleteCountText">0</strong> kelas yang dipilih?</p>
+                    <p class="mt-1 text-xs opacity-90">Siswa yang terdaftar pada kelas-kelas ini akan otomatis dialihkan menjadi <strong>Tanpa Kelas</strong> (unassigned).</p>
+                </div>
+
+                <div class="mt-6 flex justify-end gap-3">
+                    <button type="button" @click="open = false"
+                        class="rounded-lg border border-gray-200 px-4 py-2 text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-gray-800">Batal</button>
+                    <button type="submit"
+                        class="rounded-lg bg-error-500 px-4 py-2 text-white hover:bg-error-600 font-medium">
+                        <i class="fas fa-trash-alt mr-1"></i> Hapus Sekarang
+                    </button>
+                </div>
+            </form>
+        </div>
+    </x-ui.modal>
+
 @endsection
 
 @push('scripts')
@@ -521,12 +558,16 @@
                 $('#formHapusKelas').attr('action', '{{ url('kelas') }}/' + id);
             });
 
-            // Bulk Edit Checkboxes
+            // Bulk Edit & Delete Checkboxes
             function toggleBulkEditBtn() {
-                if ($('.checkItem:checked').length > 0) {
+                var checkedCount = $('.checkItem:checked').length;
+                if (checkedCount > 0) {
                     $('#btnBulkEdit').removeClass('hidden');
+                    $('#btnBulkDelete').removeClass('hidden');
+                    $('#bulkDeleteCountText').text(checkedCount);
                 } else {
                     $('#btnBulkEdit').addClass('hidden');
+                    $('#btnBulkDelete').addClass('hidden');
                 }
             }
 
@@ -546,6 +587,14 @@
 
             $('#formBulkEdit').on('submit', function() {
                 var container = $('#bulkEditIdsContainer');
+                container.empty();
+                $('.checkItem:checked').each(function() {
+                    container.append('<input type="hidden" name="kelas_ids[]" value="' + $(this).val() + '">');
+                });
+            });
+
+            $('#formBulkDelete').on('submit', function() {
+                var container = $('#bulkDeleteIdsContainer');
                 container.empty();
                 $('.checkItem:checked').each(function() {
                     container.append('<input type="hidden" name="kelas_ids[]" value="' + $(this).val() + '">');

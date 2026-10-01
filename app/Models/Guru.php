@@ -25,11 +25,12 @@ class Guru extends Model
         });
     }
 
-    protected $fillable = ['nama', 'nip', 'tgl_lahir', 'no_wa', 'bot_access', 'is_global_report', 'id_finger', 'uid_rfid', 'enroll_status', 'enroll_finger_status', 'created_at', 'updated_at', 'school_id', 'default_shift_id', 'user_id', 'telegram_chat_id', 'last_seen'];
+    protected $fillable = ['nama', 'nip', 'tgl_lahir', 'no_wa', 'bot_access', 'is_global_report', 'is_teacher_report', 'id_finger', 'uid_rfid', 'enroll_status', 'enroll_finger_status', 'created_at', 'updated_at', 'school_id', 'default_shift_id', 'user_id', 'telegram_chat_id', 'last_seen'];
 
     protected $casts = [
         'bot_access' => 'boolean',
         'is_global_report' => 'boolean',
+        'is_teacher_report' => 'boolean',
         'last_seen' => 'datetime',
     ];
 

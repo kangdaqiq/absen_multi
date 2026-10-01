@@ -1013,21 +1013,7 @@ class WhatsAppMessageTemplates
         $msg .= "• ⏳ Belum Absen      : *{$rekapGuru['belum_absen']} Orang*\n";
         $msg .= str_repeat("─", 32) . "\n\n";
 
-        // 1. Detail Hadir Tepat Waktu
-        if (!empty($rekapGuru['list_tepat_waktu'])) {
-            $count = count($rekapGuru['list_tepat_waktu']);
-            $msg .= "✅ *Hadir Tepat Waktu ({$count}):*\n";
-            $no = 1;
-            foreach ($rekapGuru['list_tepat_waktu'] as $item) {
-                $shiftStr = ($item['shift'] && $item['shift'] !== '-') ? " - {$item['shift']}" : '';
-                $pulangStr = !empty($item['jam_pulang']) ? " s/d {$item['jam_pulang']}" : '';
-                $msg .= "{$no}. *{$item['nama']}* ({$item['jam_masuk']}{$pulangStr}{$shiftStr})\n";
-                $no++;
-            }
-            $msg .= "\n";
-        }
-
-        // 2. Detail Terlambat
+        // 1. Detail Terlambat
         if (!empty($rekapGuru['list_terlambat'])) {
             $count = count($rekapGuru['list_terlambat']);
             $msg .= "⚠️ *Terlambat ({$count}):*\n";

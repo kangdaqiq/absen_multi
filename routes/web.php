@@ -40,6 +40,11 @@ Route::get('/login', [AuthController::class, 'showLoginForm'])->name('login');
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
+// ── Stream Foto Siswa (Mendukung External Drive & Public Storage) ──────────
+Route::get('/siswa/photo/{filename}', [SiswaController::class, 'showPhoto'])
+    ->where('filename', '.*')
+    ->name('siswa.photo');
+
 // ── Portal Pengajuan Izin & Sakit Mandiri (Publik) ────────────
 Route::get('/pengajuan-izin/{schoolCode?}', [App\Http\Controllers\PortalIzinController::class, 'index'])->name('portal-izin.index');
 Route::get('/portal-izin/search', [App\Http\Controllers\PortalIzinController::class, 'searchStudent'])->name('portal-izin.search');
@@ -68,6 +73,7 @@ Route::middleware(['auth', 'self_hosted_guard'])->prefix('super-admin')->name('s
         // Schools Management
         Route::resource('schools', App\Http\Controllers\SuperAdmin\SchoolController::class);
         Route::patch('schools/{school}/toggle-bot', [App\Http\Controllers\SuperAdmin\SchoolController::class, 'toggleBot'])->name('schools.toggle-bot');
+        Route::patch('schools/{school}/toggle-photo', [App\Http\Controllers\SuperAdmin\SchoolController::class, 'togglePhoto'])->name('schools.toggle-photo');
         Route::post('schools/{school}/send-invoice-wa', function (\App\Models\School $school, \App\Services\SubscriptionNotificationService $service) {
             $res = $service->sendRenewalInvoiceWhatsApp($school);
             return back()->with($res['success'] ? 'success' : 'error', $res['message']);
@@ -93,6 +99,7 @@ Route::middleware(['auth', 'self_hosted_guard'])->prefix('super-admin')->name('s
 
         // Licenses (Self-Hosted)
         Route::patch('licenses/{license}/regenerate', [App\Http\Controllers\SuperAdmin\LicenseController::class, 'regenerate'])->name('licenses.regenerate');
+        Route::patch('licenses/{license}/toggle-photo', [App\Http\Controllers\SuperAdmin\LicenseController::class, 'togglePhoto'])->name('licenses.toggle-photo');
         Route::resource('licenses', App\Http\Controllers\SuperAdmin\LicenseController::class)->only(['index', 'store', 'update', 'destroy']);
 
         // WhatsApp Devices Overview
@@ -117,22 +124,30 @@ Route::middleware('auth')->group(function () {
     Route::put('/profile', [App\Http\Controllers\ProfileController::class, 'update'])->name('profile.update');
     Route::get('/support', [App\Http\Controllers\SupportController::class, 'index'])->name('support.index');
     Route::get('/live', [App\Http\Controllers\LiveDashboardController::class, 'index'])->name('live.index');
+    Route::get('/live/boxes', [App\Http\Controllers\LiveDashboardController::class, 'boxes'])->name('live.boxes');
     Route::get('/live/fullscreen', [App\Http\Controllers\LiveDashboardController::class, 'fullscreen'])->name('live.fullscreen');
     Route::get('/live/data', [App\Http\Controllers\LiveDashboardController::class, 'data'])->name('live.data');
+    Route::get('/live/box-data', [App\Http\Controllers\LiveDashboardController::class, 'boxData'])->name('live.box-data');
+    Route::post('/live/simulate-tap', [App\Http\Controllers\LiveDashboardController::class, 'simulateTap'])->name('live.simulate-tap');
+    Route::get('/siswa/riwayat-kehadiran', [App\Http\Controllers\StudentAttendanceHistoryController::class, 'index'])->name('siswa.riwayat');
 
-    // Admin & Teacher Routes
-    Route::middleware('role:admin,teacher')->group(function () {
-        // Master Data (Siswa/Guru) - Ideally Teacher is Read Only, but for now we allow access
+    // Data Siswa (Admin, Teacher, Wali Kelas, Waka Kurikulum)
+    Route::middleware('role:admin,teacher,wali_kelas,waka_kurikulum')->group(function () {
+        Route::delete('siswa/bulk-destroy', [SiswaController::class, 'bulkDestroy'])->name('siswa.bulk-destroy');
+        Route::put('siswa/bulk-update-kelas', [SiswaController::class, 'bulkUpdateKelas'])->name('siswa.bulk-update-kelas');
+        Route::resource('siswa', SiswaController::class)->except(['create', 'show', 'edit']);
+    });
+
+    // Master Data Sekolah (Admin)
+    Route::middleware('role:admin,super_admin')->group(function () {
         Route::post('kelas/{id}/toggle-status', [KelasController::class, 'toggleStatus'])->name('kelas.toggle-status');
         Route::post('kelas/{id}/toggle-report', [KelasController::class, 'toggleReport'])->name('kelas.toggle-report');
         Route::put('kelas/bulk-update', [KelasController::class, 'bulkUpdate'])->name('kelas.bulk-update');
+        Route::delete('kelas/bulk-destroy', [KelasController::class, 'bulkDestroy'])->name('kelas.bulk-destroy');
         Route::resource('jurusan', App\Http\Controllers\JurusanController::class)->except(['create', 'show', 'edit']);
         Route::resource('kelas', KelasController::class)->except(['create', 'show', 'edit']);
         Route::resource('guru', GuruController::class)->except(['create', 'show', 'edit']);
         Route::patch('guru/{id}/toggle-bot-access', [GuruController::class, 'toggleBotAccess'])->name('guru.toggle-bot-access');
-        Route::delete('siswa/bulk-destroy', [SiswaController::class, 'bulkDestroy'])->name('siswa.bulk-destroy');
-        Route::put('siswa/bulk-update-kelas', [SiswaController::class, 'bulkUpdateKelas'])->name('siswa.bulk-update-kelas');
-        Route::resource('siswa', SiswaController::class)->except(['create', 'show', 'edit']);
     });
 
     // Absensi & Rekap Routes (Includes Wali Kelas & Waka Kurikulum)

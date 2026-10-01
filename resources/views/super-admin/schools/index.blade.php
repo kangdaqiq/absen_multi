@@ -31,6 +31,7 @@
                     <th class="py-4 px-4 text-center border-b border-stroke dark:border-strokedark">Admin</th>
                     <th class="py-4 px-4 border-b border-stroke dark:border-strokedark">Status</th>
                     <th class="py-4 px-4 text-center border-b border-stroke dark:border-strokedark">Bot WA</th>
+                    <th class="py-4 px-4 text-center border-b border-stroke dark:border-strokedark">Foto Siswa</th>
                     <th class="py-4 px-4 border-b border-stroke dark:border-strokedark">Aksi</th>
                 </tr>
             </thead>
@@ -110,6 +111,25 @@
                                     <i class="fas fa-ban"></i> N/A
                                 </span>
                             @endif
+                        </td>
+                        {{-- Toggle Foto Siswa --}}
+                        <td class="border-b border-[#eee] py-5 px-4 dark:border-strokedark align-top text-center">
+                            <label class="inline-flex items-center cursor-pointer" title="{{ ($school->photo_enabled ?? true) ? 'Klik untuk nonaktifkan fitur foto' : 'Klik untuk aktifkan fitur foto' }}">
+                                <input
+                                    type="checkbox"
+                                    class="sr-only photo-toggle"
+                                    data-school-id="{{ $school->id }}"
+                                    data-school-name="{{ $school->name }}"
+                                    data-url="{{ route('super-admin.schools.toggle-photo', $school) }}"
+                                    {{ ($school->photo_enabled ?? true) ? 'checked' : '' }}
+                                />
+                                <div class="photo-toggle-track relative w-11 h-6 rounded-full transition-colors duration-300 {{ ($school->photo_enabled ?? true) ? 'bg-brand-500' : 'bg-gray-300 dark:bg-meta-4' }}">
+                                    <div class="photo-toggle-thumb absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-300" style="{{ ($school->photo_enabled ?? true) ? 'transform: translateX(20px);' : '' }}"></div>
+                                </div>
+                            </label>
+                            <p class="text-xs mt-1 {{ ($school->photo_enabled ?? true) ? 'text-brand-500 font-medium' : 'text-gray-400 dark:text-gray-500' }}">
+                                {{ ($school->photo_enabled ?? true) ? 'Aktif' : 'Mati' }}
+                            </p>
                         </td>
                         <td class="border-b border-[#eee] py-5 px-4 dark:border-strokedark align-top">
                             <div class="flex items-center space-x-3">
@@ -216,6 +236,63 @@
                             // Rollback jika gagal
                             this.checked = !isChecked;
                             showToast('Gagal mengubah status bot.', 'error');
+                        }
+                    })
+                    .catch(() => {
+                        this.checked = !isChecked;
+                        showToast('Terjadi kesalahan jaringan.', 'error');
+                    })
+                    .finally(() => {
+                        this.disabled = false;
+                    });
+                });
+            });
+
+            // ── AJAX Toggle Foto Siswa ──────────────────────────────────────
+            document.querySelectorAll('.photo-toggle').forEach(function (toggle) {
+                toggle.addEventListener('change', function () {
+                    const isChecked    = this.checked;
+                    const url          = this.dataset.url;
+                    const schoolName   = this.dataset.schoolName;
+                    const container    = this.closest('td');
+                    const track        = container.querySelector('.photo-toggle-track');
+                    const thumb        = container.querySelector('.photo-toggle-thumb');
+                    const statusText   = container.querySelector('p');
+                    const csrfToken    = document.querySelector('meta[name="csrf-token"]').content;
+
+                    this.disabled = true;
+
+                    fetch(url, {
+                        method: 'PATCH',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': csrfToken,
+                            'Accept': 'application/json',
+                        },
+                    })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.success) {
+                            const active = data.photo_enabled;
+
+                            if (active) {
+                                track.classList.remove('bg-gray-300', 'dark:bg-meta-4');
+                                track.classList.add('bg-brand-500');
+                                thumb.style.transform = 'translateX(20px)';
+                                statusText.textContent = 'Aktif';
+                                statusText.className = 'text-xs mt-1 text-brand-500 font-medium';
+                            } else {
+                                track.classList.remove('bg-brand-500');
+                                track.classList.add('bg-gray-300', 'dark:bg-meta-4');
+                                thumb.style.transform = 'translateX(0)';
+                                statusText.textContent = 'Mati';
+                                statusText.className = 'text-xs mt-1 text-gray-400 dark:text-gray-500';
+                            }
+
+                            showToast(data.message, active ? 'success' : 'warning');
+                        } else {
+                            this.checked = !isChecked;
+                            showToast('Gagal mengubah status fitur foto.', 'error');
                         }
                     })
                     .catch(() => {

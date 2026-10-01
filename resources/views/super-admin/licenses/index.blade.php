@@ -113,7 +113,7 @@
                         <textarea name="notes" rows="2" placeholder="Nomor HP, info kontrak, dll" class="w-full rounded border border-stroke bg-transparent py-3 px-5 outline-none transition focus:border-brand-500 active:border-brand-500 dark:border-form-strokedark dark:bg-form-input dark:focus:border-brand-500">{{ old('notes') }}</textarea>
                     </div>
 
-                    <div class="mb-5.5">
+                    <div class="mb-5.5 space-y-3">
                         <label for="is_active" class="flex cursor-pointer select-none items-center">
                             <div class="relative">
                                 <input type="checkbox" id="is_active" name="is_active" checked class="sr-only" />
@@ -124,6 +124,18 @@
                                 </div>
                             </div>
                             <span class="text-sm font-medium text-black dark:text-white">Aktifkan Lisensi</span>
+                        </label>
+
+                        <label for="photo_enabled" class="flex cursor-pointer select-none items-center">
+                            <div class="relative">
+                                <input type="checkbox" id="photo_enabled" name="photo_enabled" value="1" checked class="sr-only" />
+                                <div class="box mr-4 flex h-5 w-5 items-center justify-center rounded border border-stroke dark:border-strokedark bg-white dark:bg-boxdark">
+                                    <span class="opacity-0">
+                                        <i class="fas fa-check text-xs text-brand-500"></i>
+                                    </span>
+                                </div>
+                            </div>
+                            <span class="text-sm font-medium text-black dark:text-white">Aktifkan Fitur Foto Siswa</span>
                         </label>
                     </div>
 
@@ -153,6 +165,7 @@
                             <th class="py-4 px-4 font-medium text-black dark:text-white text-center">Sekolah</th>
                             <th class="py-4 px-4 font-medium text-black dark:text-white text-center">Kuota Limit</th>
                             <th class="py-4 px-4 font-medium text-black dark:text-white">Expired</th>
+                            <th class="py-4 px-4 font-medium text-black dark:text-white text-center">Foto Siswa</th>
                             <th class="py-4 px-4 font-medium text-black dark:text-white">Status</th>
                             <th class="py-4 px-4 font-medium text-black dark:text-white text-center">Aksi</th>
                         </tr>
@@ -199,6 +212,24 @@
                                             <span>Belum pernah</span>
                                         @endif
                                     </div>
+                                </td>
+                                <td class="border-b border-[#eee] py-5 px-4 dark:border-strokedark text-center align-top">
+                                    <label class="inline-flex items-center cursor-pointer" title="{{ ($license->photo_enabled ?? true) ? 'Klik untuk nonaktifkan fitur foto' : 'Klik untuk aktifkan fitur foto' }}">
+                                        <input
+                                            type="checkbox"
+                                            class="sr-only license-photo-toggle"
+                                            data-license-id="{{ $license->id }}"
+                                            data-client-name="{{ $license->client_name }}"
+                                            data-url="{{ route('super-admin.licenses.toggle-photo', $license) }}"
+                                            {{ ($license->photo_enabled ?? true) ? 'checked' : '' }}
+                                        />
+                                        <div class="lic-photo-track relative w-10 h-5 rounded-full transition-colors duration-300 {{ ($license->photo_enabled ?? true) ? 'bg-brand-500' : 'bg-gray-300 dark:bg-meta-4' }}">
+                                            <div class="lic-photo-thumb absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-300" style="{{ ($license->photo_enabled ?? true) ? 'transform: translateX(20px);' : '' }}"></div>
+                                        </div>
+                                    </label>
+                                    <p class="text-[11px] mt-0.5 {{ ($license->photo_enabled ?? true) ? 'text-brand-500 font-medium' : 'text-gray-400 dark:text-gray-500' }}">
+                                        {{ ($license->photo_enabled ?? true) ? 'Aktif' : 'Mati' }}
+                                    </p>
                                 </td>
                                 <td class="border-b border-[#eee] py-5 px-4 dark:border-strokedark align-top">
                                     @if($license->status_label == 'Aktif')
@@ -312,7 +343,7 @@
                         <textarea name="notes" x-model="editData.notes" rows="2" class="w-full rounded border border-stroke bg-transparent py-3 px-5 outline-none transition focus:border-brand-500 active:border-brand-500 dark:border-form-strokedark dark:bg-form-input dark:focus:border-brand-500"></textarea>
                     </div>
 
-                    <div class="mb-5.5">
+                    <div class="mb-5.5 space-y-3">
                         <label for="edit_is_active" class="flex cursor-pointer select-none items-center">
                             <div class="relative">
                                 <input type="checkbox" id="edit_is_active" name="is_active" x-model="editData.is_active" class="sr-only" />
@@ -323,6 +354,18 @@
                                 </div>
                             </div>
                             <span class="text-sm font-medium text-black dark:text-white">Aktifkan Lisensi</span>
+                        </label>
+
+                        <label for="edit_photo_enabled" class="flex cursor-pointer select-none items-center">
+                            <div class="relative">
+                                <input type="checkbox" id="edit_photo_enabled" name="photo_enabled" value="1" x-model="editData.photo_enabled" class="sr-only" />
+                                <div class="box mr-4 flex h-5 w-5 items-center justify-center rounded border border-stroke dark:border-strokedark bg-white dark:bg-boxdark">
+                                    <span class="opacity-0">
+                                        <i class="fas fa-check text-xs text-brand-500"></i>
+                                    </span>
+                                </div>
+                            </div>
+                            <span class="text-sm font-medium text-black dark:text-white">Aktifkan Fitur Foto Siswa</span>
                         </label>
                     </div>
 
@@ -378,7 +421,8 @@ function licenseManager() {
             expired_at: '',
             allowed_hostname: '',
             notes: '',
-            is_active: true
+            is_active: true,
+            photo_enabled: true
         },
         openEditModal(license) {
             this.editData = {
@@ -392,11 +436,72 @@ function licenseManager() {
                 expired_at: license.expired_at ? license.expired_at.substring(0, 10) : '',
                 allowed_hostname: license.allowed_hostname ?? '',
                 notes: license.notes ?? '',
-                is_active: license.is_active
+                is_active: !!license.is_active,
+                photo_enabled: license.photo_enabled !== undefined ? !!license.photo_enabled : true
             };
             this.isEditModalOpen = true;
         }
     }
 }
+
+// ── AJAX Toggle Foto Siswa untuk Lisensi ────────────────────────────────────
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.license-photo-toggle').forEach(function (toggle) {
+        toggle.addEventListener('change', function () {
+            const isChecked  = this.checked;
+            const url        = this.dataset.url;
+            const clientName = this.dataset.clientName;
+            const container  = this.closest('td');
+            const track      = container.querySelector('.lic-photo-track');
+            const thumb      = container.querySelector('.lic-photo-thumb');
+            const statusText = container.querySelector('p');
+            const csrfToken  = document.querySelector('meta[name="csrf-token"]').content;
+
+            this.disabled = true;
+
+            fetch(url, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                    'Accept': 'application/json',
+                },
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    const active = data.photo_enabled;
+
+                    if (active) {
+                        track.classList.remove('bg-gray-300', 'dark:bg-meta-4');
+                        track.classList.add('bg-brand-500');
+                        thumb.style.transform = 'translateX(20px)';
+                        statusText.textContent = 'Aktif';
+                        statusText.className = 'text-[11px] mt-0.5 text-brand-500 font-medium';
+                    } else {
+                        track.classList.remove('bg-brand-500');
+                        track.classList.add('bg-gray-300', 'dark:bg-meta-4');
+                        thumb.style.transform = 'translateX(0)';
+                        statusText.textContent = 'Mati';
+                        statusText.className = 'text-[11px] mt-0.5 text-gray-400 dark:text-gray-500';
+                    }
+
+                    // Toast notification
+                    alert(data.message);
+                } else {
+                    this.checked = !isChecked;
+                    alert('Gagal mengubah status fitur foto.');
+                }
+            })
+            .catch(() => {
+                this.checked = !isChecked;
+                alert('Terjadi kesalahan jaringan.');
+            })
+            .finally(() => {
+                this.disabled = false;
+            });
+        });
+    });
+});
 </script>
 @endpush

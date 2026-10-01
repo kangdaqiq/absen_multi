@@ -145,6 +145,7 @@ class LicenseService
                     'max_students'         => $data['max_students'] ?? 0,
                     'max_teachers'         => $data['max_teachers'] ?? 0,
                     'max_bot_users'        => $data['max_bot_users'] ?? 0,
+                    'photo_enabled'        => $data['photo_enabled'] ?? true,
                     'history_quota_months' => $data['history_quota_months'] ?? null,
                     'message'              => 'Lisensi telah expired pada ' . $expiredAt->format('d M Y') . '. Hubungi provider untuk perpanjangan.',
                     'grace_remaining_days' => 0,
@@ -160,6 +161,7 @@ class LicenseService
                 'max_students'         => $data['max_students'] ?? 0,
                 'max_teachers'         => $data['max_teachers'] ?? 0,
                 'max_bot_users'        => $data['max_bot_users'] ?? 0,
+                'photo_enabled'        => $data['photo_enabled'] ?? true,
                 'history_quota_months' => $data['history_quota_months'] ?? null,
                 'message'              => 'Lisensi aktif.',
                 'grace_remaining_days' => 0,
@@ -181,6 +183,7 @@ class LicenseService
             'max_students'         => 0,   // 0 = unlimited
             'max_teachers'         => 0,   // 0 = unlimited
             'max_bot_users'        => 0,   // 0 = unlimited
+            'photo_enabled'        => true,
             'history_quota_months' => null,
             'message'              => $message,
             'grace_remaining_days' => 0,
@@ -203,6 +206,7 @@ class LicenseService
             'max_students'         => 0,
             'max_teachers'         => 0,
             'max_bot_users'        => 0,
+            'photo_enabled'        => false,
             'history_quota_months' => null,
             'message'              => $message,
             'grace_remaining_days' => 0,
@@ -357,5 +361,29 @@ class LicenseService
 
         $currentCount = \App\Models\Siswa::count();
         return $currentCount < $limit;
+    }
+
+    /**
+     * Periksa apakah fitur foto siswa aktif.
+     * - Pada mode self_hosted: diperiksa dari status lisensi (photo_enabled).
+     * - Pada mode hosted (SaaS / Super Admin): diperiksa dari pengaturan sekolah (school->photo_enabled).
+     */
+    public function isPhotoFeatureEnabled(?\App\Models\School $school = null): bool
+    {
+        if (config('app.mode', 'hosted') === 'self_hosted') {
+            $license = $this->validate();
+            return isset($license['photo_enabled']) ? (bool) $license['photo_enabled'] : true;
+        }
+
+        if (!$school) {
+            $user = auth()->user();
+            $school = $user?->school;
+        }
+
+        if ($school) {
+            return (bool) ($school->photo_enabled ?? true);
+        }
+
+        return true;
     }
 }

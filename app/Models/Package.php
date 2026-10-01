@@ -16,6 +16,7 @@ class Package extends Model
         'history_quota_months',
         'wa_enabled',
         'bot_enabled',
+        'photo_enabled',
         'is_active',
     ];
 
@@ -24,6 +25,7 @@ class Package extends Model
         'price_yearly' => 'decimal:2',
         'wa_enabled' => 'boolean',
         'bot_enabled' => 'boolean',
+        'photo_enabled' => 'boolean',
         'is_active' => 'boolean',
     ];
 

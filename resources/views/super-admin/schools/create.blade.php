@@ -269,6 +269,18 @@
                             </div>
                             <span class="text-sm font-medium text-black dark:text-white">Aktifkan Bot WhatsApp Interaktif</span>
                         </label>
+
+                        <label for="photo_enabled" class="flex cursor-pointer select-none items-center">
+                            <div class="relative">
+                                <input type="checkbox" id="photo_enabled" name="photo_enabled" value="1" {{ old('photo_enabled', true) ? 'checked' : '' }} class="sr-only" />
+                                <div id="photo_enabled_box" class="box mr-4 flex h-5 w-5 items-center justify-center rounded border border-stroke dark:border-strokedark bg-white dark:bg-boxdark">
+                                    <span class="opacity-0">
+                                        <i class="fas fa-check text-xs text-brand-500"></i>
+                                    </span>
+                                </div>
+                            </div>
+                            <span class="text-sm font-medium text-black dark:text-white">Aktifkan Fitur Foto Siswa</span>
+                        </label>
                     </div>
 
                     <div class="flex justify-end gap-4.5 border-t border-stroke pt-5 dark:border-strokedark">
@@ -356,7 +368,8 @@ document.addEventListener('DOMContentLoaded', function() {
         botUserLimit: document.getElementById('input_bot_user_limit'),
         historyQuota: document.getElementById('input_history_quota'),
         waEnabled: document.getElementById('wa_enabled'),
-        botEnabled: document.getElementById('bot_enabled')
+        botEnabled: document.getElementById('bot_enabled'),
+        photoEnabled: document.getElementById('photo_enabled')
     };
 
     function applyPackageValues() {

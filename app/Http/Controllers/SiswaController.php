@@ -62,8 +62,9 @@ class SiswaController extends Controller
         }
 
         $devices = $devicesQuery->get();
+        $photoEnabled = app(\App\Services\LicenseService::class)->isPhotoFeatureEnabled();
 
-        return view('siswa.index', compact('siswa', 'kelas', 'devices'));
+        return view('siswa.index', compact('siswa', 'kelas', 'devices', 'photoEnabled'));
     }
 
     public function store(Request $request)
@@ -85,6 +86,7 @@ class SiswaController extends Controller
             'wa_ortu' => ['nullable', 'string', 'max:25', 'regex:/^(\+?62|08|628)[0-9\-\s]{7,18}$/'],
             'telegram_chat_id' => 'nullable|string|max:50',
             'telegram_ortu_chat_id' => 'nullable|string|max:50',
+            'foto' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:3072',
             'user_id' => 'nullable|exists:users,id',
             'is_khusus' => 'nullable|boolean',
             'is_siswa_khusus' => 'nullable|boolean',
@@ -93,6 +95,13 @@ class SiswaController extends Controller
         ]);
 
         $input = $request->all();
+
+        $photoEnabled = app(\App\Services\LicenseService::class)->isPhotoFeatureEnabled();
+        if ($photoEnabled && $request->hasFile('foto')) {
+            $input['foto'] = $this->processAndStoreFoto($request->file('foto'));
+        } else {
+            unset($input['foto']);
+        }
         // Force null if empty string to avoid unique constraint issues on empty strings
         if (empty($input['alamat']))
             $input['alamat'] = null;
@@ -159,6 +168,7 @@ class SiswaController extends Controller
             'wa_ortu' => ['nullable', 'string', 'max:25', 'regex:/^(\+?62|08|628)[0-9\-\s]{7,18}$/'],
             'telegram_chat_id' => 'nullable|string|max:50',
             'telegram_ortu_chat_id' => 'nullable|string|max:50',
+            'foto' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:3072',
             'uid_rfid' => 'nullable|string|max:50',
             'user_id' => 'nullable|exists:users,id',
             'is_khusus' => 'nullable|boolean',
@@ -168,6 +178,16 @@ class SiswaController extends Controller
         ]);
 
         $input = $request->all();
+
+        $photoEnabled = app(\App\Services\LicenseService::class)->isPhotoFeatureEnabled($siswa->school);
+        if ($photoEnabled && $request->hasFile('foto')) {
+            if ($siswa->foto) {
+                Siswa::deletePhotoFile($siswa->foto);
+            }
+            $input['foto'] = $this->processAndStoreFoto($request->file('foto'));
+        } else {
+            unset($input['foto']);
+        }
         if (empty($input['alamat']))
             $input['alamat'] = null;
         if (!empty($input['no_wa'])) {
@@ -198,9 +218,9 @@ class SiswaController extends Controller
     {
         $siswa = Siswa::findOrFail($id);
 
-        // Optional: Delete linked user? For now keep it or manual delete.
-        // If we want to clean up:
-        // if ($siswa->user_id) { \App\Models\User::destroy($siswa->user_id); }
+        if ($siswa->foto) {
+            Siswa::deletePhotoFile($siswa->foto);
+        }
 
         $siswa->delete();
 
@@ -730,5 +750,127 @@ class SiswaController extends Controller
             'success' => true,
             'message' => "$count siswa berhasil dipindah kelas."
         ]);
+    }
+
+    /**
+     * Sajikan file foto siswa secara aman (mendukung external drive/folder maupun storage lokal).
+     */
+    public function showPhoto(Request $request, $filename)
+    {
+        // Sanitasi nama file untuk mencegah directory traversal attack
+        $filename = str_replace(['..', "\0"], '', $filename);
+        $filename = ltrim($filename, '/\\');
+
+        $diskPath = Siswa::getPhotoDiskPath($filename);
+        if (!$diskPath || !file_exists($diskPath)) {
+            $baseName = basename($filename);
+            $diskPath = Siswa::getPhotoDiskPath($baseName);
+        }
+
+        if (!$diskPath || !file_exists($diskPath)) {
+            abort(404, 'Foto siswa tidak ditemukan.');
+        }
+
+        $mime = @mime_content_type($diskPath) ?: 'image/jpeg';
+
+        return response()->file($diskPath, [
+            'Content-Type'  => $mime,
+            'Cache-Control' => 'public, max-age=604800, immutable',
+        ]);
+    }
+
+    /**
+     * Compress, auto-orient, and store student photo to keep storage lightweight and fast.
+     * Mendukung folder/drive eksternal jika dikonfigurasi via SISWA_PHOTO_PATH di .env.
+     */
+    protected function processAndStoreFoto($file)
+    {
+        $externalPath = config('filesystems.siswa_photo_path');
+        $randomName = \Illuminate\Support\Str::random(40) . '.jpg';
+
+        if (!empty($externalPath)) {
+            $destDir = rtrim($externalPath, '/\\');
+            $destinationPath = $destDir . DIRECTORY_SEPARATOR . $randomName;
+            $dbValue = $randomName;
+        } else {
+            $destDir = storage_path('app/public/siswa');
+            $destinationPath = $destDir . DIRECTORY_SEPARATOR . $randomName;
+            $dbValue = 'siswa/' . $randomName;
+        }
+
+        if (!file_exists($destDir)) {
+            @mkdir($destDir, 0755, true);
+        }
+
+        if (extension_loaded('gd')) {
+            try {
+                $filePath = $file->getRealPath();
+                $imageInfo = @getimagesize($filePath);
+
+                if ($imageInfo) {
+                    $mime = $imageInfo['mime'];
+                    $src = match ($mime) {
+                        'image/jpeg', 'image/jpg' => @imagecreatefromjpeg($filePath),
+                        'image/png' => @imagecreatefrompng($filePath),
+                        'image/webp' => @imagecreatefromwebp($filePath),
+                        default => null,
+                    };
+
+                    if ($src) {
+                        // Fix EXIF orientation if available (e.g. smartphone vertical photos)
+                        if (function_exists('exif_read_data') && ($mime === 'image/jpeg' || $mime === 'image/jpg')) {
+                            $exif = @exif_read_data($filePath);
+                            if (!empty($exif['Orientation'])) {
+                                $src = match ($exif['Orientation']) {
+                                    3 => imagerotate($src, 180, 0),
+                                    6 => imagerotate($src, -90, 0),
+                                    8 => imagerotate($src, 90, 0),
+                                    default => $src,
+                                };
+                            }
+                        }
+
+                        $origW = imagesx($src);
+                        $origH = imagesy($src);
+
+                        // Max width 600px and max height 800px (standard portrait ratio)
+                        $maxW = 600;
+                        $maxH = 800;
+
+                        $ratio = min($maxW / $origW, $maxH / $origH, 1.0);
+                        $targetW = (int) round($origW * $ratio);
+                        $targetH = (int) round($origH * $ratio);
+
+                        $dst = imagecreatetruecolor($targetW, $targetH);
+
+                        // Fill white background for transparent PNGs
+                        $white = imagecolorallocate($dst, 255, 255, 255);
+                        imagefill($dst, 0, 0, $white);
+
+                        imagecopyresampled($dst, $src, 0, 0, 0, 0, $targetW, $targetH, $origW, $origH);
+
+                        // Save as JPEG with 80% quality (compact ~50KB - 100KB)
+                        imagejpeg($dst, $destinationPath, 80);
+
+                        imagedestroy($src);
+                        imagedestroy($dst);
+
+                        return $dbValue;
+                    }
+                }
+            } catch (\Throwable $e) {
+                \Log::warning('Gagal kompresi foto siswa: ' . $e->getMessage());
+            }
+        }
+
+        // Fallback standard storage if GD fails
+        if (!empty($externalPath)) {
+            $ext = $file->getClientOriginalExtension() ?: 'jpg';
+            $fallbackName = \Illuminate\Support\Str::random(40) . '.' . $ext;
+            $file->move($destDir, $fallbackName);
+            return $fallbackName;
+        }
+
+        return $file->store('siswa', 'public');
     }
 }

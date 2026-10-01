@@ -37,6 +37,32 @@ class MenuHelper
             'items' => $dashboardItems
         ];
 
+        // 1.5. MENU KHUSUS SISWA
+        if ($role === 'student') {
+            $studentItems = [
+                [
+                    'icon' => 'calendar',
+                    'name' => 'Riwayat Kehadiran',
+                    'path' => route('siswa.riwayat', [], false),
+                ],
+                [
+                    'icon' => 'forms',
+                    'name' => 'Pengajuan Izin / Sakit',
+                    'path' => $school ? route('portal-izin.index', $school->id, false) : '/pengajuan-izin',
+                ],
+                [
+                    'icon' => 'user-profile',
+                    'name' => 'Profil Saya',
+                    'path' => route('profile.edit', [], false),
+                ]
+            ];
+
+            $menu[] = [
+                'title' => 'Menu Siswa',
+                'items' => $studentItems
+            ];
+        }
+
         // 2. SUPER ADMIN MENU
         if ($role === 'super_admin') {
             $superAdminItems = [
@@ -59,26 +85,32 @@ class MenuHelper
         }
 
         // 3. MENU SEKOLAH / KANTOR
-        if (in_array($role, ['admin', 'teacher', 'wali_kelas'])) {
+        if (in_array($role, ['admin', 'teacher', 'wali_kelas', 'waka_kurikulum'])) {
             $schoolItems = [];
             
             if (!$isOffice) {
                 $schoolItems[] = ['icon' => 'user-profile', 'name' => 'Data Siswa', 'path' => route('siswa.index', [], false)];
             }
-            $schoolItems[] = ['icon' => 'user-profile', 'name' => "Data $labelKaryawan", 'path' => route('guru.index', [], false)];
 
-            if ($school && ($school->wa_enabled || $school->telegram_enabled)) {
-                $schoolItems[] = ['icon' => 'chat', 'name' => 'Broadcast Pesan', 'path' => route('broadcast.index', [], false)];
+            // Data Guru, Broadcast Pesan, dan Kartu Gerbang HANYA untuk Admin
+            if ($role === 'admin') {
+                $schoolItems[] = ['icon' => 'user-profile', 'name' => "Data $labelKaryawan", 'path' => route('guru.index', [], false)];
+
+                if ($school && ($school->wa_enabled || $school->telegram_enabled)) {
+                    $schoolItems[] = ['icon' => 'chat', 'name' => 'Broadcast Pesan', 'path' => route('broadcast.index', [], false)];
+                }
+
+                if (!$isPesantren) {
+                    $schoolItems[] = ['icon' => 'user-profile', 'name' => 'Kartu Gerbang', 'path' => route('gate-cards.index', [], false)];
+                }
             }
 
-            if (!$isPesantren) {
-                $schoolItems[] = ['icon' => 'user-profile', 'name' => 'Kartu Gerbang', 'path' => route('gate-cards.index', [], false)];
+            if (!empty($schoolItems)) {
+                $menu[] = [
+                    'title' => 'Data Utama',
+                    'items' => $schoolItems
+                ];
             }
-
-            $menu[] = [
-                'title' => 'Data Utama',
-                'items' => $schoolItems
-            ];
         }
 
         // ABSENSI & REKAP
@@ -86,13 +118,20 @@ class MenuHelper
             $absensiSubItems = [];
             if (!$isOffice && !$isPesantren) {
                 $absensiSubItems[] = ['name' => 'Absensi Siswa', 'path' => route('absensi.index', [], false)];
-                $absensiSubItems[] = ['name' => 'Scanner Absensi', 'path' => route('absensi.scanner-usb', [], false)];
+                // Scanner Absensi USB hanya untuk admin
+                if ($role === 'admin') {
+                    $absensiSubItems[] = ['name' => 'Scanner Absensi', 'path' => route('absensi.scanner-usb', [], false)];
+                }
                 $absensiSubItems[] = ['name' => 'Pengajuan Izin', 'path' => route('student-leaves.index', [], false)];
             }
-            if (in_array($role, ['admin', 'teacher']) && !$isPesantren) {
+
+            // Absensi Guru / Karyawan untuk Admin & Waka Kurikulum (bukan guru biasa/walas)
+            if (in_array($role, ['admin', 'waka_kurikulum']) && !$isPesantren) {
                 $absensiSubItems[] = ['name' => "Absensi $labelKaryawan", 'path' => route('absensi-guru.index', [], false)];
             }
-            if (in_array($role, ['admin', 'teacher']) && !$isPesantren) {
+
+            // Jam Masuk Siswa & Shift Karyawan hanya untuk Admin
+            if ($role === 'admin' && !$isPesantren) {
                 if (!$isOffice) {
                     $absensiSubItems[] = ['name' => 'Jam Masuk Siswa', 'path' => route('jadwal.index', [], false)];
                 }
@@ -105,15 +144,22 @@ class MenuHelper
                 $rekapSubItems[] = ['name' => 'Rekap Siswa', 'path' => route('rekap.index', [], false)];
                 $rekapSubItems[] = ['name' => 'Rekap Kelas', 'path' => route('rekap-kelas.index', [], false)];
             }
-            if (in_array($role, ['admin', 'teacher']) && !$isPesantren) {
+
+            // Rekap Guru / Karyawan untuk Admin & Waka Kurikulum
+            if (in_array($role, ['admin', 'waka_kurikulum']) && !$isPesantren) {
                 $rekapSubItems[] = ['name' => "Rekap $labelKaryawan", 'path' => route('rekap-guru.index', [], false)];
             }
+
+            $monitoringSubItems = [
+                ['name' => 'Live Presensi Siswa', 'path' => route('live.boxes', [], false)],
+                ['name' => 'Live Log Sistem', 'path' => route('live.index', [], false)],
+            ];
 
             $kehadiranItems = [
                 [
                     'name' => 'Monitoring Real-time',
                     'icon' => 'charts',
-                    'path' => route('live.index', [], false),
+                    'subItems' => $monitoringSubItems
                 ]
             ];
 
@@ -138,8 +184,8 @@ class MenuHelper
                 'items' => $kehadiranItems
             ];
 
-            // Kegiatan — untuk sekolah & pesantren (non-office)
-            if (in_array($role, ['admin', 'teacher', 'wali_kelas', 'waka_kurikulum']) && !$isOffice) {
+            // Kegiatan — HANYA untuk Admin (sekolah & pesantren non-office)
+            if ($role === 'admin' && !$isOffice) {
                 $menu[] = [
                     'title' => 'Kegiatan',
                     'items' => [

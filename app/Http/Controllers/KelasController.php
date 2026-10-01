@@ -96,7 +96,19 @@ class KelasController extends Controller
 
     public function destroy($id)
     {
-        $kelas = Kelas::findOrFail($id);
+        $schoolId = auth()->user()->isSuperAdmin() ? null : auth()->user()->school_id;
+        $query = Kelas::where('id', $id);
+        if ($schoolId) {
+            $query->where('school_id', $schoolId);
+        }
+        $kelas = $query->firstOrFail();
+
+        // Lepas relasi kelas siswa agar tidak error/orphaned
+        \App\Models\Siswa::where('kelas_id', $kelas->id)->update(['kelas_id' => null]);
+        if (class_exists(\App\Models\JadwalPelajaran::class)) {
+            \App\Models\JadwalPelajaran::where('kelas_id', $kelas->id)->delete();
+        }
+
         $kelas->delete();
 
         return redirect()->route('kelas.index')->with('success', 'Kelas berhasil dihapus.');
@@ -351,5 +363,34 @@ class KelasController extends Controller
         }
 
         return back()->with('success', count($ids) . ' kelas berhasil diperbarui secara massal.');
+    }
+
+    public function bulkDestroy(Request $request)
+    {
+        $schoolId = auth()->user()->isSuperAdmin() ? null : auth()->user()->school_id;
+
+        $request->validate([
+            'kelas_ids' => 'required|array',
+            'kelas_ids.*' => 'exists:kelas,id',
+        ]);
+
+        $ids = $request->kelas_ids;
+
+        // Lepas siswa dari kelas-kelas ini agar menjadi unassigned
+        \App\Models\Siswa::whereIn('kelas_id', $ids)->update(['kelas_id' => null]);
+
+        // Hapus jadwal pelajaran terkait jika ada
+        if (class_exists(\App\Models\JadwalPelajaran::class)) {
+            \App\Models\JadwalPelajaran::whereIn('kelas_id', $ids)->delete();
+        }
+
+        $query = Kelas::whereIn('id', $ids);
+        if ($schoolId) {
+            $query->where('school_id', $schoolId);
+        }
+
+        $count = $query->delete();
+
+        return back()->with('success', "$count kelas berhasil dihapus secara massal.");
     }
 }

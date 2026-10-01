@@ -4,30 +4,65 @@
 
 @section('content')
     <div class="flex flex-col gap-6">
-        {{-- Header with Digital Clock --}}
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-                <h2 class="text-2xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
-                    <span class="relative flex h-3 w-3">
-                        <span
-                            class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                        <span class="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
-                    </span>
-                    LIVE Monitoring Absensi
+        {{-- 1. UNIFIED HEADER BAR (Rapi, Bersih, Seragam dengan Mode Box) --}}
+        <div class="rounded-2xl border border-gray-200 bg-white p-4 sm:px-6 sm:py-4 shadow-theme-sm dark:border-gray-800 dark:bg-gray-dark">
+            <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                
+                {{-- Sisi Kiri: Judul, Indikator Real-time, dan Subtitle --}}
+                <div class="flex items-center gap-3.5">
+                    <div class="relative flex h-3.5 w-3.5 shrink-0">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-3.5 w-3.5 bg-red-500"></span>
+                    </div>
+                    <div>
+                        <div class="flex flex-wrap items-center gap-2.5">
+                            <h2 class="text-xl sm:text-2xl font-black text-gray-800 dark:text-white tracking-tight">
+                                LIVE Monitoring Absensi
+                            </h2>
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                <span>Real-time</span>
+                            </span>
+                        </div>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                            Pemantauan aktivitas kehadiran dan log absensi siswa secara langsung
+                        </p>
+                    </div>
+                </div>
+
+                {{-- Sisi Kanan: Action Toolbar & Jam Digital --}}
+                <div class="flex flex-wrap items-center gap-2 sm:gap-2.5">
+                    {{-- Mode Switcher (Tab) --}}
+                    <div class="inline-flex items-center rounded-xl bg-gray-100 dark:bg-gray-800 p-1 text-xs">
+                        <a href="{{ route('live.boxes') }}"
+                            class="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 font-semibold text-gray-600 dark:text-gray-400 hover:text-brand-500 dark:hover:text-white transition">
+                            <i class="fas fa-th-large"></i> Mode Box
+                        </a>
+                        <span class="inline-flex items-center gap-1.5 rounded-lg bg-white dark:bg-gray-700 px-2.5 py-1 font-bold text-brand-500 dark:text-white shadow-2xs">
+                            <i class="fas fa-table"></i> Mode Tabel
+                        </span>
+                    </div>
+
+                    {{-- Fullscreen Toggle --}}
                     <button type="button" onclick="toggleDashboardFullscreen()" id="btn-fullscreen-toggle"
-                        class="ml-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-gray-100 dark:bg-gray-800 text-xs font-bold text-gray-600 dark:text-gray-300 hover:bg-brand-500 hover:text-white transition-all shadow-sm">
+                        class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-brand-500 hover:bg-brand-600 text-xs font-bold text-white transition-all shadow-sm">
                         <i class="fas fa-expand" id="icon-fs"></i> <span id="label-fs">Fullscreen</span>
                     </button>
-                </h2>
-            </div>
-            <div
-                class="bg-white dark:bg-boxdark rounded-lg shadow-sm border border-stroke dark:border-strokedark px-6 py-3 flex items-center gap-4">
-                <div class="text-right">
-                    <p id="live-date" class="text-xs text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wider">
-                    </p>
-                    <p id="live-clock" class="text-2xl font-bold text-brand-500 font-mono"></p>
+
+                    {{-- Divider --}}
+                    <div class="hidden xl:block h-8 w-px bg-gray-200 dark:bg-gray-800 mx-1"></div>
+
+                    {{-- Clock Widget --}}
+                    <div class="flex items-center gap-3 pl-1 shrink-0">
+                        <div class="text-right">
+                            <p id="live-date" class="text-[10px] text-gray-400 dark:text-gray-500 font-bold uppercase tracking-wider">
+                                --
+                            </p>
+                            <p id="live-clock" class="text-xl sm:text-2xl font-black text-brand-500 font-mono tracking-tight leading-none mt-0.5">--:--:--</p>
+                        </div>
+                    </div>
+
                 </div>
-                <i class="fas fa-clock text-3xl text-gray-200 dark:text-gray-700"></i>
             </div>
         </div>
 
@@ -194,7 +229,15 @@
 
         async function fetchLiveData() {
             try {
-                const response = await fetch('{{ route('live.data') }}');
+                const response = await fetch('{{ route('live.data') }}', {
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                });
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
                 const data = await response.json();
 
                 // Update Stats
@@ -220,10 +263,32 @@
                     data.logs.forEach(log => {
                         let actionBadge = '';
                         switch (log.action) {
-                            case 'checkin_success': actionBadge = '<span class="bg-green-100 text-green-700 px-2 py-0.5 rounded text-[10px] font-bold uppercase">MASUK</span>'; break;
-                            case 'checkout_success': actionBadge = '<span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-[10px] font-bold uppercase">PULANG</span>'; break;
-                            case 'gate_access': actionBadge = '<span class="bg-purple-100 text-purple-700 px-2 py-0.5 rounded text-[10px] font-bold uppercase">GERBANG</span>'; break;
-                            default: actionBadge = `<span class="bg-gray-100 text-gray-700 px-2 py-0.5 rounded text-[10px] font-bold uppercase">${log.action}</span>`;
+                            case 'checkin_success': 
+                                actionBadge = '<span class="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 px-2 py-0.5 rounded text-[10px] font-bold uppercase">MASUK</span>'; 
+                                break;
+                            case 'checkout_success': 
+                                actionBadge = '<span class="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 px-2 py-0.5 rounded text-[10px] font-bold uppercase">PULANG</span>'; 
+                                break;
+                            case 'terlambat': 
+                                actionBadge = '<span class="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 px-2 py-0.5 rounded text-[10px] font-bold uppercase">TERLAMBAT</span>'; 
+                                break;
+                            case 'izin': 
+                                actionBadge = '<span class="bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400 px-2 py-0.5 rounded text-[10px] font-bold uppercase">IZIN</span>'; 
+                                break;
+                            case 'sakit': 
+                                actionBadge = '<span class="bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 px-2 py-0.5 rounded text-[10px] font-bold uppercase">SAKIT</span>'; 
+                                break;
+                            case 'alpha': 
+                                actionBadge = '<span class="bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400 px-2 py-0.5 rounded text-[10px] font-bold uppercase">ALPHA</span>'; 
+                                break;
+                            case 'gate_access': 
+                                actionBadge = '<span class="bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 px-2 py-0.5 rounded text-[10px] font-bold uppercase">GERBANG</span>'; 
+                                break;
+                            case 'unknown_card': 
+                                actionBadge = '<span class="bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 px-2 py-0.5 rounded text-[10px] font-bold uppercase">KARTU ASING</span>'; 
+                                break;
+                            default: 
+                                actionBadge = `<span class="bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 px-2 py-0.5 rounded text-[10px] font-bold uppercase">${log.action}</span>`;
                         }
 
                         const statusIcon = log.success

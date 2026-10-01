@@ -19,6 +19,7 @@ use App\Models\TeacherCheckoutSession;
 use App\Models\MessageQueue;
 use App\Models\JadwalPelajaran;
 use App\Models\Mapel;
+use App\Models\Jurusan;
 
 use App\Models\SiswaFingerprint;
 use App\Models\GuruFingerprint;
@@ -68,16 +69,17 @@ class SchoolBackupController extends Controller
             echo '"settings": ' . Setting::where('school_id', $schoolId)->get()->toJson() . ',';
 
             // 2. Users (Role: Admin, Student, Teacher associated with this school)
-            echo '"users": ' . User::where('school_id', $schoolId)->get()->toJson() . ',';
+            echo '"users": ' . User::where('school_id', $schoolId)->get()->makeVisible(['password_hash'])->toJson() . ',';
 
-            // 3. Classes
+            // 3. Jurusan & Classes
+            echo '"jurusan": ' . Jurusan::where('school_id', $schoolId)->get()->toJson() . ',';
             echo '"kelas": ' . Kelas::where('school_id', $schoolId)->get()->toJson() . ',';
 
             // 4. Students & Fingerprints
             // We need to fetch students, then likely fetch their fingerprints separately or with eager load.
             // To keep JSON flat-ish, let's do separate keys.
             $siswaIds = Siswa::where('school_id', $schoolId)->pluck('id');
-            echo '"siswa": ' . Siswa::where('school_id', $schoolId)->get()->makeVisible(['uuid_rfid', 'id_finger'])->toJson() . ',';
+            echo '"siswa": ' . Siswa::where('school_id', $schoolId)->get()->makeVisible(['uid_rfid', 'id_finger'])->toJson() . ',';
             echo '"siswa_fingerprints": ' . SiswaFingerprint::whereIn('student_id', $siswaIds)->get()->toJson() . ',';
 
             // 5. Teachers & Fingerprints
@@ -167,6 +169,7 @@ class SchoolBackupController extends Controller
             return back()->with('error', 'Format file backup tidak valid.');
         }
 
+        DB::statement('SET FOREIGN_KEY_CHECKS=0');
         DB::beginTransaction();
         try {
             // STEP 1: WIPE CURRENT DATA
@@ -186,24 +189,27 @@ class SchoolBackupController extends Controller
             Mapel::where('school_id', $schoolId)->delete();
             Jadwal::where('school_id', $schoolId)->delete();
 
-
             Siswa::where('school_id', $schoolId)->delete();
             Guru::where('school_id', $schoolId)->delete();
             Kelas::where('school_id', $schoolId)->delete();
+            Jurusan::where('school_id', $schoolId)->delete();
             Device::where('school_id', $schoolId)->delete();
             Setting::where('school_id', $schoolId)->delete();
-            User::where('school_id', $schoolId)->where('id', '!=', $user->id)->delete(); // Keep current admin?
-            // If we delete current admin, we get logged out or error.
-            // Ideally, we should Restore Users EXCEPT current one? Or update current one?
-            // Let's decide: RESTORE Users but SKIP/UPDATE current user if collision.
-            // Safe bet: Don't delete SELF.
+            // Simpan password user yang sudah ada di sekolah ini sebagai fallback jika file backup tidak memiliki password_hash
+            $existingPasswords = User::where('school_id', $schoolId)
+                ->whereNotNull('password_hash')
+                ->pluck('password_hash', 'username')
+                ->toArray();
+
+            User::where('school_id', $schoolId)->where('id', '!=', $user->id)->delete(); // Keep current admin
 
             // STEP 2: RESTORE & MAP IDs
-            $mapUsers  = [];
-            $mapKelas  = [];
-            $mapGuru   = [];
-            $mapSiswa  = [];
-            $mapMapel  = [];
+            $mapUsers   = [];
+            $mapJurusan = [];
+            $mapKelas   = [];
+            $mapGuru    = [];
+            $mapSiswa   = [];
+            $mapMapel   = [];
 
             // 1. Settings
             foreach ($data['settings'] as $item) {
@@ -214,34 +220,90 @@ class SchoolBackupController extends Controller
 
             // 2. Users (Admin/Staff) — skip student (dibuat ulang bersama Siswa) & self
             foreach ($data['users'] as $item) {
-                if (in_array($item['role'], ['student'])) continue;
-                if ($item['id'] == $user->id) continue;
+                if (in_array($item['role'] ?? '', ['student'])) continue;
 
                 $oldId = $item['id'];
+
+                // Jika user ini adalah user yang sedang login saat ini (cocok ID, username, atau email)
+                if ($item['id'] == $user->id || $item['username'] === $user->username || (!empty($item['email']) && $item['email'] === $user->email)) {
+                    $mapUsers[$oldId] = $user->id;
+                    continue;
+                }
+
                 unset($item['id']);
                 $item['school_id'] = $schoolId;
 
-                // Anti-collision username/email
-                if (User::where('username', $item['username'])->orWhere('email', $item['email'])->exists()) {
-                    $suffix = substr(uniqid(), -6);
+                // FIX: Pastikan password_hash selalu ada jika file backup JSON menyembunyikan password_hash
+                if (empty($item['password_hash'])) {
+                    if (!empty($existingPasswords[$item['username']])) {
+                        $item['password_hash'] = $existingPasswords[$item['username']];
+                    } else {
+                        $defaultPass = !empty($item['username']) ? $item['username'] : 'admin123';
+                        $item['password_hash'] = \Illuminate\Support\Facades\Hash::make($defaultPass);
+                    }
+                }
+
+                // Anti-collision username/email jika sudah ada di database
+                $existingUser = User::where('username', $item['username'])->first();
+                if ($existingUser) {
+                    if (!empty($item['email']) && $existingUser->email === $item['email']) {
+                        $mapUsers[$oldId] = $existingUser->id;
+                        continue;
+                    }
+                    $suffix = substr(uniqid(), -5);
                     $item['username'] = $item['username'] . '_r' . $suffix;
                     $item['email']    = $item['username'] . '@restored.local';
+                } elseif (!empty($item['email']) && User::where('email', $item['email'])->exists()) {
+                    $suffix = substr(uniqid(), -5);
+                    $item['email'] = 'user_' . $suffix . '@restored.local';
                 }
 
                 $newUser = User::create($item);
                 $mapUsers[$oldId] = $newUser->id;
             }
 
-            // 3. Kelas
+            // 3. Jurusan (jika ada di backup)
+            if (!empty($data['jurusan'])) {
+                foreach ($data['jurusan'] as $item) {
+                    $oldId = $item['id'];
+                    unset($item['id']);
+                    $item['school_id'] = $schoolId;
+                    $newJurusan = Jurusan::create($item);
+                    $mapJurusan[$oldId] = $newJurusan->id;
+                }
+            }
+
+            // 4. Kelas
+            $rawWaliKelas = [];
             foreach ($data['kelas'] as $item) {
                 $oldId = $item['id'];
                 unset($item['id']);
                 $item['school_id'] = $schoolId;
+
+                // Simpan wali_kelas asli untuk di-sync setelah guru dibuat
+                $rawWaliKelas[$oldId] = [
+                    'wali_kelas_id'   => $item['wali_kelas_id'] ?? null,
+                    'wali_kelas_2_id' => $item['wali_kelas_2_id'] ?? null,
+                ];
+
+                // Set NULL dulu saat insert pertama agar foreign key tidak error jika guru belum ada
+                $item['wali_kelas_id']   = null;
+                $item['wali_kelas_2_id'] = null;
+
+                // Remap jurusan_id jika ada
+                if (!empty($item['jurusan_id'])) {
+                    if (isset($mapJurusan[$item['jurusan_id']])) {
+                        $item['jurusan_id'] = $mapJurusan[$item['jurusan_id']];
+                    } elseif (!Jurusan::where('id', $item['jurusan_id'])->where('school_id', $schoolId)->exists()) {
+                        $item['jurusan_id'] = null;
+                    }
+                }
+
                 $newKelas = Kelas::create($item);
                 $mapKelas[$oldId] = $newKelas->id;
             }
 
-            // 4. Guru
+            // 5. Guru
             foreach ($data['guru'] as $item) {
                 $oldId = $item['id'];
                 unset($item['id']);
@@ -252,6 +314,23 @@ class SchoolBackupController extends Controller
 
                 $newGuru = Guru::create($item);
                 $mapGuru[$oldId] = $newGuru->id;
+            }
+
+            // Re-sync wali_kelas di kelas dengan ID guru baru
+            foreach ($rawWaliKelas as $oldKelasId => $waliData) {
+                if (isset($mapKelas[$oldKelasId])) {
+                    $newKelasId = $mapKelas[$oldKelasId];
+                    $updateData = [];
+                    if (!empty($waliData['wali_kelas_id']) && isset($mapGuru[$waliData['wali_kelas_id']])) {
+                        $updateData['wali_kelas_id'] = $mapGuru[$waliData['wali_kelas_id']];
+                    }
+                    if (!empty($waliData['wali_kelas_2_id']) && isset($mapGuru[$waliData['wali_kelas_2_id']])) {
+                        $updateData['wali_kelas_2_id'] = $mapGuru[$waliData['wali_kelas_2_id']];
+                    }
+                    if (!empty($updateData)) {
+                        Kelas::where('id', $newKelasId)->update($updateData);
+                    }
+                }
             }
 
             // 5. Devices — harus sebelum fingerprints agar device_id bisa di-remap
@@ -398,6 +477,8 @@ class SchoolBackupController extends Controller
             DB::rollBack();
             Log::error("Restore Failed: " . $e->getMessage());
             return back()->with('error', 'Restore Gagal: ' . $e->getMessage());
+        } finally {
+            DB::statement('SET FOREIGN_KEY_CHECKS=1');
         }
     }
 }

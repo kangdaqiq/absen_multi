@@ -35,30 +35,98 @@ class DashboardController extends Controller
         }
 
         if ($user->role === 'student') {
-            $siswa = $user->student; // relasi hasOne
+            $siswa = $user->student;
+
+            if (!$siswa) {
+                $cleanNis = str_replace('siswa_', '', $user->username);
+                $siswa = Siswa::where('user_id', $user->id)
+                    ->orWhere('nis', $cleanNis)
+                    ->first();
+                if ($siswa && \Illuminate\Support\Facades\Schema::hasColumn('siswa', 'user_id')) {
+                    $siswa->user_id = $user->id;
+                    $siswa->save();
+                }
+            }
 
             if (!$siswa) {
                 return view('dashboard-student', [
-                    'linked' => false
+                    'linked' => false,
+                    'user' => $user
                 ]);
             }
 
-            // Student Stats
-            $stats = [
+            $siswa->load(['kelas', 'school', 'fingerprints']);
+            $today = Carbon::today();
+
+            // Status Kehadiran Hari Ini
+            $todayAttendance = Attendance::where('student_id', $siswa->id)
+                ->whereDate('tanggal', $today)
+                ->first();
+
+            // Jadwal Hari Ini
+            $dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+            $todayName = $dayNames[$today->dayOfWeek];
+            $jadwalHariIni = \App\Models\Jadwal::where('school_id', $siswa->school_id)
+                ->where(function ($q) use ($todayName, $today) {
+                    $q->where('hari', $todayName)
+                      ->orWhere('index_hari', $today->dayOfWeek);
+                })
+                ->first();
+
+            // Student Stats All Time
+            $statsAll = [
                 'H' => Attendance::where('student_id', $siswa->id)->where('status', 'H')->count(),
                 'I' => Attendance::where('student_id', $siswa->id)->where('status', 'I')->count(),
                 'S' => Attendance::where('student_id', $siswa->id)->where('status', 'S')->count(),
                 'A' => Attendance::where('student_id', $siswa->id)->where('status', 'A')->count(),
-                'T' => Attendance::where('student_id', $siswa->id)->where('status', 'H')->where('keterangan', 'like', 'Telat%')->count(),
+                'T' => Attendance::where('student_id', $siswa->id)->where('status', 'H')->where(function($q) {
+                    $q->where('keterangan', 'like', 'Telat%')->orWhere('keterangan', 'like', 'Terlambat%');
+                })->count(),
             ];
 
-            // Recent Logs (My Logs)
+            // Student Stats Bulan Ini
+            $startOfMonth = Carbon::now()->startOfMonth()->toDateString();
+            $endOfMonth = Carbon::now()->endOfMonth()->toDateString();
+            $statsMonth = [
+                'H' => Attendance::where('student_id', $siswa->id)->whereBetween('tanggal', [$startOfMonth, $endOfMonth])->where('status', 'H')->count(),
+                'I' => Attendance::where('student_id', $siswa->id)->whereBetween('tanggal', [$startOfMonth, $endOfMonth])->where('status', 'I')->count(),
+                'S' => Attendance::where('student_id', $siswa->id)->whereBetween('tanggal', [$startOfMonth, $endOfMonth])->where('status', 'S')->count(),
+                'A' => Attendance::where('student_id', $siswa->id)->whereBetween('tanggal', [$startOfMonth, $endOfMonth])->where('status', 'A')->count(),
+                'T' => Attendance::where('student_id', $siswa->id)->whereBetween('tanggal', [$startOfMonth, $endOfMonth])->where('status', 'H')->where(function($q) {
+                    $q->where('keterangan', 'like', 'Telat%')->orWhere('keterangan', 'like', 'Terlambat%');
+                })->count(),
+            ];
+
+            // Kehadiran Rate (%)
+            $totalRecorded = $statsAll['H'] + $statsAll['I'] + $statsAll['S'] + $statsAll['A'];
+            $rateHadir = $totalRecorded > 0 ? round(($statsAll['H'] / $totalRecorded) * 100, 1) : 100;
+
+            // Recent Logs (30 records terbaru)
             $recentLogs = Attendance::where('student_id', $siswa->id)
                 ->orderBy('tanggal', 'desc')
-                ->take(5)
+                ->take(30)
                 ->get();
 
-            return view('dashboard-student', compact('siswa', 'stats', 'recentLogs') + ['linked' => true]);
+            // Riwayat Pengajuan Izin
+            $leaves = \App\Models\StudentLeave::where('student_id', $siswa->id)
+                ->latest()
+                ->take(10)
+                ->get();
+
+            // Pengumuman
+            $announcements = Announcement::where('is_active', true)->latest()->take(5)->get();
+
+            return view('dashboard-student', compact(
+                'siswa',
+                'todayAttendance',
+                'jadwalHariIni',
+                'statsAll',
+                'statsMonth',
+                'rateHadir',
+                'recentLogs',
+                'leaves',
+                'announcements'
+            ) + ['linked' => true]);
         }
 
         // Admin / Teacher / Wali Kelas / Waka Kurikulum View

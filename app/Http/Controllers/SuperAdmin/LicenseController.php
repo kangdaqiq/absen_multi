@@ -30,6 +30,7 @@ class LicenseController extends Controller
 
         $validated['license_key']          = License::generateKey();
         $validated['is_active']            = $request->has('is_active');
+        $validated['photo_enabled']        = $request->has('photo_enabled');
         $validated['history_quota_months'] = empty($request->history_quota_months) ? null : (int) $request->history_quota_months;
 
         License::create($validated);
@@ -53,12 +54,30 @@ class LicenseController extends Controller
         ]);
 
         $validated['is_active']            = $request->has('is_active');
+        $validated['photo_enabled']        = $request->has('photo_enabled');
         $validated['history_quota_months'] = empty($request->history_quota_months) ? null : (int) $request->history_quota_months;
 
         $license->update($validated);
 
         return redirect()->route('super-admin.licenses.index')
             ->with('success', 'Lisensi ' . $license->client_name . ' berhasil diperbarui.');
+    }
+
+    /**
+     * Toggle photo_enabled for a license (AJAX, superadmin only)
+     */
+    public function togglePhoto(License $license)
+    {
+        $license->photo_enabled = !$license->photo_enabled;
+        $license->save();
+
+        $status = $license->photo_enabled ? 'aktif' : 'nonaktif';
+
+        return response()->json([
+            'success'       => true,
+            'photo_enabled' => $license->photo_enabled,
+            'message'       => "Fitur Foto Siswa untuk lisensi {$license->client_name} berhasil di{$status}kan.",
+        ]);
     }
 
     public function destroy(License $license)

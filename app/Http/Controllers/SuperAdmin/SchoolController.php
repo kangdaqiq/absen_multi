@@ -69,11 +69,12 @@ class SchoolController extends Controller
 
         // Handle checkboxes
         $validated['is_active']           = $request->has('is_active');
-        $validated['wa_enabled']           = $request->has('wa_enabled');
-        $validated['bot_enabled']          = true; // Default aktif saat buat sekolah baru
-        $validated['bot_user_limit']       = $request->bot_user_limit ?: 0;
-        $validated['student_limit']        = $request->student_limit ?: null;
-        $validated['teacher_limit']        = $request->teacher_limit ?: null;
+        $validated['photo_enabled']       = $request->has('photo_enabled');
+        $validated['wa_enabled']          = $request->has('wa_enabled');
+        $validated['bot_enabled']         = true; // Default aktif saat buat sekolah baru
+        $validated['bot_user_limit']      = $request->bot_user_limit ?: 0;
+        $validated['student_limit']       = $request->student_limit ?: null;
+        $validated['teacher_limit']       = $request->teacher_limit ?: null;
         $validated['history_quota_months'] = $request->history_quota_months ?: null;
 
         // Apply package configuration if selected
@@ -89,6 +90,9 @@ class SchoolController extends Controller
                 $validated['history_quota_months'] = $package->history_quota_months;
                 $validated['wa_enabled'] = $package->wa_enabled;
                 $validated['bot_enabled'] = $package->bot_enabled;
+                if (isset($package->photo_enabled)) {
+                    $validated['photo_enabled'] = (bool) $package->photo_enabled;
+                }
                 $validated['expired_at'] = $billingCycle === 'yearly' ? now()->addYear() : now()->addMonth();
             }
         }
@@ -207,7 +211,8 @@ class SchoolController extends Controller
 
         // Handle checkboxes
         $validated['is_active']           = $request->has('is_active');
-        $validated['wa_enabled']           = $request->has('wa_enabled');
+        $validated['photo_enabled']       = $request->has('photo_enabled');
+        $validated['wa_enabled']          = $request->has('wa_enabled');
         // bot_enabled TIDAK diubah dari form edit biasa — dikontrol lewat toggleBot() khusus superadmin
         $validated['bot_user_limit']       = $request->bot_user_limit ?: 0;
         $validated['student_limit']        = $request->student_limit ?: null;
@@ -230,6 +235,9 @@ class SchoolController extends Controller
                     $validated['bot_user_limit'] = $package->bot_user_limit;
                     $validated['history_quota_months'] = $package->history_quota_months;
                     $validated['wa_enabled'] = $package->wa_enabled;
+                    if (isset($package->photo_enabled)) {
+                        $validated['photo_enabled'] = (bool) $package->photo_enabled;
+                    }
                     // For update, we don't automatically change bot_enabled to prevent accidentally turning it back on if manually disabled by admin
                     // But if it's a completely new package, we might want to respect the package. Let's respect the package but only if turning ON.
                     if ($package->bot_enabled) {
@@ -366,6 +374,23 @@ class SchoolController extends Controller
             'success'     => true,
             'bot_enabled' => $school->bot_enabled,
             'message'     => "Bot WhatsApp untuk {$school->name} berhasil di{$status}kan.",
+        ]);
+    }
+
+    /**
+     * Toggle photo_enabled for a school (AJAX, superadmin only)
+     */
+    public function togglePhoto(School $school)
+    {
+        $school->photo_enabled = !$school->photo_enabled;
+        $school->save();
+
+        $status = $school->photo_enabled ? 'aktif' : 'nonaktif';
+
+        return response()->json([
+            'success'       => true,
+            'photo_enabled' => $school->photo_enabled,
+            'message'       => "Fitur Foto Siswa untuk {$school->name} berhasil di{$status}kan.",
         ]);
     }
 

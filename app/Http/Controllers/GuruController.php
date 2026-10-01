@@ -89,6 +89,7 @@ class GuruController extends Controller
 
         $data = $request->all();
         $data['is_global_report'] = $request->has('is_global_report');
+        $data['is_teacher_report'] = $request->has('is_teacher_report');
         if (isset($data['no_wa'])) {
             $data['no_wa'] = $this->normalizeWa($data['no_wa']);
         }
@@ -134,6 +135,7 @@ class GuruController extends Controller
 
         $data = $request->all();
         $data['is_global_report'] = $request->has('is_global_report');
+        $data['is_teacher_report'] = $request->has('is_teacher_report');
         if (isset($data['no_wa'])) {
             $data['no_wa'] = $this->normalizeWa($data['no_wa']);
         }

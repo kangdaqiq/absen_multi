@@ -456,64 +456,75 @@ class DailyReportCommand extends Command
                     }
                 }
             }
+        }
 
-            // Send dedicated Teacher & Employee Report to Global Recipients
-            if (!empty($rekapGuru) && !empty($rekapGuru['total'])) {
-                $msgGuru = WhatsAppMessageTemplates::teacherAttendanceReport(
-                    rekapGuru: $rekapGuru,
-                    tanggal: $today,
-                    schoolName: $school->name ?? 'Sekolah',
-                    isFinal: false
-                );
+        // --- SEND DEDICATED TEACHER ATTENDANCE REPORT ---
+        $guruTeacherRecipients = \App\Models\Guru::where('school_id', $schoolId)
+            ->where('is_teacher_report', true)
+            ->whereNotNull('no_wa')
+            ->where('no_wa', '!=', '')
+            ->get();
 
-                if ($targetJid) {
-                    MessageQueue::create([
-                        'school_id' => $schoolId,
-                        'phone_number' => $targetJid,
-                        'message' => $msgGuru,
-                        'status' => 'pending',
-                        'priority' => 10,
-                        'created_at' => now()
-                    ]);
-                    $this->info("Queued teacher report to legacy admin ($targetJid)");
+        // Fallback to guruGlobal if no specific is_teacher_report recipient configured
+        if ($guruTeacherRecipients->isEmpty()) {
+            $guruTeacherRecipients = $guruGlobal;
+        }
+
+        if (!empty($rekapGuru) && !empty($rekapGuru['total']) && ($targetJid || $guruTeacherRecipients->isNotEmpty())) {
+            $msgGuru = WhatsAppMessageTemplates::teacherAttendanceReport(
+                rekapGuru: $rekapGuru,
+                tanggal: $today,
+                schoolName: $school->name ?? 'Sekolah',
+                isFinal: false
+            );
+
+            if ($targetJid) {
+                MessageQueue::create([
+                    'school_id' => $schoolId,
+                    'phone_number' => $targetJid,
+                    'message' => $msgGuru,
+                    'status' => 'pending',
+                    'priority' => 10,
+                    'created_at' => now()
+                ]);
+                $this->info("Queued teacher report to legacy admin ($targetJid)");
+            }
+
+            foreach ($guruTeacherRecipients as $guru) {
+                if (!$guru->isWithinLastSeen(168)) {
+                    continue;
                 }
 
-                foreach ($guruGlobal as $guru) {
-                    if (!$guru->isWithinLastSeen(168)) {
-                        continue;
-                    }
-
-                    $noWa = $guru->no_wa;
-                    if (!str_contains($noWa, '@')) {
-                        $noWa = preg_replace('/^0/', '62', $noWa);
-                    }
-
-                    $mqGuru = new MessageQueue([
-                        'school_id' => $schoolId,
-                        'phone_number' => $noWa,
-                        'message' => $msgGuru,
-                        'status' => 'pending',
-                        'priority' => 10,
-                        'created_at' => now()
-                    ]);
-                    $mqGuru->bypass_last_seen = true;
-                    $mqGuru->save();
-                    $this->info("Queued dedicated teacher report to Guru: {$guru->nama}");
+                $noWa = $guru->no_wa;
+                if (!str_contains($noWa, '@')) {
+                    $noWa = preg_replace('/^0/', '62', $noWa);
                 }
 
-                if ($telegramEnabled && $telegramToken) {
-                    foreach ($guruGlobal as $guru) {
-                        if (!empty($guru->telegram_chat_id)) {
-                            $msgGuruTele = $msgGuru;
-                            $msgGuruTele = preg_replace('/\*([^*]+)\*/', '<b>$1</b>', $msgGuruTele);
-                            $msgGuruTele = preg_replace('/\_([^_]+)\_/', '<i>$1</i>', $msgGuruTele);
+                $mqGuru = new MessageQueue([
+                    'school_id' => $schoolId,
+                    'phone_number' => $noWa,
+                    'message' => $msgGuru,
+                    'status' => 'pending',
+                    'priority' => 10,
+                    'created_at' => now()
+                ]);
+                $mqGuru->bypass_last_seen = true;
+                $mqGuru->save();
+                $this->info("Queued dedicated teacher report to Guru: {$guru->nama}");
+            }
 
-                            if (!empty($school->name)) {
-                                $msgGuruTele = rtrim($msgGuruTele) . "\n\n<b>" . trim($school->name) . "</b>";
-                            }
+            if ($telegramEnabled && $telegramToken) {
+                foreach ($guruTeacherRecipients as $guru) {
+                    if (!empty($guru->telegram_chat_id)) {
+                        $msgGuruTele = $msgGuru;
+                        $msgGuruTele = preg_replace('/\*([^*]+)\*/', '<b>$1</b>', $msgGuruTele);
+                        $msgGuruTele = preg_replace('/\_([^_]+)\_/', '<i>$1</i>', $msgGuruTele);
 
-                            \App\Jobs\SendTelegramMessageJob::dispatch($telegramToken, $guru->telegram_chat_id, $msgGuruTele, $schoolId);
+                        if (!empty($school->name)) {
+                            $msgGuruTele = rtrim($msgGuruTele) . "\n\n<b>" . trim($school->name) . "</b>";
                         }
+
+                        \App\Jobs\SendTelegramMessageJob::dispatch($telegramToken, $guru->telegram_chat_id, $msgGuruTele, $schoolId);
                     }
                 }
             }

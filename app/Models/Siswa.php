@@ -39,6 +39,7 @@ class Siswa extends Model
         'kelas_id',
         'tgl_lahir',
         'alamat',
+        'foto',
         'no_wa',
         'wa_ortu',
         'uid_rfid',
@@ -58,6 +59,124 @@ class Siswa extends Model
         'last_seen_siswa',
         'last_seen_ortu',
     ];
+
+    protected $appends = ['foto_url'];
+
+    public function getFotoUrlAttribute(): string
+    {
+        // Jika fitur foto dinonaktifkan (via Super Admin atau Lisensi Client), kembalikan avatar
+        $isPhotoEnabled = app(\App\Services\LicenseService::class)->isPhotoFeatureEnabled($this->school);
+        if (!$isPhotoEnabled) {
+            $name = urlencode($this->nama ?? 'Siswa');
+            return "https://ui-avatars.com/api/?name={$name}&background=4f46e5&color=fff&size=256&bold=true";
+        }
+
+        if (!empty($this->foto)) {
+            if (\Illuminate\Support\Str::startsWith($this->foto, ['http://', 'https://'])) {
+                return $this->foto;
+            }
+
+            // 1. Jika external drive/folder disetting di .env
+            $externalPath = config('filesystems.siswa_photo_path');
+            if (!empty($externalPath)) {
+                $diskPath = self::getPhotoDiskPath($this->foto);
+                if ($diskPath && file_exists($diskPath)) {
+                    return route('siswa.photo', ['filename' => basename($this->foto)]);
+                }
+            }
+
+            // 2. Jika ada di public/storage (symlink normal Laravel)
+            if (file_exists(public_path('storage/' . $this->foto))) {
+                return asset('storage/' . $this->foto);
+            }
+
+            if (file_exists(public_path($this->foto))) {
+                return asset($this->foto);
+            }
+
+            // 3. Fallback: Jika file ada di server tapi symlink public belum ada
+            if (self::getPhotoDiskPath($this->foto)) {
+                return route('siswa.photo', ['filename' => basename($this->foto)]);
+            }
+        }
+
+        // Return pleasant avatar fallback with initials
+        $name = urlencode($this->nama ?? 'Siswa');
+        return "https://ui-avatars.com/api/?name={$name}&background=4f46e5&color=fff&size=256&bold=true";
+    }
+
+    /**
+     * Cari lokasi fisik file foto di disk/drive server (eksternal ataupun storage default).
+     */
+    public static function getPhotoDiskPath(?string $photo): ?string
+    {
+        if (empty($photo)) {
+            return null;
+        }
+
+        $cleanPhoto = str_replace(['..', "\0"], '', $photo);
+        $cleanPhoto = ltrim($cleanPhoto, '/\\');
+        $baseName = basename($cleanPhoto);
+
+        // 1. Cek direktori/drive eksternal (SISWA_PHOTO_PATH)
+        $externalPath = config('filesystems.siswa_photo_path');
+        if (!empty($externalPath)) {
+            $base = rtrim($externalPath, '/\\');
+
+            if (file_exists($base . DIRECTORY_SEPARATOR . $cleanPhoto)) {
+                return $base . DIRECTORY_SEPARATOR . $cleanPhoto;
+            }
+            if (file_exists($base . DIRECTORY_SEPARATOR . $baseName)) {
+                return $base . DIRECTORY_SEPARATOR . $baseName;
+            }
+            if (file_exists($base . DIRECTORY_SEPARATOR . 'siswa' . DIRECTORY_SEPARATOR . $baseName)) {
+                return $base . DIRECTORY_SEPARATOR . 'siswa' . DIRECTORY_SEPARATOR . $baseName;
+            }
+        }
+
+        // 2. Cek direktori storage bawaan Laravel (storage/app/public/...)
+        $storageDirect = storage_path('app/public/' . $cleanPhoto);
+        if (file_exists($storageDirect)) {
+            return $storageDirect;
+        }
+
+        $storageBase = storage_path('app/public/siswa/' . $baseName);
+        if (file_exists($storageBase)) {
+            return $storageBase;
+        }
+
+        // 3. Cek folder public/storage/...
+        $publicDirect = public_path('storage/' . $cleanPhoto);
+        if (file_exists($publicDirect)) {
+            return $publicDirect;
+        }
+
+        $publicBase = public_path('storage/siswa/' . $baseName);
+        if (file_exists($publicBase)) {
+            return $publicBase;
+        }
+
+        if (file_exists(public_path($cleanPhoto))) {
+            return public_path($cleanPhoto);
+        }
+
+        return null;
+    }
+
+    /**
+     * Hapus file foto dari disk (eksternal ataupun lokal) saat data diubah atau dihapus.
+     */
+    public static function deletePhotoFile(?string $photo): void
+    {
+        if (empty($photo)) {
+            return;
+        }
+
+        $diskPath = self::getPhotoDiskPath($photo);
+        if ($diskPath && file_exists($diskPath)) {
+            @unlink($diskPath);
+        }
+    }
 
     protected $casts = [
         'hari_masuk' => 'array',

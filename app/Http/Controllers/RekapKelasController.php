@@ -18,7 +18,7 @@ class RekapKelasController extends Controller
         $startDate = $request->input('start_date', Carbon::now()->startOfMonth()->format('Y-m-d'));
         $endDate = $request->input('end_date', Carbon::now()->endOfMonth()->format('Y-m-d'));
 
-        $kelasQuery = Kelas::orderBy('nama_kelas');
+        $kelasQuery = Kelas::query();
 
         if (auth()->user() && !auth()->user()->isSuperAdmin()) {
             $kelasQuery->where('school_id', auth()->user()->school_id);
@@ -44,6 +44,11 @@ class RekapKelasController extends Controller
         if ($request->has('jurusan_id') && !empty($request->jurusan_id)) {
             $kelasQuery->where('jurusan_id', $request->jurusan_id);
         }
+
+        // Apply Sorting
+        $sortBy = $request->input('sort_by', 'nama_kelas');
+        $sortDir = strtolower($request->input('sort_dir', 'asc')) === 'desc' ? 'desc' : 'asc';
+        $this->applySorting($kelasQuery, $sortBy, $sortDir, $startDate, $endDate);
 
         $allKelas = $kelasQuery->paginate(50)->withQueryString();
 
@@ -111,7 +116,7 @@ class RekapKelasController extends Controller
         $startDate = $request->input('start_date');
         $endDate = $request->input('end_date');
 
-        $kelasQuery = Kelas::orderBy('nama_kelas');
+        $kelasQuery = Kelas::query();
 
         if (auth()->user() && !auth()->user()->isSuperAdmin()) {
             $kelasQuery->where('school_id', auth()->user()->school_id);
@@ -136,6 +141,14 @@ class RekapKelasController extends Controller
 
         if ($request->has('jurusan_id') && !empty($request->jurusan_id)) {
             $kelasQuery->where('jurusan_id', $request->jurusan_id);
+        }
+
+        $sortBy = $request->input('sort_by');
+        $sortDir = $request->input('sort_dir', 'asc');
+        if ($sortBy) {
+            $this->applySorting($kelasQuery, $sortBy, $sortDir, $startDate, $endDate);
+        } else {
+            $kelasQuery->orderBy('nama_kelas');
         }
 
         $allKelas = $kelasQuery->get();
@@ -238,7 +251,7 @@ class RekapKelasController extends Controller
         $startDate = $request->input('start_date');
         $endDate = $request->input('end_date');
 
-        $kelasQuery = Kelas::orderBy('nama_kelas');
+        $kelasQuery = Kelas::query();
 
         if (auth()->user() && !auth()->user()->isSuperAdmin()) {
             $kelasQuery->where('school_id', auth()->user()->school_id);
@@ -263,6 +276,14 @@ class RekapKelasController extends Controller
 
         if ($request->has('jurusan_id') && !empty($request->jurusan_id)) {
             $kelasQuery->where('jurusan_id', $request->jurusan_id);
+        }
+
+        $sortBy = $request->input('sort_by');
+        $sortDir = $request->input('sort_dir', 'asc');
+        if ($sortBy) {
+            $this->applySorting($kelasQuery, $sortBy, $sortDir, $startDate, $endDate);
+        } else {
+            $kelasQuery->orderBy('nama_kelas');
         }
 
         $allKelas = $kelasQuery->get();
@@ -312,5 +333,58 @@ class RekapKelasController extends Controller
             'namaWaka', 'nipWaka', 'kopSurat', 'schoolName', 'schoolAddress'
         ));
         return $pdf->stream('Rekap_Kelas.pdf');
+    }
+
+    /**
+     * Apply sorting to Kelas query.
+     */
+    private function applySorting($query, $sortBy, $sortDir, $startDate, $endDate)
+    {
+        $direction = strtolower($sortDir) === 'desc' ? 'desc' : 'asc';
+
+        switch ($sortBy) {
+            case 'nama_kelas':
+            case 'kelas':
+                $query->orderBy('nama_kelas', $direction);
+                break;
+            case 'hadir':
+                $sub = "(SELECT COUNT(*) FROM attendance JOIN siswa ON attendance.student_id = siswa.id WHERE siswa.kelas_id = kelas.id AND attendance.tanggal BETWEEN '{$startDate}' AND '{$endDate}' AND attendance.status IN ('H', 'Hadir'))";
+                $query->orderByRaw("{$sub} {$direction}")->orderBy('nama_kelas', 'asc');
+                break;
+            case 'tidak_hadir':
+                $sub = "(SELECT COUNT(*) FROM attendance JOIN siswa ON attendance.student_id = siswa.id WHERE siswa.kelas_id = kelas.id AND attendance.tanggal BETWEEN '{$startDate}' AND '{$endDate}' AND attendance.status IN ('I', 'S', 'B', 'A', 'Izin', 'Sakit', 'Bolos', 'Alpha', 'Tidak Hadir'))";
+                $query->orderByRaw("{$sub} {$direction}")->orderBy('nama_kelas', 'asc');
+                break;
+            case 'telat':
+                $sub = "(SELECT COUNT(*) FROM attendance JOIN siswa ON attendance.student_id = siswa.id WHERE siswa.kelas_id = kelas.id AND attendance.tanggal BETWEEN '{$startDate}' AND '{$endDate}' AND attendance.status IN ('T', 'Telat'))";
+                $query->orderByRaw("{$sub} {$direction}")->orderBy('nama_kelas', 'asc');
+                break;
+            case 'izin':
+                $sub = "(SELECT COUNT(*) FROM attendance JOIN siswa ON attendance.student_id = siswa.id WHERE siswa.kelas_id = kelas.id AND attendance.tanggal BETWEEN '{$startDate}' AND '{$endDate}' AND attendance.status IN ('I', 'Izin'))";
+                $query->orderByRaw("{$sub} {$direction}")->orderBy('nama_kelas', 'asc');
+                break;
+            case 'sakit':
+                $sub = "(SELECT COUNT(*) FROM attendance JOIN siswa ON attendance.student_id = siswa.id WHERE siswa.kelas_id = kelas.id AND attendance.tanggal BETWEEN '{$startDate}' AND '{$endDate}' AND attendance.status IN ('S', 'Sakit'))";
+                $query->orderByRaw("{$sub} {$direction}")->orderBy('nama_kelas', 'asc');
+                break;
+            case 'bolos':
+                $sub = "(SELECT COUNT(*) FROM attendance JOIN siswa ON attendance.student_id = siswa.id WHERE siswa.kelas_id = kelas.id AND attendance.tanggal BETWEEN '{$startDate}' AND '{$endDate}' AND attendance.status IN ('B', 'Bolos'))";
+                $query->orderByRaw("{$sub} {$direction}")->orderBy('nama_kelas', 'asc');
+                break;
+            case 'alpha':
+                $sub = "(SELECT COUNT(*) FROM attendance JOIN siswa ON attendance.student_id = siswa.id WHERE siswa.kelas_id = kelas.id AND attendance.tanggal BETWEEN '{$startDate}' AND '{$endDate}' AND attendance.status IN ('A', 'Alpha'))";
+                $query->orderByRaw("{$sub} {$direction}")->orderBy('nama_kelas', 'asc');
+                break;
+            case 'persentase':
+                $subHadir = "(SELECT COUNT(*) FROM attendance JOIN siswa ON attendance.student_id = siswa.id WHERE siswa.kelas_id = kelas.id AND attendance.tanggal BETWEEN '{$startDate}' AND '{$endDate}' AND attendance.status IN ('H', 'Hadir', 'T', 'Telat'))";
+                $subTotal = "(SELECT COUNT(*) FROM attendance JOIN siswa ON attendance.student_id = siswa.id WHERE siswa.kelas_id = kelas.id AND attendance.tanggal BETWEEN '{$startDate}' AND '{$endDate}' AND attendance.status IN ('H', 'Hadir', 'T', 'Telat', 'I', 'Izin', 'S', 'Sakit', 'B', 'Bolos', 'A', 'Alpha', 'Tidak Hadir'))";
+                $query->orderByRaw("COALESCE({$subHadir} * 100.0 / NULLIF({$subTotal}, 0), 0) {$direction}")->orderBy('nama_kelas', 'asc');
+                break;
+            default:
+                $query->orderBy('nama_kelas', 'asc');
+                break;
+        }
+
+        return $query;
     }
 }

@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="utf-8">
-    <title>Rekap Absensi Guru</title>
+    <title>Rekap Absensi Guru & Staff</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -41,30 +41,6 @@
             border: 1px solid #ddd;
             font-size: 10px;
         }
-
-        .badge-success {
-            background-color: #28a745;
-            color: white;
-            padding: 2px 5px;
-            border-radius: 3px;
-            font-size: 9px;
-        }
-
-        .badge-warning {
-            background-color: #ffc107;
-            color: #000;
-            padding: 2px 5px;
-            border-radius: 3px;
-            font-size: 9px;
-        }
-
-        .badge-danger {
-            background-color: #dc3545;
-            color: white;
-            padding: 2px 5px;
-            border-radius: 3px;
-            font-size: 9px;
-        }
     </style>
 </head>
 
@@ -97,56 +73,85 @@
 
     <div class="stats">
         <strong>Ringkasan:</strong>
-        Total: <b>{{ $stats['total'] }}</b> |
-        Hadir (Tepat Waktu): <b>{{ $stats['hadir'] }}</b> |
+        Total Guru/Staff: <b>{{ $stats['total_guru'] ?? $allGurus->count() }}</b> |
+        Hadir (Tepat Waktu): <b>{{ $stats['hadir'] ?? 0 }}</b> |
         Terlambat: <b>{{ $stats['terlambat'] ?? 0 }}</b> |
-        Tidak Hadir / Alpha: <b>{{ $stats['tidak_hadir'] }}</b>
+        Izin: <b>{{ $stats['izin'] ?? 0 }}</b> |
+        Sakit: <b>{{ $stats['sakit'] ?? 0 }}</b> |
+        Tidak Hadir / Alpha: <b>{{ $stats['tidak_hadir'] ?? 0 }}</b>
     </div>
 
     <table>
         <thead>
             <tr>
                 <th width="4%">No</th>
-                <th width="10%">Tanggal</th>
-                <th width="20%">Nama Guru / Staff</th>
+                <th width="24%">Nama Guru / Staff</th>
                 <th width="12%">NIP</th>
-                <th width="14%">Shift</th>
-                <th width="10%">Status</th>
-                <th width="8%">Jam Masuk</th>
-                <th width="8%">Jam Pulang</th>
-                <th width="14%">Keterangan</th>
+                <th width="12%">Shift</th>
+                <th width="7%">Hadir</th>
+                <th width="7%">Terlambat</th>
+                <th width="8%">Tidak Hadir</th>
+                <th width="6%">Izin</th>
+                <th width="6%">Sakit</th>
+                <th width="6%">Alpha</th>
+                <th width="8%">% Hadir</th>
             </tr>
         </thead>
         <tbody>
-            @foreach($absensi as $a)
+            @foreach($allGurus as $g)
+                @php
+                    $s = $summary[$g->id] ?? [
+                        'hadir' => 0,
+                        'terlambat' => 0,
+                        'tidak_hadir' => 0,
+                        'izin' => 0,
+                        'sakit' => 0,
+                        'alpha' => 0,
+                        'total' => 0,
+                        'persen' => 0,
+                    ];
+                @endphp
                 <tr>
                     <td align="center">{{ $loop->iteration }}</td>
-                    <td align="center">{{ \Carbon\Carbon::parse($a->tanggal)->format('d/m/Y') }}</td>
-                    <td><b>{{ $a->guru->nama ?? '-' }}</b></td>
-                    <td align="center">{{ $a->guru->nip ?? '-' }}</td>
-                    <td align="center">{{ $a->shift ? $a->shift->nama_shift : '-' }}</td>
-                    <td align="center">
-                        @if($a->status == 'Hadir')
-                            <span class="badge-success">Hadir</span>
-                        @elseif($a->status == 'Terlambat')
-                            <span class="badge-warning">Terlambat ({{ $a->menit_terlambat }}m)</span>
-                        @elseif(in_array($a->status, ['Izin', 'Sakit']))
-                            <span class="badge-warning">{{ $a->status }}</span>
-                        @else
-                            <span class="badge-danger">{{ $a->status }}</span>
-                        @endif
-                    </td>
-                    <td align="center">{{ $a->jam_masuk ? \Carbon\Carbon::parse($a->jam_masuk)->format('H:i') : '-' }}</td>
-                    <td align="center">{{ $a->jam_pulang ? \Carbon\Carbon::parse($a->jam_pulang)->format('H:i') : '-' }}</td>
-                    <td>{{ $a->keterangan ?? '-' }}</td>
+                    <td><b>{{ $g->nama }}</b></td>
+                    <td align="center">{{ $g->nip ?? '-' }}</td>
+                    <td align="center">{{ $g->defaultShift ? $g->defaultShift->nama_shift : '-' }}</td>
+                    <td align="center">{{ $s['hadir'] }}</td>
+                    <td align="center">{{ $s['terlambat'] }}</td>
+                    <td align="center">{{ $s['tidak_hadir'] }}</td>
+                    <td align="center">{{ $s['izin'] }}</td>
+                    <td align="center">{{ $s['sakit'] }}</td>
+                    <td align="center">{{ $s['alpha'] }}</td>
+                    <td align="center">{{ $s['persen'] }}%</td>
                 </tr>
             @endforeach
         </tbody>
+        <tfoot>
+            @php
+                $totHadir = collect($summary)->sum('hadir');
+                $totTerlambat = collect($summary)->sum('terlambat');
+                $totTidakHadir = collect($summary)->sum('tidak_hadir');
+                $totIzin = collect($summary)->sum('izin');
+                $totSakit = collect($summary)->sum('sakit');
+                $totAlpha = collect($summary)->sum('alpha');
+                $grandTotal = $totHadir + $totTerlambat + $totTidakHadir;
+                $grandPersen = $grandTotal > 0 ? round((($totHadir + $totTerlambat) / $grandTotal) * 100, 1) : 0;
+            @endphp
+            <tr style="font-weight: bold; background-color: #f2f2f2;">
+                <td colspan="4" align="center">TOTAL</td>
+                <td align="center">{{ $totHadir }}</td>
+                <td align="center">{{ $totTerlambat }}</td>
+                <td align="center">{{ $totTidakHadir }}</td>
+                <td align="center">{{ $totIzin }}</td>
+                <td align="center">{{ $totSakit }}</td>
+                <td align="center">{{ $totAlpha }}</td>
+                <td align="center">{{ $grandPersen }}%</td>
+            </tr>
+        </tfoot>
     </table>
 
     <div style="margin-top: 25px; font-size: 9px; color: #666;">
         <p>Dicetak pada: {{ now()->format('d/m/Y H:i:s') }}</p>
     </div>
 </body>
-
 </html>

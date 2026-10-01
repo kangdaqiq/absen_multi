@@ -15,7 +15,7 @@
             📊 Rekap Absensi {{ $labelKaryawan }}
         </h2>
         <p class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-            Laporan dan akumulasi kehadiran kerja guru/staff berdasarkan shift.
+            Laporan dan akumulasi kehadiran kerja {{ strtolower($labelKaryawan) }}/staff berdasarkan shift.
         </p>
     </div>
 </div>
@@ -23,8 +23,8 @@
 <!-- Stats Cards -->
 <div class="mb-6 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
     <div class="rounded-xl border border-gray-200 bg-white p-3.5 shadow-theme-sm dark:border-gray-800 dark:bg-gray-dark">
-        <p class="text-xs text-gray-500 dark:text-gray-400">Total Catatan</p>
-        <h4 class="text-xl font-bold text-gray-800 dark:text-white mt-1">{{ $stats['total'] ?? 0 }}</h4>
+        <p class="text-xs text-gray-500 dark:text-gray-400">Total {{ $labelKaryawan }}</p>
+        <h4 class="text-xl font-bold text-gray-800 dark:text-white mt-1">{{ $stats['total_guru'] ?? $allGurus->total() }}</h4>
     </div>
     <div class="rounded-xl border border-success-200 bg-success-50/50 p-3.5 shadow-theme-sm dark:border-success-500/30 dark:bg-success-500/10">
         <p class="text-xs text-success-700 dark:text-success-400 font-medium">Hadir Tepat Waktu</p>
@@ -46,11 +46,22 @@
 
 <!-- Filter Card -->
 <div class="mb-6 rounded-2xl border border-gray-200 bg-white shadow-theme-sm dark:border-gray-800 dark:bg-gray-dark">
-    <div class="border-b border-gray-200 px-5 py-4 dark:border-gray-800">
+    <div class="border-b border-gray-200 px-5 py-4 dark:border-gray-800 flex items-center justify-between">
         <h6 class="font-semibold text-gray-800 dark:text-white/90">Filter Rekap</h6>
+        @if(request('sort_by'))
+            <a href="{{ route('rekap-guru.index', request()->except(['sort_by', 'sort_dir', 'page'])) }}" 
+               class="inline-flex items-center gap-1.5 text-xs text-brand-600 hover:text-brand-700 dark:text-brand-400 font-medium hover:underline">
+                <i class="fas fa-undo"></i> Reset Urutan ({{ ucfirst(str_replace('_', ' ', request('sort_by'))) }} {{ strtoupper(request('sort_dir', 'asc')) }})
+            </a>
+        @endif
     </div>
     <div class="p-5">
         <form action="{{ route('rekap-guru.index') }}" method="GET" class="flex flex-col flex-wrap gap-4 md:flex-row items-end">
+            @if(request('sort_by'))
+                <input type="hidden" name="sort_by" value="{{ request('sort_by') }}">
+                <input type="hidden" name="sort_dir" value="{{ request('sort_dir', 'asc') }}">
+            @endif
+
             <div class="w-full md:w-auto">
                 <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Tanggal Mulai:</label>
                 <input type="date" name="start_date" value="{{ $startDate }}" required class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
@@ -74,7 +85,7 @@
                 <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ $labelKaryawan }}:</label>
                 <select name="guru_id" class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white select2">
                     <option value="">-- Semua {{ $labelKaryawan }} --</option>
-                    @foreach($gurus as $g)
+                    @foreach($gurusList ?? [] as $g)
                         <option value="{{ $g->id }}" {{ $guruId == $g->id ? 'selected' : '' }}>
                             {{ $g->nama }}
                         </option>
@@ -82,8 +93,8 @@
                 </select>
             </div>
             <div class="w-full md:w-auto min-w-[220px]">
-                <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Cari Nama:</label>
-                <input type="text" name="search" value="{{ request('search') }}" placeholder="Ketik nama..." 
+                <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Cari {{ $labelKaryawan }}:</label>
+                <input type="text" name="search" value="{{ request('search') }}" placeholder="Ketik nama atau {{ $labelNIP }}..." 
                     oninput="clearTimeout(this.delay); this.delay = setTimeout(() => { this.form.submit() }, 500);"
                     class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
             </div>
@@ -106,89 +117,256 @@
 <!-- Data Table Card -->
 <div class="rounded-2xl border border-gray-200 bg-white shadow-theme-sm dark:border-gray-800 dark:bg-gray-dark">
     <div class="border-b border-gray-200 px-5 py-4 dark:border-gray-800 flex justify-between items-center">
-        <h6 class="font-semibold text-gray-800 dark:text-white/90">Data Rekap Absensi {{ $labelKaryawan }}</h6>
-        <span class="text-xs text-gray-500 dark:text-gray-400">{{ $absensi->total() }} catatan</span>
+        <div>
+            <h6 class="font-semibold text-gray-800 dark:text-white/90">Data Rekap Absensi {{ $labelKaryawan }}</h6>
+            @if(request('sort_by'))
+                <span class="text-xs text-brand-600 dark:text-brand-400 font-medium">
+                    Diurutkan berdasarkan: <b>{{ ucfirst(str_replace('_', ' ', request('sort_by'))) }}</b> ({{ strtoupper(request('sort_dir', 'asc')) }})
+                </span>
+            @endif
+        </div>
+        <div class="flex items-center gap-3">
+            @if(request('sort_by'))
+                <a href="{{ route('rekap-guru.index', request()->except(['sort_by', 'sort_dir', 'page'])) }}" 
+                   class="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-brand-500 dark:text-gray-400 dark:hover:text-brand-400 transition" 
+                   title="Reset Urutan">
+                    <i class="fas fa-times-circle"></i> Reset Urutan
+                </a>
+            @endif
+            <span class="text-xs text-gray-500 dark:text-gray-400">{{ $allGurus->total() }} {{ strtolower($labelKaryawan) }}</span>
+        </div>
     </div>
     
     <div class="max-w-full overflow-x-auto">
-        <table class="w-full table-auto text-sm">
+        <table class="w-full table-auto border-collapse">
             <thead>
-                <tr class="bg-gray-50 text-left dark:bg-gray-800/50 text-gray-800 dark:text-white/90 font-medium text-sm">
-                    <th class="px-4 py-4 xl:pl-6 w-16">No</th>
-                    <th class="px-4 py-4">Tanggal</th>
-                    <th class="px-4 py-4">Nama {{ $labelKaryawan }}</th>
-                    <th class="px-4 py-4 text-center">Shift</th>
-                    <th class="px-4 py-4 text-center">Status</th>
-                    <th class="px-4 py-4 text-center">Jam Masuk</th>
-                    <th class="px-4 py-4 text-center">Jam Pulang</th>
-                    <th class="px-4 py-4">Keterangan</th>
+                <tr class="bg-gray-50 dark:bg-gray-800/50 text-gray-800 dark:text-white/90 font-medium text-sm">
+                    <th rowspan="2" class="px-3 py-4 xl:pl-6 text-center border-b border-gray-200 dark:border-gray-800 border-r w-12">No</th>
+                    
+                    {{-- Nama Guru --}}
+                    <th rowspan="2" class="px-4 py-4 align-middle border-b border-gray-200 dark:border-gray-800 border-r text-left">
+                        <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'nama', 'sort_dir' => (request('sort_by') === 'nama' && request('sort_dir', 'asc') === 'asc' ? 'desc' : 'asc')]) }}" 
+                           class="group inline-flex items-center gap-1.5 hover:text-brand-500 transition select-none cursor-pointer" 
+                           title="Urutkan Nama {{ $labelKaryawan }} ({{ request('sort_by') === 'nama' && request('sort_dir', 'asc') === 'asc' ? 'Z-A' : 'A-Z' }})">
+                            <span>Nama {{ $labelKaryawan }}</span>
+                            <span class="inline-flex text-[11px]">
+                                @if(request('sort_by') === 'nama')
+                                    <i class="fas fa-arrow-{{ request('sort_dir', 'asc') === 'desc' ? 'down' : 'up' }} text-brand-500 font-bold"></i>
+                                @else
+                                    <i class="fas fa-sort text-gray-400 group-hover:text-gray-600 dark:text-gray-500 dark:group-hover:text-gray-300"></i>
+                                @endif
+                            </span>
+                        </a>
+                    </th>
+
+                    {{-- NIP --}}
+                    <th rowspan="2" class="px-4 py-4 align-middle border-b border-gray-200 dark:border-gray-800 border-r text-left">
+                        <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'nip', 'sort_dir' => (request('sort_by') === 'nip' && request('sort_dir', 'asc') === 'asc' ? 'desc' : 'asc')]) }}" 
+                           class="group inline-flex items-center gap-1.5 hover:text-brand-500 transition select-none cursor-pointer" 
+                           title="Urutkan {{ $labelNIP }} ({{ request('sort_by') === 'nip' && request('sort_dir', 'asc') === 'asc' ? 'Z-A' : 'A-Z' }})">
+                            <span>{{ $labelNIP }}</span>
+                            <span class="inline-flex text-[11px]">
+                                @if(request('sort_by') === 'nip')
+                                    <i class="fas fa-arrow-{{ request('sort_dir', 'asc') === 'desc' ? 'down' : 'up' }} text-brand-500 font-bold"></i>
+                                @else
+                                    <i class="fas fa-sort text-gray-400 group-hover:text-gray-600 dark:text-gray-500 dark:group-hover:text-gray-300"></i>
+                                @endif
+                            </span>
+                        </a>
+                    </th>
+
+                    {{-- Shift Utama --}}
+                    <th rowspan="2" class="px-4 py-4 align-middle text-center border-b border-gray-200 dark:border-gray-800 border-r min-w-[130px]">
+                        Shift Utama
+                    </th>
+
+                    {{-- Header Group Kehadiran --}}
+                    <th colspan="7" class="px-4 py-2 text-center border-b border-gray-200 dark:border-gray-800">
+                        Jumlah Kehadiran
+                    </th>
+                </tr>
+
+                {{-- Baris Sub-Kolom Kehadiran --}}
+                <tr class="text-xs text-white">
+                    {{-- Hadir --}}
+                    <th class="px-2 py-2 text-center bg-success-500 border-r border-white/20 min-w-[75px]">
+                        <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'hadir', 'sort_dir' => (request('sort_by') === 'hadir' && request('sort_dir', 'desc') === 'desc' ? 'asc' : 'desc')]) }}" 
+                           class="group flex items-center justify-center gap-1 w-full text-white font-medium hover:opacity-90 select-none py-1" 
+                           title="Urutkan Hadir ({{ request('sort_by') === 'hadir' && request('sort_dir', 'desc') === 'desc' ? 'Terkecil' : 'Terbesar' }})">
+                            <span>Hadir</span>
+                            @if(request('sort_by') === 'hadir')
+                                <i class="fas fa-arrow-{{ request('sort_dir', 'desc') === 'asc' ? 'up' : 'down' }} text-[11px] font-bold"></i>
+                            @else
+                                <i class="fas fa-sort text-[11px] text-white/50 group-hover:text-white transition"></i>
+                            @endif
+                        </a>
+                    </th>
+
+                    {{-- Terlambat --}}
+                    <th class="px-2 py-2 text-center bg-warning-500 border-r border-white/20 min-w-[85px]">
+                        <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'terlambat', 'sort_dir' => (request('sort_by') === 'terlambat' && request('sort_dir', 'desc') === 'desc' ? 'asc' : 'desc')]) }}" 
+                           class="group flex items-center justify-center gap-1 w-full text-white font-medium hover:opacity-90 select-none py-1" 
+                           title="Urutkan Terlambat ({{ request('sort_by') === 'terlambat' && request('sort_dir', 'desc') === 'desc' ? 'Terkecil' : 'Terbesar' }})">
+                            <span>Terlambat</span>
+                            @if(request('sort_by') === 'terlambat')
+                                <i class="fas fa-arrow-{{ request('sort_dir', 'desc') === 'asc' ? 'up' : 'down' }} text-[11px] font-bold"></i>
+                            @else
+                                <i class="fas fa-sort text-[11px] text-white/50 group-hover:text-white transition"></i>
+                            @endif
+                        </a>
+                    </th>
+
+                    {{-- Tidak Hadir --}}
+                    <th class="px-2 py-2 text-center bg-gray-500 border-r border-white/20 min-w-[85px]">
+                        <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'tidak_hadir', 'sort_dir' => (request('sort_by') === 'tidak_hadir' && request('sort_dir', 'desc') === 'desc' ? 'asc' : 'desc')]) }}" 
+                           class="group flex items-center justify-center gap-1 w-full text-white font-medium hover:opacity-90 select-none py-1" 
+                           title="Urutkan Tidak Hadir ({{ request('sort_by') === 'tidak_hadir' && request('sort_dir', 'desc') === 'desc' ? 'Terkecil' : 'Terbesar' }})">
+                            <span>Tidak Hadir</span>
+                            @if(request('sort_by') === 'tidak_hadir')
+                                <i class="fas fa-arrow-{{ request('sort_dir', 'desc') === 'asc' ? 'up' : 'down' }} text-[11px] font-bold"></i>
+                            @else
+                                <i class="fas fa-sort text-[11px] text-white/50 group-hover:text-white transition"></i>
+                            @endif
+                        </a>
+                    </th>
+
+                    {{-- Izin --}}
+                    <th class="px-2 py-2 text-center bg-info-500 border-r border-white/20 min-w-[70px]">
+                        <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'izin', 'sort_dir' => (request('sort_by') === 'izin' && request('sort_dir', 'desc') === 'desc' ? 'asc' : 'desc')]) }}" 
+                           class="group flex items-center justify-center gap-1 w-full text-white font-medium hover:opacity-90 select-none py-1" 
+                           title="Urutkan Izin ({{ request('sort_by') === 'izin' && request('sort_dir', 'desc') === 'desc' ? 'Terkecil' : 'Terbesar' }})">
+                            <span>Izin</span>
+                            @if(request('sort_by') === 'izin')
+                                <i class="fas fa-arrow-{{ request('sort_dir', 'desc') === 'asc' ? 'up' : 'down' }} text-[11px] font-bold"></i>
+                            @else
+                                <i class="fas fa-sort text-[11px] text-white/50 group-hover:text-white transition"></i>
+                            @endif
+                        </a>
+                    </th>
+
+                    {{-- Sakit --}}
+                    <th class="px-2 py-2 text-center bg-warning-500 border-r border-white/20 min-w-[70px]">
+                        <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'sakit', 'sort_dir' => (request('sort_by') === 'sakit' && request('sort_dir', 'desc') === 'desc' ? 'asc' : 'desc')]) }}" 
+                           class="group flex items-center justify-center gap-1 w-full text-white font-medium hover:opacity-90 select-none py-1" 
+                           title="Urutkan Sakit ({{ request('sort_by') === 'sakit' && request('sort_dir', 'desc') === 'desc' ? 'Terkecil' : 'Terbesar' }})">
+                            <span>Sakit</span>
+                            @if(request('sort_by') === 'sakit')
+                                <i class="fas fa-arrow-{{ request('sort_dir', 'desc') === 'asc' ? 'up' : 'down' }} text-[11px] font-bold"></i>
+                            @else
+                                <i class="fas fa-sort text-[11px] text-white/50 group-hover:text-white transition"></i>
+                            @endif
+                        </a>
+                    </th>
+
+                    {{-- Alpha --}}
+                    <th class="px-2 py-2 text-center bg-gray-600 dark:bg-gray-700 border-r border-white/20 min-w-[70px]">
+                        <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'alpha', 'sort_dir' => (request('sort_by') === 'alpha' && request('sort_dir', 'desc') === 'desc' ? 'asc' : 'desc')]) }}" 
+                           class="group flex items-center justify-center gap-1 w-full text-white font-medium hover:opacity-90 select-none py-1" 
+                           title="Urutkan Alpha ({{ request('sort_by') === 'alpha' && request('sort_dir', 'desc') === 'desc' ? 'Terkecil' : 'Terbesar' }})">
+                            <span>Alpha</span>
+                            @if(request('sort_by') === 'alpha')
+                                <i class="fas fa-arrow-{{ request('sort_dir', 'desc') === 'asc' ? 'up' : 'down' }} text-[11px] font-bold"></i>
+                            @else
+                                <i class="fas fa-sort text-[11px] text-white/50 group-hover:text-white transition"></i>
+                            @endif
+                        </a>
+                    </th>
+
+                    {{-- % Hadir --}}
+                    <th class="px-2 py-2 text-center bg-brand-500 min-w-[80px]">
+                        <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'persentase', 'sort_dir' => (request('sort_by') === 'persentase' && request('sort_dir', 'desc') === 'desc' ? 'asc' : 'desc')]) }}" 
+                           class="group flex items-center justify-center gap-1 w-full text-white font-medium hover:opacity-90 select-none py-1" 
+                           title="Urutkan % Hadir ({{ request('sort_by') === 'persentase' && request('sort_dir', 'desc') === 'desc' ? 'Terkecil' : 'Terbesar' }})">
+                            <span>% Hadir</span>
+                            @if(request('sort_by') === 'persentase')
+                                <i class="fas fa-arrow-{{ request('sort_dir', 'desc') === 'asc' ? 'up' : 'down' }} text-[11px] font-bold"></i>
+                            @else
+                                <i class="fas fa-sort text-[11px] text-white/50 group-hover:text-white transition"></i>
+                            @endif
+                        </a>
+                    </th>
                 </tr>
             </thead>
-            <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
-                @forelse($absensi as $a)
-                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-                        <td class="px-4 py-3.5 xl:pl-6">
-                            <p class="text-gray-500 dark:text-gray-400">{{ $loop->iteration + $absensi->firstItem() - 1 }}</p>
+            <tbody class="text-sm">
+                @forelse($allGurus as $g)
+                    @php 
+                        $sum = $summary[$g->id] ?? [
+                            'hadir' => 0,
+                            'terlambat' => 0,
+                            'tidak_hadir' => 0,
+                            'izin' => 0,
+                            'sakit' => 0,
+                            'alpha' => 0,
+                            'total' => 0,
+                            'persen' => 0,
+                        ];
+                    @endphp
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors border-b border-gray-100 dark:border-gray-800 last:border-b-0">
+                        {{-- No --}}
+                        <td class="px-3 py-3 text-center border-r border-gray-100 dark:border-gray-800 text-gray-500 dark:text-gray-400">
+                            {{ $loop->iteration + $allGurus->firstItem() - 1 }}
                         </td>
-                        <td class="px-4 py-3.5 whitespace-nowrap">
-                            <p class="font-medium text-gray-800 dark:text-white/90">{{ \Carbon\Carbon::parse($a->tanggal)->format('d/m/Y') }}</p>
+
+                        {{-- Nama Guru --}}
+                        <td class="px-4 py-3 xl:pl-6 border-r border-gray-100 dark:border-gray-800">
+                            <p class="font-semibold text-gray-800 dark:text-white/90">{{ $g->nama }}</p>
                         </td>
-                        <td class="px-4 py-3.5">
-                            <p class="font-semibold text-gray-800 dark:text-white/90">{{ $a->guru->nama ?? '-' }}</p>
-                            @if(!empty($a->guru->nip))
-                                <span class="text-xs text-gray-400 font-mono">{{ $a->guru->nip }}</span>
-                            @endif
+
+                        {{-- NIP --}}
+                        <td class="px-4 py-3 border-r border-gray-100 dark:border-gray-800 font-mono text-xs text-gray-600 dark:text-gray-400">
+                            {{ $g->nip ?? '-' }}
                         </td>
-                        <td class="px-4 py-3.5 text-center whitespace-nowrap">
-                            @if($a->shift)
+
+                        {{-- Shift Utama --}}
+                        <td class="px-4 py-3 text-center border-r border-gray-100 dark:border-gray-800 whitespace-nowrap">
+                            @if($g->defaultShift)
                                 <span class="inline-flex items-center gap-1 font-mono text-xs font-semibold px-2.5 py-1 rounded-full bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
-                                    <i class="far fa-clock text-[10px]"></i> {{ $a->shift->nama_shift }}
+                                    <i class="far fa-clock text-[10px]"></i> {{ $g->defaultShift->nama_shift }}
                                 </span>
                             @else
                                 <span class="text-xs text-gray-400 italic">-</span>
                             @endif
                         </td>
-                        <td class="px-4 py-3.5 text-center whitespace-nowrap">
-                            @if($a->status == 'Hadir')
-                                <span class="inline-flex rounded-full bg-success-50 px-3 py-1 text-xs font-semibold text-success-600 dark:bg-success-500/15 dark:text-success-500">Hadir</span>
-                            @elseif($a->status == 'Terlambat')
-                                <span class="inline-flex rounded-full bg-warning-50 px-3 py-1 text-xs font-semibold text-warning-600 dark:bg-warning-500/15 dark:text-warning-500">
-                                    Terlambat (+{{ $a->menit_terlambat }}m)
-                                </span>
-                            @elseif($a->status == 'Izin')
-                                <span class="inline-flex rounded-full bg-info-50 px-3 py-1 text-xs font-semibold text-info-600 dark:bg-info-500/15 dark:text-info-500">Izin</span>
-                            @elseif($a->status == 'Sakit')
-                                <span class="inline-flex rounded-full bg-warning-50 px-3 py-1 text-xs font-semibold text-warning-600 dark:bg-warning-500/15 dark:text-warning-500">Sakit</span>
-                            @else
-                                <span class="inline-flex rounded-full bg-error-50 px-3 py-1 text-xs font-semibold text-error-600 dark:bg-error-500/15 dark:text-error-500">{{ $a->status }}</span>
-                            @endif
+
+                        {{-- Hadir --}}
+                        <td class="px-2 py-3 text-center font-bold text-success-600 dark:text-success-400 border-r border-gray-100 dark:border-gray-800 bg-success-50/50 dark:bg-success-500/5">
+                            {{ $sum['hadir'] }}
                         </td>
-                        <td class="px-4 py-3.5 text-center whitespace-nowrap">
-                            @if($a->jam_masuk)
-                                <span class="inline-block rounded px-2 py-1 bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300 font-mono text-xs font-bold">
-                                    {{ \Carbon\Carbon::parse($a->jam_masuk)->format('H:i') }}
-                                </span>
-                            @else
-                                <span class="text-gray-400">-</span>
-                            @endif
+
+                        {{-- Terlambat --}}
+                        <td class="px-2 py-3 text-center font-bold text-warning-600 dark:text-warning-400 border-r border-gray-100 dark:border-gray-800 bg-warning-50/50 dark:bg-warning-500/5">
+                            {{ $sum['terlambat'] }}
                         </td>
-                        <td class="px-4 py-3.5 text-center whitespace-nowrap">
-                            @if($a->jam_pulang)
-                                <span class="inline-block rounded px-2 py-1 bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300 font-mono text-xs font-bold">
-                                    {{ \Carbon\Carbon::parse($a->jam_pulang)->format('H:i') }}
-                                </span>
-                            @else
-                                <span class="text-gray-400">-</span>
-                            @endif
+
+                        {{-- Tidak Hadir --}}
+                        <td class="px-2 py-3 text-center font-bold text-gray-600 dark:text-gray-400 border-r border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/50">
+                            {{ $sum['tidak_hadir'] }}
                         </td>
-                        <td class="px-4 py-3.5">
-                            <p class="text-gray-500 dark:text-gray-400 text-xs">{{ $a->keterangan ?? '-' }}</p>
+
+                        {{-- Izin --}}
+                        <td class="px-2 py-3 text-center font-bold text-info-600 dark:text-info-400 border-r border-gray-100 dark:border-gray-800 bg-info-50/50 dark:bg-info-500/5">
+                            {{ $sum['izin'] }}
+                        </td>
+
+                        {{-- Sakit --}}
+                        <td class="px-2 py-3 text-center font-bold text-warning-600 dark:text-warning-400 border-r border-gray-100 dark:border-gray-800 bg-warning-50/50 dark:bg-warning-500/5">
+                            {{ $sum['sakit'] }}
+                        </td>
+
+                        {{-- Alpha --}}
+                        <td class="px-2 py-3 text-center font-bold text-gray-600 dark:text-gray-400 border-r border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/50">
+                            {{ $sum['alpha'] }}
+                        </td>
+
+                        {{-- % Hadir --}}
+                        <td class="px-2 py-3 text-center font-bold text-brand-600 dark:text-brand-400 bg-brand-50/50 dark:bg-brand-500/5">
+                            {{ $sum['persen'] }}%
                         </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="8" class="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
-                            Tidak ada data absensi ditemukan.
+                        <td colspan="11" class="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
+                            Tidak ada data rekap absensi {{ strtolower($labelKaryawan) }} ditemukan.
                         </td>
                     </tr>
                 @endforelse
@@ -198,7 +376,7 @@
     
     <!-- Pagination -->
     <div class="px-5 py-4 border-t border-gray-200 dark:border-gray-800">
-        {{ $absensi->links('vendor.pagination.tailwind') }}
+        {{ $allGurus->links('vendor.pagination.tailwind') }}
     </div>
 </div>
 @endsection

@@ -47,6 +47,8 @@
                 </select>
             </div>
             
+            <input type="hidden" name="sort_by" value="{{ request('sort_by') }}">
+            <input type="hidden" name="sort_dir" value="{{ request('sort_dir') }}">
             <div class="w-full md:w-auto flex flex-wrap gap-2 mt-2 md:mt-0">
                 <button type="submit" class="inline-flex items-center justify-center gap-2 rounded-lg bg-brand-500 px-4 py-2 text-center font-medium text-white hover:bg-brand-600 transition">
                     <i class="fas fa-search"></i> Tampilkan
@@ -64,8 +66,13 @@
 
 <!-- Data Table Card -->
 <div class="rounded-2xl border border-gray-200 bg-white shadow-theme-sm dark:border-gray-800 dark:bg-gray-dark">
-    <div class="border-b border-gray-200 px-5 py-4 dark:border-gray-800">
+    <div class="border-b border-gray-200 px-5 py-4 dark:border-gray-800 flex justify-between items-center">
         <h6 class="font-semibold text-gray-800 dark:text-white/90">Hasil Rekap Kelas</h6>
+        @if(request('sort_by'))
+            <a href="{{ request()->fullUrlWithQuery(['sort_by' => null, 'sort_dir' => null]) }}" class="text-xs text-brand-500 hover:underline inline-flex items-center gap-1">
+                <i class="fas fa-undo"></i> Reset Urutan
+            </a>
+        @endif
     </div>
     
     <div class="max-w-full overflow-x-auto">
@@ -73,18 +80,101 @@
             <thead>
                 <tr class="bg-gray-50 text-left dark:bg-gray-800/50 text-gray-800 dark:text-white/90 font-medium text-sm">
                     <th rowspan="2" class="px-4 py-4 xl:pl-6 align-middle border-b border-gray-200 dark:border-gray-800 border-r w-12 text-center">No</th>
-                    <th rowspan="2" class="px-4 py-4 align-middle border-b border-gray-200 dark:border-gray-800 border-r">Nama Kelas</th>
+                    <th rowspan="2" class="px-4 py-4 align-middle border-b border-gray-200 dark:border-gray-800 border-r">
+                        <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'nama_kelas', 'sort_dir' => (request('sort_by') === 'nama_kelas' && request('sort_dir', 'asc') === 'asc' ? 'desc' : 'asc')]) }}" class="group inline-flex items-center gap-1.5 hover:text-brand-500 transition select-none cursor-pointer" title="Urutkan Nama Kelas ({{ request('sort_by') === 'nama_kelas' && request('sort_dir', 'asc') === 'asc' ? 'Z-A' : 'A-Z' }})">
+                            <span>Nama Kelas</span>
+                            <span class="inline-flex text-[11px]">
+                                @if(request('sort_by') === 'nama_kelas')
+                                    <i class="fas fa-arrow-{{ request('sort_dir', 'asc') === 'desc' ? 'down' : 'up' }} text-brand-500 font-bold"></i>
+                                @else
+                                    <i class="fas fa-sort text-gray-400 group-hover:text-gray-600 dark:text-gray-500 dark:group-hover:text-gray-300"></i>
+                                @endif
+                            </span>
+                        </a>
+                    </th>
                     <th colspan="8" class="px-4 py-2 text-center border-b border-gray-200 dark:border-gray-800">Jumlah Kehadiran Siswa</th>
                 </tr>
                 <tr class="text-xs text-white">
-                    <th class="px-2 py-2 text-center bg-success-500 border-r border-white/20 min-w-[80px] w-[9%]">Hadir</th>
-                    <th class="px-2 py-2 text-center bg-gray-500 border-r border-white/20 min-w-[80px] w-[9%]">Tidak Hadir</th>
-                    <th class="px-2 py-2 text-center bg-warning-500 border-r border-white/20 min-w-[80px] w-[9%]">Telat</th>
-                    <th class="px-2 py-2 text-center bg-info-500 border-r border-white/20 min-w-[80px] w-[9%]">Izin</th>
-                    <th class="px-2 py-2 text-center bg-warning-500 border-r border-white/20 min-w-[80px] w-[9%]">Sakit</th>
-                    <th class="px-2 py-2 text-center bg-error-500 border-r border-white/20 min-w-[80px] w-[9%]">Bolos</th>
-                    <th class="px-2 py-2 text-center bg-gray-600 dark:bg-gray-700 border-r border-white/20 min-w-[80px] w-[9%]">Alpha</th>
-                    <th class="px-2 py-2 text-center bg-brand-500 border-white/20 min-w-[80px] w-[9%]">Persentase (%)</th>
+                    <th class="px-2 py-2 text-center bg-success-500 border-r border-white/20 min-w-[80px] w-[9%]">
+                        <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'hadir', 'sort_dir' => (request('sort_by') === 'hadir' && request('sort_dir', 'desc') === 'desc' ? 'asc' : 'desc')]) }}" class="group flex items-center justify-center gap-1 w-full text-white font-medium hover:opacity-90 select-none py-1" title="Urutkan Hadir ({{ request('sort_by') === 'hadir' && request('sort_dir', 'desc') === 'desc' ? 'Terkecil' : 'Terbesar' }})">
+                            <span>Hadir</span>
+                            @if(request('sort_by') === 'hadir')
+                                <i class="fas fa-arrow-{{ request('sort_dir', 'desc') === 'asc' ? 'up' : 'down' }} text-[11px] font-bold"></i>
+                            @else
+                                <i class="fas fa-sort text-[11px] text-white/50 group-hover:text-white transition"></i>
+                            @endif
+                        </a>
+                    </th>
+                    <th class="px-2 py-2 text-center bg-gray-500 border-r border-white/20 min-w-[80px] w-[9%]">
+                        <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'tidak_hadir', 'sort_dir' => (request('sort_by') === 'tidak_hadir' && request('sort_dir', 'desc') === 'desc' ? 'asc' : 'desc')]) }}" class="group flex items-center justify-center gap-1 w-full text-white font-medium hover:opacity-90 select-none py-1" title="Urutkan Tidak Hadir ({{ request('sort_by') === 'tidak_hadir' && request('sort_dir', 'desc') === 'desc' ? 'Terkecil' : 'Terbesar' }})">
+                            <span>Tidak Hadir</span>
+                            @if(request('sort_by') === 'tidak_hadir')
+                                <i class="fas fa-arrow-{{ request('sort_dir', 'desc') === 'asc' ? 'up' : 'down' }} text-[11px] font-bold"></i>
+                            @else
+                                <i class="fas fa-sort text-[11px] text-white/50 group-hover:text-white transition"></i>
+                            @endif
+                        </a>
+                    </th>
+                    <th class="px-2 py-2 text-center bg-warning-500 border-r border-white/20 min-w-[80px] w-[9%]">
+                        <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'telat', 'sort_dir' => (request('sort_by') === 'telat' && request('sort_dir', 'desc') === 'desc' ? 'asc' : 'desc')]) }}" class="group flex items-center justify-center gap-1 w-full text-white font-medium hover:opacity-90 select-none py-1" title="Urutkan Telat ({{ request('sort_by') === 'telat' && request('sort_dir', 'desc') === 'desc' ? 'Terkecil' : 'Terbesar' }})">
+                            <span>Telat</span>
+                            @if(request('sort_by') === 'telat')
+                                <i class="fas fa-arrow-{{ request('sort_dir', 'desc') === 'asc' ? 'up' : 'down' }} text-[11px] font-bold"></i>
+                            @else
+                                <i class="fas fa-sort text-[11px] text-white/50 group-hover:text-white transition"></i>
+                            @endif
+                        </a>
+                    </th>
+                    <th class="px-2 py-2 text-center bg-info-500 border-r border-white/20 min-w-[80px] w-[9%]">
+                        <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'izin', 'sort_dir' => (request('sort_by') === 'izin' && request('sort_dir', 'desc') === 'desc' ? 'asc' : 'desc')]) }}" class="group flex items-center justify-center gap-1 w-full text-white font-medium hover:opacity-90 select-none py-1" title="Urutkan Izin ({{ request('sort_by') === 'izin' && request('sort_dir', 'desc') === 'desc' ? 'Terkecil' : 'Terbesar' }})">
+                            <span>Izin</span>
+                            @if(request('sort_by') === 'izin')
+                                <i class="fas fa-arrow-{{ request('sort_dir', 'desc') === 'asc' ? 'up' : 'down' }} text-[11px] font-bold"></i>
+                            @else
+                                <i class="fas fa-sort text-[11px] text-white/50 group-hover:text-white transition"></i>
+                            @endif
+                        </a>
+                    </th>
+                    <th class="px-2 py-2 text-center bg-warning-500 border-r border-white/20 min-w-[80px] w-[9%]">
+                        <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'sakit', 'sort_dir' => (request('sort_by') === 'sakit' && request('sort_dir', 'desc') === 'desc' ? 'asc' : 'desc')]) }}" class="group flex items-center justify-center gap-1 w-full text-white font-medium hover:opacity-90 select-none py-1" title="Urutkan Sakit ({{ request('sort_by') === 'sakit' && request('sort_dir', 'desc') === 'desc' ? 'Terkecil' : 'Terbesar' }})">
+                            <span>Sakit</span>
+                            @if(request('sort_by') === 'sakit')
+                                <i class="fas fa-arrow-{{ request('sort_dir', 'desc') === 'asc' ? 'up' : 'down' }} text-[11px] font-bold"></i>
+                            @else
+                                <i class="fas fa-sort text-[11px] text-white/50 group-hover:text-white transition"></i>
+                            @endif
+                        </a>
+                    </th>
+                    <th class="px-2 py-2 text-center bg-error-500 border-r border-white/20 min-w-[80px] w-[9%]">
+                        <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'bolos', 'sort_dir' => (request('sort_by') === 'bolos' && request('sort_dir', 'desc') === 'desc' ? 'asc' : 'desc')]) }}" class="group flex items-center justify-center gap-1 w-full text-white font-medium hover:opacity-90 select-none py-1" title="Urutkan Bolos ({{ request('sort_by') === 'bolos' && request('sort_dir', 'desc') === 'desc' ? 'Terkecil' : 'Terbesar' }})">
+                            <span>Bolos</span>
+                            @if(request('sort_by') === 'bolos')
+                                <i class="fas fa-arrow-{{ request('sort_dir', 'desc') === 'asc' ? 'up' : 'down' }} text-[11px] font-bold"></i>
+                            @else
+                                <i class="fas fa-sort text-[11px] text-white/50 group-hover:text-white transition"></i>
+                            @endif
+                        </a>
+                    </th>
+                    <th class="px-2 py-2 text-center bg-gray-600 dark:bg-gray-700 border-r border-white/20 min-w-[80px] w-[9%]">
+                        <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'alpha', 'sort_dir' => (request('sort_by') === 'alpha' && request('sort_dir', 'desc') === 'desc' ? 'asc' : 'desc')]) }}" class="group flex items-center justify-center gap-1 w-full text-white font-medium hover:opacity-90 select-none py-1" title="Urutkan Alpha ({{ request('sort_by') === 'alpha' && request('sort_dir', 'desc') === 'desc' ? 'Terkecil' : 'Terbesar' }})">
+                            <span>Alpha</span>
+                            @if(request('sort_by') === 'alpha')
+                                <i class="fas fa-arrow-{{ request('sort_dir', 'desc') === 'asc' ? 'up' : 'down' }} text-[11px] font-bold"></i>
+                            @else
+                                <i class="fas fa-sort text-[11px] text-white/50 group-hover:text-white transition"></i>
+                            @endif
+                        </a>
+                    </th>
+                    <th class="px-2 py-2 text-center bg-brand-500 border-white/20 min-w-[80px] w-[9%]">
+                        <a href="{{ request()->fullUrlWithQuery(['sort_by' => 'persentase', 'sort_dir' => (request('sort_by') === 'persentase' && request('sort_dir', 'desc') === 'desc' ? 'asc' : 'desc')]) }}" class="group flex items-center justify-center gap-1 w-full text-white font-medium hover:opacity-90 select-none py-1" title="Urutkan Persentase (%) ({{ request('sort_by') === 'persentase' && request('sort_dir', 'desc') === 'desc' ? 'Terkecil' : 'Terbesar' }})">
+                            <span>Persentase (%)</span>
+                            @if(request('sort_by') === 'persentase')
+                                <i class="fas fa-arrow-{{ request('sort_dir', 'desc') === 'asc' ? 'up' : 'down' }} text-[11px] font-bold"></i>
+                            @else
+                                <i class="fas fa-sort text-[11px] text-white/50 group-hover:text-white transition"></i>
+                            @endif
+                        </a>
+                    </th>
                 </tr>
             </thead>
             <tbody class="text-sm">

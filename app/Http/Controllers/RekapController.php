@@ -30,7 +30,7 @@ class RekapController extends Controller
             return redirect()->route('dashboard')->with('error', 'Akun belum terhubung dengan Data Siswa.');
         }
 
-        $siswaQuery = Siswa::with('kelas')->orderBy('nama');
+        $siswaQuery = Siswa::with('kelas');
 
         // Filter by school_id for non-super admin users
         if (auth()->user() && !auth()->user()->isSuperAdmin()) {
@@ -66,6 +66,11 @@ class RekapController extends Controller
             $search = $request->search;
             $siswaQuery->where('nama', 'like', "%{$search}%");
         }
+
+        // Apply Sorting
+        $sortBy = $request->input('sort_by', 'nama');
+        $sortDir = strtolower($request->input('sort_dir', 'asc')) === 'desc' ? 'desc' : 'asc';
+        $this->applySorting($siswaQuery, $sortBy, $sortDir, $startDate, $endDate);
 
         $allSiswa = $siswaQuery->paginate(50)->withQueryString();
 
@@ -143,6 +148,18 @@ class RekapController extends Controller
         if ($kelasId) {
             $siswaQuery->where('kelas_id', $kelasId);
         }
+        if ($request->has('search') && !empty($request->search)) {
+            $siswaQuery->where('nama', 'like', "%{$request->search}%");
+        }
+
+        $sortBy = $request->input('sort_by');
+        $sortDir = $request->input('sort_dir', 'asc');
+        if ($sortBy) {
+            $this->applySorting($siswaQuery, $sortBy, $sortDir, $startDate, $endDate);
+        } else {
+            $siswaQuery->orderBy('nama');
+        }
+
         $allSiswa = $siswaQuery->get();
         $attendances = Attendance::whereBetween('tanggal', [$startDate, $endDate])->get();
 
@@ -312,6 +329,18 @@ class RekapController extends Controller
         if ($kelasId) {
             $siswaQuery->where('kelas_id', $kelasId);
         }
+        if ($request->has('search') && !empty($request->search)) {
+            $siswaQuery->where('nama', 'like', "%{$request->search}%");
+        }
+
+        $sortBy = $request->input('sort_by');
+        $sortDir = $request->input('sort_dir', 'asc');
+        if ($sortBy) {
+            $this->applySorting($siswaQuery, $sortBy, $sortDir, $startDate, $endDate);
+        } else {
+            $siswaQuery->orderBy('nama');
+        }
+
         $allSiswa = $siswaQuery->get();
         $attendances = Attendance::whereBetween('tanggal', [$startDate, $endDate])->get();
 
@@ -384,5 +413,89 @@ class RekapController extends Controller
         $pdf->setPaper('a4', 'portrait');
 
         return $pdf->stream('rekap_absensi.pdf');
+    }
+
+    /**
+     * Apply sorting to Siswa query.
+     */
+    private function applySorting($query, $sortBy, $sortDir, $startDate, $endDate)
+    {
+        $direction = strtolower($sortDir) === 'desc' ? 'desc' : 'asc';
+
+        switch ($sortBy) {
+            case 'nama':
+                $query->orderBy('nama', $direction);
+                break;
+            case 'kelas':
+                $query->leftJoin('kelas', 'siswa.kelas_id', '=', 'kelas.id')
+                    ->select('siswa.*')
+                    ->orderBy('kelas.nama_kelas', $direction)
+                    ->orderBy('siswa.nama', 'asc');
+                break;
+            case 'hadir':
+                $query->withCount(['attendance as hadir_count' => function ($q) use ($startDate, $endDate) {
+                    $q->whereBetween('tanggal', [$startDate, $endDate])
+                      ->where(function($sq) {
+                          $sq->where('status', 'H')->orWhere('status', 'Hadir');
+                      });
+                }])->orderBy('hadir_count', $direction)->orderBy('nama', 'asc');
+                break;
+            case 'tidak_hadir':
+                $query->withCount(['attendance as tidak_hadir_count' => function ($q) use ($startDate, $endDate) {
+                    $q->whereBetween('tanggal', [$startDate, $endDate])
+                      ->whereIn('status', ['I', 'S', 'B', 'A', 'Izin', 'Sakit', 'Bolos', 'Alpha', 'Tidak Hadir']);
+                }])->orderBy('tidak_hadir_count', $direction)->orderBy('nama', 'asc');
+                break;
+            case 'telat':
+                $query->withCount(['attendance as telat_count' => function ($q) use ($startDate, $endDate) {
+                    $q->whereBetween('tanggal', [$startDate, $endDate])
+                      ->where(function($sq) {
+                          $sq->where('status', 'T')->orWhere('status', 'Telat');
+                      });
+                }])->orderBy('telat_count', $direction)->orderBy('nama', 'asc');
+                break;
+            case 'izin':
+                $query->withCount(['attendance as izin_count' => function ($q) use ($startDate, $endDate) {
+                    $q->whereBetween('tanggal', [$startDate, $endDate])
+                      ->where(function($sq) {
+                          $sq->where('status', 'I')->orWhere('status', 'Izin');
+                      });
+                }])->orderBy('izin_count', $direction)->orderBy('nama', 'asc');
+                break;
+            case 'sakit':
+                $query->withCount(['attendance as sakit_count' => function ($q) use ($startDate, $endDate) {
+                    $q->whereBetween('tanggal', [$startDate, $endDate])
+                      ->where(function($sq) {
+                          $sq->where('status', 'S')->orWhere('status', 'Sakit');
+                      });
+                }])->orderBy('sakit_count', $direction)->orderBy('nama', 'asc');
+                break;
+            case 'bolos':
+                $query->withCount(['attendance as bolos_count' => function ($q) use ($startDate, $endDate) {
+                    $q->whereBetween('tanggal', [$startDate, $endDate])
+                      ->where(function($sq) {
+                          $sq->where('status', 'B')->orWhere('status', 'Bolos');
+                      });
+                }])->orderBy('bolos_count', $direction)->orderBy('nama', 'asc');
+                break;
+            case 'alpha':
+                $query->withCount(['attendance as alpha_count' => function ($q) use ($startDate, $endDate) {
+                    $q->whereBetween('tanggal', [$startDate, $endDate])
+                      ->where(function($sq) {
+                          $sq->where('status', 'A')->orWhere('status', 'Alpha');
+                      });
+                }])->orderBy('alpha_count', $direction)->orderBy('nama', 'asc');
+                break;
+            case 'persentase':
+                $subHadir = "(SELECT COUNT(*) FROM attendance WHERE attendance.student_id = siswa.id AND attendance.tanggal BETWEEN '{$startDate}' AND '{$endDate}' AND attendance.status IN ('H', 'Hadir', 'T', 'Telat'))";
+                $subTotal = "(SELECT COUNT(*) FROM attendance WHERE attendance.student_id = siswa.id AND attendance.tanggal BETWEEN '{$startDate}' AND '{$endDate}' AND attendance.status IN ('H', 'Hadir', 'T', 'Telat', 'I', 'Izin', 'S', 'Sakit', 'B', 'Bolos', 'A', 'Alpha', 'Tidak Hadir'))";
+                $query->orderByRaw("COALESCE({$subHadir} * 100.0 / NULLIF({$subTotal}, 0), 0) {$direction}")->orderBy('nama', 'asc');
+                break;
+            default:
+                $query->orderBy('nama', 'asc');
+                break;
+        }
+
+        return $query;
     }
 }

@@ -2,6 +2,32 @@
 
 @section('title', 'Live Monitoring Absensi')
 
+@push('styles')
+<style>
+    .custom-scroll-box::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+    }
+    .custom-scroll-box::-webkit-scrollbar-track {
+        background: #f1f5f9;
+        border-radius: 4px;
+    }
+    .dark .custom-scroll-box::-webkit-scrollbar-track {
+        background: #1e293b;
+    }
+    .custom-scroll-box::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 4px;
+    }
+    .custom-scroll-box::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
+    }
+    .dark .custom-scroll-box::-webkit-scrollbar-thumb {
+        background: #475569;
+    }
+</style>
+@endpush
+
 @section('content')
     <div class="flex flex-col gap-6">
         {{-- 1. UNIFIED HEADER BAR (Rapi, Bersih, Seragam dengan Mode Box) --}}
@@ -192,12 +218,12 @@
                 <span class="text-xs text-gray-500 dark:text-gray-400 italic">Terakhir diperbarui: <span
                         id="last-update">--</span></span>
             </div>
-            <div class="overflow-x-auto">
+            <div class="overflow-x-auto overflow-y-auto max-h-[500px] custom-scroll-box border-b border-gray-100 dark:border-gray-800">
                 <table class="w-full">
-                    <thead>
-                        <tr class="text-left bg-gray-100 dark:bg-meta-4/50">
+                    <thead class="sticky top-0 z-10 bg-gray-100/95 dark:bg-meta-4/95 backdrop-blur-sm shadow-xs border-b border-gray-200 dark:border-gray-700">
+                        <tr class="text-left">
                             <th class="px-6 py-3 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">Waktu</th>
-                            <th class="px-6 py-3 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">Aksi</th>
+                            <th class="px-6 py-3 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">Status</th>
                             <th class="px-6 py-3 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">Keterangan
                             </th>
                             <th class="px-6 py-3 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase text-center">

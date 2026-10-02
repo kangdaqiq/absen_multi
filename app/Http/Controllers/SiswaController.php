@@ -477,6 +477,249 @@ class SiswaController extends Controller
         }
     }
 
+    /**
+     * Import foto siswa secara massal menggunakan file ZIP.
+     * Batasan: Maksimal 100 foto per ZIP, maksimal 128 KB per file, tanpa kompresi berat.
+     */
+    public function importPhotosZip(Request $request)
+    {
+        $photoEnabled = app(\App\Services\LicenseService::class)->isPhotoFeatureEnabled();
+        if (!$photoEnabled) {
+            return response()->json([
+                'success' => false,
+                'status'  => 'failed',
+                'message' => 'Fitur foto siswa saat ini dinonaktifkan oleh administrator atau lisensi sistem.',
+                'errors'  => []
+            ], 403);
+        }
+
+        $request->validate([
+            'fileZip' => 'required|file|mimes:zip|max:51200',
+        ], [
+            'fileZip.required' => 'File arsip ZIP wajib diunggah.',
+            'fileZip.mimes'    => 'Format file harus berupa arsip ZIP (.zip).',
+            'fileZip.max'      => 'Ukuran file ZIP maksimal 50 MB.',
+        ]);
+
+        if (!class_exists('ZipArchive')) {
+            return response()->json([
+                'success' => false,
+                'status'  => 'failed',
+                'message' => 'Ekstensi PHP ZipArchive tidak terpasang di server.',
+                'errors'  => []
+            ], 500);
+        }
+
+        $zipFile = $request->file('fileZip');
+        $zip = new \ZipArchive();
+
+        if ($zip->open($zipFile->getRealPath()) !== true) {
+            return response()->json([
+                'success' => false,
+                'status'  => 'failed',
+                'message' => 'Gagal membaca file ZIP. Pastikan file arsip valid dan tidak terkunci password.',
+                'errors'  => []
+            ], 422);
+        }
+
+        try {
+            $schoolId = auth()->user()->isSuperAdmin() ? null : auth()->user()->school_id;
+            $maxPhotos = 100;
+            $maxFileSize = 128 * 1024; // 128 KB
+            $allowedExtensions = ['jpg', 'jpeg', 'png', 'webp'];
+
+            // 1. Filter semua file di dalam ZIP (lewati folder & file sistem)
+            $validEntries = [];
+            for ($i = 0; $i < $zip->numFiles; $i++) {
+                $stat = $zip->statIndex($i);
+                $entryName = $stat['name'];
+
+                // Lewati folder
+                if (str_ends_with($entryName, '/') || str_ends_with($entryName, '\\')) {
+                    continue;
+                }
+
+                $baseName = basename($entryName);
+
+                // Lewati metadata macOS & file tersembunyi
+                if (str_contains($entryName, '__MACOSX') || str_starts_with($baseName, '.') || $baseName === 'Thumbs.db') {
+                    continue;
+                }
+
+                $validEntries[] = [
+                    'index'    => $i,
+                    'name'     => $entryName,
+                    'basename' => $baseName,
+                    'size'     => $stat['size'] ?? 0,
+                ];
+            }
+
+            $totalCount = count($validEntries);
+
+            if ($totalCount === 0) {
+                $zip->close();
+                return response()->json([
+                    'success' => false,
+                    'status'  => 'failed',
+                    'message' => 'Tidak ditemukan file foto di dalam file ZIP yang diunggah.',
+                    'errors'  => []
+                ], 422);
+            }
+
+            // Batas maksimal 100 foto per ZIP
+            if ($totalCount > $maxPhotos) {
+                $zip->close();
+                return response()->json([
+                    'success' => false,
+                    'status'  => 'failed',
+                    'message' => "File ZIP memuat {$totalCount} file. Batas maksimal yang diperbolehkan adalah {$maxPhotos} foto per upload ZIP.",
+                    'errors'  => []
+                ], 422);
+            }
+
+            // Pre-fetch data siswa sekolah ini agar query efisien
+            $siswaQuery = Siswa::query();
+            if ($schoolId) {
+                $siswaQuery->where('school_id', $schoolId);
+            }
+            $siswaMap = $siswaQuery->get(['id', 'nis', 'nama', 'foto', 'school_id'])
+                ->keyBy(fn($item) => trim((string)$item->nis));
+
+            // Tentukan direktori penyimpanan tujuan
+            $externalPath = config('filesystems.siswa_photo_path');
+            if (!empty($externalPath)) {
+                $destDir = rtrim($externalPath, '/\\');
+            } else {
+                $destDir = storage_path('app/public/siswa');
+            }
+
+            if (!file_exists($destDir)) {
+                @mkdir($destDir, 0755, true);
+            }
+
+            $countSuccess = 0;
+            $failures = [];
+
+            foreach ($validEntries as $entry) {
+                $entryName = $entry['name'];
+                $baseName = $entry['basename'];
+                $ext = strtolower(pathinfo($baseName, PATHINFO_EXTENSION));
+                $nis = trim(pathinfo($baseName, PATHINFO_FILENAME));
+
+                // 1. Validasi ekstensi foto
+                if (!in_array($ext, $allowedExtensions, true)) {
+                    $failures[] = [
+                        'file'   => $baseName,
+                        'nis'    => $nis ?: '-',
+                        'nama'   => '-',
+                        'reason' => "Format file '.{$ext}' tidak didukung (harus JPG, JPEG, PNG, atau WEBP)."
+                    ];
+                    continue;
+                }
+
+                // 2. Validasi batasan ukuran foto maksimal 128 KB
+                if ($entry['size'] > $maxFileSize) {
+                    $sizeKb = round($entry['size'] / 1024, 1);
+                    $namaSiswa = $siswaMap->has($nis) ? $siswaMap[$nis]->nama : '-';
+                    $failures[] = [
+                        'file'   => $baseName,
+                        'nis'    => $nis,
+                        'nama'   => $namaSiswa,
+                        'reason' => "Ukuran file ({$sizeKb} KB) melebihi batas maksimal 128 KB."
+                    ];
+                    continue;
+                }
+
+                // 3. Validasi apakah NIS terdaftar di sekolah ini
+                if (!$siswaMap->has($nis)) {
+                    $failures[] = [
+                        'file'   => $baseName,
+                        'nis'    => $nis,
+                        'nama'   => '-',
+                        'reason' => "Siswa dengan NIS '{$nis}' tidak ditemukan di sekolah ini."
+                    ];
+                    continue;
+                }
+
+                $siswa = $siswaMap[$nis];
+
+                // 4. Simpan file secara langsung tanpa proses kompresi berat
+                $randomName = \Illuminate\Support\Str::random(40) . '.' . $ext;
+                $destinationPath = $destDir . DIRECTORY_SEPARATOR . $randomName;
+                $dbValue = !empty($externalPath) ? $randomName : 'siswa/' . $randomName;
+
+                $stream = $zip->getStream($entryName);
+                if (!$stream) {
+                    $failures[] = [
+                        'file'   => $baseName,
+                        'nis'    => $nis,
+                        'nama'   => $siswa->nama,
+                        'reason' => "Gagal membaca isi file dari arsip ZIP."
+                    ];
+                    continue;
+                }
+
+                $destStream = @fopen($destinationPath, 'wb');
+                if (!$destStream) {
+                    fclose($stream);
+                    $failures[] = [
+                        'file'   => $baseName,
+                        'nis'    => $nis,
+                        'nama'   => $siswa->nama,
+                        'reason' => "Gagal menulis file foto ke media penyimpanan server."
+                    ];
+                    continue;
+                }
+
+                stream_copy_to_stream($stream, $destStream);
+                fclose($destStream);
+                fclose($stream);
+
+                // Hapus foto lama siswa jika sebelumnya sudah ada
+                if ($siswa->foto) {
+                    Siswa::deletePhotoFile($siswa->foto);
+                }
+
+                // Perbarui database foto siswa
+                $siswa->update(['foto' => $dbValue]);
+                $countSuccess++;
+            }
+
+            $zip->close();
+
+            $countSkip = count($failures);
+            if ($countSuccess > 0 && $countSkip === 0) {
+                $message = "Berhasil! Seluruh {$countSuccess} foto siswa berhasil diunggah dan dipasangkan.";
+                $status = 'success';
+            } elseif ($countSuccess > 0 && $countSkip > 0) {
+                $message = "Selesai sebagian: {$countSuccess} foto berhasil dipasangkan, {$countSkip} foto dilewati/gagal.";
+                $status = 'partial';
+            } else {
+                $message = "Import foto gagal: 0 foto berhasil dipasangkan, {$countSkip} foto dilewati/gagal.";
+                $status = 'failed';
+            }
+
+            return response()->json([
+                'success'       => $countSuccess > 0,
+                'status'        => $status,
+                'count_success' => $countSuccess,
+                'count_skip'    => $countSkip,
+                'message'       => $message,
+                'errors'        => $failures
+            ]);
+
+        } catch (\Throwable $e) {
+            $zip->close();
+            \Illuminate\Support\Facades\Log::error('Import Photos ZIP Error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'status'  => 'failed',
+                'message' => 'Terjadi kesalahan sistem saat memproses arsip ZIP: ' . $e->getMessage(),
+                'errors'  => []
+            ], 500);
+        }
+    }
+
     public function downloadTemplate()
     {
         $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();

@@ -208,6 +208,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/guru/{id}/delete-finger', [GuruController::class, 'deleteFingerId']);
 
         Route::post('/siswa/import', [SiswaController::class, 'import'])->name('siswa.import');
+        Route::post('/siswa/import-photos', [SiswaController::class, 'importPhotosZip'])->name('siswa.import-photos');
         Route::get('/siswa/template', [SiswaController::class, 'downloadTemplate'])->name('siswa.template');
 
         Route::post('/kelas/import', [KelasController::class, 'import'])->name('kelas.import');

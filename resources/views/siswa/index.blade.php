@@ -9,6 +9,11 @@
         Data Siswa
     </h2>
     <div class="flex flex-wrap gap-2">
+        @if($photoEnabled)
+        <button @click="$dispatch('open-modal', 'modalImportFotoZip')" class="inline-flex items-center justify-center gap-2.5 rounded-lg bg-indigo-600 px-4 py-2 text-center font-medium text-white hover:bg-indigo-700 transition shadow-xs">
+            <i class="fas fa-file-archive"></i> Import Foto (ZIP)
+        </button>
+        @endif
         <button @click="$dispatch('open-modal', 'modalImportSiswa')" class="inline-flex items-center justify-center gap-2.5 rounded-lg bg-success-500 px-4 py-2 text-center font-medium text-white hover:bg-success-600 transition">
             <i class="fas fa-file-excel"></i> Import Excel
         </button>
@@ -685,6 +690,153 @@
     </div>
 </x-ui.modal>
 
+@if($photoEnabled)
+<!-- Modal Import Foto Siswa (ZIP) -->
+<x-ui.modal id="modalImportFotoZip" :is-open="false" class="max-w-xl">
+    <div class="p-6" x-data="importFotoZipSiswa()">
+        <div class="flex items-center justify-between mb-5">
+            <div class="flex items-center gap-2.5">
+                <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-400">
+                    <i class="fas fa-file-archive"></i>
+                </div>
+                <h3 class="text-xl font-bold text-gray-800 dark:text-white/90">Import Foto Siswa (ZIP)</h3>
+            </div>
+            <button @click="open = false; if(!isImporting) reset();" class="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white"><i class="fas fa-times"></i></button>
+        </div>
+        
+        <form @submit.prevent="submitForm" x-show="!isImporting && !isFinished" enctype="multipart/form-data">
+            @csrf
+            
+            <div class="mb-4 rounded-xl border border-indigo-100 bg-indigo-50/60 p-4 text-xs text-indigo-900 dark:border-indigo-900/30 dark:bg-indigo-950/20 dark:text-indigo-300 space-y-2">
+                <div class="font-bold flex items-center gap-1.5 text-sm text-indigo-800 dark:text-indigo-200">
+                    <i class="fas fa-info-circle"></i> Ketentuan File ZIP:
+                </div>
+                <ul class="list-disc list-inside space-y-1 pl-1">
+                    <li>Beri nama setiap file foto sesuai <strong>NIS siswa</strong> (contoh: <code class="bg-indigo-100 dark:bg-indigo-900/40 px-1 py-0.5 rounded font-mono">1001.jpg</code>, <code class="bg-indigo-100 dark:bg-indigo-900/40 px-1 py-0.5 rounded font-mono">1002.png</code>).</li>
+                    <li>Maksimal <strong>100 foto</strong> di dalam satu file ZIP.</li>
+                    <li>Ukuran per file foto maksimal <strong>128 KB</strong>.</li>
+                    <li>Format gambar yang didukung: <strong>JPG, JPEG, PNG, WEBP</strong>.</li>
+                </ul>
+            </div>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Pilih File Arsip ZIP (.zip)</label>
+                    <input type="file" x-ref="zipFileInput" required accept=".zip,application/zip,application/x-zip-compressed" class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none dark:border-gray-800 dark:bg-gray-900 dark:text-white text-sm file:mr-4 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 dark:file:bg-indigo-900/30 dark:file:text-indigo-400">
+                </div>
+            </div>
+
+            <div class="mt-6 flex justify-end gap-3 pt-4 border-t border-gray-100 dark:border-gray-800">
+                <button type="button" @click="open = false" class="rounded-lg border border-gray-200 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-gray-800">Batal</button>
+                <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition">
+                    <i class="fas fa-cloud-upload-alt"></i> Upload & Pasangkan Foto
+                </button>
+            </div>
+        </form>
+
+        <!-- Progress Area -->
+        <div x-show="isImporting" class="py-6 text-center" style="display: none;">
+            <div class="mb-3 flex justify-between text-sm font-medium">
+                <span class="text-gray-700 dark:text-gray-300">Mengekstrak & menyimpan foto siswa...</span>
+                <span class="text-indigo-600 dark:text-indigo-400 font-semibold" x-text="progress + '%'"></span>
+            </div>
+            <div class="h-2.5 w-full rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
+                <div class="h-2.5 rounded-full bg-indigo-600 transition-all duration-300 ease-out" :style="'width: ' + progress + '%'"></div>
+            </div>
+            <p class="mt-3 text-xs text-gray-500 dark:text-gray-400">Mohon tunggu, sistem sedang memvalidasi dan memindahkan foto ke penyimpanan.</p>
+        </div>
+
+        <!-- Result Area -->
+        <div x-show="isFinished" class="py-2 text-center" style="display: none;">
+            <div class="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full"
+                 :class="{
+                    'bg-success-100 text-success-600 dark:bg-success-500/20 dark:text-success-400': status === 'success',
+                    'bg-amber-100 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400': status === 'partial',
+                    'bg-error-100 text-error-600 dark:bg-error-500/20 dark:text-error-400': status === 'failed'
+                 }">
+                <i class="fas fa-2x"
+                   :class="{
+                    'fa-check': status === 'success',
+                    'fa-exclamation-triangle': status === 'partial',
+                    'fa-times': status === 'failed'
+                   }"></i>
+            </div>
+
+            <h4 class="mb-1.5 text-lg font-bold text-gray-800 dark:text-white/90"
+                x-text="status === 'success' ? 'Upload Foto Berhasil' : (status === 'partial' ? 'Upload Selesai dengan Catatan' : 'Upload Foto Gagal')"></h4>
+
+            <p class="text-sm text-gray-600 dark:text-gray-300 mb-3" x-text="message"></p>
+
+            <template x-if="countSuccess > 0 || countSkip > 0">
+                <div class="flex items-center justify-center gap-2 mb-4 flex-wrap">
+                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-success-50 text-success-700 border border-success-200 dark:bg-success-500/10 dark:text-success-400 dark:border-success-500/20">
+                        <i class="fas fa-check-circle"></i> <span x-text="countSuccess"></span> Berhasil
+                    </span>
+                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold"
+                          :class="countSkip > 0 ? 'bg-error-50 text-error-700 border border-error-200 dark:bg-error-500/10 dark:text-error-400 dark:border-error-500/20' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'">
+                        <i class="fas fa-times-circle"></i> <span x-text="countSkip"></span> Dilewati / Gagal
+                    </span>
+                </div>
+            </template>
+
+            <!-- Failure List -->
+            <template x-if="failures && failures.length > 0">
+                <div class="mt-4 text-left border border-error-200 dark:border-error-800/60 rounded-xl bg-error-50/40 dark:bg-error-950/20 p-3.5 mb-5 shadow-xs">
+                    <div class="flex items-center justify-between mb-2.5">
+                        <div class="flex items-center gap-2">
+                            <i class="fas fa-exclamation-circle text-error-500"></i>
+                            <span class="text-xs font-bold text-gray-800 dark:text-gray-200">
+                                Rincian Foto Dilewati (<span x-text="failures.length"></span> File):
+                            </span>
+                        </div>
+                        <button type="button" @click="copyErrors" class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 shadow-xs transition">
+                            <i class="fas" :class="copied ? 'fa-check text-success-500' : 'fa-copy'"></i>
+                            <span x-text="copied ? 'Tersalin!' : 'Salin Detail'"></span>
+                        </button>
+                    </div>
+
+                    <div class="custom-scroll-box rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900" style="max-height: 240px; overflow-y: auto; display: block;">
+                        <table class="w-full text-left text-xs text-gray-600 dark:text-gray-300">
+                            <thead class="bg-gray-100 dark:bg-gray-800 font-semibold text-gray-700 dark:text-gray-200 border-b border-gray-200 dark:border-gray-700" style="position: sticky; top: 0; z-index: 10;">
+                                <tr>
+                                    <th class="px-3 py-2">Nama File</th>
+                                    <th class="px-3 py-2">NIS / Siswa</th>
+                                    <th class="px-3 py-2">Penyebab</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                                <template x-for="(item, i) in failures" :key="i">
+                                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/40 transition">
+                                        <td class="px-3 py-2 font-mono text-gray-700 dark:text-gray-300 font-medium whitespace-nowrap align-top" x-text="item.file"></td>
+                                        <td class="px-3 py-2 align-top">
+                                            <div class="font-mono font-medium text-brand-600 dark:text-brand-400" x-text="item.nis"></div>
+                                            <div class="text-[11px] text-gray-500 dark:text-gray-400" x-show="item.nama && item.nama !== '-'" x-text="item.nama"></div>
+                                        </td>
+                                        <td class="px-3 py-2 text-error-600 dark:text-error-400 font-medium align-top" x-text="item.reason"></td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </template>
+
+            <!-- Buttons Action -->
+            <div class="flex items-center justify-center gap-3">
+                <template x-if="countSuccess > 0">
+                    <button type="button" @click="location.reload()" class="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition shadow-xs">
+                        <i class="fas fa-check mr-1.5"></i> Selesai & Muat Ulang
+                    </button>
+                </template>
+                <button type="button" @click="reset()" class="rounded-lg border border-gray-300 dark:border-gray-700 px-5 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition">
+                    <i class="fas fa-redo mr-1.5"></i> <span x-text="countSuccess > 0 ? 'Upload File ZIP Lain' : 'Coba Lagi'"></span>
+                </button>
+            </div>
+        </div>
+    </div>
+</x-ui.modal>
+@endif
+
 <!-- Modal Enroll RFID -->
 <x-ui.modal id="modalEnrollRFID" :is-open="false" class="max-w-md">
     <div class="p-6 text-center">
@@ -1243,6 +1395,104 @@
                     });
                 }
             }
+        }
+
+        // Alpine component for handling bulk photo ZIP import
+        function importFotoZipSiswa() {
+            return {
+                isImporting: false,
+                isFinished: false,
+                isSuccess: false,
+                status: '',
+                progress: 0,
+                message: '',
+                countSuccess: 0,
+                countSkip: 0,
+                failures: [],
+                copied: false,
+                interval: null,
+                reset() {
+                    this.isImporting = false;
+                    this.isFinished = false;
+                    this.isSuccess = false;
+                    this.status = '';
+                    this.progress = 0;
+                    this.message = '';
+                    this.countSuccess = 0;
+                    this.countSkip = 0;
+                    this.failures = [];
+                    this.copied = false;
+                    if (this.$refs.zipFileInput) this.$refs.zipFileInput.value = '';
+                },
+                copyErrors() {
+                    if (!this.failures || !this.failures.length) return;
+                    const text = "Rincian Gagal/Dilewati Import Foto Siswa:\n" + 
+                        this.failures.map(f => `- File: ${f.file} (NIS: ${f.nis}) => ${f.reason}`).join('\n');
+                    navigator.clipboard.writeText(text).then(() => {
+                        this.copied = true;
+                        setTimeout(() => this.copied = false, 2000);
+                    });
+                },
+                submitForm() {
+                    const fileInput = this.$refs.zipFileInput;
+                    if (!fileInput || !fileInput.files.length) return;
+
+                    this.isImporting = true;
+                    this.isFinished = false;
+                    this.progress = 0;
+
+                    const formData = new FormData();
+                    formData.append('fileZip', fileInput.files[0]);
+                    formData.append('_token', '{{ csrf_token() }}');
+
+                    this.interval = setInterval(() => {
+                        if (this.progress < 90) {
+                            const increment = Math.max(1, Math.floor((90 - this.progress) / 8));
+                            this.progress += increment;
+                        }
+                    }, 400);
+
+                    fetch('{{ route('siswa.import-photos') }}', {
+                        method: 'POST',
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'Accept': 'application/json'
+                        },
+                        body: formData
+                    })
+                    .then(response => {
+                        return response.json().then(data => {
+                            if (!response.ok && response.status !== 422) {
+                                throw new Error(data.message || 'Gagal memproses arsip ZIP');
+                            }
+                            return data;
+                        });
+                    })
+                    .then(data => {
+                        clearInterval(this.interval);
+                        this.progress = 100;
+                        setTimeout(() => {
+                            this.isImporting = false;
+                            this.isFinished = true;
+                            this.isSuccess = !!data.success;
+                            this.status = data.status || (data.success ? 'success' : 'failed');
+                            this.message = data.message || 'Proses upload foto selesai.';
+                            this.countSuccess = data.count_success || 0;
+                            this.countSkip = data.count_skip || (data.errors ? data.errors.length : 0);
+                            this.failures = data.errors || [];
+                        }, 400);
+                    })
+                    .catch(error => {
+                        clearInterval(this.interval);
+                        this.isImporting = false;
+                        this.isFinished = true;
+                        this.isSuccess = false;
+                        this.status = 'failed';
+                        this.message = error.message || 'Terjadi kesalahan jaringan atau server saat upload.';
+                        this.failures = [];
+                    });
+                }
+            };
         }
 
         // Automatic Client-Side Photo Compression & Preview

@@ -47,6 +47,29 @@
     .pulse-ring {
         animation: pulse-ring 2.5s infinite ease-in-out;
     }
+
+    /* Custom Vertical Scrollbar */
+    .custom-scroll-box::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+    }
+    .custom-scroll-box::-webkit-scrollbar-track {
+        background: #f1f5f9;
+        border-radius: 4px;
+    }
+    .dark .custom-scroll-box::-webkit-scrollbar-track {
+        background: #1e293b;
+    }
+    .custom-scroll-box::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 4px;
+    }
+    .custom-scroll-box::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
+    }
+    .dark .custom-scroll-box::-webkit-scrollbar-thumb {
+        background: #475569;
+    }
 </style>
 @endpush
 
@@ -291,7 +314,7 @@
                     <div class="flex items-center gap-3">
                         <h4 class="text-base font-bold text-gray-800 dark:text-white flex items-center gap-2">
                             <i class="fas fa-list-ul text-brand-500"></i>
-                            <span>Daftar Aliran Absensi Hari Ini</span>
+                            <span>Daftar Absensi Hari Ini</span>
                         </h4>
                         <span id="boxes-count-pill" class="rounded-full bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400 px-2.5 py-0.5 text-xs font-bold">
                             0 Siswa
@@ -319,10 +342,10 @@
                 </div>
 
                 {{-- Subview 1: Table List View (Default & Primary: Tanpa Foto) --}}
-                <div id="subview-table-container" class="max-w-full overflow-x-auto">
+                <div id="subview-table-container" class="max-w-full overflow-x-auto overflow-y-auto max-h-[580px] custom-scroll-box border-b border-gray-100 dark:border-gray-800">
                     <table class="w-full table-auto">
-                        <thead>
-                            <tr class="bg-gray-50 text-left dark:bg-gray-800/50 text-gray-800 dark:text-white/90 font-medium text-xs uppercase tracking-wider">
+                        <thead class="sticky top-0 z-10 bg-gray-50/95 dark:bg-gray-800/95 backdrop-blur-sm shadow-xs border-b border-gray-200 dark:border-gray-700">
+                            <tr class="text-left text-gray-800 dark:text-white/90 font-medium text-xs uppercase tracking-wider">
                                 <th class="px-3.5 py-3.5 xl:pl-5 text-center w-10">#</th>
                                 <th class="px-3.5 py-3.5 min-w-[80px]">Waktu</th>
                                 <th class="px-3.5 py-3.5 min-w-[150px]">Nama Siswa</th>
@@ -346,7 +369,7 @@
                 </div>
 
                 {{-- Subview 2: Box Grid View (Alternative toggle) --}}
-                <div id="subview-grid-container" class="hidden p-5">
+                <div id="subview-grid-container" class="hidden p-5 max-h-[580px] overflow-y-auto custom-scroll-box">
                     <div id="boxes-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                         {{-- Injected via JS when grid mode active --}}
                     </div>
@@ -656,7 +679,7 @@
         if (outTime) outTime.textContent = '--:--';
 
         if (keterangan) {
-            keterangan.textContent = 'Silakan tap kartu RFID atau scan absensi...';
+            keterangan.textContent = 'Silakan tap kartu RFID ...';
         }
 
         // Hide photo, show standby icon

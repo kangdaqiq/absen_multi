@@ -150,7 +150,9 @@ class GuruController extends Controller
         if (isset($data['no_wa'])) {
             $data['no_wa'] = $this->normalizeWa($data['no_wa']);
         }
-        if (empty($data['telegram_chat_id'])) {
+        if (!$request->has('telegram_chat_id')) {
+            unset($data['telegram_chat_id']);
+        } elseif (empty($data['telegram_chat_id'])) {
             $data['telegram_chat_id'] = null;
         }
         $guruModel->update($data);
@@ -495,6 +497,26 @@ class GuruController extends Controller
                 }
 
                 $normalizedWa = $this->normalizeWa($wa);
+
+                if (empty($wa) || empty($normalizedWa)) {
+                    $failures[] = [
+                        'row' => $excelRowIndex,
+                        'nama' => $nama,
+                        'nip' => $nip ?: '-',
+                        'reason' => 'Nomor WhatsApp guru (Kolom C) kosong.'
+                    ];
+                    continue;
+                }
+
+                if (strlen($normalizedWa) < 9 || strlen($normalizedWa) > 16) {
+                    $failures[] = [
+                        'row' => $excelRowIndex,
+                        'nama' => $nama,
+                        'nip' => $nip ?: '-',
+                        'reason' => "Nomor WhatsApp '{$wa}' tidak valid (minimal 10 digit)."
+                    ];
+                    continue;
+                }
 
                 // Check duplicate by WA or NIP
                 $isDuplicate = false;

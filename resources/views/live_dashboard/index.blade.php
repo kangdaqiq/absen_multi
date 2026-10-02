@@ -25,6 +25,23 @@
     .dark .custom-scroll-box::-webkit-scrollbar-thumb {
         background: #475569;
     }
+
+    /* Fixed Scroll Container Height & Sticky Header */
+    #live-log-table-container {
+        max-height: 500px !important;
+        overflow-y: auto !important;
+        overflow-x: auto !important;
+        display: block !important;
+    }
+    #live-log-table-container thead th {
+        position: sticky !important;
+        top: 0 !important;
+        z-index: 20 !important;
+        background-color: #f3f4f6 !important;
+    }
+    .dark #live-log-table-container thead th {
+        background-color: #1f2937 !important;
+    }
 </style>
 @endpush
 
@@ -50,9 +67,6 @@
                                 <span>Real-time</span>
                             </span>
                         </div>
-                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                            Pemantauan aktivitas kehadiran dan log absensi siswa secara langsung
-                        </p>
                     </div>
                 </div>
 
@@ -218,9 +232,9 @@
                 <span class="text-xs text-gray-500 dark:text-gray-400 italic">Terakhir diperbarui: <span
                         id="last-update">--</span></span>
             </div>
-            <div class="overflow-x-auto overflow-y-auto max-h-[500px] custom-scroll-box border-b border-gray-100 dark:border-gray-800">
+            <div id="live-log-table-container" class="overflow-x-auto custom-scroll-box border-b border-gray-100 dark:border-gray-800" style="max-height: 500px; overflow-y: auto; overflow-x: auto; display: block;">
                 <table class="w-full">
-                    <thead class="sticky top-0 z-10 bg-gray-100/95 dark:bg-meta-4/95 backdrop-blur-sm shadow-xs border-b border-gray-200 dark:border-gray-700">
+                    <thead class="sticky top-0 z-20 bg-gray-100/95 dark:bg-meta-4/95 backdrop-blur-sm shadow-xs border-b border-gray-200 dark:border-gray-700" style="position: sticky; top: 0; z-index: 20;">
                         <tr class="text-left">
                             <th class="px-6 py-3 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">Waktu</th>
                             <th class="px-6 py-3 text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">Status</th>

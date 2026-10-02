@@ -247,8 +247,8 @@
                     <p class="mt-1 text-xs text-gray-500">Format: 08xxx atau 628xxx (8-13 digit)</p>
                 </div>
                 <div>
-                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Telegram Chat ID <span class="text-gray-400 font-normal">(opsional)</span></label>
-                    <input type="text" name="telegram_chat_id" placeholder="Contoh: 123456789" class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Telegram Chat ID <span class="text-xs text-brand-500 font-normal">(via Bot Telegram)</span></label>
+                    <input type="text" disabled placeholder="Terdaftar otomatis via Bot" class="w-full rounded-lg border border-gray-200 bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500 cursor-not-allowed px-4 py-2 outline-none dark:border-gray-700">
                 </div>
                 <div>
                     <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Default Shift Kerja <span class="text-error-500">*</span></label>
@@ -316,8 +316,8 @@
                     </select>
                 </div>
                 <div>
-                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Telegram Chat ID <span class="text-gray-400 font-normal">(opsional)</span></label>
-                    <input type="text" name="telegram_chat_id" id="edit_telegram" placeholder="Contoh: 123456789" class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Telegram Chat ID <span class="text-xs text-brand-500 font-normal">(via Bot Telegram)</span></label>
+                    <input type="text" id="edit_telegram" disabled placeholder="Belum terhubung ke Bot Telegram" class="w-full rounded-lg border border-gray-200 bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 cursor-not-allowed px-4 py-2 outline-none dark:border-gray-700">
                 </div>
                 <div class="sm:col-span-2">
                     <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">UID RFID (readonly)</label>

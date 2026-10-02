@@ -211,10 +211,17 @@ class SiswaController extends Controller
         } else {
             $input['wa_ortu'] = null;
         }
-        if (empty($input['telegram_chat_id']))
+        if (!$request->has('telegram_chat_id')) {
+            unset($input['telegram_chat_id']);
+        } elseif (empty($input['telegram_chat_id'])) {
             $input['telegram_chat_id'] = null;
-        if (empty($input['telegram_ortu_chat_id']))
+        }
+
+        if (!$request->has('telegram_ortu_chat_id')) {
+            unset($input['telegram_ortu_chat_id']);
+        } elseif (empty($input['telegram_ortu_chat_id'])) {
             $input['telegram_ortu_chat_id'] = null;
+        }
 
         $input['is_khusus'] = $request->has('is_khusus') ? 1 : 0;
         $input['is_siswa_khusus'] = $request->has('is_siswa_khusus') ? 1 : 0;

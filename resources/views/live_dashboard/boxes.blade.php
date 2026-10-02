@@ -118,9 +118,6 @@
                             <span id="live-indicator-text">Real-time</span>
                         </span>
                     </div>
-                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                        Pemantauan kedatangan &amp; kepulangan siswa secara langsung
-                    </p>
                 </div>
             </div>
 

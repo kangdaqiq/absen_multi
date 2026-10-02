@@ -7,11 +7,17 @@ use App\Models\MessageQueue;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Process;
 
 class ProcessWhatsappQueue extends Command
 {
-    protected $signature = 'wa:process {--limit=10}';
-    protected $description = 'Process pending WhatsApp messages from the queue (with anti-ban protection)';
+    protected $signature = 'wa:process 
+                            {--school= : ID Sekolah spesifik yang akan diproses (atau "none" untuk pesan tanpa sekolah)}
+                            {--limit=10 : Jumlah pesan per batch per sekolah}
+                            {--sync : Jalankan secara sinkron tanpa sub-proses paralel}';
+
+    protected $description = 'Process pending WhatsApp messages per school in parallel (with anti-ban protection)';
 
     /**
      * Batas maksimal pesan yang dikirim per sekolah per jam.
@@ -21,14 +27,32 @@ class ProcessWhatsappQueue extends Command
 
     public function handle()
     {
-        $limit = $this->option('limit');
+        $limit = (int) $this->option('limit') ?: 10;
+        $schoolOption = $this->option('school');
 
-        // Self-healing: Reset stuck 'processing' messages (older than 10 minutes) back to 'pending'
+        // Jika opsi --school diberikan, jalankan worker terisolasi untuk sekolah tersebut
+        if ($schoolOption !== null) {
+            $schoolId = in_array(strtolower((string)$schoolOption), ['none', 'null', '0'], true) ? null : (int) $schoolOption;
+            return $this->handleSchoolWorker($schoolId, $limit);
+        }
+
+        // Jika tanpa opsi --school, bertindak sebagai Master Dispatcher
+        return $this->handleMasterDispatcher($limit);
+    }
+
+    /**
+     * Master Dispatcher:
+     * Melakukan pembersihan global, mencari semua sekolah yang memiliki antrean pending,
+     * lalu menjalankan worker independen per sekolah secara paralel.
+     */
+    private function handleMasterDispatcher(int $limit): int
+    {
+        // 1. Self-healing: Reset stuck 'processing' messages (older than 10 minutes) back to 'pending'
         MessageQueue::where('status', 'processing')
             ->where('updated_at', '<', now()->subMinutes(10))
             ->update(['status' => 'pending', 'updated_at' => now()]);
 
-        // Expire: tandai semua pesan pending dari hari sebelumnya sebagai failed
+        // 2. Expire: tandai semua pesan pending dari hari sebelumnya sebagai failed
         MessageQueue::where('status', 'pending')
             ->where('created_at', '<', today())
             ->update([
@@ -38,88 +62,160 @@ class ProcessWhatsappQueue extends Command
                 'updated_at'  => now(),
             ]);
 
-        // Atomic lock & update — cegah worker ganda ambil pesan yang sama.
-        // Hanya ambil pesan yang scheduled_at sudah lewat atau NULL (kirim segera).
-        $messages = [];
+        // 3. Ambil seluruh target sekolah yang saat ini memiliki pesan pending
+        $targetQuery = MessageQueue::query()
+            ->leftJoin('schools', 'message_queues.school_id', '=', 'schools.id')
+            ->where('message_queues.status', 'pending')
+            ->where(function ($q) {
+                $q->whereNull('message_queues.scheduled_at')
+                  ->orWhere('message_queues.scheduled_at', '<=', now());
+            })
+            ->when(config('app.mode', 'hosted') !== 'self_hosted', function ($query) {
+                $query->where(function ($q) {
+                    $q->whereNull('message_queues.school_id')
+                      ->orWhere('schools.wa_enabled', true);
+                });
+            });
 
-        DB::transaction(function () use ($limit, &$messages) {
-            $candidates = MessageQueue::query()
-                ->select('message_queues.*')
-                ->leftJoin('schools', 'message_queues.school_id', '=', 'schools.id')
-                ->where('message_queues.status', 'pending')
-                // Hanya pesan yang sudah waktunya dikirim
-                ->where(function ($q) {
-                    $q->whereNull('message_queues.scheduled_at')
-                      ->orWhere('message_queues.scheduled_at', '<=', now());
-                })
-                ->when(config('app.mode', 'hosted') !== 'self_hosted', function ($query) {
-                    $query->where(function ($q) {
-                        $q->whereNull('message_queues.school_id')
-                          ->orWhere('schools.wa_enabled', true);
-                    });
-                })
-                ->orderBy('message_queues.priority', 'desc')
-                ->orderBy('message_queues.created_at', 'asc')
-                ->limit($limit)
-                ->lockForUpdate()
-                ->get();
+        $targets = $targetQuery->distinct()->pluck('message_queues.school_id')->toArray();
 
-            if ($candidates->isNotEmpty()) {
-                $ids = $candidates->pluck('id');
-                // Tandai sebagai 'processing' agar worker lain melewatinya
-                MessageQueue::whereIn('id', $ids)->update(['status' => 'processing', 'updated_at' => now()]);
-                $messages = $candidates;
-            }
-        });
-
-        if (empty($messages)) {
-            return;
+        if (empty($targets)) {
+            $this->line("Tidak ada antrean WhatsApp pending.");
+            return 0;
         }
 
-        $this->info("Found " . count($messages) . " messages. Processing...");
+        $this->info("Menemukan antrean WhatsApp untuk " . count($targets) . " target sekolah/global.");
 
-        foreach ($messages as $msg) {
-            // Guard: lewati pesan dari hari sebelumnya
-            if ($msg->created_at->lt(today())) {
+        $isSync = (bool) $this->option('sync');
+
+        foreach ($targets as $targetId) {
+            $targetArg = $targetId === null ? 'none' : (string) $targetId;
+            $schoolLabel = $targetId === null ? 'Global / SuperAdmin' : "Sekolah ID: {$targetId}";
+
+            if ($isSync) {
+                $this->info("Memproses {$schoolLabel} secara sinkron...");
+                $this->handleSchoolWorker($targetId, $limit);
+            } else {
+                // Jalankan worker paralel di latar belakang menggunakan PHP Process
+                $this->info("Mendispatch worker paralel untuk {$schoolLabel}...");
+                try {
+                    Process::path(base_path())->start([
+                        PHP_BINARY,
+                        base_path('artisan'),
+                        'wa:process',
+                        "--school={$targetArg}",
+                        "--limit={$limit}"
+                    ]);
+                } catch (\Throwable $e) {
+                    Log::error("Gagal mendispatch background worker WA untuk {$schoolLabel}: " . $e->getMessage());
+                    // Fallback sinkron jika background process gagal di-spawn
+                    $this->handleSchoolWorker($targetId, $limit);
+                }
+            }
+        }
+
+        return 0;
+    }
+
+    /**
+     * Worker Terisolasi per Sekolah:
+     * Memproses antrean khusus untuk 1 sekolah tertentu dengan lock independen,
+     * sehingga tidak pernah mengganggu atau terblokir oleh antrean sekolah lain.
+     */
+    private function handleSchoolWorker(?int $schoolId, int $limit): int
+    {
+        $lockKey = "wa_worker_lock_school_" . ($schoolId ?? 'global');
+        $lock = Cache::lock($lockKey, 300); // 5 menit lock
+
+        if (!$lock->get()) {
+            $this->warn("Worker untuk " . ($schoolId ? "Sekolah ID: {$schoolId}" : "Global") . " sedang berjalan. Dilewati.");
+            return 0;
+        }
+
+        try {
+            $messages = [];
+
+            DB::transaction(function () use ($schoolId, $limit, &$messages) {
+                $candidates = MessageQueue::query()
+                    ->select('message_queues.*')
+                    ->leftJoin('schools', 'message_queues.school_id', '=', 'schools.id')
+                    ->where('message_queues.status', 'pending')
+                    ->where(function ($q) {
+                        $q->whereNull('message_queues.scheduled_at')
+                          ->orWhere('message_queues.scheduled_at', '<=', now());
+                    })
+                    ->when($schoolId === null, function ($q) {
+                        $q->whereNull('message_queues.school_id');
+                    }, function ($q) use ($schoolId) {
+                        $q->where('message_queues.school_id', $schoolId);
+                    })
+                    ->when(config('app.mode', 'hosted') !== 'self_hosted', function ($query) {
+                        $query->where(function ($q) {
+                            $q->whereNull('message_queues.school_id')
+                              ->orWhere('schools.wa_enabled', true);
+                        });
+                    })
+                    ->orderBy('message_queues.priority', 'desc')
+                    ->orderBy('message_queues.created_at', 'asc')
+                    ->limit($limit)
+                    ->lockForUpdate()
+                    ->get();
+
+                if ($candidates->isNotEmpty()) {
+                    $ids = $candidates->pluck('id');
+                    MessageQueue::whereIn('id', $ids)->update(['status' => 'processing', 'updated_at' => now()]);
+                    $messages = $candidates;
+                }
+            });
+
+            if (empty($messages)) {
+                return 0;
+            }
+
+            $schoolLabel = $schoolId ? "Sekolah ID: {$schoolId}" : "Global";
+            $this->info("[{$schoolLabel}] Memproses " . count($messages) . " pesan...");
+
+            foreach ($messages as $msg) {
+                if ($msg->created_at->lt(today())) {
+                    $msg->update([
+                        'status'      => 'failed',
+                        'updated_at'  => now(),
+                        'retry_count' => 3,
+                        'last_error'  => 'Expired - Message from previous day',
+                    ]);
+                    $this->info("Message ID {$msg->id} -> EXPIRED (MARKED FAILED)");
+                    continue;
+                }
+
+                if ($msg->school_id !== null && $this->isRateLimited($msg->school_id)) {
+                    $msg->update(['status' => 'pending', 'updated_at' => now()]);
+                    $this->warn("Message ID {$msg->id} -> RATE LIMITED (school_id: {$msg->school_id}), will retry next run.");
+                    continue;
+                }
+
+                $result  = $this->sendMessage($msg->phone_number, $msg->message, $msg->school_id);
+                $success = $result['success'];
+
                 $msg->update([
-                    'status'      => 'failed',
+                    'status'      => $success ? 'sent' : 'failed',
                     'updated_at'  => now(),
-                    'retry_count' => 3,
-                    'last_error'  => 'Expired - Message from previous day',
+                    'retry_count' => $success ? $msg->retry_count : (($msg->retry_count ?? 0) + 1),
+                    'last_error'  => $success ? null : $result['error'],
                 ]);
-                $this->info("Message ID {$msg->id} -> EXPIRED (MARKED FAILED)");
-                continue;
+
+                $this->info("[{$schoolLabel}] Msg ID {$msg->id} -> " . ($success ? 'SENT' : 'FAILED'));
+
+                // Random Jitter Delay (Anti-ban) khusus per device sekolah ini
+                $minDelay = (int) env('WA_DELAY_MIN_SECONDS', 6) * 1_000_000;
+                $maxDelay = (int) env('WA_DELAY_MAX_SECONDS', 12) * 1_000_000;
+                $jitter   = rand(min($minDelay, $maxDelay), max($minDelay, $maxDelay));
+                usleep($jitter);
             }
-
-            // === RATE LIMITING PER SEKOLAH ===
-            // Cek berapa pesan sudah terkirim jam ini untuk sekolah ini.
-            // Jika sudah mencapai batas, kembalikan ke 'pending' dan skip.
-            if ($msg->school_id !== null && $this->isRateLimited($msg->school_id)) {
-                $msg->update(['status' => 'pending', 'updated_at' => now()]);
-                $this->warn("Message ID {$msg->id} -> RATE LIMITED (school_id: {$msg->school_id}), will retry next run.");
-                continue;
-            }
-
-            $result  = $this->sendMessage($msg->phone_number, $msg->message, $msg->school_id);
-            $success = $result['success'];
-
-            $msg->update([
-                'status'      => $success ? 'sent' : 'failed',
-                'updated_at'  => now(),
-                'retry_count' => $success ? $msg->retry_count : (($msg->retry_count ?? 0) + 1),
-                'last_error'  => $success ? null : $result['error'],
-            ]);
-
-            $this->info("Message ID {$msg->id} -> " . ($success ? 'SENT' : 'FAILED'));
-
-            // === RANDOM JITTER DELAY (8–15 detik) ===
-            // Delay tidak konsisten meniru pola manusia dan menghindari
-            // deteksi bot oleh WhatsApp yang mengenali pola interval tetap.
-            $minDelay = (int) env('WA_DELAY_MIN_SECONDS', 8) * 1_000_000;
-            $maxDelay = (int) env('WA_DELAY_MAX_SECONDS', 15) * 1_000_000;
-            $jitter   = rand(min($minDelay, $maxDelay), max($minDelay, $maxDelay));
-            usleep($jitter);
+        } finally {
+            $lock->release();
         }
+
+        return 0;
     }
 
     /**
@@ -204,7 +300,7 @@ class ProcessWhatsappQueue extends Command
                             }
                             return ['success' => false, 'error' => $retryBody['message'] ?? 'API Code is not SUCCESS after retry'];
                         }
-                        $response = $retryResponse; // Use retry response for error logging
+                        $response = $retryResponse;
                     }
                 } catch (\Exception $retryEx) {
                     Log::error("WA API Retry Exception for device {$deviceId}: " . $retryEx->getMessage());

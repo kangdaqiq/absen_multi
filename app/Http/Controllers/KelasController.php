@@ -74,6 +74,10 @@ class KelasController extends Controller
         $kelas = Kelas::findOrFail($id);
         $schoolId = auth()->user()->isSuperAdmin() ? null : auth()->user()->school_id;
 
+        if ($schoolId && (int)$kelas->school_id !== (int)$schoolId) {
+            abort(403, 'Akses ditolak: Anda tidak memiliki akses ke kelas sekolah lain.');
+        }
+
         $request->validate([
             'nama_kelas' => [
                 'required',

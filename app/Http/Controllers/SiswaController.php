@@ -148,9 +148,20 @@ class SiswaController extends Controller
         return redirect()->route('siswa.index')->with('success', 'Siswa berhasil ditambahkan.');
     }
 
+    private function authorizeStudentAccess(Siswa $siswa): void
+    {
+        $user = auth()->user();
+        if ($user && !$user->isSuperAdmin()) {
+            if ((int)$siswa->school_id !== (int)$user->school_id) {
+                abort(403, 'Akses ditolak: Anda tidak memiliki akses ke data siswa sekolah lain.');
+            }
+        }
+    }
+
     public function update(Request $request, $id)
     {
         $siswa = Siswa::findOrFail($id);
+        $this->authorizeStudentAccess($siswa);
         $schoolId = auth()->user()->isSuperAdmin() ? null : auth()->user()->school_id;
 
         $request->validate([
@@ -217,6 +228,7 @@ class SiswaController extends Controller
     public function destroy($id)
     {
         $siswa = Siswa::findOrFail($id);
+        $this->authorizeStudentAccess($siswa);
 
         if ($siswa->foto) {
             Siswa::deletePhotoFile($siswa->foto);
@@ -533,6 +545,7 @@ class SiswaController extends Controller
     public function enrollRequest($id)
     {
         $siswa = Siswa::findOrFail($id);
+        $this->authorizeStudentAccess($siswa);
 
         // Reset ALL other pending requests first (Single Active Request Policy) - SCOPED
         $schoolId = $siswa->school_id;
@@ -552,6 +565,7 @@ class SiswaController extends Controller
     public function cancelEnroll($id)
     {
         $siswa = Siswa::findOrFail($id);
+        $this->authorizeStudentAccess($siswa);
         if ($siswa->enroll_status === 'requested') {
             $siswa->update(['enroll_status' => 'none']);
         }
@@ -561,6 +575,7 @@ class SiswaController extends Controller
     public function enrollCheck($id)
     {
         $siswa = Siswa::findOrFail($id);
+        $this->authorizeStudentAccess($siswa);
         if ($siswa->enroll_status === 'done' && $siswa->uid_rfid) {
             return response()->json(['ok' => true, 'uid' => $siswa->uid_rfid]);
         } elseif (str_starts_with($siswa->enroll_status, 'error:')) {
@@ -577,6 +592,7 @@ class SiswaController extends Controller
     public function deleteUid($id)
     {
         $siswa = Siswa::findOrFail($id);
+        $this->authorizeStudentAccess($siswa);
         $siswa->update(['uid_rfid' => null, 'enroll_status' => 'none']);
         return response()->json(['ok' => true]);
     }
@@ -589,12 +605,7 @@ class SiswaController extends Controller
         ]);
 
         $siswa = Siswa::findOrFail($id);
-
-        if (auth()->user() && !auth()->user()->isSuperAdmin()) {
-            if ($siswa->school_id !== auth()->user()->school_id) {
-                return response()->json(['ok' => false, 'message' => 'Akses ditolak.'], 403);
-            }
-        }
+        $this->authorizeStudentAccess($siswa);
 
         $device = Device::where('id', $request->device_id)
             ->where('school_id', $siswa->school_id)
@@ -644,6 +655,7 @@ class SiswaController extends Controller
     public function cancelFingerEnroll($id)
     {
         $siswa = Siswa::findOrFail($id);
+        $this->authorizeStudentAccess($siswa);
         \Illuminate\Support\Facades\Cache::forget('enroll_target_device_' . $siswa->school_id);
         if ($siswa->enroll_finger_status === 'requested') {
             $siswa->update(['enroll_finger_status' => 'none']);
@@ -654,6 +666,7 @@ class SiswaController extends Controller
     public function enrollFingerCheck($id)
     {
         $siswa = Siswa::findOrFail($id);
+        $this->authorizeStudentAccess($siswa);
 
         if ($siswa->enroll_finger_status === 'done' && $siswa->id_finger) {
             \Illuminate\Support\Facades\Cache::forget('enroll_stage_' . $siswa->school_id);
@@ -680,6 +693,7 @@ class SiswaController extends Controller
     public function deleteFingerId($id)
     {
         $siswa = Siswa::findOrFail($id);
+        $this->authorizeStudentAccess($siswa);
         $targetId = $siswa->id_finger;
 
         // Ambil semua ID sidik jari siswa ini

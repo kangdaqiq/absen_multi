@@ -107,9 +107,20 @@ class GuruController extends Controller
         return redirect()->route('guru.index')->with('success', 'Guru berhasil ditambahkan.');
     }
 
+    private function authorizeGuruAccess(Guru $guru): void
+    {
+        $user = auth()->user();
+        if ($user && !$user->isSuperAdmin()) {
+            if ((int)$guru->school_id !== (int)$user->school_id) {
+                abort(403, 'Akses ditolak: Anda tidak memiliki akses ke data guru sekolah lain.');
+            }
+        }
+    }
+
     public function update(Request $request, $guru)
     {
         $guruModel = Guru::findOrFail($guru);
+        $this->authorizeGuruAccess($guruModel);
         $schoolId = auth()->user()->isSuperAdmin() ? null : auth()->user()->school_id;
 
         $request->validate([
@@ -150,6 +161,7 @@ class GuruController extends Controller
     public function destroy($guru)
     {
         $guruModel = Guru::findOrFail($guru);
+        $this->authorizeGuruAccess($guruModel);
         $guruModel->delete();
 
         return redirect()->route('guru.index')->with('success', 'Guru berhasil dihapus.');
@@ -215,6 +227,7 @@ class GuruController extends Controller
     {
         // Cancel others (Siswa & Guru) to ensure Single Active Request - SCOPED
         $guru = Guru::findOrFail($id);
+        $this->authorizeGuruAccess($guru);
         $schoolId = $guru->school_id;
 
         \App\Models\Siswa::where('enroll_status', 'requested')
@@ -234,6 +247,7 @@ class GuruController extends Controller
     public function cancelEnroll($id)
     {
         $guru = Guru::findOrFail($id);
+        $this->authorizeGuruAccess($guru);
         if ($guru->enroll_status === 'requested') {
             $guru->update(['enroll_status' => 'none']);
         }
@@ -243,6 +257,7 @@ class GuruController extends Controller
     public function enrollCheck($id)
     {
         $guru = Guru::findOrFail($id);
+        $this->authorizeGuruAccess($guru);
         if ($guru->enroll_status === 'done' && $guru->uid_rfid) {
             return response()->json(['ok' => true, 'uid' => $guru->uid_rfid]);
         } elseif (str_starts_with($guru->enroll_status, 'error:')) {
@@ -259,6 +274,7 @@ class GuruController extends Controller
     public function deleteUid($id)
     {
         $guru = Guru::findOrFail($id);
+        $this->authorizeGuruAccess($guru);
         $guru->update(['uid_rfid' => null, 'enroll_status' => 'none']);
         return response()->json(['ok' => true]);
     }
@@ -330,6 +346,7 @@ class GuruController extends Controller
     public function cancelFingerEnroll($id)
     {
         $guru = Guru::findOrFail($id);
+        $this->authorizeGuruAccess($guru);
         \Illuminate\Support\Facades\Cache::forget('enroll_target_device_' . $guru->school_id);
         if ($guru->enroll_finger_status === 'requested') {
             $guru->update(['enroll_finger_status' => 'none']);
@@ -340,6 +357,7 @@ class GuruController extends Controller
     public function enrollFingerCheck($id)
     {
         $guru = Guru::findOrFail($id);
+        $this->authorizeGuruAccess($guru);
 
         if ($guru->enroll_finger_status === 'done' && $guru->id_finger) {
             \Illuminate\Support\Facades\Cache::forget('enroll_stage_' . $guru->school_id);
@@ -366,6 +384,7 @@ class GuruController extends Controller
     public function deleteFingerId($id)
     {
         $guru = Guru::findOrFail($id);
+        $this->authorizeGuruAccess($guru);
         $targetId = $guru->id_finger;
 
         // 1. Get all fingerprints

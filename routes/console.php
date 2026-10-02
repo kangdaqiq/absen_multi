@@ -44,6 +44,9 @@ Schedule::command('db:backup')->dailyAt('02:00')->withoutOverlapping();
 // Auto-delete old attendance history per school quota (Runs at 01:00 AM)
 Schedule::command('absen:auto-delete-history')->dailyAt('01:00')->withoutOverlapping();
 
+// Auto-clean API logs older than 7 days per school (Runs at 01:30 AM)
+Schedule::command('absen:clean-api-logs --days=7')->dailyAt('01:30')->withoutOverlapping();
+
 // Refresh license validation cache (Runs at 00:30 AM) — only in self_hosted mode
 Schedule::command('license:validate')->dailyAt('00:30')->withoutOverlapping();
 

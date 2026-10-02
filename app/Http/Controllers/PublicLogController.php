@@ -11,13 +11,22 @@ class PublicLogController extends Controller
 {
     public function index(Request $request)
     {
+        $user = auth()->user();
+        $isSuperAdmin = $user && $user->isSuperAdmin();
+        $schoolId = $user ? $user->school_id : null;
+
         $today = Carbon::today()->format('Y-m-d');
         
+        $baseQuery = ApiLog::whereDate('created_at', $today);
+        if (!$isSuperAdmin && $schoolId) {
+            $baseQuery->where('school_id', $schoolId);
+        }
+
         // Quick Stats Today
-        $totalLogsToday = ApiLog::whereDate('created_at', $today)->count();
-        $successLogsToday = ApiLog::whereDate('created_at', $today)->where('success', true)->count();
-        $failedLogsToday = ApiLog::whereDate('created_at', $today)->where('success', false)->count();
-        $uniqueIpsToday = ApiLog::whereDate('created_at', $today)->distinct('ip_address')->count('ip_address');
+        $totalLogsToday = (clone $baseQuery)->count();
+        $successLogsToday = (clone $baseQuery)->where('success', true)->count();
+        $failedLogsToday = (clone $baseQuery)->where('success', false)->count();
+        $uniqueIpsToday = (clone $baseQuery)->distinct('ip_address')->count('ip_address');
 
         return view('public_logs.index', compact(
             'totalLogsToday',
@@ -30,6 +39,10 @@ class PublicLogController extends Controller
 
     public function getData(Request $request)
     {
+        $user = auth()->user();
+        $isSuperAdmin = $user && $user->isSuperAdmin();
+        $schoolId = $user ? $user->school_id : null;
+
         $limit = min((int)$request->input('limit', 50), 100);
         $search = $request->input('search');
         $category = $request->input('category', 'all');
@@ -37,6 +50,10 @@ class PublicLogController extends Controller
         $date = $request->input('date');
 
         $query = ApiLog::with('school')->orderBy('created_at', 'desc');
+
+        if (!$isSuperAdmin && $schoolId) {
+            $query->where('school_id', $schoolId);
+        }
 
         // Filter Date
         if ($date) {
@@ -105,11 +122,16 @@ class PublicLogController extends Controller
 
         // Current Stats
         $today = Carbon::today()->format('Y-m-d');
+        $statQuery = ApiLog::whereDate('created_at', $today);
+        if (!$isSuperAdmin && $schoolId) {
+            $statQuery->where('school_id', $schoolId);
+        }
+
         $stats = [
-            'total_today' => ApiLog::whereDate('created_at', $today)->count(),
-            'success_today' => ApiLog::whereDate('created_at', $today)->where('success', true)->count(),
-            'failed_today' => ApiLog::whereDate('created_at', $today)->where('success', false)->count(),
-            'unique_ips_today' => ApiLog::whereDate('created_at', $today)->distinct('ip_address')->count('ip_address'),
+            'total_today' => (clone $statQuery)->count(),
+            'success_today' => (clone $statQuery)->where('success', true)->count(),
+            'failed_today' => (clone $statQuery)->where('success', false)->count(),
+            'unique_ips_today' => (clone $statQuery)->distinct('ip_address')->count('ip_address'),
             'server_time' => Carbon::now()->translatedFormat('d F Y, H:i:s'),
         ];
 
@@ -122,10 +144,13 @@ class PublicLogController extends Controller
 
     public function testPing(Request $request)
     {
+        $user = auth()->user();
+        $schoolId = $user ? $user->school_id : null;
         $type = $request->input('type', 'mobile');
         
         if ($type === 'mobile') {
             $log = ApiLog::create([
+                'school_id' => $schoolId,
                 'api_key' => 'MOBILE_APP',
                 'action' => 'mobile_test_ping',
                 'uid' => 'DEMO_USER_01',
@@ -137,6 +162,7 @@ class PublicLogController extends Controller
             ]);
         } elseif ($type === 'rfid') {
             $log = ApiLog::create([
+                'school_id' => $schoolId,
                 'api_key' => 'DEVICE_RFID_TEST',
                 'action' => 'rfid_tap_test',
                 'uid' => 'A1B2C3D4',
@@ -148,6 +174,7 @@ class PublicLogController extends Controller
             ]);
         } else {
             $log = ApiLog::create([
+                'school_id' => $schoolId,
                 'api_key' => 'UNKNOWN_KEY',
                 'action' => 'auth_failed',
                 'uid' => null,
@@ -168,10 +195,24 @@ class PublicLogController extends Controller
 
     public function clearLogs(Request $request)
     {
-        ApiLog::truncate();
+        $user = auth()->user();
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        if ($user->isSuperAdmin()) {
+            ApiLog::truncate();
+            $message = 'Semua riwayat API log seluruh sekolah berhasil dibersihkan.';
+        } elseif ($user->school_id) {
+            ApiLog::where('school_id', $user->school_id)->delete();
+            $message = 'Riwayat API log sekolah Anda berhasil dibersihkan.';
+        } else {
+            return response()->json(['success' => false, 'message' => 'Akses ditolak.'], 403);
+        }
+
         return response()->json([
             'success' => true,
-            'message' => 'Semua riwayat API log berhasil dibersihkan'
+            'message' => $message
         ]);
     }
 }

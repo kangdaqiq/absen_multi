@@ -51,13 +51,15 @@ Route::get('/portal-izin/search', [App\Http\Controllers\PortalIzinController::cl
 Route::post('/pengajuan-izin', [App\Http\Controllers\PortalIzinController::class, 'store'])->name('portal-izin.store');
 Route::get('/pengajuan-izin/status/{code}', [App\Http\Controllers\PortalIzinController::class, 'status'])->name('portal-izin.status');
 
-// ── Public Log Request Inspector (Tanpa Login) ────────────
-Route::get('/log-request', [App\Http\Controllers\PublicLogController::class, 'index'])->name('public-logs.index');
-Route::get('/log-requests', [App\Http\Controllers\PublicLogController::class, 'index']);
-Route::get('/public-logs', [App\Http\Controllers\PublicLogController::class, 'index']);
-Route::get('/log-request/data', [App\Http\Controllers\PublicLogController::class, 'getData'])->name('public-logs.data');
-Route::post('/log-request/test', [App\Http\Controllers\PublicLogController::class, 'testPing'])->name('public-logs.test');
-Route::post('/log-request/clear', [App\Http\Controllers\PublicLogController::class, 'clearLogs'])->name('public-logs.clear');
+// ── Log Request Inspector (Wajib Login & Multi-Tenant Scoped) ────────────
+Route::middleware(['auth'])->group(function () {
+    Route::get('/log-request', [App\Http\Controllers\PublicLogController::class, 'index'])->name('public-logs.index');
+    Route::get('/log-requests', [App\Http\Controllers\PublicLogController::class, 'index']);
+    Route::get('/public-logs', [App\Http\Controllers\PublicLogController::class, 'index']);
+    Route::get('/log-request/data', [App\Http\Controllers\PublicLogController::class, 'getData'])->name('public-logs.data');
+    Route::post('/log-request/test', [App\Http\Controllers\PublicLogController::class, 'testPing'])->name('public-logs.test');
+    Route::post('/log-request/clear', [App\Http\Controllers\PublicLogController::class, 'clearLogs'])->name('public-logs.clear');
+});
 
 // ── Public E-Invoice & Payment Gateway (Tanpa Login) ────────────
 use App\Http\Controllers\PublicInvoiceController;

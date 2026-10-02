@@ -30,19 +30,6 @@ Route::post('/license/validate', [App\Http\Controllers\Api\LicenseValidateContro
 Route::any('/callback/accept/{key?}', [App\Http\Controllers\Api\QrisCallbackController::class, 'accept']);
 Route::any('/endpoint/accept/{key?}', [App\Http\Controllers\Api\QrisCallbackController::class, 'accept']);
 
-Route::get('/debug-db', function () {
-    return DB::connection()->getDatabaseName();
-});
-
-Route::get('/debug-db-full', function () {
-    return response()->json([
-        'db' => DB::connection()->getDatabaseName(),
-        'host' => config('database.connections.mysql.host'),
-        'user' => config('database.connections.mysql.username'),
-        'port' => config('database.connections.mysql.port')
-    ]);
-});
-
 // Mobile App REST API Routes
 use App\Http\Controllers\Api\MobileAttendanceController;
 

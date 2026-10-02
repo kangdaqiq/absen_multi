@@ -86,15 +86,32 @@ class BackupDatabase extends Command
         // Command Construction
         // Note: Password argument -p must be attached immediately to value without space
         $passwordArg = !empty($password) ? "--password=\"$password\"" : "";
+        $errorLogPath = "$path/dump_error.log";
         
-        // Use 2>&1 to capture errors
-        $command = "\"$mysqldumpPath\" --user=\"$username\" $passwordArg --host=\"$host\" \"$database\" > \"$filePath\" 2>&1";
+        // Write SQL stdout to $filePath and stderr to separate error log file (never mix stderr into .sql file)
+        // Note: --no-tablespaces is required for MySQL 8.0+ when the database user lacks global PROCESS privilege
+        $command = "\"$mysqldumpPath\" --user=\"$username\" $passwordArg --host=\"$host\" --no-tablespaces \"$database\" > \"$filePath\" 2> \"$errorLogPath\"";
 
         $this->info("Executing mysqldump backup to {$filename}...");
         
         $output = [];
         $returnVar = null;
         exec($command, $output, $returnVar);
+
+        // Sanitize: ensure no stray mysqldump warning or error header was written into the SQL file
+        if (file_exists($filePath)) {
+            $content = file_get_contents($filePath);
+            if (str_contains($content, 'mysqldump:')) {
+                // Strip lines or prefixes starting with mysqldump: up to the next newline or SQL statement
+                $content = preg_replace('/^mysqldump:[^\r\n]*?(\r?\n|(?=--|\/\*))/m', '', $content);
+                file_put_contents($filePath, $content);
+            }
+        }
+
+        // Clean up error log if empty or successfully finished
+        if (file_exists($errorLogPath) && $returnVar === 0) {
+            @unlink($errorLogPath);
+        }
 
         if ($returnVar === 0) {
             $this->info("Backup successful: $filename");
@@ -133,7 +150,8 @@ class BackupDatabase extends Command
             $this->cleanOldBackups($path, $keepDays);
             
         } else {
-            $this->error("Backup failed with exit code $returnVar");
+            $errorDetails = file_exists($errorLogPath) ? file_get_contents($errorLogPath) : '';
+            $this->error("Backup failed with exit code $returnVar. Error: $errorDetails");
         }
     }
 

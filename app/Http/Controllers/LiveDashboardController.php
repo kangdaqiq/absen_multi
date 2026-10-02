@@ -53,9 +53,13 @@ class LiveDashboardController extends Controller
         $sudahTap = $attendanceToday->count(); // semua yang sudah absen hari ini (kelas aktif)
         $belumTap = max(0, $totalSiswa - $sudahTap);
 
-        // 2. Real-time Attendance Activity Logs (Disamakan sumbernya dengan boxData)
+        // 2. Real-time Attendance Activity Logs (Hanya siswa yang hadir/tap, bukan Alpha, Sakit, Izin, atau Bolos)
         $attendances = Attendance::with(['student.kelas'])
             ->where('tanggal', $today)
+            ->whereNotIn('status', ['A', 'S', 'I', 'B'])
+            ->where(function($q) {
+                $q->whereNotNull('jam_masuk')->orWhereNotNull('jam_pulang');
+            })
             ->whereHas('student', function($q) use ($schoolId) {
                 $q->where('school_id', $schoolId)
                   ->whereHas('kelas', function($sub) {
@@ -66,9 +70,13 @@ class LiveDashboardController extends Controller
             ->limit(30)
             ->get();
 
-        // Fallback jika hari ini belum ada aktivitas absensi, tampilkan riwayat kehadiran terbaru (sama persis dengan Mode Box)
+        // Fallback jika hari ini belum ada aktivitas absensi, tampilkan riwayat kehadiran terbaru yang hadir
         if ($attendances->isEmpty()) {
             $attendances = Attendance::with(['student.kelas'])
+                ->whereNotIn('status', ['A', 'S', 'I', 'B'])
+                ->where(function($q) {
+                    $q->whereNotNull('jam_masuk')->orWhereNotNull('jam_pulang');
+                })
                 ->whereHas('student', function($q) use ($schoolId) {
                     $q->where('school_id', $schoolId);
                 })
@@ -216,8 +224,13 @@ class LiveDashboardController extends Controller
         $belumTap = max(0, $totalSiswa - $sudahTap);
 
         // 2. Real-time Student Attendance Boxes (Today's Taps, latest first)
+        // Hanya siswa yang hadir/tap (bukan Alpha, Sakit, Izin, atau Bolos)
         $attendances = Attendance::with(['student.kelas'])
             ->where('tanggal', $today)
+            ->whereNotIn('status', ['A', 'S', 'I', 'B'])
+            ->where(function($q) {
+                $q->whereNotNull('jam_masuk')->orWhereNotNull('jam_pulang');
+            })
             ->whereHas('student', function($q) use ($schoolId, $kelasId) {
                 $q->where('school_id', $schoolId);
                 if ($kelasId) {
@@ -225,13 +238,17 @@ class LiveDashboardController extends Controller
                 }
             })
             ->orderByDesc('updated_at')
-            ->limit(30)
+            ->limit(50)
             ->get();
 
         // If today is empty, fallback to most recent records so display has preview data
         $isFallback = false;
         if ($attendances->isEmpty()) {
             $fallbackAttendances = Attendance::with(['student.kelas'])
+                ->whereNotIn('status', ['A', 'S', 'I', 'B'])
+                ->where(function($q) {
+                    $q->whereNotNull('jam_masuk')->orWhereNotNull('jam_pulang');
+                })
                 ->whereHas('student', function($q) use ($schoolId, $kelasId) {
                     $q->where('school_id', $schoolId);
                     if ($kelasId) {
@@ -239,7 +256,7 @@ class LiveDashboardController extends Controller
                     }
                 })
                 ->orderByDesc('updated_at')
-                ->limit(12)
+                ->limit(20)
                 ->get();
 
             if ($fallbackAttendances->isNotEmpty()) {

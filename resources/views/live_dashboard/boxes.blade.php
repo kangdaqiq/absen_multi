@@ -70,6 +70,28 @@
     .dark .custom-scroll-box::-webkit-scrollbar-thumb {
         background: #475569;
     }
+
+    /* Fixed Scroll Container Height & Sticky Header */
+    #subview-table-container {
+        max-height: 520px !important;
+        overflow-y: auto !important;
+        overflow-x: auto !important;
+        display: block !important;
+    }
+    #subview-grid-container {
+        max-height: 520px !important;
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
+    }
+    #subview-table-container thead th {
+        position: sticky !important;
+        top: 0 !important;
+        z-index: 20 !important;
+        background-color: #f9fafb !important;
+    }
+    .dark #subview-table-container thead th {
+        background-color: #1f2937 !important;
+    }
 </style>
 @endpush
 
@@ -342,9 +364,9 @@
                 </div>
 
                 {{-- Subview 1: Table List View (Default & Primary: Tanpa Foto) --}}
-                <div id="subview-table-container" class="max-w-full overflow-x-auto overflow-y-auto max-h-[580px] custom-scroll-box border-b border-gray-100 dark:border-gray-800">
+                <div id="subview-table-container" class="max-w-full custom-scroll-box border-b border-gray-100 dark:border-gray-800" style="max-height: 520px; overflow-y: auto; overflow-x: auto; display: block;">
                     <table class="w-full table-auto">
-                        <thead class="sticky top-0 z-10 bg-gray-50/95 dark:bg-gray-800/95 backdrop-blur-sm shadow-xs border-b border-gray-200 dark:border-gray-700">
+                        <thead class="sticky top-0 z-20 bg-gray-50/95 dark:bg-gray-800/95 backdrop-blur-sm shadow-xs border-b border-gray-200 dark:border-gray-700">
                             <tr class="text-left text-gray-800 dark:text-white/90 font-medium text-xs uppercase tracking-wider">
                                 <th class="px-3.5 py-3.5 xl:pl-5 text-center w-10">#</th>
                                 <th class="px-3.5 py-3.5 min-w-[80px]">Waktu</th>
@@ -369,7 +391,7 @@
                 </div>
 
                 {{-- Subview 2: Box Grid View (Alternative toggle) --}}
-                <div id="subview-grid-container" class="hidden p-5 max-h-[580px] overflow-y-auto custom-scroll-box">
+                <div id="subview-grid-container" class="hidden p-5 custom-scroll-box" style="max-height: 520px; overflow-y: auto;">
                     <div id="boxes-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                         {{-- Injected via JS when grid mode active --}}
                     </div>
@@ -608,9 +630,18 @@
             document.getElementById('stat-izin-sakit').textContent = (data.stats.izin ?? 0) + (data.stats.sakit ?? 0);
             document.getElementById('stat-belum').textContent = data.stats.belum ?? 0;
 
+            // Filter hanya siswa yang hadir/tap (jangan masukkan Alpha, Sakit, Izin, Bolos)
+            const allBoxes = data.boxes || [];
+            cachedBoxes = allBoxes.filter(box => {
+                const statusType = (box.status_type || '').toLowerCase();
+                const statusRaw = (box.status_raw || '').toUpperCase();
+                return !['alpha', 'sakit', 'izin', 'bolos'].includes(statusType) 
+                    && !['A', 'S', 'I', 'B'].includes(statusRaw);
+            });
+
             const boxesCountPill = document.getElementById('boxes-count-pill');
             if (boxesCountPill) {
-                boxesCountPill.textContent = (data.boxes?.length || 0) + ' Siswa';
+                boxesCountPill.textContent = cachedBoxes.length + ' Siswa';
             }
 
             // 2. Check for New Student Tap
@@ -628,8 +659,7 @@
                 updateSpotlightCard(data.latest);
             }
 
-            // Cache data and render display
-            cachedBoxes = data.boxes || [];
+            // Render display dengan list yang sudah disaring
             renderDisplay(cachedBoxes);
 
             const syncText = document.getElementById('last-sync-time');
@@ -835,7 +865,7 @@
             if (box.status_type === 'terlambat') {
                 badgeHtml = `<span class="inline-flex rounded-full bg-warning-50 px-2.5 py-1 text-xs font-semibold text-warning-600 dark:bg-warning-500/15 dark:text-warning-500 border border-warning-200 dark:border-warning-500/20">Terlambat</span>`;
             } else if (box.status_type === 'pulang') {
-                badgeHtml = `<span class="inline-flex rounded-full bg-info-50 px-2.5 py-1 text-xs font-semibold text-info-600 dark:bg-info-500/15 dark:text-info-500 border border-info-200 dark:border-info-500/20">Sudah Pulang</span>`;
+                badgeHtml = `<span class="inline-flex rounded-full bg-info-50 px-2.5 py-1 text-xs font-semibold text-info-600 dark:bg-info-500/15 dark:text-info-500 border border-info-200 dark:border-info-500/20">Pulang</span>`;
             } else if (box.status_type === 'izin') {
                 badgeHtml = `<span class="inline-flex rounded-full bg-info-50 px-2.5 py-1 text-xs font-semibold text-info-600 dark:bg-info-500/15 dark:text-info-500 border border-info-200 dark:border-info-500/20">Izin</span>`;
             } else if (box.status_type === 'sakit') {
@@ -843,7 +873,7 @@
             } else if (box.status_type === 'alpha') {
                 badgeHtml = `<span class="inline-flex rounded-full bg-error-50 px-2.5 py-1 text-xs font-semibold text-error-600 dark:bg-error-500/15 dark:text-error-500 border border-error-200 dark:border-error-500/20">Alpha</span>`;
             } else {
-                badgeHtml = `<span class="inline-flex rounded-full bg-success-50 px-2.5 py-1 text-xs font-semibold text-success-600 dark:bg-success-500/15 dark:text-success-500 border border-success-200 dark:border-success-500/20">Hadir Tepat Waktu</span>`;
+                badgeHtml = `<span class="inline-flex rounded-full bg-success-50 px-2.5 py-1 text-xs font-semibold text-success-600 dark:bg-success-500/15 dark:text-success-500 border border-success-200 dark:border-success-500/20">Hadir</span>`;
             }
 
             html += `

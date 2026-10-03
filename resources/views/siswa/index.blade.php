@@ -460,7 +460,7 @@
                     <input type="text" id="edit_telegram_ortu_chat_id" disabled placeholder="Belum terhubung ke Bot" class="w-full rounded-lg border border-gray-200 bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 cursor-not-allowed px-4 py-2 outline-none dark:border-gray-700">
                 </div>
                 <div class="sm:col-span-2">
-                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">UID RFID (readonly)</label>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">UID RFID</label>
                     <input type="text" name="uid_rfid" id="edit_uid_rfid" readonly class="w-full rounded-lg border border-gray-200 bg-gray-100 px-4 py-2 outline-none dark:border-gray-800 dark:bg-gray-800 dark:text-gray-400">
                 </div>
                 <div class="sm:col-span-2">

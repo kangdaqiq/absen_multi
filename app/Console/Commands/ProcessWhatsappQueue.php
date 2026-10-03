@@ -9,6 +9,8 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Process;
+use Illuminate\Process\Pool;
+use App\Models\School;
 
 class ProcessWhatsappQueue extends Command
 {
@@ -47,9 +49,9 @@ class ProcessWhatsappQueue extends Command
      */
     private function handleMasterDispatcher(int $limit): int
     {
-        // 1. Self-healing: Reset stuck 'processing' messages (older than 10 minutes) back to 'pending'
+        // 1. Self-healing: Reset stuck 'processing' messages (older than 3 minutes) back to 'pending'
         MessageQueue::where('status', 'processing')
-            ->where('updated_at', '<', now()->subMinutes(10))
+            ->where('updated_at', '<', now()->subMinutes(3))
             ->update(['status' => 'pending', 'updated_at' => now()]);
 
         // 2. Expire: tandai semua pesan pending dari hari sebelumnya sebagai failed
@@ -77,7 +79,9 @@ class ProcessWhatsappQueue extends Command
                 });
             });
 
-        $targets = $targetQuery->distinct()->pluck('message_queues.school_id')->toArray();
+        $targets = array_values(array_unique(
+            $targetQuery->pluck('message_queues.school_id')->toArray()
+        ));
 
         if (empty($targets)) {
             $this->line("Tidak ada antrean WhatsApp pending.");
@@ -88,28 +92,46 @@ class ProcessWhatsappQueue extends Command
 
         $isSync = (bool) $this->option('sync');
 
-        foreach ($targets as $targetId) {
-            $targetArg = $targetId === null ? 'none' : (string) $targetId;
-            $schoolLabel = $targetId === null ? 'Global / SuperAdmin' : "Sekolah ID: {$targetId}";
-
-            if ($isSync) {
-                $this->info("Memproses {$schoolLabel} secara sinkron...");
+        // Jika mode sinkron atau hanya ada 1 target sekolah, proses langsung tanpa overhead sub-process
+        if ($isSync || count($targets) === 1) {
+            foreach ($targets as $targetId) {
+                $schoolLabel = $targetId === null ? 'Global / SuperAdmin' : "Sekolah ID: {$targetId}";
+                $this->info("Memproses {$schoolLabel} secara langsung...");
                 $this->handleSchoolWorker($targetId, $limit);
-            } else {
-                // Jalankan worker paralel di latar belakang menggunakan PHP Process
-                $this->info("Mendispatch worker paralel untuk {$schoolLabel}...");
-                try {
-                    Process::path(base_path())->start([
+            }
+            return 0;
+        }
+
+        // Multi-sekolah: Jalankan paralel menggunakan Process Pool agar tidak dibunuh premature oleh destructor PHP
+        $this->info("Menjalankan worker paralel untuk " . count($targets) . " target sekolah/global...");
+
+        $pool = Process::pool(function (Pool $pool) use ($targets, $limit) {
+            foreach ($targets as $targetId) {
+                $targetArg = $targetId === null ? 'none' : (string) $targetId;
+                $pool->path(base_path())
+                    ->timeout(300)
+                    ->command([
                         PHP_BINARY,
                         base_path('artisan'),
                         'wa:process',
                         "--school={$targetArg}",
                         "--limit={$limit}"
                     ]);
-                } catch (\Throwable $e) {
-                    Log::error("Gagal mendispatch background worker WA untuk {$schoolLabel}: " . $e->getMessage());
-                    // Fallback sinkron jika background process gagal di-spawn
-                    $this->handleSchoolWorker($targetId, $limit);
+            }
+        });
+
+        $responses = $pool->wait();
+
+        foreach ($responses as $response) {
+            $output = trim($response->output());
+            if ($output) {
+                $this->line($output);
+            }
+            if ($response->failed()) {
+                $error = trim($response->errorOutput());
+                if ($error) {
+                    $this->error($error);
+                    Log::error("Parallel WA worker error: " . $error);
                 }
             }
         }
@@ -133,30 +155,31 @@ class ProcessWhatsappQueue extends Command
         }
 
         try {
+            // Guard: Pastikan fitur WA sekolah aktif (untuk mode hosted)
+            if ($schoolId !== null && config('app.mode', 'hosted') !== 'self_hosted') {
+                $school = School::find($schoolId);
+                if (!$school || !$school->wa_enabled) {
+                    $this->warn("Sekolah ID {$schoolId} dinonaktifkan fitur WhatsApp-nya. Dilewati.");
+                    return 0;
+                }
+            }
+
             $messages = [];
 
             DB::transaction(function () use ($schoolId, $limit, &$messages) {
                 $candidates = MessageQueue::query()
-                    ->select('message_queues.*')
-                    ->leftJoin('schools', 'message_queues.school_id', '=', 'schools.id')
-                    ->where('message_queues.status', 'pending')
+                    ->where('status', 'pending')
                     ->where(function ($q) {
-                        $q->whereNull('message_queues.scheduled_at')
-                          ->orWhere('message_queues.scheduled_at', '<=', now());
+                        $q->whereNull('scheduled_at')
+                          ->orWhere('scheduled_at', '<=', now());
                     })
                     ->when($schoolId === null, function ($q) {
-                        $q->whereNull('message_queues.school_id');
+                        $q->whereNull('school_id');
                     }, function ($q) use ($schoolId) {
-                        $q->where('message_queues.school_id', $schoolId);
+                        $q->where('school_id', $schoolId);
                     })
-                    ->when(config('app.mode', 'hosted') !== 'self_hosted', function ($query) {
-                        $query->where(function ($q) {
-                            $q->whereNull('message_queues.school_id')
-                              ->orWhere('schools.wa_enabled', true);
-                        });
-                    })
-                    ->orderBy('message_queues.priority', 'desc')
-                    ->orderBy('message_queues.created_at', 'asc')
+                    ->orderBy('priority', 'desc')
+                    ->orderBy('created_at', 'asc')
                     ->limit($limit)
                     ->lockForUpdate()
                     ->get();
@@ -241,10 +264,10 @@ class ProcessWhatsappQueue extends Command
      */
     private function sendMessage($phone, $message, $schoolId = null)
     {
-        $baseUrl  = rtrim(env('GOWA_API_BASE_URL', 'http://localhost:3000'), '/');
+        $baseUrl  = rtrim(env('WA_API_BASE_URL', env('GOWA_API_BASE_URL', 'http://localhost:3000')), '/');
         $url      = $baseUrl . '/send/message';
-        $user     = env('GOWA_API_USER', 'admin');
-        $pass     = env('GOWA_API_PASS', 'jagattech');
+        $user     = env('WA_API_USER', env('GOWA_API_USER', 'admin'));
+        $pass     = env('WA_API_PASS', env('GOWA_API_PASS', 'jagattech'));
         $deviceId = $schoolId ? (string)$schoolId : 'superadmin';
 
         try {

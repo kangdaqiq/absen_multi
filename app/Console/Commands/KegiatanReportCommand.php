@@ -149,12 +149,15 @@ class KegiatanReportCommand extends Command
                 statsByKelas: $statsByKelas
             );
 
+            $expiryDays = max(1, (int) Setting::getVal('last_seen_expiry_days', 3, $schoolId));
+            $expiryHours = $expiryDays * 24;
+
             // A. JIKA EKSTRAKURIKULER: HANYA KIRIM KE GURU PEMBINA YANG DITUNJUK
             if ($kegiatan->kategori === 'ekskul') {
                 if ($kegiatan->pembina_id) {
                     $pembina = Guru::where('school_id', $schoolId)->find($kegiatan->pembina_id);
                     if ($pembina) {
-                        if (!empty($pembina->no_wa) && $pembina->isWithinLastSeen(168)) {
+                        if (!empty($pembina->no_wa) && $pembina->isWithinLastSeen($expiryHours)) {
                             $noWaPembina = preg_replace('/^0/', '62', $pembina->no_wa);
                             $mq = new MessageQueue([
                                 'school_id'    => $schoolId,
@@ -200,7 +203,7 @@ class KegiatanReportCommand extends Command
                     ->get();
 
                 foreach ($guruGlobal as $guru) {
-                    if ($guru->isWithinLastSeen(168)) {
+                    if ($guru->isWithinLastSeen($expiryHours)) {
                         $noWa = preg_replace('/^0/', '62', $guru->no_wa);
                         $mq = new MessageQueue([
                             'school_id'    => $schoolId,
@@ -279,7 +282,7 @@ class KegiatanReportCommand extends Command
                             listAbsen: $listAbsenClass
                         );
 
-                        if (!empty($wali->no_wa) && $wali->isWithinLastSeen(168)) {
+                        if (!empty($wali->no_wa) && $wali->isWithinLastSeen($expiryHours)) {
                             $mq = new MessageQueue([
                                 'school_id'    => $schoolId,
                                 'phone_number' => $wali->no_wa,

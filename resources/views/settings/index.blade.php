@@ -449,7 +449,9 @@
                 @endif
 
                 <!-- Tab Lokasi & Geofencing (Mobile) -->
-                <div x-show="activeTab === 'geofence'" x-transition:enter="transition ease-out duration-200"
+                <div x-show="activeTab === 'geofence'"
+                    x-effect="if (activeTab === 'geofence') { setTimeout(() => { if (window.initGeofenceMap) window.initGeofenceMap(); }, 100); }"
+                    x-transition:enter="transition ease-out duration-200"
                     x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" class="space-y-6">
 
                     <div class="border-b border-gray-200 dark:border-gray-800 pb-4">
@@ -463,15 +465,17 @@
                                 </p>
                             </div>
                             <div class="flex items-center">
-                                <label class="relative inline-flex cursor-pointer items-center">
-                                    <input type="checkbox" name="geofence_enabled" value="true" class="sr-only"
-                                        {{ ($settings['geofence_enabled'] ?? 'false') === 'true' ? 'checked' : '' }}>
-                                    <div class="toggle-bg h-6 w-11 rounded-full bg-gray-200 transition-colors dark:bg-gray-700"></div>
-                                    <div class="toggle-dot absolute left-1 top-1 h-4 w-4 rounded-full bg-white transition-transform"></div>
+                                <label class="flex items-center cursor-pointer select-none">
+                                    <div class="relative">
+                                        <input type="checkbox" id="geofence_enabled" name="geofence_enabled" value="true" class="sr-only"
+                                            {{ ($settings['geofence_enabled'] ?? 'false') === 'true' ? 'checked' : '' }}>
+                                        <div class="block h-6 w-10 rounded-full bg-gray-300 dark:bg-gray-600 toggle-bg transition"></div>
+                                        <div class="dot absolute left-1 top-1 h-4 w-4 rounded-full bg-white transition toggle-dot"></div>
+                                    </div>
+                                    <span class="ml-3 font-medium text-gray-800 dark:text-white/90 text-sm">
+                                        Aktifkan Geofence
+                                    </span>
                                 </label>
-                                <span class="ml-3 text-sm font-medium text-gray-700 dark:text-gray-300">
-                                    Aktifkan Geofence
-                                </span>
                             </div>
                         </div>
                     </div>
@@ -484,11 +488,13 @@
                                     Latitude Titik Sekolah <span class="text-danger">*</span>
                                 </label>
                                 <div class="relative">
+                                    <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-gray-400 dark:text-gray-500">
+                                        <i class="fas fa-map-marker-alt text-brand-500 text-sm"></i>
+                                    </div>
                                     <input type="text" id="school_latitude" name="school_latitude"
                                         value="{{ $settings['school_latitude'] ?? '-6.175392' }}"
                                         placeholder="-6.175392"
                                         class="w-full rounded-lg border border-gray-200 bg-transparent pl-10 pr-4 py-2.5 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white text-sm font-mono">
-                                    <i class="fas fa-map-pin absolute left-3.5 top-3.5 text-gray-400 text-xs"></i>
                                 </div>
                             </div>
 
@@ -497,11 +503,13 @@
                                     Longitude Titik Sekolah <span class="text-danger">*</span>
                                 </label>
                                 <div class="relative">
+                                    <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-gray-400 dark:text-gray-500">
+                                        <i class="fas fa-compass text-brand-500 text-sm"></i>
+                                    </div>
                                     <input type="text" id="school_longitude" name="school_longitude"
                                         value="{{ $settings['school_longitude'] ?? '106.827153' }}"
                                         placeholder="106.827153"
                                         class="w-full rounded-lg border border-gray-200 bg-transparent pl-10 pr-4 py-2.5 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white text-sm font-mono">
-                                    <i class="fas fa-map-pin absolute left-3.5 top-3.5 text-gray-400 text-xs"></i>
                                 </div>
                             </div>
 
@@ -514,10 +522,20 @@
                                         {{ $settings['geofence_radius'] ?? '100' }} m
                                     </span>
                                 </div>
-                                <div class="flex items-center gap-3">
+                                <div class="relative">
+                                    <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-gray-400 dark:text-gray-500">
+                                        <i class="fas fa-bullseye text-brand-500 text-sm"></i>
+                                    </div>
                                     <input type="number" id="geofence_radius" name="geofence_radius" min="10" max="5000" step="5"
                                         value="{{ $settings['geofence_radius'] ?? '100' }}"
-                                        class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2.5 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white text-sm">
+                                        class="w-full rounded-lg border border-gray-200 bg-transparent pl-10 pr-4 py-2.5 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white text-sm">
+                                </div>
+                                <div class="flex items-center gap-1.5 mt-2">
+                                    <span class="text-xs text-gray-400 mr-1">Preset Cepat:</span>
+                                    <button type="button" onclick="setRadius(50)" class="px-2 py-0.5 rounded border border-gray-200 text-xs text-gray-600 hover:border-brand-500 hover:text-brand-500 dark:border-gray-700 dark:text-gray-300 transition">50m</button>
+                                    <button type="button" onclick="setRadius(100)" class="px-2 py-0.5 rounded border border-gray-200 text-xs text-gray-600 hover:border-brand-500 hover:text-brand-500 dark:border-gray-700 dark:text-gray-300 transition">100m</button>
+                                    <button type="button" onclick="setRadius(200)" class="px-2 py-0.5 rounded border border-gray-200 text-xs text-gray-600 hover:border-brand-500 hover:text-brand-500 dark:border-gray-700 dark:text-gray-300 transition">200m</button>
+                                    <button type="button" onclick="setRadius(500)" class="px-2 py-0.5 rounded border border-gray-200 text-xs text-gray-600 hover:border-brand-500 hover:text-brand-500 dark:border-gray-700 dark:text-gray-300 transition">500m</button>
                                 </div>
                                 <p class="mt-1.5 text-xs text-gray-500">
                                     Jarak maksimal (dalam meter) dari titik pusat sekolah yang diperbolehkan untuk melakukan absensi mobile.
@@ -525,14 +543,15 @@
                             </div>
 
                             <!-- Action buttons -->
-                            <div class="pt-2 flex flex-col sm:flex-row gap-2">
+                            <div class="pt-1 flex flex-col sm:flex-row gap-2">
                                 <button type="button" id="btn-get-current-loc"
-                                    class="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-xs font-semibold text-white hover:bg-emerald-700 transition shadow-sm">
-                                    <i class="fas fa-crosshairs"></i> Ambil Lokasi Saya Saat Ini
+                                    style="background-color: #059669; color: #ffffff;"
+                                    class="flex-1 inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-xs font-semibold hover:opacity-95 transition shadow-sm">
+                                    <i class="fas fa-crosshairs text-sm"></i> Ambil Lokasi Saya Saat Ini
                                 </button>
                                 <a id="btn-open-gmaps" href="https://maps.google.com/?q={{ $settings['school_latitude'] ?? '-6.175392' }},{{ $settings['school_longitude'] ?? '106.827153' }}" target="_blank"
-                                    class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 transition">
-                                    <i class="fas fa-external-link-alt"></i> Buka Google Maps
+                                    class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-3.5 py-2.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 transition shadow-sm">
+                                    <i class="fas fa-external-link-alt text-brand-500"></i> Buka Google Maps
                                 </a>
                             </div>
 
@@ -547,11 +566,18 @@
                         </div>
 
                         <!-- Right: Interactive Leaflet Map -->
-                        <div class="lg:col-span-7">
-                            <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                                Visualisasi Area Radius Sekolah
-                            </label>
-                            <div id="geofence-map" class="w-full h-[380px] rounded-xl border border-gray-200 dark:border-gray-800 shadow-inner z-0"></div>
+                        <div class="lg:col-span-7 flex flex-col">
+                            <div class="flex items-center justify-between mb-2">
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    Visualisasi Area Radius Sekolah
+                                </label>
+                                <span class="text-xs text-gray-500 dark:text-gray-400">
+                                    <i class="fas fa-hand-pointer text-brand-500 mr-1"></i> Klik atau geser pin merah untuk atur titik
+                                </span>
+                            </div>
+                            <div class="relative w-full rounded-xl overflow-hidden border border-gray-200 dark:border-gray-800 shadow-inner bg-gray-100 dark:bg-gray-900" style="height: 420px; min-height: 420px;">
+                                <div id="geofence-map" style="height: 100%; width: 100%; min-height: 420px; z-index: 1;"></div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -565,9 +591,10 @@
             </div>
         </div>
     </form>
+@endsection
 
-
-
+@push('styles')
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         /* Custom Toggle Switch Styles */
         input:checked~.toggle-bg {
@@ -578,9 +605,30 @@
         input:checked~.toggle-dot {
             transform: translateX(100%);
         }
+
+        #geofence-map {
+            height: 420px !important;
+            min-height: 420px !important;
+            width: 100% !important;
+        }
+
+        .leaflet-container {
+            height: 100% !important;
+            width: 100% !important;
+            font-family: inherit;
+        }
+
+        @keyframes geofence-pulse {
+            0% { transform: scale(0.9); opacity: 0.7; }
+            50% { transform: scale(1.3); opacity: 0.2; }
+            100% { transform: scale(0.9); opacity: 0.7; }
+        }
+
+        .geofence-pulse-ring {
+            animation: geofence-pulse 2s infinite ease-in-out;
+        }
     </style>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-@endsection
+@endpush
 
 @push('scripts')
     <script src="{{ asset('vendor/jquery/jquery.min.js') }}"></script>
@@ -615,36 +663,64 @@
         let marker = null;
         let circle = null;
 
+        window.setRadius = function(r) {
+            const input = document.getElementById('geofence_radius');
+            if (input) {
+                input.value = r;
+                input.dispatchEvent(new Event('input'));
+            }
+        };
+
         window.initGeofenceMap = function() {
             const mapContainer = document.getElementById('geofence-map');
             if (!mapContainer) return;
+
+            if (typeof L === 'undefined') {
+                setTimeout(window.initGeofenceMap, 200);
+                return;
+            }
 
             let lat = parseFloat(document.getElementById('school_latitude')?.value) || -6.175392;
             let lng = parseFloat(document.getElementById('school_longitude')?.value) || 106.827153;
             let radius = parseFloat(document.getElementById('geofence_radius')?.value) || 100;
 
             if (!map) {
-                map = L.map('geofence-map').setView([lat, lng], 16);
+                map = L.map('geofence-map', {
+                    center: [lat, lng],
+                    zoom: 16,
+                    scrollWheelZoom: true
+                });
+
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    attribution: '© OpenStreetMap contributors',
+                    attribution: '&copy; OpenStreetMap contributors',
                     maxZoom: 19
                 }).addTo(map);
 
-                // Custom Red Pin Icon
-                const redIcon = L.icon({
-                    iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
-                    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-                    iconSize: [25, 41],
-                    iconAnchor: [12, 41],
-                    popupAnchor: [1, -34],
-                    shadowSize: [41, 41]
+                // Modern SVG Pin (Self-contained, no external png dependency)
+                const pinHtml = `
+                    <div style="position: relative; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center;">
+                        <div class="geofence-pulse-ring" style="position: absolute; width: 34px; height: 34px; background: rgba(239, 68, 68, 0.4); border-radius: 50%;"></div>
+                        <div style="position: absolute; top: 0; left: 7px; width: 20px; height: 20px; background: #DC2626; border: 2.5px solid #FFFFFF; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); box-shadow: 0 3px 6px rgba(0,0,0,0.35);">
+                            <div style="position: absolute; top: 3.5px; left: 3.5px; width: 7px; height: 7px; background: #FFFFFF; border-radius: 50%;"></div>
+                        </div>
+                    </div>
+                `;
+                const customPinIcon = L.divIcon({
+                    html: pinHtml,
+                    className: '',
+                    iconSize: [34, 34],
+                    iconAnchor: [17, 34],
+                    popupAnchor: [0, -34]
                 });
 
-                marker = L.marker([lat, lng], { draggable: true, icon: redIcon }).addTo(map);
+                marker = L.marker([lat, lng], { draggable: true, icon: customPinIcon }).addTo(map);
+                marker.bindPopup("<b>Titik Pusat Sekolah</b><br><span style='font-size:11px;color:#666;'>Geser pin untuk ubah lokasi</span>");
+
                 circle = L.circle([lat, lng], {
                     color: '#3C50E0',
                     fillColor: '#3C50E0',
-                    fillOpacity: 0.25,
+                    fillOpacity: 0.2,
+                    weight: 2,
                     radius: radius
                 }).addTo(map);
 
@@ -664,13 +740,19 @@
                     document.getElementById('school_longitude').value = pos.lng.toFixed(6);
                     updateGmapsLink(pos.lat, pos.lng);
                 });
-            } else {
-                map.invalidateSize();
-                map.setView([lat, lng], 16);
-                marker.setLatLng([lat, lng]);
-                circle.setLatLng([lat, lng]);
-                circle.setRadius(radius);
             }
+
+            setTimeout(() => {
+                if (map) {
+                    map.invalidateSize();
+                    map.setView([lat, lng], 16);
+                    if (marker) marker.setLatLng([lat, lng]);
+                    if (circle) {
+                        circle.setLatLng([lat, lng]);
+                        circle.setRadius(radius);
+                    }
+                }
+            }, 100);
         };
 
         function updateGmapsLink(lat, lng) {
@@ -684,7 +766,7 @@
         document.getElementById('school_latitude')?.addEventListener('input', function() {
             let lat = parseFloat(this.value);
             let lng = parseFloat(document.getElementById('school_longitude')?.value);
-            if (!isNaN(lat) && !isNaN(lng) && marker && circle) {
+            if (!isNaN(lat) && !isNaN(lng) && marker && circle && map) {
                 marker.setLatLng([lat, lng]);
                 circle.setLatLng([lat, lng]);
                 map.panTo([lat, lng]);
@@ -695,7 +777,7 @@
         document.getElementById('school_longitude')?.addEventListener('input', function() {
             let lat = parseFloat(document.getElementById('school_latitude')?.value);
             let lng = parseFloat(this.value);
-            if (!isNaN(lat) && !isNaN(lng) && marker && circle) {
+            if (!isNaN(lat) && !isNaN(lng) && marker && circle && map) {
                 marker.setLatLng([lat, lng]);
                 circle.setLatLng([lat, lng]);
                 map.panTo([lat, lng]);
@@ -726,7 +808,7 @@
             navigator.geolocation.getCurrentPosition(
                 function(pos) {
                     btn.disabled = false;
-                    btn.innerHTML = '<i class="fas fa-crosshairs"></i> Ambil Lokasi Saya Saat Ini';
+                    btn.innerHTML = '<i class="fas fa-crosshairs text-sm"></i> Ambil Lokasi Saya Saat Ini';
 
                     const lat = pos.coords.latitude.toFixed(6);
                     const lng = pos.coords.longitude.toFixed(6);
@@ -741,7 +823,7 @@
                 },
                 function(err) {
                     btn.disabled = false;
-                    btn.innerHTML = '<i class="fas fa-crosshairs"></i> Ambil Lokasi Saya Saat Ini';
+                    btn.innerHTML = '<i class="fas fa-crosshairs text-sm"></i> Ambil Lokasi Saya Saat Ini';
                     alert('Gagal mendapatkan lokasi GPS: ' + err.message + '. Pastikan izin akses lokasi aktif pada browser.');
                 },
                 { enableHighAccuracy: true, timeout: 10000 }

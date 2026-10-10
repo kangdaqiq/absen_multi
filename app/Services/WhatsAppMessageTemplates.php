@@ -1210,7 +1210,7 @@ class WhatsAppMessageTemplates
         $msg .= "---------------------------\n";
 
         if (!empty($listAbsen)) {
-            $msg .= "*Detail Siswa Non-Hadir:*\n";
+            $msg .= "*Detail Siswa Tidak Hadir:*\n";
             foreach ($listAbsen as $item) {
                 $msg .= "- {$item}\n";
             }

@@ -31,28 +31,39 @@ class SendLastSeenReminderCommand extends Command
      */
     public function handle()
     {
-        $expiryDays = (int) (Setting::where('setting_key', 'last_seen_expiry_days')->value('setting_value') ?: 3);
-        $expiryHours = $expiryDays * 24;
-        $warningThresholdHours = max(1, $expiryHours - 12); // 60 jam (rentang 60 - 72 jam)
+        $schoolExpiryDaysCache = [];
+        $getSchoolExpiryHours = function (?int $schoolId) use (&$schoolExpiryDaysCache) {
+            $key = $schoolId ?? 0;
+            if (!isset($schoolExpiryDaysCache[$key])) {
+                $days = max(1, (int) Setting::getVal('last_seen_expiry_days', 3, $schoolId));
+                $schoolExpiryDaysCache[$key] = $days * 24;
+            }
+            return $schoolExpiryDaysCache[$key];
+        };
 
-        $this->info("Starting Last Seen Reminder check (Global expiry: {$expiryHours} hours [{$expiryDays} days], Threshold: {$warningThresholdHours} hours)...");
+        $this->info("Starting Last Seen Reminder check with per-school expiry configuration...");
 
-        $expiryTime = now()->subHours($expiryHours);
-        $thresholdTime = now()->subHours($warningThresholdHours);
         $processedPhones = [];
         $countGuru = 0;
         $countSiswa = 0;
         $countOrtu = 0;
 
-        // 1. GURU (Hanya yang SUDAH ADA last_seen dan masanya di rentang 60 jam s/d 72 jam)
+        // 1. GURU (Hanya yang SUDAH ADA last_seen dan masanya di rentang mendekati kadaluarsa)
         $gurus = Guru::whereNotNull('no_wa')
             ->where('no_wa', '!=', '')
             ->whereNotNull('last_seen')
-            ->where('last_seen', '<=', $thresholdTime)
-            ->where('last_seen', '>=', $expiryTime)
             ->get();
 
         foreach ($gurus as $guru) {
+            $expiryHours = $getSchoolExpiryHours($guru->school_id);
+            $warningThresholdHours = max(1, $expiryHours - 12);
+            $expiryTime = now()->subHours($expiryHours);
+            $thresholdTime = now()->subHours($warningThresholdHours);
+
+            if ($guru->last_seen > $thresholdTime || $guru->last_seen < $expiryTime) {
+                continue;
+            }
+
             $phone = $this->cleanPhone($guru->no_wa);
             if (!$phone || in_array($phone, $processedPhones) || $this->isReminderAlreadySent($phone)) {
                 continue;
@@ -74,15 +85,22 @@ class SendLastSeenReminderCommand extends Command
             $countGuru++;
         }
 
-        // 2. SISWA (Hanya yang SUDAH ADA last_seen_siswa dan masanya di rentang 60 jam s/d 72 jam)
+        // 2. SISWA (Hanya yang SUDAH ADA last_seen_siswa dan masanya di rentang mendekati kadaluarsa)
         $siswas = Siswa::whereNotNull('no_wa')
             ->where('no_wa', '!=', '')
             ->whereNotNull('last_seen_siswa')
-            ->where('last_seen_siswa', '<=', $thresholdTime)
-            ->where('last_seen_siswa', '>=', $expiryTime)
             ->get();
 
         foreach ($siswas as $siswa) {
+            $expiryHours = $getSchoolExpiryHours($siswa->school_id);
+            $warningThresholdHours = max(1, $expiryHours - 12);
+            $expiryTime = now()->subHours($expiryHours);
+            $thresholdTime = now()->subHours($warningThresholdHours);
+
+            if ($siswa->last_seen_siswa > $thresholdTime || $siswa->last_seen_siswa < $expiryTime) {
+                continue;
+            }
+
             $phone = $this->cleanPhone($siswa->no_wa);
             if (!$phone || in_array($phone, $processedPhones) || $this->isReminderAlreadySent($phone)) {
                 continue;
@@ -103,15 +121,22 @@ class SendLastSeenReminderCommand extends Command
             $countSiswa++;
         }
 
-        // 3. ORTU (Hanya yang SUDAH ADA last_seen_ortu dan masanya di rentang 60 jam s/d 72 jam)
+        // 3. ORTU (Hanya yang SUDAH ADA last_seen_ortu dan masanya di rentang mendekati kadaluarsa)
         $ortus = Siswa::whereNotNull('wa_ortu')
             ->where('wa_ortu', '!=', '')
             ->whereNotNull('last_seen_ortu')
-            ->where('last_seen_ortu', '<=', $thresholdTime)
-            ->where('last_seen_ortu', '>=', $expiryTime)
             ->get();
 
         foreach ($ortus as $siswa) {
+            $expiryHours = $getSchoolExpiryHours($siswa->school_id);
+            $warningThresholdHours = max(1, $expiryHours - 12);
+            $expiryTime = now()->subHours($expiryHours);
+            $thresholdTime = now()->subHours($warningThresholdHours);
+
+            if ($siswa->last_seen_ortu > $thresholdTime || $siswa->last_seen_ortu < $expiryTime) {
+                continue;
+            }
+
             $phone = $this->cleanPhone($siswa->wa_ortu);
             if (!$phone || in_array($phone, $processedPhones) || $this->isReminderAlreadySent($phone)) {
                 continue;

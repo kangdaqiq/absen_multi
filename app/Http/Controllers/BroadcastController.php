@@ -56,9 +56,7 @@ class BroadcastController extends Controller
 
         // Default Last Seen threshold (from school/system setting or fallback 3 days / 72 hours)
         $userSchoolId = $user ? $user->school_id : null;
-        $lastSeenDays = (int) (Setting::where('school_id', $userSchoolId)->where('setting_key', 'last_seen_expiry_days')->value('setting_value') 
-            ?: Setting::where('school_id', 0)->where('setting_key', 'last_seen_expiry_days')->value('setting_value') 
-            ?: 3);
+        $lastSeenDays = max(1, (int) Setting::getVal('last_seen_expiry_days', 3, $userSchoolId));
         $lastSeenHours = $lastSeenDays * 24;
 
         // Query students with eager loaded relationships

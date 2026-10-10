@@ -339,12 +339,15 @@ class AutoBolosCommand extends Command
                 ]);
             }
 
+            $expiryDays = max(1, (int) Setting::getVal('last_seen_expiry_days', 3, $schoolId));
+            $expiryHours = $expiryDays * 24;
+
             // Kirim ke nomor WA / Telegram pribadi masing-masing Wali Kelas
             foreach ($walis as $wali) {
                 // 2. Kirim ke Nomor WA Pribadi Wali Kelas (jika ada)
                 if (!empty($wali->no_wa)) {
-                    if (!$wali->isWithinLastSeen(168)) {
-                        $this->warn("Skipping AutoBolos report WA to Guru: {$wali->nama} (last_seen is null or older than 7 days / 168 hours)");
+                    if (!$wali->isWithinLastSeen($expiryHours)) {
+                        $this->warn("Skipping AutoBolos report WA to Guru: {$wali->nama} (last_seen is null or older than {$expiryHours} hours)");
                     } else {
                         $noWa = $wali->no_wa;
                         if (!str_contains($noWa, '@')) {
@@ -452,8 +455,8 @@ class AutoBolosCommand extends Command
 
             // Guru dengan akses report global
             foreach ($guruGlobal as $guru) {
-                if (!$guru->isWithinLastSeen(168)) {
-                    $this->warn("Skipping AutoBolos global report WA to Guru: {$guru->nama} (last_seen is null or older than 7 days / 168 hours)");
+                if (!$guru->isWithinLastSeen($expiryHours)) {
+                    $this->warn("Skipping AutoBolos global report WA to Guru: {$guru->nama} (last_seen is null or older than {$expiryHours} hours)");
                     continue;
                 }
 
@@ -522,7 +525,8 @@ class AutoBolosCommand extends Command
             }
 
             foreach ($guruTeacherRecipients as $guru) {
-                if (!$guru->isWithinLastSeen(168)) {
+                if (!$guru->isWithinLastSeen($expiryHours)) {
+                    $this->warn("Skipping AutoBolos teacher report WA to Guru: {$guru->nama} (last_seen is null or older than {$expiryHours} hours)");
                     continue;
                 }
 

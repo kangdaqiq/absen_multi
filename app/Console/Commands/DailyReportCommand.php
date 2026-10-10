@@ -415,9 +415,12 @@ class DailyReportCommand extends Command
                 $this->info("Queued global report to legacy admin ($targetJid)");
             }
 
+            $expiryDays = max(1, (int) Setting::getVal('last_seen_expiry_days', 3, $schoolId));
+            $expiryHours = $expiryDays * 24;
+
             foreach ($guruGlobal as $guru) {
-                if (!$guru->isWithinLastSeen(168)) {
-                    $this->warn("Skipping global report WA to Guru: {$guru->nama} (last_seen is null or older than 7 days / 168 hours)");
+                if (!$guru->isWithinLastSeen($expiryHours)) {
+                    $this->warn("Skipping global report WA to Guru: {$guru->nama} (last_seen is null or older than {$expiryHours} hours)");
                     continue;
                 }
 
@@ -491,7 +494,8 @@ class DailyReportCommand extends Command
             }
 
             foreach ($guruTeacherRecipients as $guru) {
-                if (!$guru->isWithinLastSeen(168)) {
+                if (!$guru->isWithinLastSeen($expiryHours)) {
+                    $this->warn("Skipping teacher report WA to Guru: {$guru->nama} (last_seen is null or older than {$expiryHours} hours)");
                     continue;
                 }
 
@@ -620,8 +624,8 @@ class DailyReportCommand extends Command
                     listKegiatan: $listKegiatanClass
                 );
 
-                if (!$wali->isWithinLastSeen(168)) {
-                    $this->warn("Skipping Wali Kelas report WA to Guru: {$wali->nama} (last_seen is null or older than 7 days / 168 hours)");
+                if (!$wali->isWithinLastSeen($expiryHours)) {
+                    $this->warn("Skipping Wali Kelas report WA to Guru: {$wali->nama} (last_seen is null or older than {$expiryHours} hours)");
                 } else {
                     $mq = new MessageQueue([
                         'school_id' => $schoolId,
@@ -698,9 +702,12 @@ class DailyReportCommand extends Command
         $teleSiswaEnabled = \App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'notification_tele_siswa')->value('setting_value') !== 'false';
         $teleOrtuEnabled = \App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'notification_tele_ortu')->value('setting_value') !== 'false';
 
+        $expiryDays = max(1, (int) Setting::getVal('last_seen_expiry_days', 3, $schoolId));
+        $expiryHours = $expiryDays * 24;
+
         if ($studentPhone && $waSiswaEnabled) {
-            if (!$student->isSiswaWithinLastSeen(72)) {
-                $this->warn("Skipping WA alpha notification for student: {$studentName} (last_seen_siswa is null or older than 72 hours)");
+            if (!$student->isSiswaWithinLastSeen($expiryHours)) {
+                $this->warn("Skipping WA alpha notification for student: {$studentName} (last_seen_siswa is null or older than {$expiryHours} hours)");
             } else {
                 $msgStudent = "❌ *Pemberitahuan Ketidakhadiran*\n\n" .
                     "Halo, *{$studentName}*,\n\n" .
@@ -721,8 +728,8 @@ class DailyReportCommand extends Command
         }
 
         if ($parentPhone && $waOrtuEnabled) {
-            if (!$student->isOrtuWithinLastSeen(72)) {
-                $this->warn("Skipping WA alpha notification for parent of student: {$studentName} (last_seen_ortu is null or older than 72 hours)");
+            if (!$student->isOrtuWithinLastSeen($expiryHours)) {
+                $this->warn("Skipping WA alpha notification for parent of student: {$studentName} (last_seen_ortu is null or older than {$expiryHours} hours)");
             } else {
                 $msgParent = "❌ *Pemberitahuan Ketidakhadiran Anak*\n\n" .
                     "Halo, Orang Tua/Wali dari *{$studentName}*,\n\n" .

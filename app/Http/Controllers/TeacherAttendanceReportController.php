@@ -60,10 +60,35 @@ class TeacherAttendanceReportController extends Controller
             $att = $attendances->get($guru->id);
             $shift = $att?->shift ?: $guru->getShiftForDate($dateStr);
 
+            $status = 'Belum Absen';
+            if ($att) {
+                $st = strtoupper(trim($att->status ?? ''));
+                if ($st === 'H' || $st === 'HADIR') {
+                    if (($att->menit_terlambat ?? 0) > 0 || strtolower($att->status_kehadiran ?? '') === 'terlambat') {
+                        $status = 'Terlambat';
+                    } else {
+                        $status = 'Hadir';
+                    }
+                } elseif ($st === 'T' || $st === 'TERLAMBAT') {
+                    $status = 'Terlambat';
+                } elseif ($st === 'I' || $st === 'IZIN') {
+                    $status = 'Izin';
+                } elseif ($st === 'S' || $st === 'SAKIT') {
+                    $status = 'Sakit';
+                } elseif ($st === 'A' || $st === 'ALPHA' || $st === 'ALPA') {
+                    $status = 'Alpha';
+                } elseif ($st === 'B' || $st === 'BELUM ABSEN' || $st === '') {
+                    $status = 'Belum Absen';
+                } else {
+                    $status = ucfirst(strtolower($att->status));
+                }
+            }
+
             return [
                 'guru' => $guru,
                 'shift' => $shift,
-                'status' => $att ? $att->status : 'Belum Absen',
+                'status' => $status,
+                'raw_status' => $att ? $att->status : null,
                 'status_kehadiran' => $att ? $att->status_kehadiran : null,
                 'menit_terlambat' => $att ? $att->menit_terlambat : 0,
                 'jam_masuk' => $att ? $att->jam_masuk : '-',
@@ -82,10 +107,25 @@ class TeacherAttendanceReportController extends Controller
         // 8. Filter by Shift
         $filterShift = $request->input('shift_id', '');
         if ($filterShift !== '') {
-            $report = $report->filter(fn($item) => $item['shift']?->id == $filterShift)->values();
+            if ($filterShift === 'none' || $filterShift === 'no_shift') {
+                $report = $report->filter(fn($item) => empty($item['shift']))->values();
+            } else {
+                $report = $report->filter(fn($item) => $item['shift']?->id == $filterShift)->values();
+            }
         }
 
-        return view('teacher-attendance.index', compact('report', 'shifts', 'dateStr', 'dayName', 'filterStatus', 'filterShift'));
+        // 9. Filter by Search (Nama / NIP)
+        $search = $request->input('search', '');
+        if ($search !== '') {
+            $searchLower = strtolower($search);
+            $report = $report->filter(function ($item) use ($searchLower) {
+                $nama = strtolower($item['guru']->nama ?? '');
+                $nip = strtolower($item['guru']->nip ?? '');
+                return str_contains($nama, $searchLower) || str_contains($nip, $searchLower);
+            })->values();
+        }
+
+        return view('teacher-attendance.index', compact('report', 'shifts', 'dateStr', 'dayName', 'filterStatus', 'filterShift', 'search'));
     }
 
     public function store(Request $request)

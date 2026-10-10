@@ -21,29 +21,33 @@ class SuperAdminSeeder extends Seeder
         DB::beginTransaction();
 
         try {
-            // Create default school
-            $defaultSchool = School::create([
-                'name' => 'Sekolah Default',
-                'code' => 'DEFAULT',
-                'address' => 'Alamat Sekolah Default',
-                'phone' => '0812345678',
-                'email' => 'default@school.com',
-                'is_active' => true,
-            ]);
+            // Create default school if not exists
+            $defaultSchool = School::firstOrCreate(
+                ['code' => 'DEFAULT'],
+                [
+                    'name' => 'Sekolah Default',
+                    'address' => 'Alamat Sekolah Default',
+                    'phone' => '0812345678',
+                    'email' => 'default@school.com',
+                    'is_active' => true,
+                ]
+            );
 
-            echo "✓ Sekolah default berhasil dibuat (ID: {$defaultSchool->id})\n";
+            echo "✓ Sekolah default siap (ID: {$defaultSchool->id})\n";
 
-            // Create Super Admin
-            $superAdmin = User::create([
-                'full_name' => 'Super Administrator',
-                'username' => 'superadmin',
-                'email' => 'superadmin@absen.com',
-                'password_hash' => Hash::make('superadmin123'),
-                'role' => 'super_admin',
-                'school_id' => null, // Super admin tidak terikat ke sekolah
-            ]);
+            // Create Super Admin if not exists
+            $superAdmin = User::firstOrCreate(
+                ['username' => 'superadmin'],
+                [
+                    'full_name' => 'Super Administrator',
+                    'email' => 'superadmin@absen.com',
+                    'password_hash' => Hash::make('superadmin123'),
+                    'role' => 'super_admin',
+                    'school_id' => null, // Super admin tidak terikat ke sekolah
+                ]
+            );
 
-            echo "✓ Super Admin berhasil dibuat\n";
+            echo "✓ Super Admin berhasil disiapkan\n";
             echo "  Username: superadmin\n";
             echo "  Password: superadmin123\n\n";
 

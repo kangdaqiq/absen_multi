@@ -56,6 +56,7 @@
                 <select name="shift_id" id="filter_shift"
                     class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
                     <option value="">Semua Shift</option>
+                    <option value="none" {{ ($filterShift ?? '') === 'none' ? 'selected' : '' }}>Tanpa Shift / Belum Ditugaskan</option>
                     @foreach($shifts as $s)
                         <option value="{{ $s->id }}" {{ ($filterShift ?? '') == $s->id ? 'selected' : '' }}>
                             {{ $s->nama_shift }} ({{ $s->formatted_jam_masuk }}-{{ $s->formatted_jam_pulang }})
@@ -77,21 +78,28 @@
                     <option value="Alpha"       {{ ($filterStatus ?? '') == 'Alpha'       ? 'selected' : '' }}>Alpha / Tidak Hadir</option>
                 </select>
             </div>
-            {{-- Cari nama (client-side) --}}
+            {{-- Cari nama / NIP --}}
             <div class="w-full sm:w-auto relative min-w-[220px]">
-                <label for="clientSearch" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Cari Nama</label>
-                <input type="text" id="clientSearch" placeholder="Ketik nama {{ strtolower($labelKaryawan) }}..."
-                    class="w-full rounded-lg border border-gray-200 bg-transparent py-2 pl-4 pr-10 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                <label for="search" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Cari Nama / {{ $labelNIP }}</label>
+                <input type="text" name="search" id="search" value="{{ $search ?? '' }}" placeholder="Ketik nama {{ strtolower($labelKaryawan) }}..."
+                    class="client-search w-full rounded-lg border border-gray-200 bg-transparent py-2 pl-4 pr-10 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
                 <div class="absolute right-3 bottom-2.5 text-gray-400">
                     <i class="fas fa-search"></i>
                 </div>
             </div>
-            {{-- Tombol Tampilkan --}}
-            <div class="w-full sm:w-auto">
+            {{-- Tombol Tampilkan & Reset --}}
+            <div class="w-full sm:w-auto flex items-center gap-2">
                 <button type="submit"
-                    class="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-lg bg-brand-500 px-6 py-2 text-center font-medium text-white hover:bg-brand-600 transition">
+                    class="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-lg bg-brand-500 px-6 py-2 text-center font-medium text-white hover:bg-brand-600 transition shadow-sm">
                     <i class="fas fa-filter"></i> Tampilkan
                 </button>
+                @if(($filterShift ?? '') !== '' || ($filterStatus ?? '') !== '' || ($search ?? '') !== '' || ($dateStr ?? '') !== now()->format('Y-m-d'))
+                    <a href="{{ route('absensi-guru.index') }}"
+                        class="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-center font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 transition shadow-sm"
+                        title="Reset Filter ke Hari Ini">
+                        <i class="fas fa-undo"></i> Reset
+                    </a>
+                @endif
             </div>
         </form>
     </div>
@@ -104,7 +112,7 @@
             Tabel Absensi: {{ \Carbon\Carbon::parse($dateStr)->isoFormat('D MMMM Y') }}
             <span class="ml-2 inline-flex rounded-full bg-info/10 px-3 py-1 text-xs font-medium text-info">{{ $dayName }}</span>
         </h6>
-        <span class="text-xs text-gray-400">{{ count($report) }} {{ $labelKaryawan }}</span>
+        <span id="guruCount" class="text-xs text-gray-400">{{ count($report) }} {{ $labelKaryawan }}</span>
     </div>
 
     <div class="max-w-full overflow-x-auto">
@@ -133,7 +141,7 @@
                             <p class="font-medium text-gray-800 dark:text-white/90 guru-nama">{{ $item['guru']->nama }}</p>
                         </td>
                         <td class="px-4 py-4">
-                            <p class="text-gray-500 dark:text-gray-400 text-sm font-mono">{{ $item['guru']->nip ?: '-' }}</p>
+                            <p class="text-gray-500 dark:text-gray-400 text-sm font-mono guru-nip">{{ $item['guru']->nip ?: '-' }}</p>
                         </td>
                         <td class="px-4 py-4 text-center whitespace-nowrap">
                             @if($item['shift'])
@@ -337,50 +345,90 @@
 @endsection
 
 @push('scripts')
-<script src="{{ asset('vendor/jquery/jquery.min.js') }}"></script>
 <script>
-$(document).ready(function() {
-    // Client-side search
-    $('#clientSearch').on('keyup', function() {
-        var value = $(this).val().toLowerCase();
-        $('.guru-row').filter(function() {
-            var name = $(this).find('.guru-nama').text().toLowerCase();
-            $(this).toggle(name.indexOf(value) > -1);
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('search');
+    const guruRows = document.querySelectorAll('.guru-row');
+    const guruCountEl = document.getElementById('guruCount');
+    const labelKaryawan = @json($labelKaryawan);
+
+    function filterTable() {
+        if (!searchInput) return;
+        const val = searchInput.value.toLowerCase().trim();
+        let visibleCount = 0;
+
+        guruRows.forEach(function(row) {
+            const nama = (row.querySelector('.guru-nama')?.textContent || '').toLowerCase();
+            const nip = (row.querySelector('.guru-nip')?.textContent || '').toLowerCase();
+            if (!val || nama.includes(val) || nip.includes(val)) {
+                row.style.display = '';
+                visibleCount++;
+            } else {
+                row.style.display = 'none';
+            }
         });
-    });
 
-    // Populate Edit Modal
-    $('.btnEditGuru').on('click', function() {
-        var guruId = $(this).data('guru-id');
-        var nama = $(this).data('nama');
-        var shiftId = $(this).data('shift-id');
-        var status = $(this).data('status');
-        var jamMasuk = $(this).data('jam-masuk');
-        var jamPulang = $(this).data('jam-pulang');
-        var keterangan = $(this).data('keterangan');
+        if (guruCountEl) {
+            guruCountEl.textContent = visibleCount + ' ' + labelKaryawan;
+        }
+    }
 
-        $('#edit_guru_id').val(guruId);
-        $('#edit_guru_nama').text(nama);
-        $('#edit_shift_id').val(shiftId || '');
-        
-        if (status === 'Belum Absen') {
-            $('#edit_status').val('Hadir');
-        } else {
-            $('#edit_status').val(status);
+    if (searchInput) {
+        searchInput.addEventListener('input', filterTable);
+        // If there's already a search value on page load
+        if (searchInput.value.trim() !== '') {
+            filterTable();
+        }
+    }
+
+    // Populate Edit & Delete Modals using event delegation (no jQuery dependency)
+    document.addEventListener('click', function(e) {
+        const btnEdit = e.target.closest('.btnEditGuru');
+        if (btnEdit) {
+            const guruId = btnEdit.dataset.guruId;
+            const nama = btnEdit.dataset.nama;
+            const shiftId = btnEdit.dataset.shiftId;
+            const status = btnEdit.dataset.status;
+            const jamMasuk = btnEdit.dataset.jamMasuk;
+            const jamPulang = btnEdit.dataset.jamPulang;
+            const keterangan = btnEdit.dataset.keterangan;
+
+            const editGuruId = document.getElementById('edit_guru_id');
+            const editGuruNama = document.getElementById('edit_guru_nama');
+            const editShiftId = document.getElementById('edit_shift_id');
+            const editStatus = document.getElementById('edit_status');
+            const editJamMasuk = document.getElementById('edit_jam_masuk');
+            const editJamPulang = document.getElementById('edit_jam_pulang');
+            const editKeterangan = document.getElementById('edit_keterangan');
+
+            if (editGuruId) editGuruId.value = guruId || '';
+            if (editGuruNama) editGuruNama.textContent = nama || '';
+            if (editShiftId) editShiftId.value = shiftId || '';
+            
+            if (editStatus) {
+                if (status === 'Belum Absen' || !status) {
+                    editStatus.value = 'Hadir';
+                } else {
+                    editStatus.value = status;
+                }
+            }
+
+            if (editJamMasuk) editJamMasuk.value = jamMasuk || '';
+            if (editJamPulang) editJamPulang.value = jamPulang || '';
+            if (editKeterangan) editKeterangan.value = keterangan || '';
         }
 
-        $('#edit_jam_masuk').val(jamMasuk);
-        $('#edit_jam_pulang').val(jamPulang);
-        $('#edit_keterangan').val(keterangan);
-    });
+        const btnHapus = e.target.closest('.btnHapusGuru');
+        if (btnHapus) {
+            const guruId = btnHapus.dataset.guruId;
+            const nama = btnHapus.dataset.nama;
 
-    // Populate Delete Modal
-    $('.btnHapusGuru').on('click', function() {
-        var guruId = $(this).data('guru-id');
-        var nama = $(this).data('nama');
+            const hapusGuruId = document.getElementById('hapus_guru_id');
+            const hapusGuruNama = document.getElementById('hapus_guru_nama');
 
-        $('#hapus_guru_id').val(guruId);
-        $('#hapus_guru_nama').text(nama);
+            if (hapusGuruId) hapusGuruId.value = guruId || '';
+            if (hapusGuruNama) hapusGuruNama.textContent = nama || '';
+        }
     });
 });
 </script>

@@ -261,10 +261,10 @@
 
                         <div>
                             <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Masa Kadaluarsa Last Seen WA (Hari)</label>
-                            <input type="number" name="last_seen_expiry_days" min="1" max="30"
+                            <input type="number" name="last_seen_expiry_days" min="1" max="365"
                                 value="{{ $settings['last_seen_expiry_days'] ?? '3' }}"
                                 class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
-                            <p class="mt-1 text-xs text-gray-500">Batas masa aktif status last_seen WhatsApp secara global (Default: 3 hari = 72 jam)</p>
+                            <p class="mt-1 text-xs text-gray-500">Batas masa aktif status last_seen WhatsApp secara global (Default: 3 hari = 72 jam, Maks: 365 hari)</p>
                         </div>
                     </div>
 

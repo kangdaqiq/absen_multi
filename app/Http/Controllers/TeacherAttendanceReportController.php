@@ -99,13 +99,13 @@ class TeacherAttendanceReportController extends Controller
         });
 
         // 7. Filter by Status
-        $filterStatus = $request->input('status', '');
+        $filterStatus = $request->filled('status') ? $request->input('status') : '';
         if ($filterStatus !== '') {
             $report = $report->filter(fn($item) => $item['status'] === $filterStatus)->values();
         }
 
         // 8. Filter by Shift
-        $filterShift = $request->input('shift_id', '');
+        $filterShift = $request->filled('shift_id') ? $request->input('shift_id') : '';
         if ($filterShift !== '') {
             if ($filterShift === 'none' || $filterShift === 'no_shift') {
                 $report = $report->filter(fn($item) => empty($item['shift']))->values();
@@ -115,7 +115,7 @@ class TeacherAttendanceReportController extends Controller
         }
 
         // 9. Filter by Search (Nama / NIP)
-        $search = $request->input('search', '');
+        $search = $request->filled('search') ? trim($request->input('search')) : '';
         if ($search !== '') {
             $searchLower = strtolower($search);
             $report = $report->filter(function ($item) use ($searchLower) {

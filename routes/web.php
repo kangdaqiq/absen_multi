@@ -305,6 +305,8 @@ Route::middleware('auth')->group(function () {
 
         // WhatsApp Logs
         Route::get('/whatsapp-logs', [App\Http\Controllers\WhatsappLogController::class, 'index'])->name('whatsapp-logs.index');
+        Route::get('/whatsapp-logs/delivery-detail', [App\Http\Controllers\WhatsappLogController::class, 'deliveryDetail'])->name('whatsapp-logs.delivery-detail');
+        Route::post('/whatsapp-logs/send-reminder-single', [App\Http\Controllers\WhatsappLogController::class, 'sendSingleReminder'])->name('whatsapp-logs.send-reminder-single');
         Route::post('/whatsapp-logs/clear-pending', [App\Http\Controllers\WhatsappLogController::class, 'clearPending'])->name('whatsapp-logs.clear-pending');
         Route::post('/whatsapp-logs/clear-all', [App\Http\Controllers\WhatsappLogController::class, 'clearAll'])->name('whatsapp-logs.clear-all');
 

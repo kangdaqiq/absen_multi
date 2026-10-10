@@ -8,6 +8,9 @@
         Log Pengiriman WhatsApp
     </h2>
     <div class="flex flex-wrap items-center gap-2">
+        <a href="{{ route('whatsapp-logs.delivery-detail') }}" class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 transition shadow-sm">
+            <i class="fas fa-chart-pie"></i> Detail Delivery & Last Seen
+        </a>
         <form method="POST" action="{{ route('whatsapp-logs.clear-pending') }}" onsubmit="return confirm('Yakin ingin menghapus semua pesan antrean PENDING?')">
             @csrf
             <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-warning-500 px-4 py-2 text-sm font-medium text-white hover:bg-warning-600 transition shadow-sm" style="background-color: #d97706; color: #ffffff;">
@@ -68,6 +71,13 @@
                 <span>Sukses: {{ $deliveryStats['wa']['sent'] }}</span>
                 <span>Absen: {{ $deliveryStats['absen_count'] }}</span>
             </div>
+        </div>
+
+        <div class="mt-3 pt-3 border-t border-gray-100 dark:border-gray-800">
+            <a href="{{ route('whatsapp-logs.delivery-detail') }}" class="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300 transition">
+                <span>Detail Antrean & Last Seen</span>
+                <i class="fas fa-arrow-right text-[10px]"></i>
+            </a>
         </div>
     </div>
 

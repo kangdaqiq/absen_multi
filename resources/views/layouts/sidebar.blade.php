@@ -9,7 +9,7 @@
 
 <aside id="sidebar"
     x-show="!$store.sidebar.isFullScreen"
-    class="fixed flex flex-col mt-0 top-0 px-5 left-0 bg-white dark:bg-gray-900 dark:border-gray-800 text-gray-900 h-screen transition-all duration-300 ease-in-out z-99999 border-r border-gray-200"
+    class="fixed flex flex-col mt-0 top-0 px-5 left-0 bg-white dark:bg-gray-900 dark:border-gray-800 text-gray-900 h-screen h-[100dvh] max-h-screen max-h-[100dvh] transition-all duration-300 ease-in-out z-99999 border-r border-gray-200"
     :style="$store.sidebar.isFullScreen ? 'display: none !important;' : ''"
     x-data="{
         openSubmenus: {},
@@ -62,7 +62,7 @@
     @mouseenter="if (!$store.sidebar.isExpanded && !$store.sidebar.isFullScreen) $store.sidebar.setHovered(true)"
     @mouseleave="$store.sidebar.setHovered(false)">
     <!-- Logo Section -->
-    <div class="pt-8 pb-7 flex"
+    <div class="pt-8 pb-7 flex shrink-0"
         :style="$store.sidebar.isMobileOpen ? 'padding-top: 4rem' : ''"
         :class="(!$store.sidebar.isExpanded && !$store.sidebar.isHovered && !$store.sidebar.isMobileOpen) ?
         'xl:justify-center' :
@@ -94,8 +94,8 @@
     </div>
 
     <!-- Navigation Menu -->
-    <div class="flex flex-col overflow-y-auto duration-300 ease-linear no-scrollbar">
-        <nav class="mb-6">
+    <div class="flex-1 min-h-0 flex flex-col overflow-y-auto duration-300 ease-linear no-scrollbar" style="overscroll-behavior: contain; -webkit-overflow-scrolling: touch;">
+        <nav class="mb-6 pb-28 xl:pb-8">
             <div class="flex flex-col gap-4">
                 @foreach ($menuGroups as $groupIndex => $menuGroup)
                     <div>

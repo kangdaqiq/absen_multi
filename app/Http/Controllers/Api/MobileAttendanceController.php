@@ -14,6 +14,7 @@ use App\Models\Siswa;
 use App\Models\ApiLog;
 use App\Models\Setting;
 use App\Models\Jadwal;
+use App\Services\FcmNotificationService;
 use Carbon\Carbon;
 
 class MobileAttendanceController extends Controller
@@ -323,6 +324,8 @@ class MobileAttendanceController extends Controller
             $isWaliKelas = true;
         }
 
+        $isMobileAttendanceEnabled = $this->isGeofenceEnabled($schoolId);
+
         // Case 1: Siswa (Student)
         if ($user && ($user->student || in_array($user->role, ['student', 'siswa']))) {
             $student = $user->student ?? Siswa::with('kelas')->where('user_id', $user->id)->orWhere('nis', str_replace('siswa_', '', $user->username))->first();
@@ -365,6 +368,8 @@ class MobileAttendanceController extends Controller
                         'wali_kelas' => false,
                         'kelas_name' => $student->kelas ? ($student->kelas->nama_kelas ?? $student->kelas->nama) : null,
                         'kelas_id' => $student->kelas_id,
+                        'is_mobile_attendance_enabled' => $isMobileAttendanceEnabled,
+                        'geofence_enabled' => $isMobileAttendanceEnabled,
                     ]
                 ]);
             }
@@ -397,6 +402,8 @@ class MobileAttendanceController extends Controller
                     'wali_kelas' => $isWaliKelas,
                     'kelas_name' => $kelasWali ? ($kelasWali->nama_kelas ?? $kelasWali->nama) : null,
                     'kelas_id' => $kelasWali?->id,
+                    'is_mobile_attendance_enabled' => $isMobileAttendanceEnabled,
+                    'geofence_enabled' => $isMobileAttendanceEnabled,
                 ]
             ]);
         }
@@ -418,6 +425,8 @@ class MobileAttendanceController extends Controller
                 'wali_kelas' => $isWaliKelas,
                 'kelas_name' => null,
                 'kelas_id' => null,
+                'is_mobile_attendance_enabled' => $isMobileAttendanceEnabled,
+                'geofence_enabled' => $isMobileAttendanceEnabled,
             ]
         ]);
     }
@@ -444,10 +453,9 @@ class MobileAttendanceController extends Controller
     }
 
     /**
-     * Validate geofence radius if enabled
-     * @return array [bool $isValid, string|null $errorMessage, float|null $distanceMeters, float|null $maxRadius]
+     * Check if geofence is enabled for school
      */
-    private function validateGeofence($schoolId, $userLat, $userLng): array
+    private function isGeofenceEnabled($schoolId): bool
     {
         $schoolId = $schoolId ?? 0;
         $enabled = Setting::where('school_id', $schoolId)->where('setting_key', 'geofence_enabled')->value('setting_value') ?? 'false';
@@ -457,19 +465,44 @@ class MobileAttendanceController extends Controller
             $enabled = Setting::where('school_id', 0)->where('setting_key', 'geofence_enabled')->value('setting_value') ?? 'false';
         }
 
-        if ($enabled !== 'true' && $enabled !== '1') {
-            return [true, null, null, null];
+        return in_array(strtolower((string)$enabled), ['true', '1', 'yes'], true);
+    }
+
+    /**
+     * Validate geofence radius.
+     * Aturan: Jika geolocation sekolah dinonaktifkan, maka absensi via mobile DITOLAK / NONAKTIF.
+     * @return array [bool $isValid, string|null $errorMessage, float|null $distanceMeters, float|null $maxRadius]
+     */
+    private function validateGeofence($schoolId, $userLat, $userLng): array
+    {
+        $schoolId = $schoolId ?? 0;
+        $isGeoEnabled = $this->isGeofenceEnabled($schoolId);
+
+        // 1. Jika Geolocation dinonaktifkan: tolak absen via mobile
+        if (!$isGeoEnabled) {
+            return [
+                false,
+                'Absensi via mobile saat ini dinonaktifkan oleh sekolah (Geolocation tidak aktif). Silakan hubungi pihak sekolah atau gunakan mesin absensi (RFID/Fingerprint).',
+                null,
+                null
+            ];
         }
 
+        // 2. Jika Geolocation aktif, periksa kelengkapan koordinat sekolah
         $schoolLat = Setting::where('school_id', $schoolId)->where('setting_key', 'school_latitude')->value('setting_value');
         $schoolLng = Setting::where('school_id', $schoolId)->where('setting_key', 'school_longitude')->value('setting_value');
         $radius = (float) (Setting::where('school_id', $schoolId)->where('setting_key', 'geofence_radius')->value('setting_value') ?? 100);
 
         if (!$schoolLat || !$schoolLng) {
-            // Coordinate not configured yet, don't block
-            return [true, null, null, null];
+            return [
+                false,
+                'Titik lokasi sekolah belum dikonfigurasi oleh admin. Absensi via mobile tidak dapat diproses.',
+                null,
+                null
+            ];
         }
 
+        // 3. Validasi radius jarak pengguna ke sekolah
         $distance = $this->calculateDistanceInMeters($userLat, $userLng, $schoolLat, $schoolLng);
         $distanceRound = round($distance, 1);
 
@@ -486,7 +519,7 @@ class MobileAttendanceController extends Controller
         $user = $request->user();
         $schoolId = $user?->school_id ?? 0;
 
-        $enabled = Setting::where('school_id', $schoolId)->where('setting_key', 'geofence_enabled')->value('setting_value') ?? 'false';
+        $isGeoEnabled = $this->isGeofenceEnabled($schoolId);
         $schoolLat = Setting::where('school_id', $schoolId)->where('setting_key', 'school_latitude')->value('setting_value');
         $schoolLng = Setting::where('school_id', $schoolId)->where('setting_key', 'school_longitude')->value('setting_value');
         $radius = (float) (Setting::where('school_id', $schoolId)->where('setting_key', 'geofence_radius')->value('setting_value') ?? 100);
@@ -494,10 +527,14 @@ class MobileAttendanceController extends Controller
         return response()->json([
             'success' => true,
             'data' => [
-                'geofence_enabled' => ($enabled === 'true' || $enabled === '1'),
+                'geofence_enabled' => $isGeoEnabled,
+                'is_mobile_attendance_enabled' => $isGeoEnabled,
                 'latitude' => $schoolLat ? (float) $schoolLat : null,
                 'longitude' => $schoolLng ? (float) $schoolLng : null,
                 'radius_meters' => $radius,
+                'message' => $isGeoEnabled 
+                    ? 'Geolocation aktif. Absensi via mobile diizinkan dalam radius sekolah.' 
+                    : 'Geolocation dinonaktifkan oleh sekolah. Absensi via mobile ditolak/nonaktif.',
             ]
         ]);
     }
@@ -626,6 +663,17 @@ class MobileAttendanceController extends Controller
                 ]
             );
 
+            // Send FCM Push Notification (Pop-up banner)
+            try {
+                FcmNotificationService::sendToGuru($teacher, "Presensi Masuk Tercatat", "Halo {$teacher->nama}, absensi masuk Anda berhasil dicatat pukul {$now->format('H:i')} (Status: {$status}).", [
+                    'type' => 'checkin_guru',
+                    'status' => $status,
+                    'jam' => $now->format('H:i'),
+                ]);
+            } catch (\Throwable $e) {
+                // Ignore FCM failure
+            }
+
             ApiLog::create([
                 'school_id' => $schoolId,
                 'api_key' => 'MOBILE_APP',
@@ -739,6 +787,18 @@ class MobileAttendanceController extends Controller
                         'created_at' => $now
                     ]
                 );
+
+                // Send FCM Push Notification (Pop-up banner)
+                try {
+                    $readableStatus = $status === 'T' ? 'Terlambat' : 'Hadir';
+                    FcmNotificationService::sendToSiswa($student, "Presensi Masuk Tercatat", "Halo {$student->nama}, absensi masuk Anda berhasil dicatat pukul {$now->format('H:i')} (Status: {$readableStatus}).", [
+                        'type' => 'checkin_siswa',
+                        'status' => $readableStatus,
+                        'jam' => $now->format('H:i'),
+                    ]);
+                } catch (\Throwable $e) {
+                    // Ignore FCM failure
+                }
 
                 ApiLog::create([
                     'school_id' => $schoolId,
@@ -860,6 +920,16 @@ class MobileAttendanceController extends Controller
                 'updated_at' => $now
             ]);
 
+            // Send FCM Push Notification (Pop-up banner)
+            try {
+                FcmNotificationService::sendToGuru($teacher, "Presensi Pulang Tercatat", "Halo {$teacher->nama}, absensi pulang Anda berhasil dicatat pukul {$now->format('H:i')}.", [
+                    'type' => 'checkout_guru',
+                    'jam' => $now->format('H:i'),
+                ]);
+            } catch (\Throwable $e) {
+                // Ignore FCM failure
+            }
+
             ApiLog::create([
                 'school_id' => $schoolId,
                 'api_key' => 'MOBILE_APP',
@@ -940,6 +1010,16 @@ class MobileAttendanceController extends Controller
                     'keterangan' => $newKeterangan,
                     'updated_at' => $now
                 ]);
+
+                // Send FCM Push Notification (Pop-up banner)
+                try {
+                    FcmNotificationService::sendToSiswa($student, "Presensi Pulang Tercatat", "Halo {$student->nama}, absensi pulang Anda berhasil dicatat pukul {$now->format('H:i')}.", [
+                        'type' => 'checkout_siswa',
+                        'jam' => $now->format('H:i'),
+                    ]);
+                } catch (\Throwable $e) {
+                    // Ignore FCM failure
+                }
 
                 ApiLog::create([
                     'school_id' => $schoolId,

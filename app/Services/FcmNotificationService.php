@@ -80,9 +80,18 @@ class FcmNotificationService
         $url = "https://fcm.googleapis.com/v1/projects/{$projectId}/messages:send";
         $successCount = 0;
 
-        // Convert all data values to strings (FCM HTTP v1 requirement)
+        // Convert all data values to strings (FCM requirement)
+        // Masukkan title, body, dan message ke dalam 'data' agar aplikasi Android memicu Pop-Up Heads-Up
         $stringData = [];
-        foreach (array_merge(['click_action' => 'FLUTTER_NOTIFICATION_CLICK', 'type' => 'attendance_alert'], $data) as $k => $v) {
+        $mergedData = array_merge([
+            'title'        => (string) $title,
+            'body'         => (string) $message,
+            'message'      => (string) $message,
+            'click_action' => 'FLUTTER_NOTIFICATION_CLICK',
+            'type'         => 'attendance_alert'
+        ], $data);
+
+        foreach ($mergedData as $k => $v) {
             $stringData[(string) $k] = (string) $v;
         }
 
@@ -97,20 +106,15 @@ class FcmNotificationService
             Cache::put($dedupKey, true, now()->addSeconds(5));
 
             try {
+                // DATA-ONLY Payload (tanpa root key 'notification')
+                // Menjamin HP Samsung (OneUI), Xiaomi, Oppo, Vivo selalu memicu onMessageReceived/background handler
+                // dan menampilkan pop-up banner heads-up melayang di atas layar
                 $payload = [
                     'message' => [
                         'token' => $token,
-                        'notification' => [
-                            'title' => $title,
-                            'body' => $message,
-                        ],
-                        'data' => $stringData,
+                        'data'  => $stringData,
                         'android' => [
                             'priority' => 'high',
-                            'notification' => [
-                                'sound' => 'default',
-                                'channel_id' => 'high_importance_channel',
-                            ]
                         ]
                     ]
                 ];
@@ -127,7 +131,7 @@ class FcmNotificationService
 
                 if ($response->successful()) {
                     $successCount++;
-                    Log::info("FCM HTTP v1 sent successfully to token: " . substr($token, 0, 15) . "...");
+                    Log::info("FCM HTTP v1 (data-only) sent successfully to token: " . substr($token, 0, 15) . "...");
                 } else {
                     self::$lastError = "Google FCM HTTP " . $response->status() . ": " . $response->body();
                     Log::warning("FCM HTTP v1 error: " . self::$lastError);
@@ -142,22 +146,22 @@ class FcmNotificationService
     }
 
     /**
-     * Send push notification via Legacy FCM API
+     * Send push notification via Legacy FCM API (DATA-ONLY Payload)
      */
     private static function sendViaLegacy(array $tokens, string $title, string $message, array $data, string $serverKey): bool
     {
         try {
+            $mergedData = array_merge([
+                'title'        => (string) $title,
+                'body'         => (string) $message,
+                'message'      => (string) $message,
+                'click_action' => 'FLUTTER_NOTIFICATION_CLICK',
+                'type'         => 'attendance_alert',
+            ], array_map('strval', $data));
+
             $payload = [
-                'notification' => [
-                    'title' => $title,
-                    'body' => $message,
-                    'sound' => 'default',
-                ],
-                'data' => array_merge([
-                    'click_action' => 'FLUTTER_NOTIFICATION_CLICK',
-                    'type' => 'attendance_alert',
-                ], $data),
-                'priority' => 'high'
+                'priority' => 'high',
+                'data'     => $mergedData,
             ];
 
             if (count($tokens) === 1) {
@@ -172,7 +176,7 @@ class FcmNotificationService
             ])->timeout(10)->post('https://fcm.googleapis.com/fcm/send', $payload);
 
             if ($response->successful()) {
-                Log::info("FCM Legacy sent successfully to " . count($tokens) . " device(s): " . $title);
+                Log::info("FCM Legacy (data-only) sent successfully to " . count($tokens) . " device(s): " . $title);
                 return true;
             } else {
                 Log::warning("FCM Legacy failed: HTTP " . $response->status() . " - " . $response->body());

@@ -51,14 +51,14 @@ class TestFcmCommand extends Command
         $this->info("=== FCM Diagnostic & Test ===");
 
         // 1. Check Configuration
-        $cred = env('FIREBASE_CREDENTIALS');
-        $serverKey = env('FCM_SERVER_KEY');
-        $projectId = env('FIREBASE_PROJECT_ID');
-        $clientEmail = env('FIREBASE_CLIENT_EMAIL');
+        $cred = config('services.firebase.credentials') ?: env('FIREBASE_CREDENTIALS');
+        $serverKey = config('services.firebase.server_key') ?: env('FCM_SERVER_KEY');
+        $projectId = config('services.firebase.project_id') ?: env('FIREBASE_PROJECT_ID');
+        $clientEmail = config('services.firebase.client_email') ?: env('FIREBASE_CLIENT_EMAIL');
 
-        $this->line("1. Configuration in .env:");
+        $this->line("1. Configuration in .env / config:");
         if ($projectId && $clientEmail) {
-            $this->info("   - Direct .env Keys:     ACTIVE (Project: {$projectId}, Email: {$clientEmail})");
+            $this->info("   - Firebase HTTP v1:     ACTIVE (Project: {$projectId}, Email: {$clientEmail})");
         } else {
             $this->line("   - FIREBASE_CREDENTIALS: " . ($cred ?: '(empty)'));
             $this->line("   - FCM_SERVER_KEY:       " . ($serverKey ? substr($serverKey, 0, 15) . '...' : '(empty)'));

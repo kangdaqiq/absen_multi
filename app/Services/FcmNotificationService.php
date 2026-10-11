@@ -48,7 +48,7 @@ class FcmNotificationService
         }
 
         // 2. Fallback to Legacy FCM Server Key
-        $serverKey = env('FCM_SERVER_KEY');
+        $serverKey = config('services.firebase.server_key') ?: env('FCM_SERVER_KEY');
         if (!empty($serverKey)) {
             return self::sendViaLegacy($tokens, $title, $message, $data, $serverKey);
         }
@@ -194,23 +194,23 @@ class FcmNotificationService
     private static function getServiceAccount(): ?array
     {
         // 1. Direct environment variables in .env (FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY)
-        $privateKey = env('FIREBASE_PRIVATE_KEY');
-        $clientEmail = env('FIREBASE_CLIENT_EMAIL');
-        $projectId = env('FIREBASE_PROJECT_ID');
+        $privateKey = config('services.firebase.private_key') ?: env('FIREBASE_PRIVATE_KEY');
+        $clientEmail = config('services.firebase.client_email') ?: env('FIREBASE_CLIENT_EMAIL');
+        $projectId = config('services.firebase.project_id') ?: env('FIREBASE_PROJECT_ID');
 
         if (!empty($privateKey) && !empty($clientEmail) && !empty($projectId)) {
-            // Normalize newline formatting if stored with \n in .env
-            $normalizedKey = str_replace('\n', "\n", $privateKey);
+            // Normalize newline formatting if stored with \n in .env or escaped
+            $normalizedKey = str_replace(["\\n", "\r\n", "\r"], ["\n", "\n", "\n"], $privateKey);
             return [
                 'type' => 'service_account',
                 'project_id' => trim($projectId),
                 'client_email' => trim($clientEmail),
-                'private_key' => $normalizedKey,
+                'private_key' => trim($normalizedKey),
             ];
         }
 
         // 2. Direct JSON string in .env (FIREBASE_SERVICE_ACCOUNT_JSON)
-        $jsonString = env('FIREBASE_SERVICE_ACCOUNT_JSON');
+        $jsonString = config('services.firebase.service_account_json') ?: env('FIREBASE_SERVICE_ACCOUNT_JSON');
         if (!empty($jsonString)) {
             $data = json_decode($jsonString, true);
             if ($data && isset($data['private_key'], $data['client_email'], $data['project_id'])) {
@@ -219,7 +219,7 @@ class FcmNotificationService
         }
 
         // 3. File path from .env (FIREBASE_CREDENTIALS)
-        $credPath = env('FIREBASE_CREDENTIALS');
+        $credPath = config('services.firebase.credentials') ?: env('FIREBASE_CREDENTIALS');
         if ($credPath) {
             $fullPath = base_path($credPath);
             if (file_exists($fullPath)) {

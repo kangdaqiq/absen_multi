@@ -50,4 +50,13 @@ return [
         'pass'     => env('GOWA_API_PASS', env('WA_API_PASS', 'opowae')),
     ],
 
+    'firebase' => [
+        'project_id'           => env('FIREBASE_PROJECT_ID'),
+        'client_email'          => env('FIREBASE_CLIENT_EMAIL'),
+        'private_key'          => env('FIREBASE_PRIVATE_KEY'),
+        'service_account_json' => env('FIREBASE_SERVICE_ACCOUNT_JSON'),
+        'credentials'          => env('FIREBASE_CREDENTIALS'),
+        'server_key'           => env('FCM_SERVER_KEY'),
+    ],
+
 ];

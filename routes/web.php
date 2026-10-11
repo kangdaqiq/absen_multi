@@ -138,6 +138,7 @@ Route::middleware('auth')->group(function () {
     Route::middleware('role:admin,teacher,wali_kelas,waka_kurikulum')->group(function () {
         Route::delete('siswa/bulk-destroy', [SiswaController::class, 'bulkDestroy'])->name('siswa.bulk-destroy');
         Route::put('siswa/bulk-update-kelas', [SiswaController::class, 'bulkUpdateKelas'])->name('siswa.bulk-update-kelas');
+        Route::match(['post', 'delete'], 'siswa/{id}/delete-face', [SiswaController::class, 'deleteFaceId'])->name('siswa.delete-face');
         Route::resource('siswa', SiswaController::class)->except(['create', 'show', 'edit']);
     });
 

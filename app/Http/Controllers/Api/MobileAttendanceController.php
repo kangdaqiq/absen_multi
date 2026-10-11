@@ -217,6 +217,8 @@ class MobileAttendanceController extends Controller
                                 'id' => $siswa->id,
                                 'nama' => $siswa->nama,
                                 'nis' => $siswa->nis,
+                                'foto' => $siswa->foto,
+                                'foto_url' => $siswa->foto_url,
                                 'tgl_lahir' => $siswa->tgl_lahir ? Carbon::parse($siswa->tgl_lahir)->format('Y-m-d') : null,
                                 'kelas_id' => $siswa->kelas_id,
                                 'kelas_name' => $siswa->kelas ? ($siswa->kelas->nama_kelas ?? $siswa->kelas->nama) : null,
@@ -277,6 +279,8 @@ class MobileAttendanceController extends Controller
                 'id' => $s->id,
                 'nama' => $s->nama,
                 'nis' => $s->nis,
+                'foto' => $s->foto,
+                'foto_url' => $s->foto_url,
                 'tgl_lahir' => $s->tgl_lahir ? Carbon::parse($s->tgl_lahir)->format('Y-m-d') : null,
                 'kelas_id' => $s->kelas_id,
                 'kelas_name' => $s->kelas ? ($s->kelas->nama_kelas ?? $s->kelas->nama) : null,
@@ -1473,6 +1477,8 @@ class MobileAttendanceController extends Controller
                 'student_id' => $siswa->id,
                 'nama' => $siswa->nama,
                 'nis' => $siswa->nis,
+                'foto' => $siswa->foto,
+                'foto_url' => $siswa->foto_url,
                 'kelas_id' => $siswa->kelas_id,
                 'kelas_name' => $kelasName,
                 'status' => $absen ? $absen->status : 'H',
@@ -1753,6 +1759,18 @@ class MobileAttendanceController extends Controller
 
         $student = $user->student ?? Siswa::where('user_id', $user->id)->first();
 
+        // Khusus Face ID: Jika sudah terdaftar, tolak pendaftaran berikutnya
+        $existingFace = UserFaceData::where('user_id', $user->id)
+            ->when($student, fn($q) => $q->orWhere('siswa_id', $student->id))
+            ->first();
+
+        if ($existingFace && !empty($existingFace->face_embedding)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Pendaftaran ditolak: Wajah Anda sudah terdaftar di sistem. Silakan hubungi admin sekolah jika ingin mereset/mendaftarkan ulang data Face ID.'
+            ], 422);
+        }
+
         // 1. Ekstraksi vektor wajah via Python Service
         $extractResult = FaceRecognitionService::extractVector($request->file('photo'));
 
@@ -1825,6 +1843,258 @@ class MobileAttendanceController extends Controller
                 'is_verified' => $faceData?->is_verified ?? false,
                 'sample_photo_url' => $faceData?->sample_photo_path ? asset('storage/' . $faceData->sample_photo_path) : null,
                 'registered_at' => $faceData?->updated_at?->format('Y-m-d H:i:s'),
+            ]
+        ]);
+    }
+
+    /**
+     * Kompresi dan simpan foto profil siswa (GD Library, auto-orient, max 600x800).
+     */
+    private function processAndStoreSiswaFoto($file): string
+    {
+        $externalPath = config('filesystems.siswa_photo_path');
+        $randomName = \Illuminate\Support\Str::random(40) . '.jpg';
+
+        if (!empty($externalPath)) {
+            $destDir = rtrim($externalPath, '/\\');
+            $destinationPath = $destDir . DIRECTORY_SEPARATOR . $randomName;
+            $dbValue = $randomName;
+        } else {
+            $destDir = storage_path('app/public/siswa');
+            $destinationPath = $destDir . DIRECTORY_SEPARATOR . $randomName;
+            $dbValue = 'siswa/' . $randomName;
+        }
+
+        if (!file_exists($destDir)) {
+            @mkdir($destDir, 0755, true);
+        }
+
+        if (extension_loaded('gd')) {
+            try {
+                $filePath = $file->getRealPath();
+                $imageInfo = @getimagesize($filePath);
+
+                if ($imageInfo) {
+                    $mime = $imageInfo['mime'];
+                    $src = match ($mime) {
+                        'image/jpeg', 'image/jpg' => @imagecreatefromjpeg($filePath),
+                        'image/png' => @imagecreatefrompng($filePath),
+                        'image/webp' => @imagecreatefromwebp($filePath),
+                        default => null,
+                    };
+
+                    if ($src) {
+                        if (function_exists('exif_read_data') && ($mime === 'image/jpeg' || $mime === 'image/jpg')) {
+                            $exif = @exif_read_data($filePath);
+                            if (!empty($exif['Orientation'])) {
+                                $src = match ($exif['Orientation']) {
+                                    3 => imagerotate($src, 180, 0),
+                                    6 => imagerotate($src, -90, 0),
+                                    8 => imagerotate($src, 90, 0),
+                                    default => $src,
+                                };
+                            }
+                        }
+
+                        $origW = imagesx($src);
+                        $origH = imagesy($src);
+
+                        $maxW = 600;
+                        $maxH = 800;
+
+                        $ratio = min($maxW / $origW, $maxH / $origH, 1.0);
+                        $targetW = (int) round($origW * $ratio);
+                        $targetH = (int) round($origH * $ratio);
+
+                        $dst = imagecreatetruecolor($targetW, $targetH);
+
+                        $white = imagecolorallocate($dst, 255, 255, 255);
+                        imagefill($dst, 0, 0, $white);
+
+                        imagecopyresampled($dst, $src, 0, 0, 0, 0, $targetW, $targetH, $origW, $origH);
+                        imagejpeg($dst, $destinationPath, 80);
+
+                        imagedestroy($src);
+                        imagedestroy($dst);
+
+                        return $dbValue;
+                    }
+                }
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Gagal kompresi foto siswa di API: ' . $e->getMessage());
+            }
+        }
+
+        if (!empty($externalPath)) {
+            $ext = $file->getClientOriginalExtension() ?: 'jpg';
+            $fallbackName = \Illuminate\Support\Str::random(40) . '.' . $ext;
+            $file->move($destDir, $fallbackName);
+            return $fallbackName;
+        }
+
+        return $file->store('siswa', 'public');
+    }
+
+    /**
+     * Endpoint Upload Foto Siswa (POST /api/mobile/student/photo atau /api/mobile/student/upload-photo)
+     * Dapat dipanggil oleh siswa sendiri atau guru/admin dengan menyertakan student_id.
+     * Otomatis melakukan sinkronisasi dengan registrasi Face ID jika wajah terdeteksi.
+     */
+    public function uploadStudentPhoto(Request $request)
+    {
+        $fileKey = $request->hasFile('photo') ? 'photo' : ($request->hasFile('foto') ? 'foto' : null);
+        if (!$fileKey) {
+            return response()->json([
+                'success' => false,
+                'message' => 'File foto wajib diunggah (gunakan key: photo atau foto).'
+            ], 422);
+        }
+
+        $request->validate([
+            $fileKey => 'required|image|max:10240', // max 10MB
+            'student_id' => 'nullable|integer',
+            'sync_face' => 'nullable|boolean',
+        ]);
+
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated'], 401);
+        }
+
+        $studentId = $request->input('student_id');
+        $siswa = null;
+        $isStaff = in_array($user->role, ['guru', 'teacher', 'wali_kelas', 'admin', 'super_admin']) || !empty($user->guru);
+
+        if ($studentId) {
+            $siswa = Siswa::find($studentId);
+            if (!$siswa) {
+                return response()->json(['success' => false, 'message' => 'Data siswa tidak ditemukan.'], 404);
+            }
+
+            // Jika bukan staf/guru, pastikan siswa yang diedit adalah akunnya sendiri
+            if (!$isStaff && $siswa->user_id !== $user->id) {
+                $cleanNis = str_replace('siswa_', '', $user->username);
+                if ($siswa->nis !== $cleanNis) {
+                    return response()->json(['success' => false, 'message' => 'Akses ditolak: Anda hanya dapat mengubah foto profil Anda sendiri.'], 403);
+                }
+            }
+        } else {
+            // Ambil dari profil login user siswa
+            $siswa = $user->student ?? Siswa::where('user_id', $user->id)->first();
+            if (!$siswa && in_array($user->role, ['student', 'siswa'])) {
+                $cleanNis = str_replace('siswa_', '', $user->username);
+                $siswa = Siswa::where('nis', $cleanNis)->first();
+            }
+
+            if (!$siswa) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Parameter student_id diperlukan jika diunggah oleh akun dewan guru/admin.'
+                ], 422);
+            }
+        }
+
+        // Hapus file foto lama dari disk jika ada
+        if (!empty($siswa->foto)) {
+            Siswa::deletePhotoFile($siswa->foto);
+        }
+
+        $uploadedFile = $request->file($fileKey);
+        $newPhotoPath = $this->processAndStoreSiswaFoto($uploadedFile);
+
+        $siswa->foto = $newPhotoPath;
+        $siswa->save();
+
+        // Sinkronisasi otomatis ke Face ID jika wajah terdeteksi (opsional, default: true)
+        $faceRegistered = false;
+        $faceMessage = null;
+        $syncFace = $request->boolean('sync_face', true);
+
+        if ($syncFace) {
+            // Cek apakah siswa sudah punya data Face ID terdaftar. Jika sudah, tolak pendaftaran berikutnya!
+            $existingFace = UserFaceData::where('siswa_id', $siswa->id)
+                ->when($siswa->user_id, fn($q) => $q->orWhere('user_id', $siswa->user_id))
+                ->first();
+
+            if ($existingFace && !empty($existingFace->face_embedding)) {
+                $faceRegistered = false;
+                $faceMessage = 'Wajah sudah terdaftar sebelumnya. Pendaftaran Face ID baru ditolak (hubungi admin untuk reset Face ID).';
+            } else {
+                try {
+                $extractResult = FaceRecognitionService::extractVector($uploadedFile);
+                if (!empty($extractResult['success']) && !empty($extractResult['embedding'])) {
+                    // Cari atau buat target User untuk siswa agar memiliki relasi di user_face_data
+                    $targetUser = null;
+                    if ($siswa->user_id) {
+                        $targetUser = User::find($siswa->user_id);
+                    }
+                    if (!$targetUser) {
+                        $targetUser = User::where('username', 'siswa_' . $siswa->nis)
+                            ->orWhere('username', $siswa->nis)
+                            ->first();
+                    }
+                    if (!$targetUser) {
+                        $targetUser = User::create([
+                            'full_name' => $siswa->nama,
+                            'username' => 'siswa_' . $siswa->nis,
+                            'email' => $siswa->nis . '@siswa.local',
+                            'password_hash' => Hash::make($siswa->tgl_lahir ? Carbon::parse($siswa->tgl_lahir)->format('Ymd') : '123456'),
+                            'role' => 'student',
+                            'school_id' => $siswa->school_id,
+                        ]);
+                    }
+
+                    if (\Illuminate\Support\Facades\Schema::hasColumn('siswa', 'user_id')) {
+                        if ($siswa->user_id !== $targetUser->id) {
+                            $siswa->user_id = $targetUser->id;
+                            $siswa->save();
+                        }
+                    }
+
+                    UserFaceData::updateOrCreate(
+                        ['user_id' => $targetUser->id],
+                        [
+                            'siswa_id' => $siswa->id,
+                            'face_embedding' => json_encode($extractResult['embedding']),
+                            'sample_photo_path' => $newPhotoPath,
+                            'is_verified' => true,
+                        ]
+                    );
+                    $faceRegistered = true;
+                    $faceMessage = 'Wajah berhasil dideteksi dan didaftarkan sebagai master Face ID.';
+                } else {
+                    $faceMessage = $extractResult['message'] ?? 'Wajah tidak terdeteksi untuk pendaftaran Face ID otomatis.';
+                }
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::info('Sync face error during student photo upload: ' . $e->getMessage());
+                    $faceMessage = 'Layanan Face Engine offline, foto siswa tetap tersimpan.';
+                }
+            }
+        }
+
+        ApiLog::create([
+            'school_id' => $siswa->school_id ?: $user->school_id,
+            'api_key' => 'MOBILE_APP',
+            'action' => 'mobile_upload_student_photo',
+            'uid' => $siswa->nis,
+            'success' => true,
+            'message' => "Upload foto siswa berhasil: {$siswa->nama} (NIS: {$siswa->nis})" . ($faceRegistered ? " + Face ID terdaftar" : ""),
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent() ?? 'Android Mobile App',
+            'created_at' => now(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Foto siswa berhasil diperbarui' . ($faceRegistered ? ' dan didaftarkan untuk Face ID.' : '.'),
+            'data' => [
+                'student_id' => $siswa->id,
+                'nama' => $siswa->nama,
+                'nis' => $siswa->nis,
+                'foto' => $siswa->foto,
+                'foto_url' => $siswa->foto_url,
+                'face_registered' => $faceRegistered,
+                'face_message' => $faceMessage,
             ]
         ]);
     }

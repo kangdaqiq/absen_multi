@@ -17,7 +17,7 @@ class SiswaController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Siswa::with(['kelas', 'user'])->orderBy('nama');
+        $query = Siswa::with(['kelas', 'user.faceData', 'faceData'])->orderBy('nama');
 
         // Filter by school_id for non-super admin users
         if (auth()->user() && !auth()->user()->isSuperAdmin()) {
@@ -963,6 +963,55 @@ class SiswaController extends Controller
 
         return response()->json(['ok' => true]);
     }
+
+    /**
+     * Hapus / Reset data Face ID master siswa.
+     * Memastikan akses sesuai school_id tenant sekolah.
+     */
+    public function deleteFaceId($id)
+    {
+        $siswa = Siswa::findOrFail($id);
+        $this->authorizeStudentAccess($siswa);
+
+        $faceRecords = \App\Models\UserFaceData::where('siswa_id', $siswa->id)
+            ->when($siswa->user_id, function($q) use ($siswa) {
+                $q->orWhere('user_id', $siswa->user_id);
+            })
+            ->get();
+
+        foreach ($faceRecords as $face) {
+            if (!empty($face->sample_photo_path)) {
+                $filePath = storage_path('app/public/' . $face->sample_photo_path);
+                if (file_exists($filePath)) {
+                    @unlink($filePath);
+                }
+            }
+            $face->delete();
+        }
+
+        ApiLog::create([
+            'school_id' => $siswa->school_id,
+            'api_key' => 'WEB_ADMIN',
+            'action' => 'delete_face_id',
+            'uid' => $siswa->nis,
+            'success' => true,
+            'message' => "Hapus Face ID siswa: {$siswa->nama} (NIS: {$siswa->nis}) oleh " . (auth()->user()->full_name ?? auth()->user()->username),
+            'ip_address' => request()->ip(),
+            'user_agent' => request()->userAgent() ?? 'Web Dashboard',
+            'created_at' => now(),
+        ]);
+
+        if (request()->ajax() || request()->wantsJson()) {
+            return response()->json([
+                'ok' => true,
+                'success' => true,
+                'message' => "Face ID siswa {$siswa->nama} berhasil dihapus/direset."
+            ]);
+        }
+
+        return redirect()->back()->with('success', "Data Face ID siswa {$siswa->nama} berhasil dihapus/direset.");
+    }
+
     public function bulkDestroy(Request $request)
     {
         $request->validate([

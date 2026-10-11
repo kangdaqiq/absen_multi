@@ -255,4 +255,15 @@ class Siswa extends Model
     {
         return $this->hasOne(UserFaceData::class, 'siswa_id');
     }
+
+    public function getHasFaceRegisteredAttribute(): bool
+    {
+        if ($this->relationLoaded('faceData') && $this->faceData) {
+            return true;
+        }
+        if ($this->relationLoaded('user') && $this->user && $this->user->relationLoaded('faceData') && $this->user->faceData) {
+            return true;
+        }
+        return $this->faceData()->exists() || ($this->user_id && UserFaceData::where('user_id', $this->user_id)->exists());
+    }
 }

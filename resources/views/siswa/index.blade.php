@@ -187,6 +187,18 @@
                                     <i class="fas fa-fingerprint"></i>
                                 </button>
                                 
+                                <!-- Face ID Action (Delete/Reset) -->
+                                @if($s->has_face_registered)
+                                    <button type="button" class="btnDeleteFace text-purple-600 hover:text-purple-800 hover:bg-purple-50 dark:hover:bg-purple-900/20 p-2 rounded-lg transition" 
+                                        data-id="{{ $s->id }}" data-nama="{{ $s->nama }}" title="Face ID Terdaftar (Klik untuk Hapus / Reset)">
+                                        <i class="fas fa-smile-beam"></i>
+                                    </button>
+                                @else
+                                    <span class="text-gray-300 dark:text-gray-600 p-2 inline-flex cursor-not-allowed" title="Face ID belum didaftarkan">
+                                        <i class="fas fa-smile"></i>
+                                    </span>
+                                @endif
+                                
                                 <!-- Edit -->
                                 <button class="btnEdit text-orange-500 hover:text-orange-700 hover:bg-orange-50 p-2 rounded-lg transition" 
                                     data-id="{{ $s->id }}" data-nama="{{ $s->nama }}" data-nis="{{ $s->nis }}" data-tgl_lahir="{{ $s->tgl_lahir }}"
@@ -1236,6 +1248,36 @@
                         $('#enroll_finger_status').html('<span class="text-warning-500">Sidik jari dihapus.</span>');
                         setTimeout(function () { location.reload(); }, 1000);
                     }
+                });
+            });
+
+            // Delete Face ID handler
+            $(document).on('click', '.btnDeleteFace', function () {
+                var id = $(this).data('id');
+                var nama = $(this).data('nama');
+                if (!id) return;
+
+                if (!confirm('Hapus/Reset data Face ID siswa "' + nama + '"?\n\nSetelah dihapus, siswa dapat mendaftarkan wajah baru melalui aplikasi mobile.')) {
+                    return;
+                }
+
+                var $btn = $(this);
+                $btn.prop('disabled', true).addClass('opacity-50');
+
+                $.post('{{ url('siswa') }}/' + id + '/delete-face', {
+                    _token: '{{ csrf_token() }}'
+                }, function (res) {
+                    if (res.ok || res.success) {
+                        alert('Face ID siswa ' + nama + ' berhasil dihapus.');
+                        location.reload();
+                    } else {
+                        alert('Gagal: ' + (res.message || 'Terjadi kesalahan'));
+                        $btn.prop('disabled', false).removeClass('opacity-50');
+                    }
+                }).fail(function (xhr) {
+                    var msg = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : 'Gagal menghubungi server.';
+                    alert(msg);
+                    $btn.prop('disabled', false).removeClass('opacity-50');
                 });
             });
         });

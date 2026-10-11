@@ -43,6 +43,27 @@ class TestFcmCommand extends Command
             } else {
                 $this->error("❌ Gagal mengirimkan ke siswa. Pastikan siswa telah login di aplikasi mobile / token terdaftar.");
             }
+        if ($guruTarget = $this->option('guru')) {
+            $user = User::where('full_name', 'like', "%{$guruTarget}%")
+                ->orWhere('name', 'like', "%{$guruTarget}%")
+                ->orWhere('username', $guruTarget)
+                ->first();
+            if (!$user) {
+                $this->error("❌ Guru/User '{$guruTarget}' tidak ditemukan.");
+                return 1;
+            }
+            $this->info("Mengirim push notifikasi uji coba ke User/Guru: {$user->full_name} ({$user->username})...");
+            $res = FcmNotificationService::sendToGuru(
+                $user,
+                "🔔 Uji Presensi Guru",
+                "Halo {$user->full_name}, ini adalah tes notifikasi langsung ke akun Anda.",
+                ['type' => 'test_guru', 'user_id' => (string) $user->id]
+            );
+            if ($res) {
+                $this->info("✅ Push notifikasi BERHASIL dikirimkan ke perangkat!");
+            } else {
+                $this->error("❌ Gagal: " . (FcmNotificationService::$lastError ?? 'Token tidak terdaftar atau kedaluwarsa.'));
+            }
             return 0;
         }
 

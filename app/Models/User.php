@@ -59,6 +59,11 @@ class User extends Authenticatable
         return $this->hasOne(Guru::class, 'user_id');
     }
 
+    public function faceData()
+    {
+        return $this->hasOne(UserFaceData::class, 'user_id');
+    }
+
     /**
      * Get the school that owns the user
      */

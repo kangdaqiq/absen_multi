@@ -14,7 +14,9 @@ use App\Models\Siswa;
 use App\Models\ApiLog;
 use App\Models\Setting;
 use App\Models\Jadwal;
+use App\Models\UserFaceData;
 use App\Services\FcmNotificationService;
+use App\Services\FaceRecognitionService;
 use Carbon\Carbon;
 
 class MobileAttendanceController extends Controller
@@ -579,6 +581,70 @@ class MobileAttendanceController extends Controller
             ], 422);
         }
 
+        // 2. Face Recognition & Liveness Verification
+        $studentUser = $user?->student ?? Siswa::where('user_id', $user?->id)->first();
+        $faceData = UserFaceData::where('user_id', $user?->id)
+            ->when($studentUser, function ($q) use ($studentUser) {
+                $q->orWhere('siswa_id', $studentUser->id);
+            })
+            ->first();
+
+        $faceSimilarity = null;
+        $isFaceMatched = false;
+
+        if ($faceData) {
+            if (!$request->hasFile('photo')) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Absen ditolak: Foto selfie verifikasi wajah wajib disertakan saat absen masuk.'
+                ], 422);
+            }
+
+            $compareResult = FaceRecognitionService::compareFace($faceData->face_embedding, $request->file('photo'));
+
+            if (!$compareResult['success']) {
+                ApiLog::create([
+                    'school_id' => $schoolId,
+                    'api_key' => 'MOBILE_APP',
+                    'action' => 'mobile_checkin_face_failed',
+                    'uid' => $user?->username ?? $user?->email,
+                    'success' => false,
+                    'message' => "Verifikasi Wajah Gagal: " . ($compareResult['message'] ?? 'Wajah tidak terdeteksi'),
+                    'ip_address' => $request->ip(),
+                    'user_agent' => $request->userAgent() ?? 'Android Mobile App',
+                    'created_at' => now(),
+                ]);
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Absen ditolak: ' . ($compareResult['message'] ?? 'Wajah tidak terdeteksi saat absen')
+                ], 400);
+            }
+
+            $faceSimilarity = $compareResult['similarity'];
+            $isFaceMatched = (bool) $compareResult['is_match'];
+
+            if (!$isFaceMatched) {
+                $simPercent = round($faceSimilarity * 100);
+                ApiLog::create([
+                    'school_id' => $schoolId,
+                    'api_key' => 'MOBILE_APP',
+                    'action' => 'mobile_checkin_face_mismatch',
+                    'uid' => $user?->username ?? $user?->email,
+                    'success' => false,
+                    'message' => "Wajah Tidak Cocok: {$user?->full_name} (Kemiripan: {$simPercent}%)",
+                    'ip_address' => $request->ip(),
+                    'user_agent' => $request->userAgent() ?? 'Android Mobile App',
+                    'created_at' => now(),
+                ]);
+
+                return response()->json([
+                    'success' => false,
+                    'message' => "Absen ditolak: Wajah Anda tidak cocok dengan foto terdaftar (Kemiripan: {$simPercent}%)."
+                ], 400);
+            }
+        }
+
         $photoPath = null;
         if ($request->hasFile('photo')) {
             $photoPath = $request->file('photo')->store('absensi_photos', 'public');
@@ -659,6 +725,9 @@ class MobileAttendanceController extends Controller
                     'status_kehadiran' => $statusKehadiran,
                     'status' => $status,
                     'keterangan' => $keterangan,
+                    'photo_checkin_path' => $photoPath,
+                    'face_similarity_score' => $faceSimilarity,
+                    'is_face_matched' => $isFaceMatched,
                     'created_at' => $now
                 ]
             );
@@ -697,6 +766,9 @@ class MobileAttendanceController extends Controller
                     'status_kehadiran' => $statusKehadiran,
                     'menit_terlambat' => $menitTerlambat,
                     'shift' => $shift->nama_shift,
+                    'face_similarity_score' => $faceSimilarity,
+                    'is_face_matched' => $isFaceMatched,
+                    'photo_checkin_url' => $photoPath ? asset('storage/' . $photoPath) : null,
                     'is_checked_in' => true,
                     'is_checked_out' => !empty($absen->jam_pulang)
                 ]
@@ -784,6 +856,9 @@ class MobileAttendanceController extends Controller
                         'jam_masuk' => $nowTime,
                         'status' => $status,
                         'keterangan' => $keterangan,
+                        'photo_checkin_path' => $photoPath,
+                        'face_similarity_score' => $faceSimilarity,
+                        'is_face_matched' => $isFaceMatched,
                         'created_at' => $now
                     ]
                 );
@@ -822,6 +897,9 @@ class MobileAttendanceController extends Controller
                         'status' => $status,
                         'status_kehadiran' => $status === 'T' ? 'terlambat' : 'hadir',
                         'keterangan' => $keterangan,
+                        'face_similarity_score' => $faceSimilarity,
+                        'is_face_matched' => $isFaceMatched,
+                        'photo_checkin_url' => $photoPath ? asset('storage/' . $photoPath) : null,
                         'is_checked_in' => true,
                         'is_checked_out' => !empty($att->jam_pulang)
                     ]
@@ -1651,6 +1729,103 @@ class MobileAttendanceController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'FCM Token berhasil diperbarui'
+        ]);
+    }
+
+    /**
+     * Endpoint Registrasi Wajah Master (POST /api/mobile/face-register)
+     * 1. Laravel menerima foto pendaftaran dari Android
+     * 2. Laravel mengirim foto ke Python Service http://127.0.0.1:8000/extract-face-vector
+     * 3. Simpan file foto di storage/app/public/faces/
+     * 4. Simpan array embedding JSON ke tabel user_face_data
+     * 5. Kembalikan respon sukses ke Android
+     */
+    public function registerFace(Request $request)
+    {
+        $request->validate([
+            'photo' => 'required|image|max:10240', // max 10MB
+        ]);
+
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated'], 401);
+        }
+
+        $student = $user->student ?? Siswa::where('user_id', $user->id)->first();
+
+        // 1. Ekstraksi vektor wajah via Python Service
+        $extractResult = FaceRecognitionService::extractVector($request->file('photo'));
+
+        if (!$extractResult['success'] || empty($extractResult['embedding'])) {
+            return response()->json([
+                'success' => false,
+                'message' => $extractResult['message'] ?? 'Wajah tidak terdeteksi pada foto. Pastikan wajah terlihat jelas menghadap kamera.'
+            ], 400);
+        }
+
+        // 2. Simpan file foto di storage/app/public/faces/
+        $storedPath = $request->file('photo')->store('faces', 'public');
+
+        // 3. Simpan data embedding ke user_face_data
+        $faceData = UserFaceData::updateOrCreate(
+            ['user_id' => $user->id],
+            [
+                'siswa_id' => $student?->id,
+                'face_embedding' => json_encode($extractResult['embedding']),
+                'sample_photo_path' => $storedPath,
+                'is_verified' => true,
+            ]
+        );
+
+        ApiLog::create([
+            'school_id' => $user->school_id,
+            'api_key' => 'MOBILE_APP',
+            'action' => 'face_registered',
+            'uid' => $user->username ?? $user->email,
+            'success' => true,
+            'message' => "Registrasi Wajah Master Berhasil: {$user->full_name}",
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent() ?? 'Android Mobile App',
+            'created_at' => now(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Registrasi wajah master berhasil disimpan.',
+            'data' => [
+                'is_verified' => true,
+                'sample_photo_url' => asset('storage/' . $storedPath),
+                'registered_at' => $faceData->updated_at?->format('Y-m-d H:i:s'),
+            ]
+        ]);
+    }
+
+    /**
+     * Endpoint Status Registrasi Wajah (GET /api/mobile/face-status)
+     */
+    public function getFaceStatus(Request $request)
+    {
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated'], 401);
+        }
+
+        $faceData = UserFaceData::where('user_id', $user->id)->first();
+        if (!$faceData && ($user->student || in_array($user->role, ['student', 'siswa']))) {
+            $student = $user->student ?? Siswa::where('user_id', $user->id)->first();
+            if ($student) {
+                $faceData = UserFaceData::where('siswa_id', $student->id)->first();
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'has_face_registered' => !empty($faceData),
+                'is_verified' => $faceData?->is_verified ?? false,
+                'sample_photo_url' => $faceData?->sample_photo_path ? asset('storage/' . $faceData->sample_photo_path) : null,
+                'registered_at' => $faceData?->updated_at?->format('Y-m-d H:i:s'),
+            ]
         ]);
     }
 

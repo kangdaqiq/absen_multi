@@ -53,5 +53,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/mobile/geofence', [MobileAttendanceController::class, 'getGeofenceSetting']);
     Route::get('/mobile/location-setting', [MobileAttendanceController::class, 'getGeofenceSetting']);
     Route::post('/mobile/fcm-token', [MobileAttendanceController::class, 'updateFcmToken']);
+    Route::post('/mobile/face-register', [MobileAttendanceController::class, 'registerFace']);
+    Route::get('/mobile/face-status', [MobileAttendanceController::class, 'getFaceStatus']);
     Route::post('/mobile/logout', [MobileAttendanceController::class, 'logout']);
 });

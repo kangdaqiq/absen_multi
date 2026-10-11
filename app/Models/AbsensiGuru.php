@@ -23,7 +23,10 @@ class AbsensiGuru extends Model
         'menit_terlambat',
         'status',
         'status_kehadiran',
-        'keterangan'
+        'keterangan',
+        'photo_checkin_path',
+        'face_similarity_score',
+        'is_face_matched'
     ];
 
     protected static function booted()

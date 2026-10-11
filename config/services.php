@@ -59,4 +59,9 @@ return [
         'server_key'           => env('FCM_SERVER_KEY'),
     ],
 
+    'face_engine' => [
+        'url'       => env('FACE_ENGINE_URL', 'http://127.0.0.1:8000'),
+        'threshold' => env('FACE_SIMILARITY_THRESHOLD', 0.75),
+    ],
+
 ];

@@ -250,4 +250,9 @@ class Siswa extends Model
     {
         return $this->hasMany(SiswaFingerprint::class, 'student_id');
     }
+
+    public function faceData()
+    {
+        return $this->hasOne(UserFaceData::class, 'siswa_id');
+    }
 }

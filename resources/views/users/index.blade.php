@@ -91,14 +91,14 @@
                             <td class="border-b border-[#eee] py-5 px-4 dark:border-strokedark text-center">
                                 <div class="flex items-center justify-center gap-2">
                                     {{-- Edit --}}
-                                    <button class="btnEditUser text-orange-500 hover:text-orange-700 hover:bg-orange-50 dark:hover:bg-orange-500/10 p-2 rounded-lg transition"
+                                    <button type="button" class="btnEditUser text-orange-500 hover:text-orange-700 hover:bg-orange-50 dark:hover:bg-orange-500/10 p-2 rounded-lg transition"
                                         data-id="{{ $user->id }}"
                                         data-name="{{ $user->full_name }}"
                                         data-username="{{ $user->username }}"
                                         data-email="{{ $user->email }}"
                                         data-role="{{ $user->role }}"
                                         data-update-url="{{ route('users.update', $user->id) }}"
-                                        @click="$dispatch('open-modal', 'modalEditUser')"
+                                        @click.prevent="$dispatch('open-modal', 'modalEditUser')"
                                         title="Edit">
                                         <i class="fas fa-edit"></i>
                                     </button>
@@ -166,6 +166,11 @@
                     <select name="role" id="edit_user_role" required
                         class="w-full appearance-none rounded-lg border border-gray-200 bg-transparent px-4 py-2.5 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
                         <option value="admin">Admin</option>
+                        @if(auth()->user() && auth()->user()->isSuperAdmin())
+                        <option value="super_admin">Super Admin</option>
+                        @endif
+                        <option value="wali_kelas">Wali Kelas</option>
+                        <option value="waka_kurikulum">Waka Kurikulum</option>
                     </select>
                     <span class="pointer-events-none absolute top-1/2 right-4 -translate-y-1/2 text-gray-400">
                         <i class="fas fa-chevron-down text-xs"></i>
@@ -247,7 +252,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // ===== Modal Edit User =====
     document.querySelectorAll('.btnEditUser').forEach(function(btn) {
-        btn.addEventListener('click', function() {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
             document.getElementById('formEditUser').action = this.dataset.updateUrl;
             document.getElementById('edit_user_name').value     = this.dataset.name;
             document.getElementById('edit_user_username').value = this.dataset.username;

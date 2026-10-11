@@ -1465,9 +1465,10 @@ class MobileAttendanceController extends Controller
     public function getKelases(Request $request)
     {
         $user = $request->user();
+        $schoolId = $user?->school_id ?? ($user?->guru?->school_id ?? null);
         $query = Kelas::query();
-        if ($user && $user->school_id) {
-            $query->where('school_id', $user->school_id);
+        if ($schoolId) {
+            $query->where('school_id', $schoolId);
         }
         $kelases = $query->orderBy('nama_kelas', 'asc')->get();
 
@@ -1475,6 +1476,7 @@ class MobileAttendanceController extends Controller
             return [
                 'id' => $k->id,
                 'nama' => $k->nama_kelas ?? $k->nama,
+                'nama_kelas' => $k->nama_kelas ?? $k->nama,
             ];
         });
 
@@ -1484,17 +1486,19 @@ class MobileAttendanceController extends Controller
     public function schoolStudentsRecap(Request $request)
     {
         $user = $request->user();
+        $schoolId = $user?->school_id ?? ($user?->guru?->school_id ?? null);
         $kelasId = $request->query('kelas_id');
         $months = (int) $request->query('months', 1);
-        $startDate = $request->query('start_date');
-        $endDate = $request->query('end_date');
+        $startDateParam = $request->query('start_date');
+        $endDateParam = $request->query('end_date');
 
-        if ($startDate && $endDate) {
+        if ($startDateParam && $endDateParam) {
             try {
-                $startDate = Carbon::parse($startDate)->format('Y-m-d');
-                $endDate = Carbon::parse($endDate)->format('Y-m-d');
+                $startDate = Carbon::parse($startDateParam)->format('Y-m-d');
+                $endDate = Carbon::parse($endDateParam)->format('Y-m-d');
             } catch (\Exception $e) {
-                // Keep as is
+                $startDate = Carbon::now()->subDays(30 * $months)->format('Y-m-d');
+                $endDate = Carbon::now()->format('Y-m-d');
             }
         } else {
             $endDate = Carbon::now()->format('Y-m-d');
@@ -1502,7 +1506,10 @@ class MobileAttendanceController extends Controller
         }
 
         // Ambil daftar ID siswa (seluruh sekolah atau kelas tertentu)
-        $siswaQuery = Siswa::where('school_id', $user->school_id);
+        $siswaQuery = Siswa::query();
+        if ($schoolId) {
+            $siswaQuery->where('school_id', $schoolId);
+        }
         if ($kelasId) {
             $siswaQuery->where('kelas_id', $kelasId);
         }
@@ -1517,7 +1524,7 @@ class MobileAttendanceController extends Controller
         $totalTerlambat = $attendances->whereIn('status', ['T', 'Terlambat'])->count();
         $totalIzin = $attendances->whereIn('status', ['I', 'Izin'])->count();
         $totalSakit = $attendances->whereIn('status', ['S', 'Sakit'])->count();
-        $totalAlpha = $attendances->whereIn('status', ['A', 'Alpha'])->count();
+        $totalAlpha = $attendances->whereIn('status', ['A', 'Alpha', 'B', 'Bolos', 'Tidak Hadir'])->count();
 
         $totalRecord = $attendances->count();
         $totalAbsenOk = $totalHadir + $totalTerlambat;

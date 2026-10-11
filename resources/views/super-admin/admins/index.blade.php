@@ -62,7 +62,7 @@
                         <td class="border-b border-[#eee] py-5 px-4 dark:border-strokedark text-center align-middle">
                             <div class="flex items-center justify-center gap-2">
                                 {{-- Edit --}}
-                                <button class="btnEditAdmin text-orange-500 hover:text-orange-700 hover:bg-orange-50 dark:hover:bg-orange-500/10 p-2 rounded-lg transition"
+                                <button type="button" class="btnEditAdmin text-orange-500 hover:text-orange-700 hover:bg-orange-50 dark:hover:bg-orange-500/10 p-2 rounded-lg transition"
                                     data-id="{{ $admin->id }}"
                                     data-full-name="{{ $admin->full_name }}"
                                     data-username="{{ $admin->username }}"
@@ -70,7 +70,7 @@
                                     data-role="{{ ucfirst($admin->role) }}"
                                     data-created="{{ $admin->created_at->format('d M Y H:i') }}"
                                     data-update-url="{{ route('super-admin.schools.admins.update', [$school, $admin]) }}"
-                                    @click="$dispatch('open-modal', 'modalEditAdmin')"
+                                    @click.prevent="$dispatch('open-modal', 'modalEditAdmin')"
                                     title="Edit">
                                     <i class="fas fa-edit"></i>
                                 </button>

@@ -396,9 +396,9 @@ class SchoolController extends Controller
 
     private function syncWaDevice(School $school)
     {
-        $base = rtrim(env('GOWA_API_BASE_URL', 'http://localhost:3000'), '/');
-        $user = env('GOWA_API_USER', 'admin');
-        $pass = env('GOWA_API_PASS', 'jagattech');
+        $base = rtrim(config('services.whatsapp.base_url', env('GOWA_API_BASE_URL', env('WA_API_BASE_URL', 'http://localhost:3000'))), '/');
+        $user = config('services.whatsapp.user', env('GOWA_API_USER', env('WA_API_USER', 'admin')));
+        $pass = config('services.whatsapp.pass', env('GOWA_API_PASS', env('WA_API_PASS', 'opowae')));
         $deviceId = (string)$school->id;
 
         try {
@@ -421,9 +421,9 @@ class SchoolController extends Controller
 
     private function deleteWaDevice(School $school)
     {
-        $base = rtrim(env('GOWA_API_BASE_URL', 'http://localhost:3000'), '/');
-        $user = env('GOWA_API_USER', 'admin');
-        $pass = env('GOWA_API_PASS', 'jagattech');
+        $base = rtrim(config('services.whatsapp.base_url', env('GOWA_API_BASE_URL', env('WA_API_BASE_URL', 'http://localhost:3000'))), '/');
+        $user = config('services.whatsapp.user', env('GOWA_API_USER', env('WA_API_USER', 'admin')));
+        $pass = config('services.whatsapp.pass', env('GOWA_API_PASS', env('WA_API_PASS', 'opowae')));
         $deviceId = (string)$school->id;
 
         try {

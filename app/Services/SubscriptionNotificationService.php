@@ -84,9 +84,9 @@ class SubscriptionNotificationService
      */
     public function isDeviceConnected(string $deviceId): bool
     {
-        $baseUrl = rtrim(env('GOWA_API_BASE_URL', 'http://localhost:3000'), '/');
-        $user    = env('GOWA_API_USER', 'admin');
-        $pass    = env('GOWA_API_PASS', 'jagattech');
+        $baseUrl = rtrim(config('services.whatsapp.base_url', env('GOWA_API_BASE_URL', env('WA_API_BASE_URL', 'http://localhost:3000'))), '/');
+        $user    = config('services.whatsapp.user', env('GOWA_API_USER', env('WA_API_USER', 'admin')));
+        $pass    = config('services.whatsapp.pass', env('GOWA_API_PASS', env('WA_API_PASS', 'opowae')));
 
         try {
             $res = Http::timeout(5)

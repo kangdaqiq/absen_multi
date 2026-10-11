@@ -307,7 +307,10 @@ class MobileAttendanceController extends Controller
     public function today(Request $request)
     {
         $user = $request->user();
-        $today = Carbon::today()->format('Y-m-d');
+        $schoolId = $user?->school_id ?? 0;
+        $schoolTz = Setting::where('school_id', $schoolId)->where('setting_key', 'timezone')->value('setting_value') ?: config('app.timezone', 'Asia/Jakarta');
+        $now = Carbon::now($schoolTz);
+        $today = $now->format('Y-m-d');
 
         $isWaliKelas = false;
         $kelasWali = null;
@@ -320,12 +323,31 @@ class MobileAttendanceController extends Controller
             $isWaliKelas = true;
         }
 
+        // Case 1: Siswa (Student)
         if ($user && ($user->student || in_array($user->role, ['student', 'siswa']))) {
             $student = $user->student ?? Siswa::with('kelas')->where('user_id', $user->id)->orWhere('nis', str_replace('siswa_', '', $user->username))->first();
             if ($student) {
+                $studentSchoolId = $student->school_id ?: $schoolId;
                 $absen = Attendance::where('student_id', $student->id)
                     ->where('tanggal', $today)
                     ->first();
+
+                // Cari jadwal harian siswa
+                $indexHari = (int) $now->format('N'); // 1 (Senin) - 7 (Minggu)
+                $jadwal = Jadwal::where('index_hari', $indexHari)
+                    ->where('is_active', 1)
+                    ->when($studentSchoolId > 0, function ($q) use ($studentSchoolId) {
+                        $q->where('school_id', $studentSchoolId);
+                    })
+                    ->first();
+
+                if (!$jadwal && $studentSchoolId > 0) {
+                    $jadwal = Jadwal::where('index_hari', $indexHari)->where('is_active', 1)->first();
+                }
+
+                $jadwalMasuk = $jadwal?->jam_masuk ?? '07:00:00';
+                $jadwalPulang = $jadwal?->jam_pulang ?? '15:30:00';
+                $shiftName = $jadwal ? ($jadwal->hari ? "Reguler {$jadwal->hari}" : "Reguler Pagi") : "Reguler Pagi";
 
                 return response()->json([
                     'success' => true,
@@ -333,6 +355,9 @@ class MobileAttendanceController extends Controller
                         'tanggal' => $today,
                         'jam_masuk' => $absen?->jam_masuk,
                         'jam_pulang' => $absen?->jam_pulang,
+                        'jadwal_masuk' => $jadwalMasuk,
+                        'jadwal_pulang' => $jadwalPulang,
+                        'shift_name' => $shiftName,
                         'status_kehadiran' => $absen?->status ?? 'Belum Absen',
                         'is_checked_in' => !empty($absen?->jam_masuk),
                         'is_checked_out' => !empty($absen?->jam_pulang),
@@ -345,10 +370,16 @@ class MobileAttendanceController extends Controller
             }
         }
 
+        // Case 2: Guru / Pegawai / Admin
         if ($user && (in_array($user->role, ['guru', 'teacher', 'wali_kelas', 'admin']) || $user->guru) && $user->guru) {
             $absen = AbsensiGuru::where('guru_id', $user->guru->id)
                 ->where('tanggal', $today)
                 ->first();
+
+            $shift = $user->guru->getShiftForDate($now);
+            $jadwalMasuk = $shift?->jam_masuk ?? '07:00:00';
+            $jadwalPulang = $shift?->jam_pulang ?? '15:30:00';
+            $shiftName = $shift?->nama_shift ?? 'Reguler Pagi';
 
             return response()->json([
                 'success' => true,
@@ -356,6 +387,9 @@ class MobileAttendanceController extends Controller
                     'tanggal' => $today,
                     'jam_masuk' => $absen?->jam_masuk,
                     'jam_pulang' => $absen?->jam_pulang,
+                    'jadwal_masuk' => $jadwalMasuk,
+                    'jadwal_pulang' => $jadwalPulang,
+                    'shift_name' => $shiftName,
                     'status_kehadiran' => $absen?->status_kehadiran ?? ($absen?->status ?? 'Belum Absen'),
                     'is_checked_in' => !empty($absen?->jam_masuk),
                     'is_checked_out' => !empty($absen?->jam_pulang),
@@ -367,12 +401,16 @@ class MobileAttendanceController extends Controller
             ]);
         }
 
+        // Fallback
         return response()->json([
             'success' => true,
             'data' => [
                 'tanggal' => $today,
                 'jam_masuk' => null,
                 'jam_pulang' => null,
+                'jadwal_masuk' => '07:00:00',
+                'jadwal_pulang' => '15:30:00',
+                'shift_name' => 'Reguler Pagi',
                 'status_kehadiran' => 'Belum Absen',
                 'is_checked_in' => false,
                 'is_checked_out' => false,
@@ -1121,18 +1159,45 @@ class MobileAttendanceController extends Controller
     {
         $user = $request->user();
 
-        if (!in_array($user->role, ['guru', 'teacher', 'wali_kelas', 'admin']) || !$user->guru) {
+        if (!$user || (!in_array($user->role, ['guru', 'teacher', 'wali_kelas', 'admin']) && !$user->guru)) {
             return response()->json(['success' => false, 'message' => 'Akses khusus dewan guru'], 403);
         }
 
         $guru = $user->guru;
-        // Cari kelas di mana guru ini ditugaskan sebagai wali kelas
-        $kelas = Kelas::where('wali_kelas_id', $guru->id)
-            ->orWhere('wali_kelas_2_id', $guru->id)
-            ->first();
+        $requestedKelasId = $request->query('kelas_id');
+
+        $kelas = null;
+        if ($requestedKelasId) {
+            $kelasQuery = Kelas::where('id', $requestedKelasId);
+            if ($user->school_id) {
+                $kelasQuery->where('school_id', $user->school_id);
+            }
+
+            if ($guru && !in_array($user->role, ['admin', 'super_admin'])) {
+                // Cari kelas di mana guru adalah wali kelas 1 atau 2, atau fallback ke kelas di sekolah yang sama
+                $kelasWali = (clone $kelasQuery)->where(function ($q) use ($guru) {
+                    $q->where('wali_kelas_id', $guru->id)
+                      ->orWhere('wali_kelas_2_id', $guru->id);
+                })->first();
+
+                $kelas = $kelasWali ?: $kelasQuery->first();
+            } else {
+                $kelas = $kelasQuery->first();
+            }
+        } elseif ($guru) {
+            // Default: Cari kelas di mana guru ini ditugaskan sebagai wali kelas
+            $kelas = Kelas::where(function ($q) use ($guru) {
+                $q->where('wali_kelas_id', $guru->id)
+                  ->orWhere('wali_kelas_2_id', $guru->id);
+            });
+            if ($user->school_id) {
+                $kelas->where('school_id', $user->school_id);
+            }
+            $kelas = $kelas->first();
+        }
 
         if (!$kelas) {
-            return response()->json(['success' => false, 'message' => 'Anda belum ditugaskan sebagai wali kelas'], 404);
+            return response()->json(['success' => false, 'message' => 'Kelas tidak ditemukan atau Anda belum ditugaskan sebagai wali kelas'], 404);
         }
 
         $startDate = $request->query('start_date', Carbon::today()->format('Y-m-d'));
@@ -1146,12 +1211,16 @@ class MobileAttendanceController extends Controller
         }
 
         // Ambil daftar siswa di kelas tersebut
-        $siswaList = Siswa::where('kelas_id', $kelas->id)->get();
+        $siswaList = Siswa::where('kelas_id', $kelas->id)->orderBy('nama', 'asc')->get();
+        $siswaIds = $siswaList->pluck('id');
 
-        $studentsRecap = $siswaList->map(function ($siswa) use ($startDate, $endDate) {
-            $attendances = Attendance::where('student_id', $siswa->id)
-                ->whereBetween('tanggal', [$startDate, $endDate])
-                ->get();
+        $allAttendances = Attendance::whereIn('student_id', $siswaIds)
+            ->whereBetween('tanggal', [$startDate, $endDate])
+            ->get()
+            ->groupBy('student_id');
+
+        $studentsRecap = $siswaList->map(function ($siswa) use ($allAttendances) {
+            $attendances = $allAttendances->get($siswa->id, collect());
 
             return [
                 'student_id' => $siswa->id,
@@ -1161,16 +1230,19 @@ class MobileAttendanceController extends Controller
                 'terlambat' => $attendances->whereIn('status', ['T', 'Terlambat'])->count(),
                 'izin' => $attendances->whereIn('status', ['I', 'Izin'])->count(),
                 'sakit' => $attendances->whereIn('status', ['S', 'Sakit'])->count(),
-                'alpha' => $attendances->whereIn('status', ['A', 'Alpha'])->count(),
+                'alpha' => $attendances->whereIn('status', ['A', 'Alpha', 'B', 'Bolos', 'Tidak Hadir'])->count(),
             ];
         });
 
         $namaKelas = $kelas->nama_kelas ?? $kelas->nama;
-        $formattedKelasName = str_starts_with($namaKelas, 'Kelas') ? "{$namaKelas} (Wali Kelas)" : "Kelas {$namaKelas} (Wali Kelas)";
+        $isWali = $guru && ($kelas->wali_kelas_id == $guru->id || $kelas->wali_kelas_2_id == $guru->id);
+        $waliLabel = $isWali ? " (Wali Kelas)" : "";
+        $formattedKelasName = str_starts_with($namaKelas, 'Kelas') ? "{$namaKelas}{$waliLabel}" : "Kelas {$namaKelas}{$waliLabel}";
 
         return response()->json([
             'success' => true,
             'data' => [
+                'kelas_id' => $kelas->id,
                 'kelas_name' => $formattedKelasName,
                 'total_siswa' => $siswaList->count(),
                 'start_date' => $startDate,
@@ -1184,7 +1256,7 @@ class MobileAttendanceController extends Controller
     {
         $user = $request->user();
 
-        if ($user && (!in_array($user->role, ['guru', 'teacher', 'wali_kelas', 'admin']) && $user->role !== 'guru') || !$user->guru) {
+        if (!$user || (!in_array($user->role, ['guru', 'teacher', 'wali_kelas', 'admin']) && !$user->guru)) {
             return response()->json(['success' => false, 'message' => 'Akses khusus dewan guru'], 403);
         }
 
@@ -1195,30 +1267,44 @@ class MobileAttendanceController extends Controller
             $tanggal = Carbon::today()->format('Y-m-d');
         }
 
-        $queryStr = $request->query('q');
+        $kelasId = $request->query('kelas_id');
+        $queryStr = trim($request->query('q', ''));
 
-        // Jika kata kunci pencarian kurang dari 2 karakter, kembalikan array kosong
-        if (empty($queryStr) || strlen(trim($queryStr)) < 2) {
+        // Jika tidak ada kelas_id DAN query pencarian kosong/kurang dari 2 karakter, kembalikan array kosong
+        if (empty($kelasId) && strlen($queryStr) < 2) {
             return response()->json(['success' => true, 'data' => []]);
         }
 
-        // Cari seluruh siswa di sekolah berdasarkan Nama atau NIS/NISN
         $siswaQuery = Siswa::with('kelas');
-        if ($user->school_id) {
-            $siswaQuery->where('school_id', $user->school_id);
+        $schoolId = $user->school_id ?? ($user->guru ? $user->guru->school_id : null);
+        if ($schoolId) {
+            $siswaQuery->where('school_id', $schoolId);
         }
 
-        $siswaList = $siswaQuery->where(function ($q) use ($queryStr) {
+        if (!empty($kelasId)) {
+            $siswaQuery->where('kelas_id', $kelasId);
+        }
+
+        if (strlen($queryStr) >= 2) {
+            $siswaQuery->where(function ($q) use ($queryStr) {
                 $q->where('nama', 'like', "%{$queryStr}%")
                   ->orWhere('nis', 'like', "%{$queryStr}%");
-            })
-            ->limit(30)
-            ->get();
+                if (\Illuminate\Support\Facades\Schema::hasColumn('siswa', 'nisn')) {
+                    $q->orWhere('nisn', 'like', "%{$queryStr}%");
+                }
+            });
+        }
 
-        $data = $siswaList->map(function ($siswa) use ($tanggal) {
-            $absen = Attendance::where('student_id', $siswa->id)
-                ->where('tanggal', $tanggal)
-                ->first();
+        $siswaList = $siswaQuery->orderBy('nama', 'asc')->get();
+
+        $studentIds = $siswaList->pluck('id');
+        $attendances = Attendance::whereIn('student_id', $studentIds)
+            ->where('tanggal', $tanggal)
+            ->get()
+            ->keyBy('student_id');
+
+        $data = $siswaList->map(function ($siswa) use ($attendances) {
+            $absen = $attendances->get($siswa->id);
 
             $kelasName = $siswa->kelas ? ($siswa->kelas->nama_kelas ?? $siswa->kelas->nama) : 'Siswa';
             if ($siswa->kelas && !str_starts_with($kelasName, 'Kelas')) {
@@ -1229,9 +1315,13 @@ class MobileAttendanceController extends Controller
                 'student_id' => $siswa->id,
                 'nama' => $siswa->nama,
                 'nis' => $siswa->nis,
+                'kelas_id' => $siswa->kelas_id,
                 'kelas_name' => $kelasName,
                 'status' => $absen ? $absen->status : 'H',
-                'keterangan' => $absen ? $absen->keterangan : null
+                'status_kehadiran' => $absen ? $absen->status : 'Belum Absen',
+                'keterangan' => $absen ? $absen->keterangan : null,
+                'jam_masuk' => $absen?->jam_masuk,
+                'jam_pulang' => $absen?->jam_pulang,
             ];
         });
 
@@ -1242,7 +1332,7 @@ class MobileAttendanceController extends Controller
     {
         $user = $request->user();
 
-        if (!in_array($user->role, ['guru', 'teacher', 'wali_kelas', 'admin']) || !$user->guru) {
+        if (!$user || (!in_array($user->role, ['guru', 'teacher', 'wali_kelas', 'admin']) && !$user->guru)) {
             return response()->json(['success' => false, 'message' => 'Akses khusus dewan guru'], 403);
         }
 
@@ -1259,45 +1349,71 @@ class MobileAttendanceController extends Controller
             $tanggal = $request->tanggal;
         }
 
+        $schoolId = $user->school_id ?? ($user->guru ? $user->guru->school_id : null);
+        $schoolTz = Setting::where('school_id', $schoolId ?? 0)->where('setting_key', 'timezone')->value('setting_value') ?: config('app.timezone', 'Asia/Jakarta');
+        $now = Carbon::now($schoolTz);
+        $currentTime = $now->format('H:i:s');
+
+        $studentIds = collect($request->attendances)->pluck('student_id')->all();
+        $existingRecords = Attendance::whereIn('student_id', $studentIds)
+            ->where('tanggal', $tanggal)
+            ->get()
+            ->keyBy('student_id');
+
+        $count = 0;
         foreach ($request->attendances as $item) {
+            $studentId = $item['student_id'];
             $status = $item['status'];
             $isHadir = in_array($status, ['H', 'Hadir', 'T', 'Terlambat']);
 
+            $existing = $existingRecords->get($studentId);
+            $jamMasuk = $existing?->jam_masuk;
+            if (!$jamMasuk && $isHadir) {
+                $jamMasuk = $currentTime;
+            } elseif (!$isHadir) {
+                $jamMasuk = null;
+            }
+
             Attendance::updateOrCreate(
                 [
-                    'student_id' => $item['student_id'],
+                    'student_id' => $studentId,
                     'tanggal' => $tanggal
                 ],
                 [
-                    'school_id' => $user->school_id,
+                    'school_id' => $schoolId,
                     'status' => $status,
                     'keterangan' => $item['keterangan'] ?? null,
-                    'jam_masuk' => $isHadir ? now()->format('H:i:s') : null,
-                    'updated_at' => now()
+                    'jam_masuk' => $jamMasuk,
+                    'updated_at' => $now
                 ]
             );
+            $count++;
         }
 
         ApiLog::create([
-            'school_id' => $user->school_id,
+            'school_id' => $schoolId,
             'api_key' => 'MOBILE_APP',
             'action' => 'mobile_bulk_attendance',
-            'uid' => $user->guru->nip ?? $user->username,
+            'uid' => $user->guru?->nip ?? $user->username,
             'success' => true,
-            'message' => "Input Absensi Siswa Massal oleh {$user->full_name}: " . count($request->attendances) . " siswa (Tgl: {$tanggal})",
+            'message' => "Input Absensi Siswa Massal oleh {$user->full_name}: {$count} siswa (Tgl: {$tanggal})",
             'ip_address' => $request->ip(),
             'user_agent' => $request->userAgent() ?? 'Android Mobile App',
-            'created_at' => now(),
+            'created_at' => $now,
         ]);
 
-        return response()->json(['success' => true, 'message' => 'Absensi seluruh siswa berhasil disimpan']);
+        return response()->json([
+            'success' => true,
+            'message' => 'Absensi seluruh siswa berhasil disimpan',
+            'total_updated' => $count
+        ]);
     }
 
     public function updateSingleStudentAttendance(Request $request)
     {
         $user = $request->user();
 
-        if ($user && (!in_array($user->role, ['guru', 'teacher', 'wali_kelas', 'admin']) && $user->role !== 'guru') || !$user->guru) {
+        if (!$user || (!in_array($user->role, ['guru', 'teacher', 'wali_kelas', 'admin']) && !$user->guru)) {
             return response()->json(['success' => false, 'message' => 'Akses khusus dewan guru'], 403);
         }
 
@@ -1313,8 +1429,21 @@ class MobileAttendanceController extends Controller
             $tanggal = $request->tanggal;
         }
 
+        $schoolId = $user->school_id ?? ($user->guru ? $user->guru->school_id : null);
+        $schoolTz = Setting::where('school_id', $schoolId ?? 0)->where('setting_key', 'timezone')->value('setting_value') ?: config('app.timezone', 'Asia/Jakarta');
+        $now = Carbon::now($schoolTz);
+        $currentTime = $now->format('H:i:s');
+
         $status = $request->status;
         $isHadir = in_array($status, ['H', 'Hadir', 'T', 'Terlambat']);
+
+        $existing = Attendance::where('student_id', $request->student_id)->where('tanggal', $tanggal)->first();
+        $jamMasuk = $existing?->jam_masuk;
+        if (!$jamMasuk && $isHadir) {
+            $jamMasuk = $currentTime;
+        } elseif (!$isHadir) {
+            $jamMasuk = null;
+        }
 
         Attendance::updateOrCreate(
             [
@@ -1322,11 +1451,11 @@ class MobileAttendanceController extends Controller
                 'tanggal' => $tanggal
             ],
             [
-                'school_id' => $user->school_id,
+                'school_id' => $schoolId,
                 'status' => $status,
                 'keterangan' => $request->keterangan ?? null,
-                'jam_masuk' => $isHadir ? now()->format('H:i:s') : null,
-                'updated_at' => now()
+                'jam_masuk' => $jamMasuk,
+                'updated_at' => $now
             ]
         );
 

@@ -140,9 +140,16 @@ Mengambil jam masuk, jam pulang, dan status presensi hari ini.
     "tanggal": "10-09-2026",
     "jam_masuk": "06:55:41",
     "jam_pulang": "15:40:40",
+    "jadwal_masuk": "07:00:00",
+    "jadwal_pulang": "15:30:00",
+    "shift_name": "Reguler Pagi",
     "status_kehadiran": "Hadir",
     "is_checked_in": true,
-    "is_checked_out": true
+    "is_checked_out": true,
+    "is_wali_kelas": false,
+    "wali_kelas": false,
+    "kelas_name": "Kelas X IPA 1",
+    "kelas_id": 1
   }
 }
 ```
@@ -329,14 +336,18 @@ Mendapatkan akumulasi persentase dan rincian kehadiran individu.
 ## 👨‍🏫 3. Fitur Dewan Guru & Wali Kelas
 
 ### 3.1 Cari & Tampilkan Siswa untuk Absensi (`GET /api/mobile/students-attendance`)
-Cari siswa di seluruh sekolah berdasarkan kata kunci Nama / NISN untuk diisi absensinya.
+Cari siswa di seluruh sekolah berdasarkan kelas atau kata kunci Nama / NISN untuk diisi absensinya.
 
 - **URL**: `/api/mobile/students-attendance`
 - **Method**: `GET`
 - **Auth**: Bearer Token
 - **Query Parameters**:
-  - `tanggal` (required): `10-09-2026`
-  - `q` (required for search, min 2 chars): `Ahmad`
+  - `tanggal` (optional, default hari ini): `10-09-2026`
+  - `kelas_id` (optional): `1` *(Dapat digunakan untuk memfilter seluruh siswa per kelas langsung tanpa kata kunci)*
+  - `q` (optional): `Ahmad` *(Pencarian nama atau NIS/NISN, minimal 2 karakter)*
+- **Contoh Request**:
+  - Filter per kelas: `GET /api/mobile/students-attendance?tanggal=10-09-2026&kelas_id=1&q=`
+  - Cari nama/NISN: `GET /api/mobile/students-attendance?tanggal=10-09-2026&q=Ahmad`
 - **Response Success (200 OK)**:
 ```json
 {
@@ -346,9 +357,13 @@ Cari siswa di seluruh sekolah berdasarkan kata kunci Nama / NISN untuk diisi abs
       "student_id": 15,
       "nama": "Ahmad Rizky",
       "nis": "1001",
+      "kelas_id": 1,
       "kelas_name": "Kelas X IPA 1",
       "status": "H",
-      "keterangan": null
+      "status_kehadiran": "Hadir",
+      "keterangan": null,
+      "jam_masuk": "06:55:00",
+      "jam_pulang": null
     }
   ]
 }
@@ -356,8 +371,38 @@ Cari siswa di seluruh sekolah berdasarkan kata kunci Nama / NISN untuk diisi abs
 
 ---
 
-### 3.2 Simpan Absensi Per Siswa (`POST /api/mobile/student-attendance-single`)
-Menyimpan atau mengubah status absensi satu orang siswa saat tombol "Simpan Absen" ditekan.
+### 3.2 Simpan Absensi Siswa Massal / Sekaligus (`POST /api/mobile/students-attendance`)
+Menyimpan atau memperbarui data absensi seluruh siswa sekaligus (bulk submit) dalam satu kelas.
+
+- **URL**: `/api/mobile/students-attendance`
+- **Method**: `POST`
+- **Auth**: Bearer Token
+- **Body Request (JSON)**:
+```json
+{
+  "tanggal": "10-09-2026",
+  "attendances": [
+    { "student_id": 15, "status": "H", "keterangan": null },
+    { "student_id": 16, "status": "I", "keterangan": "Izin acara keluarga" },
+    { "student_id": 17, "status": "S", "keterangan": "Demam / Surat Dokter" }
+  ]
+}
+```
+*Catatan kode status:* `H` (Hadir), `T` (Terlambat), `I` (Izin), `S` (Sakit), `A` (Alpha).
+
+- **Response Success (200 OK)**:
+```json
+{
+  "success": true,
+  "message": "Absensi seluruh siswa berhasil disimpan",
+  "total_updated": 3
+}
+```
+
+---
+
+### 3.3 Simpan Absensi Per Siswa Realtime (`POST /api/mobile/student-attendance-single`)
+Menyimpan atau mengubah status absensi satu orang siswa saat tombol status individual ditekan.
 
 - **URL**: `/api/mobile/student-attendance-single`
 - **Method**: `POST`
@@ -383,20 +428,24 @@ Menyimpan atau mengubah status absensi satu orang siswa saat tombol "Simpan Abse
 
 ---
 
-### 3.3 Rekap Absensi Siswa Kelas Wali Kelas (`GET /api/mobile/rekap-kelas`)
-Mendapatkan rekapitulasi kehadiran seluruh siswa di kelas tempat guru tersebut menjadi wali kelas.
+### 3.4 Rekap Absensi Siswa Kelas Wali Kelas (`GET /api/mobile/rekap-kelas`)
+Mendapatkan rekapitulasi kehadiran seluruh siswa di kelas tempat guru tersebut menjadi wali kelas atau kelas yang dipilih.
 
 - **URL**: `/api/mobile/rekap-kelas`
 - **Method**: `GET`
 - **Auth**: Bearer Token
 - **Query Parameters**:
+  - `kelas_id` (optional): `1` *(Opsional jika guru mengajar atau menjadi wali kelas di lebih dari satu kelas)*
   - `start_date` (optional): `01-09-2026`
   - `end_date` (optional): `10-09-2026`
+- **Contoh Request**:
+  - `GET /api/mobile/rekap-kelas?start_date=01-09-2026&end_date=10-09-2026&kelas_id=1`
 - **Response Success (200 OK)**:
 ```json
 {
   "success": true,
   "data": {
+    "kelas_id": 1,
     "kelas_name": "Kelas X IPA 1 (Wali Kelas)",
     "total_siswa": 32,
     "start_date": "01-09-2026",

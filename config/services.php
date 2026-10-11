@@ -44,4 +44,10 @@ return [
         'base_url' => env('QIOSPAY_BASE_URL', 'https://qiospay.id'),
     ],
 
+    'whatsapp' => [
+        'base_url' => env('GOWA_API_BASE_URL', env('WA_API_BASE_URL', 'http://localhost:3000')),
+        'user'     => env('GOWA_API_USER', env('WA_API_USER', 'admin')),
+        'pass'     => env('GOWA_API_PASS', env('WA_API_PASS', 'opowae')),
+    ],
+
 ];

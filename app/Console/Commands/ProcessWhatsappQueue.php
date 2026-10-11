@@ -75,7 +75,8 @@ class ProcessWhatsappQueue extends Command
             ->when(config('app.mode', 'hosted') !== 'self_hosted', function ($query) {
                 $query->where(function ($q) {
                     $q->whereNull('message_queues.school_id')
-                      ->orWhere('schools.wa_enabled', true);
+                      ->orWhere('schools.wa_enabled', true)
+                      ->orWhere('message_queues.priority', '>=', 10);
                 });
             });
 
@@ -155,10 +156,15 @@ class ProcessWhatsappQueue extends Command
         }
 
         try {
-            // Guard: Pastikan fitur WA sekolah aktif (untuk mode hosted)
+            // Guard: Pastikan fitur WA sekolah aktif (untuk mode hosted), kecuali jika ada antrean pesan prioritas tinggi (seperti tagihan)
             if ($schoolId !== null && config('app.mode', 'hosted') !== 'self_hosted') {
                 $school = School::find($schoolId);
-                if (!$school || !$school->wa_enabled) {
+                $hasHighPriority = MessageQueue::where('school_id', $schoolId)
+                    ->where('status', 'pending')
+                    ->where('priority', '>=', 10)
+                    ->exists();
+
+                if ((!$school || !$school->wa_enabled) && !$hasHighPriority) {
                     $this->warn("Sekolah ID {$schoolId} dinonaktifkan fitur WhatsApp-nya. Dilewati.");
                     return 0;
                 }
@@ -264,10 +270,10 @@ class ProcessWhatsappQueue extends Command
      */
     private function sendMessage($phone, $message, $schoolId = null)
     {
-        $baseUrl  = rtrim(env('WA_API_BASE_URL', env('GOWA_API_BASE_URL', 'http://localhost:3000')), '/');
+        $baseUrl  = rtrim(config('services.whatsapp.base_url', env('GOWA_API_BASE_URL', env('WA_API_BASE_URL', 'http://localhost:3000'))), '/');
         $url      = $baseUrl . '/send/message';
-        $user     = env('WA_API_USER', env('GOWA_API_USER', 'admin'));
-        $pass     = env('WA_API_PASS', env('GOWA_API_PASS', 'jagattech'));
+        $user     = config('services.whatsapp.user', env('GOWA_API_USER', env('WA_API_USER', 'admin')));
+        $pass     = config('services.whatsapp.pass', env('GOWA_API_PASS', env('WA_API_PASS', 'opowae')));
         $deviceId = $schoolId ? (string)$schoolId : 'superadmin';
 
         try {

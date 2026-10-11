@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
 
@@ -14,14 +15,14 @@ class BackupDatabase extends Command
      *
      * @var string
      */
-    protected $signature = 'db:backup {--client= : Override client name for self-hosted backup} {--selfhosted : Force self-hosted mode}';
+    protected $signature = 'db:backup {--client= : Override client name for self-hosted backup} {--selfhosted : Force self-hosted mode} {--force : Ignore 2-day interval limit for self-hosted backup}';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Backup database to storage/app/backups and Cloudflare R2';
+    protected $description = 'Backup database to storage/app/backups and upload (to main server for self-hosted, or Cloudflare R2 for hosted)';
 
     /**
      * Execute the console command.
@@ -31,7 +32,27 @@ class BackupDatabase extends Command
         $this->info('Starting database backup...');
 
         $isSelfHosted = (config('app.mode') === 'self_hosted') || $this->option('selfhosted');
-        $keepDays = $isSelfHosted ? 2 : 7;
+        $path = storage_path("app/backups");
+
+        if (!file_exists($path)) {
+            mkdir($path, 0755, true);
+        }
+
+        // Kebijakan Self-Hosted: Backup 2 hari sekali (kecuali --force)
+        if ($isSelfHosted && !$this->option('force')) {
+            $lastBackupTime = $this->getLastSelfHostedBackupTime($path);
+            if ($lastBackupTime !== null) {
+                $hoursSinceLastBackup = Carbon::createFromTimestamp($lastBackupTime)->diffInHours(now());
+                // 2 hari = 48 jam. Batas 36 jam untuk toleransi jadwal eksekusi
+                if ($hoursSinceLastBackup < 36) {
+                    $lastDateStr = Carbon::createFromTimestamp($lastBackupTime)->format('d-m-Y H:i:s');
+                    $this->info("Kebijakan Self-Hosted: Backup dilakukan 2 hari sekali.");
+                    $this->info("Backup terakhir ditemukan pada: {$lastDateStr} ({$hoursSinceLastBackup} jam yang lalu).");
+                    $this->info("Proses backup dilewati. Gunakan opsi --force untuk memaksa backup saat ini.");
+                    return 0;
+                }
+            }
+        }
 
         if ($isSelfHosted) {
             $clientName = $this->getClientName();
@@ -40,20 +61,14 @@ class BackupDatabase extends Command
                 $clientSlug = 'client';
             }
             // Format file: client-name_tgl-bckup (contoh: sman1-jakarta_01-10-2026.sql)
-            $filename = "{$clientSlug}_" . Carbon::now()->format('d-m-Y') . ".sql";
-            $cloudFolder = 'Client';
-            $this->info("Self-hosted mode detected. Client: '{$clientSlug}', Retention: {$keepDays} days");
+            $filename = "{$clientSlug}_" . Carbon::now()->format('d-m-Y_His') . ".sql";
+            $this->info("Self-hosted mode detected. Client: '{$clientSlug}'");
         } else {
             $clientSlug = null;
             $filename = "backup-" . Carbon::now()->format('Y-m-d-H-i-s') . ".sql";
             $cloudFolder = 'backups';
+            $keepDays = 7;
             $this->info("Hosted mode detected. Retention: {$keepDays} days");
-        }
-
-        $path = storage_path("app/backups");
-
-        if (!file_exists($path)) {
-            mkdir($path, 0755, true);
         }
 
         $filePath = "$path/$filename";
@@ -114,40 +129,48 @@ class BackupDatabase extends Command
         }
 
         if ($returnVar === 0) {
-            $this->info("Backup successful: $filename");
+            $this->info("Backup local berhasil dibuat: $filename");
             
-            // Upload to Cloudflare R2 if configured
-            $r2Endpoint = config('filesystems.disks.r2.endpoint') ?: env('CLOUDFLARE_R2_ENDPOINT');
-            $r2Key = config('filesystems.disks.r2.key') ?: env('CLOUDFLARE_R2_ACCESS_KEY_ID');
-            $r2Bucket = config('filesystems.disks.r2.bucket') ?: env('CLOUDFLARE_R2_BUCKET');
+            if ($isSelfHosted) {
+                // 1. Kirim backup langsung ke server utama (tidak butuh Cloudflare R2)
+                $this->uploadToMainServer($filePath, $filename);
 
-            if (!empty($r2Endpoint) && !empty($r2Key) && !empty($r2Bucket)) {
-                $cloudPath = "{$cloudFolder}/{$filename}";
-                $this->info("Uploading backup to Cloudflare R2 ({$cloudPath})...");
-                try {
-                    $stream = fopen($filePath, 'r');
-                    $uploaded = Storage::disk('r2')->put($cloudPath, $stream);
-                    if (is_resource($stream)) {
-                        fclose($stream);
-                    }
-
-                    if ($uploaded !== false) {
-                        $this->info("Backup successfully uploaded to Cloudflare R2: {$cloudPath}");
-                    } else {
-                        $this->warn("Upload to Cloudflare R2 returned false. Check permissions or credentials.");
-                    }
-                    
-                    // Clean old backups in Cloudflare R2
-                    $this->cleanOldCloudBackups($cloudFolder, $keepDays, $clientSlug);
-                } catch (\Exception $e) {
-                    $this->error("Failed to upload to Cloudflare R2: " . $e->getMessage());
-                }
+                // 2. Bersihkan backup lokal: hanya simpan 1 backup terbaru
+                $this->cleanLocalBackupsExceptCurrent($path, $filename);
             } else {
-                $this->line("Cloudflare R2 is not configured. Skipping cloud upload.");
-            }
+                // Mode Hosted: Upload ke Cloudflare R2 jika dikonfigurasi
+                $r2Endpoint = config('filesystems.disks.r2.endpoint') ?: env('CLOUDFLARE_R2_ENDPOINT');
+                $r2Key = config('filesystems.disks.r2.key') ?: env('CLOUDFLARE_R2_ACCESS_KEY_ID');
+                $r2Bucket = config('filesystems.disks.r2.bucket') ?: env('CLOUDFLARE_R2_BUCKET');
 
-            // Clean old backups locally
-            $this->cleanOldBackups($path, $keepDays);
+                if (!empty($r2Endpoint) && !empty($r2Key) && !empty($r2Bucket)) {
+                    $cloudPath = "{$cloudFolder}/{$filename}";
+                    $this->info("Uploading backup to Cloudflare R2 ({$cloudPath})...");
+                    try {
+                        $stream = fopen($filePath, 'r');
+                        $uploaded = Storage::disk('r2')->put($cloudPath, $stream);
+                        if (is_resource($stream)) {
+                            fclose($stream);
+                        }
+
+                        if ($uploaded !== false) {
+                            $this->info("Backup successfully uploaded to Cloudflare R2: {$cloudPath}");
+                        } else {
+                            $this->warn("Upload to Cloudflare R2 returned false. Check permissions or credentials.");
+                        }
+                        
+                        // Clean old backups in Cloudflare R2
+                        $this->cleanOldCloudBackups($cloudFolder, $keepDays, $clientSlug);
+                    } catch (\Exception $e) {
+                        $this->error("Failed to upload to Cloudflare R2: " . $e->getMessage());
+                    }
+                } else {
+                    $this->line("Cloudflare R2 is not configured. Skipping cloud upload.");
+                }
+
+                // Clean old backups locally (hosted retention: 7 days)
+                $this->cleanOldBackups($path, $keepDays);
+            }
             
         } else {
             $errorDetails = file_exists($errorLogPath) ? file_get_contents($errorLogPath) : '';
@@ -350,6 +373,86 @@ class BackupDatabase extends Command
             }
         } catch (\Exception $e) {
             $this->error("Failed to clean old cloud backups: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Upload backup SQL to the main license server via HTTP multipart.
+     */
+    private function uploadToMainServer(string $filePath, string $filename): void
+    {
+        $serverUrl = rtrim(config('app.license_server_url') ?: env('LICENSE_SERVER_URL', ''), '/');
+        $licenseKey = config('app.license_key') ?: env('LICENSE_KEY', '');
+
+        if (empty($serverUrl) || empty($licenseKey)) {
+            $this->warn("LICENSE_SERVER_URL atau LICENSE_KEY tidak terkonfigurasi di .env. Backup hanya tersimpan di lokal.");
+            return;
+        }
+
+        $uploadUrl = "{$serverUrl}/api/license/backup/upload";
+        $this->info("Mengirim file backup ke server utama ({$uploadUrl})...");
+
+        try {
+            $response = Http::timeout(600)
+                ->attach('backup_file', fopen($filePath, 'r'), $filename)
+                ->post($uploadUrl, [
+                    'license_key' => $licenseKey,
+                ]);
+
+            if ($response->successful()) {
+                $body = $response->json();
+                $msg = $body['message'] ?? 'OK';
+                $this->info("Berhasil dikirim ke server utama: {$msg}");
+            } else {
+                $status = $response->status();
+                $body = $response->body();
+                $this->error("Gagal mengirim backup ke server utama (HTTP {$status}): {$body}");
+            }
+        } catch (\Throwable $e) {
+            $this->error("Koneksi ke server utama gagal: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Get the latest modification timestamp of existing backup files.
+     */
+    private function getLastSelfHostedBackupTime(string $path): ?int
+    {
+        $files = glob("$path/*.sql");
+        if (empty($files)) {
+            return null;
+        }
+
+        $latestTime = null;
+        foreach ($files as $file) {
+            if (!is_file($file)) {
+                continue;
+            }
+            $mtime = filemtime($file);
+            if ($latestTime === null || $mtime > $latestTime) {
+                $latestTime = $mtime;
+            }
+        }
+
+        return $latestTime;
+    }
+
+    /**
+     * Enforce single backup retention locally for self-hosted clients.
+     * Deletes all other .sql files in the backup directory except the current one.
+     */
+    private function cleanLocalBackupsExceptCurrent(string $path, string $currentFilename): void
+    {
+        $files = glob("$path/*.sql");
+        foreach ($files as $file) {
+            if (!is_file($file)) {
+                continue;
+            }
+
+            if (basename($file) !== $currentFilename) {
+                @unlink($file);
+                $this->info("Menghapus backup lokal lama (kebijakan 1 backup): " . basename($file));
+            }
         }
     }
 }

@@ -38,8 +38,12 @@ Schedule::command('absen:check-abnormal')->everyMinute()->withoutOverlapping()
         }
     });
 
-// Daily Full SQL Database Backup (Runs at 02:00 AM)
-Schedule::command('db:backup')->dailyAt('02:00')->withoutOverlapping();
+// Full SQL Database Backup (Self-hosted: 2 hari sekali pada jam 02:00 AM, Hosted: harian pada jam 02:00 AM)
+if (config('app.mode') === 'self_hosted') {
+    Schedule::command('db:backup')->cron('0 2 */2 * *')->withoutOverlapping();
+} else {
+    Schedule::command('db:backup')->dailyAt('02:00')->withoutOverlapping();
+}
 
 // Auto-delete old attendance history per school quota (Runs at 01:00 AM)
 Schedule::command('absen:auto-delete-history')->dailyAt('01:00')->withoutOverlapping();

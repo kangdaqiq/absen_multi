@@ -165,6 +165,7 @@
                             <th class="py-4 px-4 font-medium text-black dark:text-white text-center">Sekolah</th>
                             <th class="py-4 px-4 font-medium text-black dark:text-white text-center">Kuota Limit</th>
                             <th class="py-4 px-4 font-medium text-black dark:text-white">Expired</th>
+                            <th class="py-4 px-4 font-medium text-black dark:text-white text-center">Backup Database</th>
                             <th class="py-4 px-4 font-medium text-black dark:text-white text-center">Foto Siswa</th>
                             <th class="py-4 px-4 font-medium text-black dark:text-white">Status</th>
                             <th class="py-4 px-4 font-medium text-black dark:text-white text-center">Aksi</th>
@@ -199,7 +200,7 @@
                                 <td class="border-b border-[#eee] py-5 px-4 dark:border-strokedark align-top text-sm">
                                     @if($license->expired_at)
                                         <span class="{{ $license->isExpired() ? 'text-danger font-bold' : 'text-black dark:text-white' }}">
-                                            {{ $license->expired_at->format('d M Y') }}
+                                             {{ $license->expired_at->format('d M Y') }}
                                         </span>
                                     @else
                                         <span class="text-gray-500">Selamanya</span>
@@ -212,6 +213,24 @@
                                             <span>Belum pernah</span>
                                         @endif
                                     </div>
+                                </td>
+                                <td class="border-b border-[#eee] py-5 px-4 dark:border-strokedark align-top text-center text-xs">
+                                    @if($license->last_backup_at)
+                                        <div class="flex flex-col items-center gap-1">
+                                            <span class="text-black dark:text-white font-medium" title="{{ $license->last_backup_at->format('d M Y H:i:s') }}">
+                                                {{ $license->last_backup_at->format('d/m/Y H:i') }}
+                                            </span>
+                                            <span class="text-[11px] text-gray-500">({{ $license->last_backup_at->diffForHumans() }})</span>
+                                            <span class="inline-block px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-[11px] font-semibold text-brand-500">
+                                                {{ $license->formatted_backup_size }}
+                                            </span>
+                                            <a href="{{ route('super-admin.licenses.download-backup', $license) }}" class="mt-1 inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium text-white bg-brand-500 hover:bg-brand-600 rounded transition shadow-sm" title="Download Backup SQL">
+                                                <i class="fas fa-download"></i> SQL
+                                            </a>
+                                        </div>
+                                    @else
+                                        <span class="text-gray-400 italic">Belum ada</span>
+                                    @endif
                                 </td>
                                 <td class="border-b border-[#eee] py-5 px-4 dark:border-strokedark text-center align-top">
                                     <label class="inline-flex items-center cursor-pointer" title="{{ ($license->photo_enabled ?? true) ? 'Klik untuk nonaktifkan fitur foto' : 'Klik untuk aktifkan fitur foto' }}">
@@ -262,7 +281,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="7" class="border-b border-[#eee] py-8 px-4 dark:border-strokedark text-center text-gray-500">
+                                <td colspan="8" class="border-b border-[#eee] py-8 px-4 dark:border-strokedark text-center text-gray-500">
                                     <div class="flex flex-col items-center">
                                         <i class="fas fa-key text-4xl mb-3 text-gray-400"></i>
                                         <span>Belum ada lisensi. Buat lisensi pertama di form sebelah.</span>

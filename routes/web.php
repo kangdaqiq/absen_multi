@@ -102,6 +102,7 @@ Route::middleware(['auth', 'self_hosted_guard'])->prefix('super-admin')->name('s
         // Licenses (Self-Hosted)
         Route::patch('licenses/{license}/regenerate', [App\Http\Controllers\SuperAdmin\LicenseController::class, 'regenerate'])->name('licenses.regenerate');
         Route::patch('licenses/{license}/toggle-photo', [App\Http\Controllers\SuperAdmin\LicenseController::class, 'togglePhoto'])->name('licenses.toggle-photo');
+        Route::get('licenses/{license}/download-backup', [App\Http\Controllers\SuperAdmin\LicenseController::class, 'downloadBackup'])->name('licenses.download-backup');
         Route::resource('licenses', App\Http\Controllers\SuperAdmin\LicenseController::class)->only(['index', 'store', 'update', 'destroy']);
 
         // WhatsApp Devices Overview

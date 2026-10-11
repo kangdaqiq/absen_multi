@@ -99,4 +99,20 @@ class LicenseController extends Controller
         return redirect()->route('super-admin.licenses.index')
             ->with('success', 'License key untuk ' . $license->client_name . ' berhasil diperbarui.');
     }
+
+    /**
+     * Download the latest backup for the license
+     */
+    public function downloadBackup(License $license)
+    {
+        if (empty($license->backup_file) || !\Illuminate\Support\Facades\Storage::disk('local')->exists($license->backup_file)) {
+            return redirect()->route('super-admin.licenses.index')
+                ->with('error', 'File backup untuk lisensi ' . $license->client_name . ' belum tersedia atau tidak ditemukan di server.');
+        }
+
+        $fullPath = \Illuminate\Support\Facades\Storage::disk('local')->path($license->backup_file);
+        $downloadName = basename($license->backup_file);
+
+        return response()->download($fullPath, $downloadName);
+    }
 }

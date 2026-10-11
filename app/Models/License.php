@@ -21,19 +21,37 @@ class License extends Model
         'allowed_hostname',
         'notes',
         'last_ping_at',
+        'last_backup_at',
+        'backup_file',
+        'backup_size',
     ];
 
     protected $casts = [
-        'is_active'     => 'boolean',
-        'photo_enabled' => 'boolean',
-        'expired_at'   => 'date',
-        'last_ping_at' => 'datetime',
-        'max_schools'  => 'integer',
-        'max_students' => 'integer',
-        'max_teachers' => 'integer',
-        'max_bot_users' => 'integer',
+        'is_active'      => 'boolean',
+        'photo_enabled'  => 'boolean',
+        'expired_at'    => 'date',
+        'last_ping_at'   => 'datetime',
+        'last_backup_at' => 'datetime',
+        'backup_size'    => 'integer',
+        'max_schools'   => 'integer',
+        'max_students'  => 'integer',
+        'max_teachers'  => 'integer',
+        'max_bot_users'  => 'integer',
         'history_quota_months' => 'integer',
     ];
+
+    public function getFormattedBackupSizeAttribute(): string
+    {
+        if (empty($this->backup_size)) {
+            return '-';
+        }
+        $units = ['B', 'KB', 'MB', 'GB', 'TB'];
+        $bytes = max($this->backup_size, 0);
+        $pow = floor(($bytes ? log($bytes) : 0) / log(1024));
+        $pow = min($pow, count($units) - 1);
+        $bytes /= pow(1024, $pow);
+        return round($bytes, 2) . ' ' . $units[$pow];
+    }
 
     /**
      * Generate a unique license key (XXXX-XXXX-XXXX-XXXX)

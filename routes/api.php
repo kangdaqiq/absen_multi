@@ -23,8 +23,9 @@ Route::any('/r307/sync-list', [App\Http\Controllers\Api\R307FingerprintControlle
 Route::any('/r307/sync-template', [App\Http\Controllers\Api\R307FingerprintController::class, 'getSyncTemplate']);
 Route::any('/r307/trigger-sync', [App\Http\Controllers\Api\R307FingerprintController::class, 'triggerSync']);
 
-// License validation (public - for self-hosted clients)
+// License validation & Client Backup (public - for self-hosted clients)
 Route::post('/license/validate', [App\Http\Controllers\Api\LicenseValidateController::class, 'validate']);
+Route::post('/license/backup/upload', [App\Http\Controllers\Api\ClientBackupController::class, 'upload']);
 
 // Qiospay QRIS Callback Endpoint (POST /api/callback/accept/{secret_key})
 Route::any('/callback/accept/{key?}', [App\Http\Controllers\Api\QrisCallbackController::class, 'accept']);

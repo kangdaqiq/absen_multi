@@ -55,7 +55,7 @@ Schedule::command('absen:clean-api-logs --days=7')->dailyAt('01:30')->withoutOve
 Schedule::command('license:validate')->dailyAt('00:30')->withoutOverlapping();
 
 // Daily Subscription and Package Check (Runs at 08:00 AM)
-Schedule::command('subscription:check')->dailyAt('08:00')->withoutOverlapping();
+Schedule::command('subscription:check')->dailyAt('06:00')->withoutOverlapping();
 
 // Kirim Ucapan Selamat Ulang Tahun ke Guru & Siswa (Runs at 00:01 AM)
 Schedule::command('absen:send-birthdays')->dailyAt('00:01')->withoutOverlapping();

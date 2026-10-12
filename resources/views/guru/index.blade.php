@@ -587,10 +587,10 @@
                 <i class="fas fa-barcode text-brand-500"></i>
                 <span>Scan USB Reader / Ketik Manual</span>
             </div>
-            <div class="flex gap-2">
-                <input type="text" id="inputManualUID" placeholder="Tap kartu / ketik UID..." class="flex-1 text-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-mono uppercase tracking-wider outline-none focus:border-brand-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white">
-                <button type="button" id="btnSimpanManualUID" class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 transition shrink-0 inline-flex items-center gap-1.5 shadow-xs">
-                    <i class="fas fa-check text-xs"></i> Simpan
+            <div class="relative w-full" style="width: 100%;">
+                <input type="text" id="inputManualUID" placeholder="Tap kartu / ketik UID..." style="width: 100%; text-align: center; padding-left: 20px; padding-right: 84px;" class="w-full text-center rounded-lg border border-gray-300 bg-white py-2.5 text-sm font-mono uppercase tracking-wider outline-none focus:border-brand-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white">
+                <button type="button" id="btnSimpanManualUID" style="position: absolute; right: 6px; top: 50%; transform: translateY(-50%); background-color: #4f6bed; color: #ffffff;" class="rounded-md px-3 py-1.5 text-xs font-medium text-white hover:opacity-90 transition shadow-xs inline-flex items-center gap-1">
+                    <i class="fas fa-check text-[10px]"></i> Simpan
                 </button>
             </div>
             <p class="mt-2 text-[11px] text-gray-400 dark:text-gray-500 text-center flex items-center justify-center gap-1">
@@ -598,11 +598,7 @@
             </p>
         </div>
 
-        <div class="relative flex py-2 items-center mb-3">
-            <div class="flex-grow border-t border-gray-200 dark:border-gray-700"></div>
-            <span class="flex-shrink mx-3 text-xs text-gray-400 dark:text-gray-500 uppercase tracking-wider">atau</span>
-            <div class="flex-grow border-t border-gray-200 dark:border-gray-700"></div>
-        </div>
+        <div class="border-t border-gray-200 dark:border-gray-700 my-4"></div>
 
         <div class="flex flex-col gap-3">
             <button type="button" class="rounded-lg bg-brand-500 p-3 font-medium text-white hover:bg-brand-600 transition" id="btnMulaiEnroll">

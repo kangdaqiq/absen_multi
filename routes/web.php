@@ -206,6 +206,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/guru/{id}/enroll-cancel', [GuruController::class, 'cancelEnroll']);
         Route::get('/guru/{id}/enroll-check', [GuruController::class, 'enrollCheck']);
         Route::post('/guru/{id}/delete-uid', [GuruController::class, 'deleteUid']);
+        Route::post('/guru/{id}/save-uid', [GuruController::class, 'saveUid'])->name('guru.save-uid');
 
         Route::post('/guru/{id}/enroll-finger', [GuruController::class, 'enrollFingerRequest']);
         Route::post('/guru/{id}/enroll-finger-cancel', [GuruController::class, 'cancelFingerEnroll']);
@@ -223,6 +224,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/siswa/{id}/enroll-cancel', [SiswaController::class, 'cancelEnroll']);
         Route::get('/siswa/{id}/enroll-check', [SiswaController::class, 'enrollCheck']);
         Route::post('/siswa/{id}/delete-uid', [SiswaController::class, 'deleteUid']);
+        Route::post('/siswa/{id}/save-uid', [SiswaController::class, 'saveUid'])->name('siswa.save-uid');
 
         Route::post('/siswa/{id}/enroll-finger', [SiswaController::class, 'enrollFingerRequest']);
         Route::post('/siswa/{id}/enroll-finger-cancel', [SiswaController::class, 'cancelFingerEnroll']);

@@ -348,6 +348,10 @@
                     <input type="text" disabled placeholder="Terdaftar otomatis via Bot" class="w-full rounded-lg border border-gray-200 bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500 cursor-not-allowed px-4 py-2 outline-none dark:border-gray-700">
                 </div>
                 <div class="sm:col-span-2">
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">UID RFID <span class="text-gray-400 font-normal">(opsional / Scan USB Reader)</span></label>
+                    <input type="text" name="uid_rfid" placeholder="Tempel kartu ke USB Reader atau ketik UID..." class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 font-mono uppercase dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                </div>
+                <div class="sm:col-span-2">
                     <div class="flex flex-wrap items-center gap-6 mt-1">
                         <label class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer">
                             <input type="checkbox" name="is_khusus" id="is_khusus" value="1" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-600 dark:bg-gray-800">
@@ -478,8 +482,8 @@
                     <input type="text" id="edit_telegram_ortu_chat_id" disabled placeholder="Belum terhubung ke Bot" class="w-full rounded-lg border border-gray-200 bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 cursor-not-allowed px-4 py-2 outline-none dark:border-gray-700">
                 </div>
                 <div class="sm:col-span-2">
-                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">UID RFID</label>
-                    <input type="text" name="uid_rfid" id="edit_uid_rfid" readonly class="w-full rounded-lg border border-gray-200 bg-gray-100 px-4 py-2 outline-none dark:border-gray-800 dark:bg-gray-800 dark:text-gray-400">
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">UID RFID <span class="text-gray-400 font-normal">(bisa diedit / Scan USB Reader)</span></label>
+                    <input type="text" name="uid_rfid" id="edit_uid_rfid" placeholder="Tempel kartu ke USB Reader atau ketik UID..." class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 font-mono uppercase dark:border-gray-800 dark:bg-gray-900 dark:text-white">
                 </div>
                 <div class="sm:col-span-2">
                     <div class="flex flex-wrap items-center gap-6 mt-1">
@@ -868,14 +872,36 @@
         <h5 id="enroll_nama" class="font-medium text-gray-600 dark:text-gray-400 mb-6"></h5>
 
         <div id="uid_wrapper" class="hidden mb-4 rounded-lg bg-success-50 p-3 text-success-700 dark:bg-success-500/15 dark:text-success-500">
-            UID Terdaftar: <strong id="enroll_uid" class="text-lg"></strong>
+            UID Terdaftar: <strong id="enroll_uid" class="text-lg font-mono"></strong>
         </div>
 
-        <div id="enroll_status" class="mb-6 h-10 flex items-center justify-center"></div>
+        <div id="enroll_status" class="mb-4 min-h-10 flex items-center justify-center text-sm"></div>
+
+        <!-- Scan via USB Reader / Input Manual -->
+        <div class="mb-4 rounded-xl border border-gray-200 bg-gray-50/70 p-3.5 text-left dark:border-gray-700 dark:bg-gray-800/40">
+            <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                <i class="fas fa-barcode text-brand-500 mr-1"></i> Scan USB Reader / Ketik Manual
+            </label>
+            <div class="flex gap-2">
+                <input type="text" id="inputManualUIDSiswa" placeholder="Tap kartu ke USB Reader..." class="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-mono uppercase outline-none focus:border-brand-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white">
+                <button type="button" id="btnSimpanManualUIDSiswa" class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 transition shrink-0 inline-flex items-center gap-1.5 shadow-xs">
+                    <i class="fas fa-check text-xs"></i> Simpan
+                </button>
+            </div>
+            <p class="mt-1.5 text-[11px] text-gray-400 dark:text-gray-500">
+                <i class="fas fa-info-circle mr-0.5"></i> Tempelkan kartu pada scanner USB (otomatis tersimpan saat Enter).
+            </p>
+        </div>
+
+        <div class="relative flex py-2 items-center mb-2">
+            <div class="flex-grow border-t border-gray-200 dark:border-gray-700"></div>
+            <span class="flex-shrink mx-3 text-[11px] text-gray-400 dark:text-gray-500 uppercase tracking-wider">Atau via Mesin Absensi ESP</span>
+            <div class="flex-grow border-t border-gray-200 dark:border-gray-700"></div>
+        </div>
 
         <div class="flex flex-col gap-3">
             <button type="button" class="rounded-lg bg-brand-500 p-3 font-medium text-white hover:bg-brand-600 transition" id="btnMulaiEnroll">
-                <i class="fas fa-rss mr-1"></i> Mulai Scan Kartu
+                <i class="fas fa-rss mr-1"></i> Mulai Scan via Mesin ESP
             </button>
             <button type="button" class="rounded-lg bg-error-500 p-3 font-medium text-white hover:bg-error-600 transition disabled:opacity-50 disabled:cursor-not-allowed" id="btnHapusUID" disabled>
                 <i class="fas fa-trash mr-1"></i> Hapus UID
@@ -1068,10 +1094,70 @@
 
                 // Check existing UID
                 var uid = $(this).data('uid');
+                $('#inputManualUIDSiswa').val('');
                 if (uid) {
                     $('#enroll_uid').text(uid);
                     $('#uid_wrapper').removeClass('hidden');
                     $('#btnHapusUID').prop('disabled', false);
+                }
+
+                setTimeout(function () {
+                    $('#inputManualUIDSiswa').focus();
+                }, 300);
+            });
+
+            // Simpan Manual UID / USB Scanner Siswa
+            function simpanManualSiswaUID() {
+                if (!enrollSiswaId) return;
+                var uidVal = $('#inputManualUIDSiswa').val().trim();
+                if (!uidVal) {
+                    alert('Silakan tempelkan kartu pada USB scanner atau ketikkan UID terlebih dahulu.');
+                    $('#inputManualUIDSiswa').focus();
+                    return;
+                }
+
+                var $btn = $('#btnSimpanManualUIDSiswa');
+                $btn.prop('disabled', true).addClass('opacity-50');
+                $('#enroll_status').html('<span class="text-brand-500"><i class="fas fa-spinner fa-spin mr-1"></i>Menyimpan UID...</span>');
+
+                $.post('{{ url('siswa') }}/' + enrollSiswaId + '/save-uid', {
+                    _token: '{{ csrf_token() }}',
+                    uid: uidVal
+                }, function (res) {
+                    if (res.ok || res.success) {
+                        $('#enroll_uid').text(res.uid);
+                        $('#uid_wrapper').removeClass('hidden');
+                        $('#btnHapusUID').prop('disabled', false);
+                        $('#inputManualUIDSiswa').val('');
+                        $('#enroll_status').html('<span class="text-emerald-500 font-semibold"><i class="fas fa-check-circle mr-1"></i>' + (res.message || 'UID siswa berhasil disimpan.') + '</span>');
+
+                        // Update data di tabel & tombol
+                        $('.btnEnroll[data-id="' + enrollSiswaId + '"]').data('uid', res.uid).attr('data-uid', res.uid);
+                        $('.btnEdit[data-id="' + enrollSiswaId + '"]').data('uid', res.uid).attr('data-uid', res.uid);
+
+                        var $row = $('.btnEnroll[data-id="' + enrollSiswaId + '"]').closest('tr');
+                        var $rfidBadge = $row.find('td:nth-child(9) span');
+                        if ($rfidBadge.length) {
+                            $rfidBadge.replaceWith('<span class="inline-flex rounded-full bg-brand-50 px-2.5 py-1 text-xs font-medium text-brand-600 dark:bg-brand-500/15 dark:text-brand-500">' + res.uid + '</span>');
+                        }
+
+                        setTimeout(function () { $('#inputManualUIDSiswa').focus(); }, 300);
+                    } else {
+                        $('#enroll_status').html('<span class="text-error-500 font-semibold"><i class="fas fa-times-circle mr-1"></i>' + (res.message || 'Gagal menyimpan UID.') + '</span>');
+                    }
+                }).fail(function (xhr) {
+                    var msg = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : 'Gagal menyimpan UID.';
+                    $('#enroll_status').html('<span class="text-error-500 font-semibold"><i class="fas fa-times-circle mr-1"></i>' + msg + '</span>');
+                }).always(function () {
+                    $btn.prop('disabled', false).removeClass('opacity-50');
+                });
+            }
+
+            $('#btnSimpanManualUIDSiswa').on('click', simpanManualSiswaUID);
+            $('#inputManualUIDSiswa').on('keypress', function (e) {
+                if (e.which === 13) {
+                    e.preventDefault();
+                    simpanManualSiswaUID();
                 }
             });
 

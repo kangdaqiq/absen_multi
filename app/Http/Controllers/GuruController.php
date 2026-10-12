@@ -98,6 +98,7 @@ class GuruController extends Controller
             $data['telegram_chat_id'] = null;
         }
         $data['default_shift_id'] = $request->filled('default_shift_id') ? $request->default_shift_id : null;
+        $data['uid_rfid'] = !empty($data['uid_rfid']) ? strtoupper(trim($data['uid_rfid'])) : null;
 
         if ($request->hasFile('foto')) {
             $data['foto'] = $this->processAndStoreFoto($request->file('foto'));
@@ -165,6 +166,7 @@ class GuruController extends Controller
             $data['telegram_chat_id'] = null;
         }
         $data['default_shift_id'] = $request->filled('default_shift_id') ? $request->default_shift_id : null;
+        $data['uid_rfid'] = !empty($data['uid_rfid']) ? strtoupper(trim($data['uid_rfid'])) : null;
 
         if ($request->hasFile('foto')) {
             if ($guruModel->foto) {
@@ -464,6 +466,35 @@ class GuruController extends Controller
         $this->authorizeGuruAccess($guru);
         $guru->update(['uid_rfid' => null, 'enroll_status' => 'none']);
         return response()->json(['ok' => true]);
+    }
+
+    public function saveUid(Request $request, $id)
+    {
+        $guru = Guru::findOrFail($id);
+        $this->authorizeGuruAccess($guru);
+        $schoolId = $guru->school_id;
+
+        $request->validate([
+            'uid' => [
+                'required',
+                'string',
+                'max:50',
+                Rule::unique('guru', 'uid_rfid')->ignore($guru->id)->where(fn($q) => $q->where('school_id', $schoolId)),
+                Rule::unique('siswa', 'uid_rfid')->where(fn($q) => $q->where('school_id', $schoolId)),
+            ]
+        ], [
+            'uid.unique' => 'Kartu RFID ini sudah terdaftar pada guru atau siswa lain di sekolah ini.'
+        ]);
+
+        $uid = strtoupper(trim($request->input('uid')));
+        $guru->update(['uid_rfid' => $uid, 'enroll_status' => 'none']);
+
+        return response()->json([
+            'ok' => true,
+            'success' => true,
+            'uid' => $uid,
+            'message' => 'UID RFID dewan guru berhasil disimpan.'
+        ]);
     }
 
     // Fingerprint Enrollment Methods

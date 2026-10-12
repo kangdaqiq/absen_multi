@@ -87,6 +87,13 @@ class SiswaController extends Controller
             'telegram_chat_id' => 'nullable|string|max:50',
             'telegram_ortu_chat_id' => 'nullable|string|max:50',
             'foto' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:3072',
+            'uid_rfid' => [
+                'nullable',
+                'string',
+                'max:50',
+                Rule::unique('siswa', 'uid_rfid')->where(fn($q) => $q->where('school_id', $schoolId)),
+                Rule::unique('guru', 'uid_rfid')->where(fn($q) => $q->where('school_id', $schoolId)),
+            ],
             'user_id' => 'nullable|exists:users,id',
             'is_khusus' => 'nullable|boolean',
             'is_siswa_khusus' => 'nullable|boolean',
@@ -119,6 +126,7 @@ class SiswaController extends Controller
             $input['telegram_chat_id'] = null;
         if (empty($input['telegram_ortu_chat_id']))
             $input['telegram_ortu_chat_id'] = null;
+        $input['uid_rfid'] = !empty($input['uid_rfid']) ? strtoupper(trim($input['uid_rfid'])) : null;
 
         $input['is_khusus'] = $request->has('is_khusus') ? 1 : 0;
         $input['is_siswa_khusus'] = $request->has('is_siswa_khusus') ? 1 : 0;
@@ -180,7 +188,13 @@ class SiswaController extends Controller
             'telegram_chat_id' => 'nullable|string|max:50',
             'telegram_ortu_chat_id' => 'nullable|string|max:50',
             'foto' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:3072',
-            'uid_rfid' => 'nullable|string|max:50',
+            'uid_rfid' => [
+                'nullable',
+                'string',
+                'max:50',
+                Rule::unique('siswa', 'uid_rfid')->ignore($siswa->id)->where(fn($q) => $q->where('school_id', $schoolId)),
+                Rule::unique('guru', 'uid_rfid')->where(fn($q) => $q->where('school_id', $schoolId)),
+            ],
             'user_id' => 'nullable|exists:users,id',
             'is_khusus' => 'nullable|boolean',
             'is_siswa_khusus' => 'nullable|boolean',
@@ -227,6 +241,8 @@ class SiswaController extends Controller
         } elseif (empty($input['telegram_ortu_chat_id'])) {
             $input['telegram_ortu_chat_id'] = null;
         }
+
+        $input['uid_rfid'] = !empty($input['uid_rfid']) ? strtoupper(trim($input['uid_rfid'])) : null;
 
         $input['is_khusus'] = $request->has('is_khusus') ? 1 : 0;
         $input['is_siswa_khusus'] = $request->has('is_siswa_khusus') ? 1 : 0;
@@ -850,6 +866,35 @@ class SiswaController extends Controller
         $this->authorizeStudentAccess($siswa);
         $siswa->update(['uid_rfid' => null, 'enroll_status' => 'none']);
         return response()->json(['ok' => true]);
+    }
+
+    public function saveUid(Request $request, $id)
+    {
+        $siswa = Siswa::findOrFail($id);
+        $this->authorizeStudentAccess($siswa);
+        $schoolId = $siswa->school_id;
+
+        $request->validate([
+            'uid' => [
+                'required',
+                'string',
+                'max:50',
+                Rule::unique('siswa', 'uid_rfid')->ignore($siswa->id)->where(fn($q) => $q->where('school_id', $schoolId)),
+                Rule::unique('guru', 'uid_rfid')->where(fn($q) => $q->where('school_id', $schoolId)),
+            ]
+        ], [
+            'uid.unique' => 'Kartu RFID ini sudah terdaftar pada siswa atau guru lain di sekolah ini.'
+        ]);
+
+        $uid = strtoupper(trim($request->input('uid')));
+        $siswa->update(['uid_rfid' => $uid, 'enroll_status' => 'none']);
+
+        return response()->json([
+            'ok' => true,
+            'success' => true,
+            'uid' => $uid,
+            'message' => 'UID RFID siswa berhasil disimpan.'
+        ]);
     }
 
     // Fingerprint Enrollment Methods

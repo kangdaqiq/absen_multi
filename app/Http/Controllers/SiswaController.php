@@ -196,6 +196,11 @@ class SiswaController extends Controller
                 Siswa::deletePhotoFile($siswa->foto);
             }
             $input['foto'] = $this->processAndStoreFoto($request->file('foto'));
+        } elseif ($request->boolean('hapus_foto')) {
+            if ($siswa->foto) {
+                Siswa::deletePhotoFile($siswa->foto);
+            }
+            $input['foto'] = null;
         } else {
             unset($input['foto']);
         }
@@ -1010,6 +1015,43 @@ class SiswaController extends Controller
         }
 
         return redirect()->back()->with('success', "Data Face ID siswa {$siswa->nama} berhasil dihapus/direset.");
+    }
+
+    /**
+     * Hapus foto profil siswa.
+     * Memastikan akses sesuai school_id tenant sekolah.
+     */
+    public function deletePhoto($id)
+    {
+        $siswa = Siswa::findOrFail($id);
+        $this->authorizeStudentAccess($siswa);
+
+        if ($siswa->foto) {
+            Siswa::deletePhotoFile($siswa->foto);
+            $siswa->update(['foto' => null]);
+        }
+
+        ApiLog::create([
+            'school_id' => $siswa->school_id,
+            'api_key' => 'WEB_ADMIN',
+            'action' => 'delete_photo_siswa',
+            'uid' => $siswa->nis,
+            'success' => true,
+            'message' => "Hapus foto profil siswa: {$siswa->nama} (NIS: {$siswa->nis}) oleh " . (auth()->user()->full_name ?? auth()->user()->username),
+            'ip_address' => request()->ip(),
+            'user_agent' => request()->userAgent() ?? 'Web Dashboard',
+            'created_at' => now(),
+        ]);
+
+        if (request()->ajax() || request()->wantsJson()) {
+            return response()->json([
+                'ok' => true,
+                'success' => true,
+                'message' => "Foto profil siswa {$siswa->nama} berhasil dihapus."
+            ]);
+        }
+
+        return redirect()->back()->with('success', "Foto profil siswa {$siswa->nama} berhasil dihapus.");
     }
 
     public function bulkDestroy(Request $request)

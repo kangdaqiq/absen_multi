@@ -416,13 +416,19 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 @if($photoEnabled ?? true)
                 <div class="sm:col-span-2">
-                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Ganti Foto Siswa <span class="text-gray-400 font-normal">(opsional - biarkan kosong jika tidak ingin mengubah)</span></label>
+                    <div class="flex items-center justify-between mb-1.5">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Ganti Foto Siswa <span class="text-gray-400 font-normal">(opsional - biarkan kosong jika tidak ingin mengubah)</span></label>
+                        <button type="button" id="btnHapusFotoSiswa" class="hidden text-xs text-red-600 hover:text-red-700 dark:text-red-400 font-medium items-center gap-1.5 px-2.5 py-1 rounded-lg border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 transition cursor-pointer">
+                            <i class="fas fa-trash-alt text-[10px]"></i> Hapus Foto Saat Ini
+                        </button>
+                    </div>
                     <div class="flex items-center gap-3">
                         <div id="previewEditWrapper" class="hidden w-14 h-18 aspect-[3/4] rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 shrink-0 bg-gray-50 dark:bg-gray-800 shadow-xs">
                             <img id="previewEditImg" src="" class="w-full h-full object-cover object-top">
                         </div>
                         <div class="flex-1">
                             <input type="file" name="foto" id="inputFotoEdit" accept="image/*" onchange="handlePhotoUploadCompress(this, 'previewEditImg', 'previewEditWrapper')" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-brand-50 file:text-brand-600 hover:file:bg-brand-100 dark:file:bg-brand-900/30 dark:file:text-brand-400 cursor-pointer">
+                            <input type="hidden" name="hapus_foto" id="edit_hapus_foto" value="0">
                             <span class="text-[11px] text-gray-400 block mt-1"><i class="fas fa-magic text-brand-500 mr-1"></i>Foto akan dikompresi otomatis agar ukuran ringan & seragam</span>
                         </div>
                     </div>
@@ -924,10 +930,15 @@
     <script src="{{ asset('vendor/jquery/jquery.min.js') }}"></script>
     <script>
         $(document).ready(function () {
+            let currentEditSiswaId = null;
+            let currentEditSiswaNama = null;
+
             // Edit
             $('.btnEdit').on('click', function () {
                 var id = $(this).data('id');
                 var nama = $(this).data('nama');
+                currentEditSiswaId = id;
+                currentEditSiswaNama = nama;
                 var nis = $(this).data('nis');
                 var tgl_lahir = $(this).data('tgl_lahir');
                 var alamat = $(this).data('alamat');
@@ -942,12 +953,15 @@
                 var hari_masuk = $(this).data('hari_masuk');
                 var foto = $(this).data('foto');
 
+                $('#edit_hapus_foto').val('0');
                 if (foto) {
                     $('#previewEditImg').attr('src', foto);
                     $('#previewEditWrapper').removeClass('hidden');
+                    $('#btnHapusFotoSiswa').removeClass('hidden').addClass('inline-flex');
                 } else {
                     $('#previewEditImg').attr('src', '');
                     $('#previewEditWrapper').addClass('hidden');
+                    $('#btnHapusFotoSiswa').addClass('hidden').removeClass('inline-flex');
                 }
                 $('#inputFotoEdit').val('');
 
@@ -981,6 +995,42 @@
                 }
 
                 $('#formEditSiswa').attr('action', '{{ url('siswa') }}/' + id);
+            });
+
+            // Hapus Foto Siswa via AJAX
+            $('#btnHapusFotoSiswa').on('click', function () {
+                if (!currentEditSiswaId) return;
+
+                if (!confirm('Hapus foto profil siswa ' + (currentEditSiswaNama || 'ini') + '?\n\nFoto akan dihapus secara permanen dari server.')) {
+                    return;
+                }
+
+                var $btn = $(this);
+                $btn.prop('disabled', true).addClass('opacity-50');
+
+                $.post('{{ url('siswa') }}/' + currentEditSiswaId + '/delete-photo', {
+                    _token: '{{ csrf_token() }}'
+                }, function (res) {
+                    if (res.ok || res.success) {
+                        $('#previewEditImg').attr('src', '');
+                        $('#previewEditWrapper').addClass('hidden');
+                        $('#btnHapusFotoSiswa').addClass('hidden').removeClass('inline-flex');
+                        $('#inputFotoEdit').val('');
+                        $('#edit_hapus_foto').val('1');
+
+                        // Update attribute button di tabel
+                        $('.btnEdit[data-id="' + currentEditSiswaId + '"]').data('foto', '').attr('data-foto', '');
+
+                        alert(res.message || 'Foto profil siswa berhasil dihapus.');
+                    } else {
+                        alert('Gagal: ' + (res.message || 'Terjadi kesalahan saat menghapus foto'));
+                    }
+                }).fail(function (xhr) {
+                    var msg = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : 'Gagal menghubungi server.';
+                    alert(msg);
+                }).always(function () {
+                    $btn.prop('disabled', false).removeClass('opacity-50');
+                });
             });
 
             // Toggle edit days container when edit_is_siswa_khusus changes

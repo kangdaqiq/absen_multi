@@ -171,6 +171,11 @@ class GuruController extends Controller
                 Guru::deletePhotoFile($guruModel->foto);
             }
             $data['foto'] = $this->processAndStoreFoto($request->file('foto'));
+        } elseif ($request->boolean('hapus_foto')) {
+            if ($guruModel->foto) {
+                Guru::deletePhotoFile($guruModel->foto);
+            }
+            $data['foto'] = null;
         } else {
             unset($data['foto']);
         }
@@ -239,6 +244,42 @@ class GuruController extends Controller
         }
 
         return redirect()->back()->with('success', "Data Face ID guru {$guruModel->nama} berhasil dihapus/direset.");
+    }
+
+    /**
+     * Hapus foto profil dewan guru.
+     */
+    public function deletePhoto($id)
+    {
+        $guruModel = Guru::findOrFail($id);
+        $this->authorizeGuruAccess($guruModel);
+
+        if ($guruModel->foto) {
+            Guru::deletePhotoFile($guruModel->foto);
+            $guruModel->update(['foto' => null]);
+        }
+
+        \App\Models\ApiLog::create([
+            'school_id' => $guruModel->school_id,
+            'api_key' => 'WEB_ADMIN',
+            'action' => 'delete_photo_guru',
+            'uid' => $guruModel->nip ?: $guruModel->nama,
+            'success' => true,
+            'message' => "Hapus foto profil dewan guru: {$guruModel->nama} oleh " . (auth()->user()->full_name ?? auth()->user()->username),
+            'ip_address' => request()->ip(),
+            'user_agent' => request()->userAgent() ?? 'Web Dashboard',
+            'created_at' => now(),
+        ]);
+
+        if (request()->ajax() || request()->wantsJson()) {
+            return response()->json([
+                'ok' => true,
+                'success' => true,
+                'message' => "Foto profil guru {$guruModel->nama} berhasil dihapus."
+            ]);
+        }
+
+        return redirect()->back()->with('success', "Foto profil guru {$guruModel->nama} berhasil dihapus.");
     }
 
     /**

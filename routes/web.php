@@ -139,6 +139,7 @@ Route::middleware('auth')->group(function () {
         Route::delete('siswa/bulk-destroy', [SiswaController::class, 'bulkDestroy'])->name('siswa.bulk-destroy');
         Route::put('siswa/bulk-update-kelas', [SiswaController::class, 'bulkUpdateKelas'])->name('siswa.bulk-update-kelas');
         Route::match(['post', 'delete'], 'siswa/{id}/delete-face', [SiswaController::class, 'deleteFaceId'])->name('siswa.delete-face');
+        Route::match(['post', 'delete'], 'siswa/{id}/delete-photo', [SiswaController::class, 'deletePhoto'])->name('siswa.delete-photo');
         Route::resource('siswa', SiswaController::class)->except(['create', 'show', 'edit']);
     });
 
@@ -153,6 +154,7 @@ Route::middleware('auth')->group(function () {
         Route::resource('guru', GuruController::class)->except(['create', 'show', 'edit']);
         Route::patch('guru/{id}/toggle-bot-access', [GuruController::class, 'toggleBotAccess'])->name('guru.toggle-bot-access');
         Route::match(['post', 'delete'], 'guru/{id}/delete-face', [GuruController::class, 'deleteFaceId'])->name('guru.delete-face');
+        Route::match(['post', 'delete'], 'guru/{id}/delete-photo', [GuruController::class, 'deletePhoto'])->name('guru.delete-photo');
     });
 
     // Absensi & Rekap Routes (Includes Wali Kelas & Waka Kurikulum)

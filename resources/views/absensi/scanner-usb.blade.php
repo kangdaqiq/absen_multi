@@ -61,7 +61,7 @@
                         Siap Scan
                     </span>
                 </div>
-                <p class="text-xs text-gray-500 dark:text-gray-400">Tempelkan kartu RFID pada scanner USB kapan saja</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400">Tempelkan kartu RFID pada scanner USB</p>
             </div>
         </div>
 

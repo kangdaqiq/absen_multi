@@ -115,12 +115,7 @@ class FaceRecognitionService
                 ];
             }
 
-            $response = $req->asMultipart()->post($url, [
-                [
-                    'name' => 'master_embedding_json',
-                    'contents' => $embeddingJson
-                ]
-            ]);
+            $response = $req->attach('master_embedding_json', $embeddingJson)->post($url);
 
             if ($response->successful()) {
                 $data = $response->json();

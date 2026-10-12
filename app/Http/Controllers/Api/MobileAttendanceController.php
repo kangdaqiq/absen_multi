@@ -11,6 +11,7 @@ use App\Models\AbsensiGuru;
 use App\Models\Attendance;
 use App\Models\Kelas;
 use App\Models\Siswa;
+use App\Models\Guru;
 use App\Models\ApiLog;
 use App\Models\Setting;
 use App\Models\Jadwal;
@@ -640,16 +641,17 @@ class MobileAttendanceController extends Controller
         }
 
         // 2. Face Recognition & Liveness Verification
-        $studentUser = $user?->student ?? Siswa::where('user_id', $user?->id)->first();
+        $studentUser = $user?->student ?? Siswa::where('user_id', $user?->id)->orWhere('nis', str_replace('siswa_', '', $user?->username ?? ''))->first();
         $teacherUser = $user?->guru ?? Guru::where('user_id', $user?->id)->first();
-        $faceData = UserFaceData::where('user_id', $user?->id)
-            ->when($studentUser, function ($q) use ($studentUser) {
+        $faceData = UserFaceData::where(function ($q) use ($user, $studentUser, $teacherUser) {
+            $q->where('user_id', $user?->id);
+            if ($studentUser) {
                 $q->orWhere('siswa_id', $studentUser->id);
-            })
-            ->when($teacherUser, function ($q) use ($teacherUser) {
+            }
+            if ($teacherUser) {
                 $q->orWhere('guru_id', $teacherUser->id);
-            })
-            ->first();
+            }
+        })->first();
 
         $faceSimilarity = null;
         $isFaceMatched = false;

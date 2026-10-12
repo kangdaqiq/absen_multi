@@ -383,6 +383,7 @@ function usbScannerApp() {
         lastUpdateTime: '{{ date("H.i.s") }}',
         lastScannedUid: '',
         lastScannedTime: 0,
+        audioCtx: null,
 
         // Spotlight State
         spotlight: {
@@ -418,8 +419,9 @@ function usbScannerApp() {
             // Fokuskan input hidden saat pertama kali dimuat
             this.focusInput();
 
-            // Pasang auto re-focus saat user mengklik area manapun di layar
+            // Pasang auto re-focus dan unlock AudioContext saat ada interaksi
             document.addEventListener('click', (e) => {
+                this.getAudioContext();
                 if (!e.target.closest('button, a, select, textarea')) {
                     setTimeout(() => this.focusInput(), 60);
                 }
@@ -427,6 +429,7 @@ function usbScannerApp() {
 
             // Global Keystroke Buffer: fail-safe jika input kehilangan fokus
             window.addEventListener('keydown', (e) => {
+                this.getAudioContext();
                 if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
                     return; // Normal handling
                 }
@@ -524,55 +527,81 @@ function usbScannerApp() {
             }
         },
 
+        getAudioContext() {
+            if (!this.audioCtx) {
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                if (AudioCtx) this.audioCtx = new AudioCtx();
+            }
+            if (this.audioCtx && this.audioCtx.state === 'suspended') {
+                this.audioCtx.resume();
+            }
+            return this.audioCtx;
+        },
+
         playBeep(type) {
             if (!this.soundEnabled) return;
             try {
-                const AudioCtx = window.AudioContext || window.webkitAudioContext;
-                if (!AudioCtx) return;
-                const ctx = new AudioCtx();
+                const ctx = this.getAudioContext();
+                if (!ctx) return;
 
-                if (type === 'ok') {
-                    // Chime Sukses (Harmoni nada ganda tinggi)
-                    const now = ctx.currentTime;
-                    const osc = ctx.createOscillator();
-                    const gain = ctx.createGain();
-                    osc.type = 'sine';
-                    osc.frequency.setValueAtTime(880, now);
-                    osc.frequency.exponentialRampToValueAtTime(1320, now + 0.12);
-                    gain.gain.setValueAtTime(0.3, now);
-                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
-                    osc.connect(gain);
-                    gain.connect(ctx.destination);
-                    osc.start(now);
-                    osc.stop(now + 0.25);
+                const now = ctx.currentTime;
+
+                if (type === 'ok' || type === 'success') {
+                    // 🔔 SUARA BERHASIL: Chime Melodis Ceria 2-Nada ("Ting-Tung!" Harmoni Tinggi)
+                    // Nada 1: 784 Hz (G5) - Jernih dan renyah
+                    const osc1 = ctx.createOscillator();
+                    const gain1 = ctx.createGain();
+                    osc1.type = 'sine';
+                    osc1.frequency.setValueAtTime(784, now);
+                    gain1.gain.setValueAtTime(0.35, now);
+                    gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+                    osc1.connect(gain1);
+                    gain1.connect(ctx.destination);
+                    osc1.start(now);
+                    osc1.stop(now + 0.12);
+
+                    // Nada 2: 1174.66 Hz (D6) - Nada kedua lebih tinggi, ceria & jelas
+                    const osc2 = ctx.createOscillator();
+                    const gain2 = ctx.createGain();
+                    osc2.type = 'sine';
+                    osc2.frequency.setValueAtTime(1174.66, now + 0.1);
+                    gain2.gain.setValueAtTime(0.4, now + 0.1);
+                    gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.38);
+                    osc2.connect(gain2);
+                    gain2.connect(ctx.destination);
+                    osc2.start(now + 0.1);
+                    osc2.stop(now + 0.38);
+
                 } else if (type === 'warning') {
-                    // Chime Peringatan (Double pulse sedang)
-                    const now = ctx.currentTime;
-                    const osc = ctx.createOscillator();
-                    const gain = ctx.createGain();
-                    osc.type = 'triangle';
-                    osc.frequency.setValueAtTime(600, now);
-                    osc.frequency.setValueAtTime(500, now + 0.1);
-                    gain.gain.setValueAtTime(0.25, now);
-                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
-                    osc.connect(gain);
-                    gain.connect(ctx.destination);
-                    osc.start(now);
-                    osc.stop(now + 0.25);
+                    // ⚠️ SUARA PERINGATAN (Sudah Absen / Jam Tutup): Nada Ganda Sedang ("Pip-Pip")
+                    [0, 0.12].forEach((offset) => {
+                        const osc = ctx.createOscillator();
+                        const gain = ctx.createGain();
+                        osc.type = 'triangle';
+                        osc.frequency.setValueAtTime(659.25, now + offset); // E5
+                        gain.gain.setValueAtTime(0.3, now + offset);
+                        gain.gain.exponentialRampToValueAtTime(0.001, now + offset + 0.09);
+                        osc.connect(gain);
+                        gain.connect(ctx.destination);
+                        osc.start(now + offset);
+                        osc.stop(now + offset + 0.09);
+                    });
+
                 } else {
-                    // Chime Gagal / Error (Buzzer rendah)
-                    const now = ctx.currentTime;
-                    const osc = ctx.createOscillator();
-                    const gain = ctx.createGain();
-                    osc.type = 'sawtooth';
-                    osc.frequency.setValueAtTime(220, now);
-                    osc.frequency.setValueAtTime(160, now + 0.15);
-                    gain.gain.setValueAtTime(0.3, now);
-                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
-                    osc.connect(gain);
-                    gain.connect(ctx.destination);
-                    osc.start(now);
-                    osc.stop(now + 0.35);
+                    // ❌ SUARA GAGAL / ERROR (Kartu Belum Terdaftar / Ditolak): Double Buzzer Rendah Kasar ("BZZT-BZZT!")
+                    [0, 0.18].forEach((offset) => {
+                        const osc = ctx.createOscillator();
+                        const gain = ctx.createGain();
+                        osc.type = 'sawtooth'; // Gelombang gergaji kasar
+                        osc.frequency.setValueAtTime(160, now + offset);
+                        osc.frequency.linearRampToValueAtTime(100, now + offset + 0.14); // Turun ke nada sangat rendah
+                        gain.gain.setValueAtTime(0.45, now + offset);
+                        gain.gain.exponentialRampToValueAtTime(0.01, now + offset + 0.14);
+                        osc.connect(gain);
+                        gain.connect(ctx.destination);
+                        osc.start(now + offset);
+                        osc.stop(now + offset + 0.14);
+                    });
                 }
             } catch (e) {
                 console.warn('Audio tone error:', e);

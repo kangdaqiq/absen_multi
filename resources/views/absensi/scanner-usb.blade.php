@@ -3,6 +3,37 @@
 @section('title', 'Scanner Absensi USB RFID')
 
 @section('content')
+<style>
+    .scanner-feed-scroll {
+        max-height: 520px;
+        overflow-y: auto;
+        overflow-x: hidden;
+    }
+    @media (max-width: 1024px) {
+        .scanner-feed-scroll {
+            max-height: 400px;
+        }
+    }
+    .scanner-feed-scroll::-webkit-scrollbar {
+        width: 6px;
+    }
+    .scanner-feed-scroll::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    .scanner-feed-scroll::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 9999px;
+    }
+    .scanner-feed-scroll::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
+    }
+    .dark .scanner-feed-scroll::-webkit-scrollbar-thumb {
+        background: #475569;
+    }
+    .dark .scanner-feed-scroll::-webkit-scrollbar-thumb:hover {
+        background: #64748b;
+    }
+</style>
 <div x-data="fullPageUsbScanner()" x-init="initScanner()" class="space-y-5">
     
     <!-- Top Bar: Title, Clock & Controls -->
@@ -279,8 +310,8 @@
                     <span class="text-xs font-semibold text-brand-600 dark:text-brand-400" x-text="sessionScans.length + ' aktivitas'"></span>
                 </div>
 
-                <!-- Feed List -->
-                <div class="overflow-y-auto max-h-[500px] p-2.5 space-y-2">
+                <!-- Feed List (Scrollbox) -->
+                <div class="scanner-feed-scroll p-2.5 space-y-2" style="max-height: 520px; overflow-y: auto; overflow-x: hidden;">
                     <template x-if="sessionScans.length === 0">
                         <div class="py-14 text-center text-gray-400">
                             <div class="mx-auto mb-2.5 flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-50 text-brand-500 dark:bg-brand-500/15">

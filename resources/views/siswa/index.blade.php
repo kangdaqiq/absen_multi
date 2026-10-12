@@ -580,7 +580,7 @@
         <form @submit.prevent="submitForm" x-show="!isImporting && !isFinished" enctype="multipart/form-data">
             @csrf
             <div class="mb-4 rounded-lg bg-info-50 p-4 text-sm text-info-700 dark:bg-info-500/15 dark:text-info-500">
-                <i class="fas fa-info-circle mr-1"></i> Gunakan file Excel (.xlsx) dengan format kolom: <strong>Nama, NIS, Tgl Lahir, Kelas, WA Siswa, WA Ortu, Alamat</strong>.
+                <i class="fas fa-info-circle mr-1"></i> Gunakan file Excel (.xlsx) dengan format kolom: <strong>Nama, NIS, Tgl Lahir, Kelas, WA Siswa, WA Ortu, Alamat, UID RFID (Opsional)</strong>.
             </div>
             <div class="space-y-4">
                 <div>

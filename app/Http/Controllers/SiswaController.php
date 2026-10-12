@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Siswa;
+use App\Models\Guru;
 use App\Models\Kelas;
 use App\Models\Device;
 use App\Models\ApiLog;
@@ -305,6 +306,18 @@ class SiswaController extends Controller
             }
             $existingNis = $existingNisQuery->pluck('nis')->map(fn($v) => trim((string)$v))->toArray();
 
+            // Scope Existing UID RFID by School (both Siswa and Guru)
+            $existingUidSiswaQuery = Siswa::whereNotNull('uid_rfid')->where('uid_rfid', '!=', '');
+            $existingUidGuruQuery = Guru::whereNotNull('uid_rfid')->where('uid_rfid', '!=', '');
+            if ($schoolId) {
+                $existingUidSiswaQuery->where('school_id', $schoolId);
+                $existingUidGuruQuery->where('school_id', $schoolId);
+            }
+            $existingUids = array_merge(
+                $existingUidSiswaQuery->pluck('uid_rfid')->map(fn($v) => strtoupper(trim((string)$v)))->toArray(),
+                $existingUidGuruQuery->pluck('uid_rfid')->map(fn($v) => strtoupper(trim((string)$v)))->toArray()
+            );
+
             foreach ($rows as $row) {
                 $excelRowIndex++;
                 if ($firstRow) {
@@ -363,6 +376,10 @@ class SiswaController extends Controller
                     // Column G (Index 6): Alamat
                     $alamat = isset($row[6]) ? trim((string)$row[6]) : null;
 
+                    // Column H (Index 7): UID RFID (Opsional)
+                    $uidRfidRaw = isset($row[7]) ? trim((string)$row[7]) : '';
+                    $uidRfid = $uidRfidRaw !== '' ? strtoupper($uidRfidRaw) : null;
+
                     if ($nama === '' && $nis === '') {
                         $failures[] = [
                             'row' => $excelRowIndex,
@@ -401,6 +418,18 @@ class SiswaController extends Controller
                             'reason' => "NIS '{$nis}' sudah terdaftar dalam sistem (duplikat)."
                         ];
                         continue;
+                    }
+
+                    if ($uidRfid !== null) {
+                        if (in_array($uidRfid, $existingUids, true)) {
+                            $failures[] = [
+                                'row' => $excelRowIndex,
+                                'nama' => $nama,
+                                'nis' => $nis,
+                                'reason' => "UID RFID '{$uidRfid}' sudah terdaftar pada siswa/guru lain (duplikat)."
+                            ];
+                            continue;
+                        }
                     }
 
                     // Resolve Kelas
@@ -445,11 +474,15 @@ class SiswaController extends Controller
                         'kelas_id' => $kelasId,
                         'no_wa' => $this->normalizeWa($wa) ?: null,
                         'wa_ortu' => $this->normalizeWa($waOrtu) ?: null,
+                        'uid_rfid' => $uidRfid,
                         'school_id' => $schoolId,
                         'created_at' => now()
                     ]);
 
                     $existingNis[] = $nis;
+                    if ($uidRfid !== null) {
+                        $existingUids[] = $uidRfid;
+                    }
                     $countSuccess++;
                 } catch (\Throwable $e) {
                     \Illuminate\Support\Facades\Log::error("Import Row Error (Baris {$excelRowIndex}, NIS: " . ($row[1] ?? 'unknown') . "): " . $e->getMessage());
@@ -761,6 +794,7 @@ class SiswaController extends Controller
         $sheet->setCellValue('E1', 'No WhatsApp Siswa');
         $sheet->setCellValue('F1', 'No WhatsApp Ortu');
         $sheet->setCellValue('G1', 'Alamat');
+        $sheet->setCellValue('H1', 'UID RFID (Opsional)');
 
         // Example
         $sheet->setCellValue('A2', 'Ahmad Dani');
@@ -770,9 +804,11 @@ class SiswaController extends Controller
         $sheet->setCellValue('E2', '081234567890');
         $sheet->setCellValue('F2', '081234567891');
         $sheet->setCellValue('G2', 'Jl. Merdeka No. 123');
+        $sheet->setCellValue('H2', '1A2B3C4D');
 
-        // Format kolom C sebagai teks agar Excel tidak mengubah format tanggal
+        // Format kolom C dan H sebagai teks agar Excel tidak mengubah format tanggal / UID
         $sheet->getStyle('C2:C1000')->getNumberFormat()->setFormatCode(\PhpOffice\PhpSpreadsheet\Style\NumberFormat::FORMAT_TEXT);
+        $sheet->getStyle('H2:H1000')->getNumberFormat()->setFormatCode(\PhpOffice\PhpSpreadsheet\Style\NumberFormat::FORMAT_TEXT);
         // Set lebar kolom
         $sheet->getColumnDimension('A')->setWidth(25);
         $sheet->getColumnDimension('B')->setWidth(15);
@@ -781,10 +817,11 @@ class SiswaController extends Controller
         $sheet->getColumnDimension('E')->setWidth(20);
         $sheet->getColumnDimension('F')->setWidth(20);
         $sheet->getColumnDimension('G')->setWidth(30);
+        $sheet->getColumnDimension('H')->setWidth(22);
         // Style header
-        $sheet->getStyle('A1:G1')->getFont()->setBold(true);
-        $sheet->getStyle('A1:G1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB('FF3C50E0');
-        $sheet->getStyle('A1:G1')->getFont()->getColor()->setARGB('FFFFFFFF');
+        $sheet->getStyle('A1:H1')->getFont()->setBold(true);
+        $sheet->getStyle('A1:H1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB('FF3C50E0');
+        $sheet->getStyle('A1:H1')->getFont()->getColor()->setARGB('FFFFFFFF');
 
         $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
 

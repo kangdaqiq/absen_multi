@@ -371,7 +371,7 @@
                     <input type="text" id="edit_telegram" disabled placeholder="Belum terhubung ke Bot Telegram" class="w-full rounded-lg border border-gray-200 bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 cursor-not-allowed px-4 py-2 outline-none dark:border-gray-700">
                 </div>
                 <div class="sm:col-span-2">
-                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">UID RFID <span class="text-gray-400 font-normal">(bisa diedit / Scan USB Reader)</span></label>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">UID RFID <span class="text-gray-400 font-normal"></span></label>
                     <input type="text" name="uid_rfid" id="edit_rfid" placeholder="Tempel kartu ke USB Reader atau ketik UID..." class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 font-mono uppercase dark:border-gray-800 dark:bg-gray-900 dark:text-white">
                 </div>
                 <div class="sm:col-span-2 space-y-2">

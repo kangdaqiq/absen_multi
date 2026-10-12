@@ -878,23 +878,25 @@
         <div id="enroll_status" class="mb-4 min-h-10 flex items-center justify-center text-sm"></div>
 
         <!-- Scan via USB Reader / Input Manual -->
-        <div class="mb-4 rounded-xl border border-gray-200 bg-gray-50/70 p-3.5 text-left dark:border-gray-700 dark:bg-gray-800/40">
-            <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300">
-                <i class="fas fa-barcode text-brand-500 mr-1"></i> Scan USB Reader / Ketik Manual
-            </label>
+        <div class="mb-4 rounded-xl border border-gray-200 bg-gray-50/70 p-4 text-center dark:border-gray-700 dark:bg-gray-800/40">
+            <div class="mb-2.5 flex items-center justify-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                <i class="fas fa-barcode text-brand-500"></i>
+                <span>Scan USB Reader / Ketik Manual</span>
+            </div>
             <div class="flex gap-2">
-                <input type="text" id="inputManualUIDSiswa" placeholder="Tap kartu ke USB Reader..." class="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-mono uppercase outline-none focus:border-brand-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white">
+                <input type="text" id="inputManualUIDSiswa" placeholder="Tap kartu / ketik UID..." class="flex-1 text-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-mono uppercase tracking-wider outline-none focus:border-brand-500 dark:border-gray-600 dark:bg-gray-900 dark:text-white">
                 <button type="button" id="btnSimpanManualUIDSiswa" class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 transition shrink-0 inline-flex items-center gap-1.5 shadow-xs">
                     <i class="fas fa-check text-xs"></i> Simpan
                 </button>
             </div>
-            <p class="mt-1.5 text-[11px] text-gray-400 dark:text-gray-500">
-                <i class="fas fa-info-circle mr-0.5"></i> Tempelkan kartu pada scanner USB (otomatis tersimpan saat Enter).
+            <p class="mt-2 text-[11px] text-gray-400 dark:text-gray-500 text-center flex items-center justify-center gap-1">
+                <i class="fas fa-info-circle text-[10px]"></i> Otomatis tersimpan saat kartu di-tap atau tekan Enter
             </p>
         </div>
 
-        <div class="relative flex py-2 items-center mb-2">
+        <div class="relative flex py-2 items-center mb-3">
             <div class="flex-grow border-t border-gray-200 dark:border-gray-700"></div>
+            <span class="flex-shrink mx-3 text-xs text-gray-400 dark:text-gray-500 uppercase tracking-wider">atau</span>
             <div class="flex-grow border-t border-gray-200 dark:border-gray-700"></div>
         </div>
 

@@ -43,11 +43,23 @@ class MobileAttendanceController extends Controller
 
             $isWaliKelas = false;
             $kelasWali = null;
+            $waliKelases = [];
             if ($user->guru) {
-                $kelasWali = Kelas::where('wali_kelas_id', $user->guru->id)
+                $allKelasWali = Kelas::where('wali_kelas_id', $user->guru->id)
                     ->orWhere('wali_kelas_2_id', $user->guru->id)
-                    ->first();
-                $isWaliKelas = !empty($kelasWali) || $user->role === 'wali_kelas';
+                    ->get();
+                $kelasWali = $allKelasWali->first();
+                $isWaliKelas = $allKelasWali->isNotEmpty() || $user->role === 'wali_kelas';
+                $waliKelases = $allKelasWali->map(function ($kw) use ($user) {
+                    $peran = ($kw->wali_kelas_id == $user->guru->id) ? 'Wali Kelas 1' : 'Wali Kelas 2';
+                    return [
+                        'id' => $kw->id,
+                        'nama' => $kw->nama_kelas ?? $kw->nama,
+                        'nama_kelas' => $kw->nama_kelas ?? $kw->nama,
+                        'peran' => $peran,
+                        'is_utama' => ($kw->wali_kelas_id == $user->guru->id),
+                    ];
+                })->values()->all();
             } elseif ($user->role === 'wali_kelas') {
                 $isWaliKelas = true;
             }
@@ -58,6 +70,7 @@ class MobileAttendanceController extends Controller
                     'is_wali_kelas' => $isWaliKelas,
                     'kelas_id' => $kelasWali?->id,
                     'kelas_name' => $kelasWali ? ($kelasWali->nama_kelas ?? $kelasWali->nama) : null,
+                    'wali_kelases' => $waliKelases,
                 ]);
             }
 
@@ -99,10 +112,12 @@ class MobileAttendanceController extends Controller
                         'nama' => $kelasWali->nama_kelas ?? $kelasWali->nama,
                         'nama_kelas' => $kelasWali->nama_kelas ?? $kelasWali->nama,
                     ] : null,
+                    'wali_kelases' => $waliKelases,
                     'guru' => $guruPayload,
                     'student' => $user->student
                 ],
                 'is_wali_kelas' => $isWaliKelas,
+                'wali_kelases' => $waliKelases,
                 'school' => $user->school
             ]);
         }
@@ -292,6 +307,37 @@ class MobileAttendanceController extends Controller
             ];
         }
 
+        $guruData = null;
+        if ($user->guru) {
+            $allKelasWali = Kelas::where('wali_kelas_id', $user->guru->id)
+                ->orWhere('wali_kelas_2_id', $user->guru->id)
+                ->get();
+            $kelasWali = $allKelasWali->first();
+            $isWaliKelas = $allKelasWali->isNotEmpty() || $user->role === 'wali_kelas';
+            $waliKelases = $allKelasWali->map(function ($kw) use ($user) {
+                $peran = ($kw->wali_kelas_id == $user->guru->id) ? 'Wali Kelas 1' : 'Wali Kelas 2';
+                return [
+                    'id' => $kw->id,
+                    'nama' => $kw->nama_kelas ?? $kw->nama,
+                    'nama_kelas' => $kw->nama_kelas ?? $kw->nama,
+                    'peran' => $peran,
+                    'is_utama' => ($kw->wali_kelas_id == $user->guru->id),
+                ];
+            })->values()->all();
+
+            $guruData = [
+                'id' => $user->guru->id,
+                'nama' => $user->guru->nama,
+                'nip' => $user->guru->nip,
+                'foto' => $user->guru->foto,
+                'foto_url' => $user->guru->foto_url,
+                'is_wali_kelas' => $isWaliKelas,
+                'kelas_id' => $kelasWali?->id,
+                'kelas_name' => $kelasWali ? ($kelasWali->nama_kelas ?? $kelasWali->nama) : null,
+                'wali_kelases' => $waliKelases,
+            ];
+        }
+
         return response()->json([
             'success' => true,
             'data' => [
@@ -301,13 +347,7 @@ class MobileAttendanceController extends Controller
                 'email' => $user->email,
                 'role' => $user->role,
                 'school_id' => $user->school_id,
-                'guru' => $user->guru ? [
-                    'id' => $user->guru->id,
-                    'nama' => $user->guru->nama,
-                    'nip' => $user->guru->nip,
-                    'foto' => $user->guru->foto,
-                    'foto_url' => $user->guru->foto_url,
-                ] : null,
+                'guru' => $guruData,
                 'student' => $studentData
             ]
         ]);
@@ -323,11 +363,22 @@ class MobileAttendanceController extends Controller
 
         $isWaliKelas = false;
         $kelasWali = null;
+        $waliKelases = [];
         if ($user && $user->guru) {
-            $kelasWali = Kelas::where('wali_kelas_id', $user->guru->id)
+            $allKelasWali = Kelas::where('wali_kelas_id', $user->guru->id)
                 ->orWhere('wali_kelas_2_id', $user->guru->id)
-                ->first();
-            $isWaliKelas = !empty($kelasWali) || $user->role === 'wali_kelas';
+                ->get();
+            $kelasWali = $allKelasWali->first();
+            $isWaliKelas = $allKelasWali->isNotEmpty() || $user->role === 'wali_kelas';
+            $waliKelases = $allKelasWali->map(function ($kw) use ($user) {
+                return [
+                    'id' => $kw->id,
+                    'nama' => $kw->nama_kelas ?? $kw->nama,
+                    'nama_kelas' => $kw->nama_kelas ?? $kw->nama,
+                    'peran' => ($kw->wali_kelas_id == $user->guru->id) ? 'Wali Kelas 1' : 'Wali Kelas 2',
+                    'is_utama' => ($kw->wali_kelas_id == $user->guru->id),
+                ];
+            })->values()->all();
         } elseif ($user && $user->role === 'wali_kelas') {
             $isWaliKelas = true;
         }
@@ -410,6 +461,7 @@ class MobileAttendanceController extends Controller
                     'wali_kelas' => $isWaliKelas,
                     'kelas_name' => $kelasWali ? ($kelasWali->nama_kelas ?? $kelasWali->nama) : null,
                     'kelas_id' => $kelasWali?->id,
+                    'wali_kelases' => $waliKelases,
                     'is_mobile_attendance_enabled' => $isMobileAttendanceEnabled,
                     'geofence_enabled' => $isMobileAttendanceEnabled,
                 ]
@@ -1335,41 +1387,64 @@ class MobileAttendanceController extends Controller
             return response()->json(['success' => false, 'message' => 'Akses khusus dewan guru dan staf sekolah'], 403);
         }
 
+        $isWakaOrAdmin = in_array($userRole, ['admin', 'super_admin', 'waka', 'kurikulum'])
+            || str_contains($userRole, 'waka')
+            || str_contains($userRole, 'kurikulum');
+
         $guru = $user->guru;
         $requestedKelasId = $request->query('kelas_id');
+        $schoolId = $user->school_id ?? ($guru?->school_id ?? null);
 
-        $kelas = null;
-        if ($requestedKelasId) {
-            $kelasQuery = Kelas::where('id', $requestedKelasId);
-            if ($user->school_id) {
-                $kelasQuery->where('school_id', $user->school_id);
-            }
-
-            if ($guru && !in_array($userRole, ['admin', 'super_admin', 'waka', 'kurikulum'])) {
-                // Cari kelas di mana guru adalah wali kelas 1 atau 2, atau fallback ke kelas di sekolah yang sama
-                $kelasWali = (clone $kelasQuery)->where(function ($q) use ($guru) {
-                    $q->where('wali_kelas_id', $guru->id)
-                      ->orWhere('wali_kelas_2_id', $guru->id);
-                })->first();
-
-                $kelas = $kelasWali ?: $kelasQuery->first();
-            } else {
-                $kelas = $kelasQuery->first();
-            }
-        } elseif ($guru) {
-            // Default: Cari kelas di mana guru ini ditugaskan sebagai wali kelas
-            $kelas = Kelas::where(function ($q) use ($guru) {
+        // Ambil daftar kelas yang diwalikan oleh guru (1 atau 2 kelas)
+        $waliKelasList = collect();
+        if ($guru) {
+            $waliKelasList = Kelas::where(function ($q) use ($guru) {
                 $q->where('wali_kelas_id', $guru->id)
                   ->orWhere('wali_kelas_2_id', $guru->id);
-            });
-            if ($user->school_id) {
-                $kelas->where('school_id', $user->school_id);
+            })
+            ->when($schoolId, fn($q) => $q->where('school_id', $schoolId))
+            ->get();
+        }
+
+        $kelas = null;
+
+        if ($isWakaOrAdmin) {
+            // Waka Kurikulum & Admin: Bebas mengambil rekap untuk seluruh kelas di sekolah
+            if ($requestedKelasId) {
+                $kelasQuery = Kelas::where('id', $requestedKelasId);
+                if ($schoolId) {
+                    $kelasQuery->where('school_id', $schoolId);
+                }
+                $kelas = $kelasQuery->first();
+            } else {
+                $kelas = Kelas::when($schoolId, fn($q) => $q->where('school_id', $schoolId))->orderBy('nama_kelas', 'asc')->first();
             }
-            $kelas = $kelas->first();
+        } else {
+            // Walas (Wali Kelas): HANYA kelas yang diwalikannya (1 atau 2 kelas miliknya)
+            if ($waliKelasList->isEmpty()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Akses ditolak: Anda belum ditugaskan sebagai wali kelas untuk kelas manapun.'
+                ], 403);
+            }
+
+            if ($requestedKelasId) {
+                // Pastikan requestedKelasId adalah kelas yang memang diampu guru tersebut
+                $kelas = $waliKelasList->firstWhere('id', (int)$requestedKelasId);
+                if (!$kelas) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Akses ditolak: Anda hanya dapat mengakses rekap kelas yang Anda walikan.'
+                    ], 403);
+                }
+            } else {
+                // Default ke kelas wali pertama
+                $kelas = $waliKelasList->first();
+            }
         }
 
         if (!$kelas) {
-            return response()->json(['success' => false, 'message' => 'Kelas tidak ditemukan atau Anda belum ditugaskan sebagai wali kelas'], 404);
+            return response()->json(['success' => false, 'message' => 'Kelas tidak ditemukan'], 404);
         }
 
         $startDate = $request->query('start_date', Carbon::today()->format('Y-m-d'));
@@ -1436,6 +1511,10 @@ class MobileAttendanceController extends Controller
             return response()->json(['success' => false, 'message' => 'Akses khusus dewan guru dan staf sekolah'], 403);
         }
 
+        $isWakaOrAdmin = in_array($userRole, ['admin', 'super_admin', 'waka', 'kurikulum'])
+            || str_contains($userRole, 'waka')
+            || str_contains($userRole, 'kurikulum');
+
         $rawTanggal = $request->query('tanggal', Carbon::today()->format('Y-m-d'));
         try {
             $tanggal = Carbon::parse($rawTanggal)->format('Y-m-d');
@@ -1447,46 +1526,72 @@ class MobileAttendanceController extends Controller
         $queryStr = trim($request->query('q', ''));
         $hasSearchQuery = strlen($queryStr) >= 2;
 
-        // Jika tidak ada kelas_id DAN query pencarian kosong/kurang dari 2 karakter
-        if (empty($kelasId) && !$hasSearchQuery) {
-            // Jika guru adalah wali kelas dan belum memilih kelas, default ke kelas walinya
-            if ($user->guru) {
-                $kelasWali = Kelas::where(function ($q) use ($user) {
-                    $q->where('wali_kelas_id', $user->guru->id)
-                      ->orWhere('wali_kelas_2_id', $user->guru->id);
-                });
-                if ($user->school_id) {
-                    $kelasWali->where('school_id', $user->school_id);
-                }
-                $waliKelasObj = $kelasWali->first();
-                if ($waliKelasObj) {
-                    $kelasId = $waliKelasObj->id;
-                }
+        $schoolId = $user->school_id ?? ($user->guru ? $user->guru->school_id : null);
+
+        // Ambil daftar ID kelas yang diwalikan guru (1 atau 2 kelas)
+        $waliKelasIds = [];
+        if ($user->guru) {
+            $waliKelasIds = Kelas::where(function ($q) use ($user) {
+                $q->where('wali_kelas_id', $user->guru->id)
+                  ->orWhere('wali_kelas_2_id', $user->guru->id);
+            })
+            ->when($schoolId, fn($q) => $q->where('school_id', $schoolId))
+            ->pluck('id')
+            ->all();
+        }
+
+        // Validasi akses untuk Walas (bukan Waka/Admin)
+        if (!$isWakaOrAdmin) {
+            if (empty($waliKelasIds)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Akses ditolak: Anda belum ditugaskan sebagai wali kelas untuk kelas manapun.'
+                ], 403);
             }
 
-            if (empty($kelasId)) {
+            // Jika Walas mengirimkan kelas_id spesifik, pastikan kelas tersebut memang miliknya
+            if (!empty($kelasId) && $kelasId !== 'all' && $kelasId !== 'semua' && $kelasId !== '0') {
+                if (!in_array((int)$kelasId, $waliKelasIds)) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Akses ditolak: Anda hanya dapat mengakses kelas yang Anda walikan.'
+                    ], 403);
+                }
+            }
+        }
+
+        // Jika tidak ada kelas_id DAN tidak ada kata kunci pencarian
+        if (empty($kelasId) && !$hasSearchQuery) {
+            if (!empty($waliKelasIds)) {
+                // Untuk Walas, default ke kelas wali pertama jika belum memilih kelas
+                $kelasId = $waliKelasIds[0];
+            } elseif ($isWakaOrAdmin) {
                 return response()->json(['success' => true, 'data' => []]);
             }
         }
 
         $siswaQuery = Siswa::with('kelas');
-        $schoolId = $user->school_id ?? ($user->guru ? $user->guru->school_id : null);
         if ($schoolId) {
             $siswaQuery->where('school_id', $schoolId);
         }
 
-        // Role yang berhak mencari ke seluruh siswa di sekolah tanpa dibatasi kelas wali kelas:
-        // guru, teacher, waka, kurikulum, admin, super_admin, wali_kelas
-        $allowGlobalSchoolSearch = in_array($userRole, ['guru', 'teacher', 'waka', 'kurikulum', 'admin', 'super_admin', 'wali_kelas']) || !empty($user->guru);
-
-        // Jika user melakukan pencarian (parameter q diisi) dan memiliki hak akses guru/waka/kurikulum/admin,
-        // server mengizinkan pencarian ke SELURUH siswa di sekolah (tanpa dibatasi hanya kelas tempat guru menjadi wali kelas),
-        // kecuali jika client secara eksplisit meminta strict_class / filter_by_class = true.
-        $strictClass = $request->boolean('strict_class') || $request->boolean('filter_by_class');
-
-        if (!empty($kelasId) && $kelasId !== 'all' && $kelasId !== 'semua' && $kelasId !== '0') {
-            if (!$hasSearchQuery || (!$allowGlobalSchoolSearch || $strictClass)) {
-                $siswaQuery->where('kelas_id', $kelasId);
+        if ($isWakaOrAdmin) {
+            // Waka Kurikulum & Admin: Bisa mencari ke seluruh siswa di sekolah
+            if (!empty($kelasId) && $kelasId !== 'all' && $kelasId !== 'semua' && $kelasId !== '0') {
+                $strictClass = $request->boolean('strict_class') || $request->boolean('filter_by_class');
+                // Jika sedang mencari dan tidak strict_class, biarkan cari global satu sekolah
+                if (!$hasSearchQuery || $strictClass) {
+                    $siswaQuery->where('kelas_id', (int)$kelasId);
+                }
+            }
+        } else {
+            // Walas: WAJIB HANYA DI DALAM KELAS WALINYA (1 ATAU 2 KELAS SAJA)!
+            if (!empty($kelasId) && $kelasId !== 'all' && $kelasId !== 'semua' && $kelasId !== '0') {
+                // Jika walas memilih 1 kelas spesifik dari 2 kelas walinya
+                $siswaQuery->where('kelas_id', (int)$kelasId);
+            } else {
+                // Jika walas punya 2 kelas dan mencari tanpa filter kelas tunggal, cari di 2 kelas tersebut
+                $siswaQuery->whereIn('kelas_id', $waliKelasIds);
             }
         }
 
@@ -1681,17 +1786,42 @@ class MobileAttendanceController extends Controller
     {
         $user = $request->user();
         $schoolId = $user?->school_id ?? ($user?->guru?->school_id ?? null);
+        $userRole = strtolower($user?->role ?? '');
+        $isWakaOrAdmin = in_array($userRole, ['admin', 'super_admin', 'waka', 'kurikulum'])
+            || str_contains($userRole, 'waka')
+            || str_contains($userRole, 'kurikulum');
+
         $query = Kelas::query();
         if ($schoolId) {
             $query->where('school_id', $schoolId);
         }
+
+        // Jika bukan waka/admin (walas / guru biasa), hanya tampilkan kelas yang diwalikannya (1 atau 2 kelas)
+        if (!$isWakaOrAdmin && $user?->guru) {
+            $guruId = $user->guru->id;
+            $query->where(function ($q) use ($guruId) {
+                $q->where('wali_kelas_id', $guruId)
+                  ->orWhere('wali_kelas_2_id', $guruId);
+            });
+        }
+
         $kelases = $query->orderBy('nama_kelas', 'asc')->get();
 
-        $data = $kelases->map(function ($k) {
+        $data = $kelases->map(function ($k) use ($user) {
+            $peran = null;
+            if ($user?->guru) {
+                if ($k->wali_kelas_id == $user->guru->id) {
+                    $peran = 'Wali Kelas 1';
+                } elseif ($k->wali_kelas_2_id == $user->guru->id) {
+                    $peran = 'Wali Kelas 2';
+                }
+            }
+
             return [
                 'id' => $k->id,
                 'nama' => $k->nama_kelas ?? $k->nama,
                 'nama_kelas' => $k->nama_kelas ?? $k->nama,
+                'peran' => $peran,
             ];
         });
 
@@ -1701,6 +1831,18 @@ class MobileAttendanceController extends Controller
     public function schoolStudentsRecap(Request $request)
     {
         $user = $request->user();
+        $userRole = strtolower($user?->role ?? '');
+        $isWakaOrAdmin = in_array($userRole, ['admin', 'super_admin', 'waka', 'kurikulum'])
+            || str_contains($userRole, 'waka')
+            || str_contains($userRole, 'kurikulum');
+
+        if (!$isWakaOrAdmin) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Akses ditolak: Fitur rekapitulasi siswa seluruh sekolah khusus untuk Waka Kurikulum dan Administrator.'
+            ], 403);
+        }
+
         $schoolId = $user?->school_id ?? ($user?->guru?->school_id ?? null);
         $kelasId = $request->query('kelas_id');
         $months = (int) $request->query('months', 1);

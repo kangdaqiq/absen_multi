@@ -280,9 +280,9 @@
                     <input type="text" disabled placeholder="Terdaftar otomatis via Bot" class="w-full rounded-lg border border-gray-200 bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500 cursor-not-allowed px-4 py-2 outline-none dark:border-gray-700">
                 </div>
                 <div>
-                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Default Shift Kerja <span class="text-error-500">*</span></label>
-                    <select name="default_shift_id" required class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
-                        <option value="">-- Pilih Shift (Wajib) --</option>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Default Shift Kerja <span class="text-gray-400 font-normal">(opsional)</span></label>
+                    <select name="default_shift_id" class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                        <option value="">-- Pilih Shift (Opsional) --</option>
                         @foreach($shifts as $s)
                             <option value="{{ $s->id }}">{{ $s->nama_shift }} ({{ $s->formatted_jam_masuk }} - {{ $s->formatted_jam_pulang }})</option>
                         @endforeach
@@ -348,9 +348,9 @@
                     <p class="mt-1 text-xs text-gray-500">Format: 08xxx atau 628xxx (8-13 digit)</p>
                 </div>
                 <div>
-                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Default Shift Kerja <span class="text-error-500">*</span></label>
-                    <select name="default_shift_id" id="edit_default_shift_id" required class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
-                        <option value="">-- Pilih Shift (Wajib) --</option>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Default Shift Kerja <span class="text-gray-400 font-normal">(opsional)</span></label>
+                    <select name="default_shift_id" id="edit_default_shift_id" class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                        <option value="">-- Pilih Shift (Opsional) --</option>
                         @foreach($shifts as $s)
                             <option value="{{ $s->id }}">{{ $s->nama_shift }} ({{ $s->formatted_jam_masuk }} - {{ $s->formatted_jam_pulang }})</option>
                         @endforeach

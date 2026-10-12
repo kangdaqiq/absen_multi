@@ -187,14 +187,30 @@ Mengambil jam masuk, jam pulang, dan status presensi hari ini.
     "shift_name": "Reguler Pagi",
     "status_kehadiran": "Hadir",
     "is_checked_in": true,
-    "is_checked_out": true,
-    "is_wali_kelas": false,
-    "wali_kelas": false,
+    "is_wali_kelas": true,
+    "wali_kelas": true,
     "kelas_name": "Kelas X IPA 1",
-    "kelas_id": 1
+    "kelas_id": 1,
+    "wali_kelases": [
+      {
+        "id": 1,
+        "nama": "X IPA 1",
+        "nama_kelas": "X IPA 1",
+        "peran": "Wali Kelas 1",
+        "is_utama": true
+      },
+      {
+        "id": 4,
+        "nama": "XI IPS 2",
+        "nama_kelas": "XI IPS 2",
+        "peran": "Wali Kelas 2",
+        "is_utama": false
+      }
+    ]
   }
 }
 ```
+*Catatan Multi-Wali Kelas: Jika guru menjadi wali di lebih dari 1 kelas (misal Wali Kelas 1 di X IPA 1 dan Wali Kelas 2 di XI IPS 2), array `wali_kelases` akan berisi seluruh kelas yang diampu, sedangkan `kelas_id` dan `kelas_name` tetap berisi kelas utama untuk backward-compatibility aplikasi.*
 
 ---
 
@@ -396,12 +412,13 @@ Cari siswa di seluruh sekolah berdasarkan kelas atau kata kunci Nama / NIS / NIS
   - `kelas_id` (optional): `1` *(Untuk memfilter siswa dalam satu kelas tertentu tanpa kata kunci pencarian)*
   - `q` (optional): `Ahmad` *(Kata kunci pencarian nama atau NIS/NISN, minimal 2 karakter)*
   - `strict_class` (optional boolean, default `false`): Jika diset `true`, pencarian tetap dibatasi hanya di dalam `kelas_id` yang dipilih.
-- **Logika Pencarian Multi-Kelas**:
-  - Untuk pengguna dengan role **Guru, Waka, Kurikulum, atau Admin**: Ketika parameter pencarian `q` diisi, server otomatis melakukan pencarian ke **seluruh siswa di sekolah** tanpa dibatasi hanya kelas tempat guru tersebut menjadi wali kelas.
-  - Setiap data siswa yang ditemukan menyertakan `kelas_name` dan `kelas_id` aslinya.
+- **Hak Akses & Batasan Pencarian**:
+  - **Waka Kurikulum & Admin**: Dapat mencari seluruh siswa di sekolah secara global lintas kelas.
+  - **Wali Kelas (Walas)**: Akses dibatasi secara ketat **hanya pada kelas yang diwalikannya**. Jika walas memiliki 1 kelas, hanya siswa di kelas tersebut yang tampil/dicari. Jika walas memiliki 2 kelas, maka siswa dari 2 kelas tersebut yang tampil dan dapat dicari. Walas tidak dapat mengakses atau mencari siswa di kelas lain.
 - **Contoh Request**:
-  - Filter per kelas: `GET /api/mobile/students-attendance?tanggal=10-09-2026&kelas_id=1`
-  - Cari nama/NISN satu sekolah: `GET /api/mobile/students-attendance?tanggal=10-09-2026&q=Ahmad`
+  - Walas (otomatis ke kelas walinya): `GET /api/mobile/students-attendance?tanggal=10-09-2026`
+  - Walas pilih salah satu kelas walinya: `GET /api/mobile/students-attendance?tanggal=10-09-2026&kelas_id=1`
+  - Waka/Admin cari global satu sekolah: `GET /api/mobile/students-attendance?tanggal=10-09-2026&q=Ahmad`
 - **Response Success (200 OK)**:
 ```json
 {
@@ -488,8 +505,11 @@ Mendapatkan rekapitulasi kehadiran seluruh siswa di kelas tempat guru tersebut m
 - **URL**: `/api/mobile/rekap-kelas`
 - **Method**: `GET`
 - **Auth**: Bearer Token
+- **Hak Akses & Batasan**:
+  - **Wali Kelas (Walas)**: Hanya dapat mengambil rekap kelas yang diwalikannya (1 atau 2 kelas miliknya). Jika walas mengampu 2 kelas, ia dapat memilih salah satu dari 2 kelas tersebut via parameter `kelas_id`. Upaya mengakses rekap kelas guru lain akan ditolak (`403 Forbidden`).
+  - **Waka Kurikulum & Admin**: Dapat mengambil rekap untuk seluruh kelas di sekolah.
 - **Query Parameters**:
-  - `kelas_id` (optional): `1` *(Opsional jika guru mengajar atau menjadi wali kelas di lebih dari satu kelas)*
+  - `kelas_id` (optional): `1` *(Opsional jika walas mengampu lebih dari 1 kelas atau diakses oleh Waka/Admin)*
   - `start_date` (optional): `01-09-2026`
   - `end_date` (optional): `10-09-2026`
 - **Contoh Request**:
@@ -525,11 +545,14 @@ Mendapatkan rekapitulasi kehadiran seluruh siswa di kelas tempat guru tersebut m
 ## 📊 4. Fitur Waka Kurikulum & Manajemen Sekolah
 
 ### 4.1 Daftar Kelas Sekolah (`GET /api/mobile/kelases`)
-Mendapatkan daftar kelas yang terdaftar di sekolah.
+Mendapatkan daftar pilihan kelas.
 
-- **URL**: `/api/mobile/kelases`
+- **URL**: `/api/mobile/kelases` (atau `/api/mobile/kelas`)
 - **Method**: `GET`
 - **Auth**: Bearer Token
+- **Hak Akses & Batasan**:
+  - **Wali Kelas (Walas)**: Otomatis hanya mengembalikan kelas-kelas tempat guru tersebut menjadi wali kelas (jika 1 kelas maka 1 kelas yang tampil, jika 2 kelas maka 2 kelas tersebut yang tampil) beserta status perannya (`Wali Kelas 1` / `Wali Kelas 2`).
+  - **Waka Kurikulum & Admin**: Mengembalikan seluruh kelas yang ada di sekolah.
 - **Response Success (200 OK)**:
 ```json
 {

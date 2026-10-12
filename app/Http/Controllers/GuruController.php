@@ -97,6 +97,7 @@ class GuruController extends Controller
         if (empty($data['telegram_chat_id'])) {
             $data['telegram_chat_id'] = null;
         }
+        $data['default_shift_id'] = $request->filled('default_shift_id') ? $request->default_shift_id : null;
 
         if ($request->hasFile('foto')) {
             $data['foto'] = $this->processAndStoreFoto($request->file('foto'));
@@ -163,6 +164,7 @@ class GuruController extends Controller
         } elseif (empty($data['telegram_chat_id'])) {
             $data['telegram_chat_id'] = null;
         }
+        $data['default_shift_id'] = $request->filled('default_shift_id') ? $request->default_shift_id : null;
 
         if ($request->hasFile('foto')) {
             if ($guruModel->foto) {

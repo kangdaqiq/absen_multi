@@ -179,6 +179,19 @@ class Guru extends Model
             }
         }
 
+        // 3. Fallback: Shift aktif di sekolah jika guru belum di-setting shift khusus
+        if ($this->school_id) {
+            $schoolShifts = Shift::where('school_id', $this->school_id)
+                ->where('is_active', true)
+                ->orderBy('jam_masuk', 'asc')
+                ->get();
+            foreach ($schoolShifts as $s) {
+                if ($s->isActiveOnDay($dayIndex)) {
+                    return $s;
+                }
+            }
+        }
+
         return null;
     }
 

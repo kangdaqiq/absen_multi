@@ -895,13 +895,12 @@
 
         <div class="relative flex py-2 items-center mb-2">
             <div class="flex-grow border-t border-gray-200 dark:border-gray-700"></div>
-            <span class="flex-shrink mx-3 text-[11px] text-gray-400 dark:text-gray-500 uppercase tracking-wider">Atau via Mesin Absensi ESP</span>
             <div class="flex-grow border-t border-gray-200 dark:border-gray-700"></div>
         </div>
 
         <div class="flex flex-col gap-3">
             <button type="button" class="rounded-lg bg-brand-500 p-3 font-medium text-white hover:bg-brand-600 transition" id="btnMulaiEnroll">
-                <i class="fas fa-rss mr-1"></i> Mulai Scan via Mesin ESP
+                <i class="fas fa-rss mr-1"></i> Mulai Scan
             </button>
             <button type="button" class="rounded-lg bg-error-500 p-3 font-medium text-white hover:bg-error-600 transition disabled:opacity-50 disabled:cursor-not-allowed" id="btnHapusUID" disabled>
                 <i class="fas fa-trash mr-1"></i> Hapus UID

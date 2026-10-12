@@ -152,6 +152,7 @@ Route::middleware('auth')->group(function () {
         Route::resource('kelas', KelasController::class)->except(['create', 'show', 'edit']);
         Route::resource('guru', GuruController::class)->except(['create', 'show', 'edit']);
         Route::patch('guru/{id}/toggle-bot-access', [GuruController::class, 'toggleBotAccess'])->name('guru.toggle-bot-access');
+        Route::match(['post', 'delete'], 'guru/{id}/delete-face', [GuruController::class, 'deleteFaceId'])->name('guru.delete-face');
     });
 
     // Absensi & Rekap Routes (Includes Wali Kelas & Waka Kurikulum)

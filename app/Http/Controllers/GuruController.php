@@ -10,7 +10,7 @@ class GuruController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Guru::with('defaultShift')->orderBy('nama');
+        $query = Guru::with(['defaultShift', 'user.faceData', 'faceData'])->orderBy('nama');
 
         // Filter by school_id for non-super admin users
         $schoolId = null;
@@ -85,6 +85,7 @@ class GuruController extends Controller
                 Rule::unique('guru')->where(fn($q) => $q->where('school_id', $schoolId))
             ],
             'telegram_chat_id' => 'nullable|string|max:50',
+            'foto' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:5120',
         ]);
 
         $data = $request->all();
@@ -95,6 +96,12 @@ class GuruController extends Controller
         }
         if (empty($data['telegram_chat_id'])) {
             $data['telegram_chat_id'] = null;
+        }
+
+        if ($request->hasFile('foto')) {
+            $data['foto'] = $this->processAndStoreFoto($request->file('foto'));
+        } else {
+            unset($data['foto']);
         }
 
         // Add school_id from authenticated user
@@ -142,6 +149,7 @@ class GuruController extends Controller
                 Rule::unique('guru')->ignore($guruModel->id)->where(fn($q) => $q->where('school_id', $schoolId))
             ],
             'telegram_chat_id' => 'nullable|string|max:50',
+            'foto' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:5120',
         ]);
 
         $data = $request->all();
@@ -155,6 +163,16 @@ class GuruController extends Controller
         } elseif (empty($data['telegram_chat_id'])) {
             $data['telegram_chat_id'] = null;
         }
+
+        if ($request->hasFile('foto')) {
+            if ($guruModel->foto) {
+                Guru::deletePhotoFile($guruModel->foto);
+            }
+            $data['foto'] = $this->processAndStoreFoto($request->file('foto'));
+        } else {
+            unset($data['foto']);
+        }
+
         $guruModel->update($data);
 
         return redirect()->route('guru.index')->with('success', 'Data guru berhasil diperbarui.');
@@ -164,9 +182,133 @@ class GuruController extends Controller
     {
         $guruModel = Guru::findOrFail($guru);
         $this->authorizeGuruAccess($guruModel);
+
+        if ($guruModel->foto) {
+            Guru::deletePhotoFile($guruModel->foto);
+        }
+
         $guruModel->delete();
 
         return redirect()->route('guru.index')->with('success', 'Guru berhasil dihapus.');
+    }
+
+    /**
+     * Hapus / Reset data Face ID master guru.
+     */
+    public function deleteFaceId($id)
+    {
+        $guruModel = Guru::findOrFail($id);
+        $this->authorizeGuruAccess($guruModel);
+
+        $faceRecords = \App\Models\UserFaceData::where('guru_id', $guruModel->id)
+            ->when($guruModel->user_id, function($q) use ($guruModel) {
+                $q->orWhere('user_id', $guruModel->user_id);
+            })
+            ->get();
+
+        foreach ($faceRecords as $face) {
+            if (!empty($face->sample_photo_path)) {
+                $filePath = storage_path('app/public/' . $face->sample_photo_path);
+                if (file_exists($filePath)) {
+                    @unlink($filePath);
+                }
+            }
+            $face->delete();
+        }
+
+        \App\Models\ApiLog::create([
+            'school_id' => $guruModel->school_id,
+            'api_key' => 'WEB_ADMIN',
+            'action' => 'delete_face_id_guru',
+            'uid' => $guruModel->nip ?: $guruModel->nama,
+            'success' => true,
+            'message' => "Hapus Face ID dewan guru: {$guruModel->nama} oleh " . (auth()->user()->full_name ?? auth()->user()->username),
+            'ip_address' => request()->ip(),
+            'user_agent' => request()->userAgent() ?? 'Web Dashboard',
+            'created_at' => now(),
+        ]);
+
+        if (request()->ajax() || request()->wantsJson()) {
+            return response()->json([
+                'ok' => true,
+                'success' => true,
+                'message' => "Face ID guru {$guruModel->nama} berhasil dihapus/direset."
+            ]);
+        }
+
+        return redirect()->back()->with('success', "Data Face ID guru {$guruModel->nama} berhasil dihapus/direset.");
+    }
+
+    /**
+     * Kompresi dan simpan foto guru (maks 600x800, JPEG 80%).
+     */
+    protected function processAndStoreFoto($file): string
+    {
+        $randomName = \Illuminate\Support\Str::random(40) . '.jpg';
+        $destDir = storage_path('app/public/guru');
+        $destinationPath = $destDir . DIRECTORY_SEPARATOR . $randomName;
+        $dbValue = 'guru/' . $randomName;
+
+        if (!file_exists($destDir)) {
+            @mkdir($destDir, 0755, true);
+        }
+
+        if (extension_loaded('gd')) {
+            try {
+                $filePath = $file->getRealPath();
+                $imageInfo = @getimagesize($filePath);
+
+                if ($imageInfo) {
+                    $mime = $imageInfo['mime'];
+                    $src = match ($mime) {
+                        'image/jpeg', 'image/jpg' => @imagecreatefromjpeg($filePath),
+                        'image/png' => @imagecreatefrompng($filePath),
+                        'image/webp' => @imagecreatefromwebp($filePath),
+                        default => null,
+                    };
+
+                    if ($src) {
+                        if (function_exists('exif_read_data') && ($mime === 'image/jpeg' || $mime === 'image/jpg')) {
+                            $exif = @exif_read_data($filePath);
+                            if (!empty($exif['Orientation'])) {
+                                $src = match ($exif['Orientation']) {
+                                    3 => imagerotate($src, 180, 0),
+                                    6 => imagerotate($src, -90, 0),
+                                    8 => imagerotate($src, 90, 0),
+                                    default => $src,
+                                };
+                            }
+                        }
+
+                        $origW = imagesx($src);
+                        $origH = imagesy($src);
+
+                        $maxW = 600;
+                        $maxH = 800;
+
+                        $ratio = min($maxW / $origW, $maxH / $origH, 1.0);
+                        $targetW = (int) round($origW * $ratio);
+                        $targetH = (int) round($origH * $ratio);
+
+                        $dst = imagecreatetruecolor($targetW, $targetH);
+                        $white = imagecolorallocate($dst, 255, 255, 255);
+                        imagefill($dst, 0, 0, $white);
+
+                        imagecopyresampled($dst, $src, 0, 0, 0, 0, $targetW, $targetH, $origW, $origH);
+                        imagejpeg($dst, $destinationPath, 80);
+
+                        imagedestroy($src);
+                        imagedestroy($dst);
+
+                        return $dbValue;
+                    }
+                }
+            } catch (\Throwable $e) {
+                \Log::warning('Gagal kompresi foto guru: ' . $e->getMessage());
+            }
+        }
+
+        return $file->store('guru', 'public');
     }
 
     /**

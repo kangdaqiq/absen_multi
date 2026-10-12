@@ -108,7 +108,49 @@ Memperbarui FCM Device Registration Token untuk push notification.
 
 ---
 
-### 1.4 Logout (`POST /api/mobile/logout`)
+### 1.4 Ganti Password Akun (`POST /api/mobile/change-password`)
+Mengubah kata sandi akun pengguna yang sedang login (berlaku untuk Guru, Pegawai, maupun Siswa).
+
+- **URL**: `/api/mobile/change-password` atau `/api/mobile/ganti-password`
+- **Method**: `POST`
+- **Auth**: Bearer Token
+- **Body Request (JSON / Form-Data)**:
+```json
+{
+  "current_password": "passwordLama123",
+  "new_password": "passwordBaru456",
+  "new_password_confirmation": "passwordBaru456"
+}
+```
+*Catatan:* Parameter juga mendukung penamaan bahasa Indonesia (`password_lama`, `password_baru`, `konfirmasi_password`).
+
+- **Response Success (200 OK)**:
+```json
+{
+  "success": true,
+  "message": "Password akun berhasil diubah. Silakan gunakan password baru ini untuk login berikutnya."
+}
+```
+
+- **Response Error (422 Unprocessable Entity - Password Lama Salah)**:
+```json
+{
+  "success": false,
+  "message": "Password saat ini (lama) yang Anda masukkan salah."
+}
+```
+
+- **Response Error (422 - Konfirmasi Tidak Cocok / Kurang dari 6 Karakter)**:
+```json
+{
+  "success": false,
+  "message": "Password baru minimal terdiri dari 6 karakter."
+}
+```
+
+---
+
+### 1.5 Logout (`POST /api/mobile/logout`)
 Menghapus/revokasi token Sanctum aktif.
 
 - **URL**: `/api/mobile/logout`
@@ -212,6 +254,14 @@ Mencatat absen masuk berbasis verifikasi koordinat GPS.
 {
   "success": false,
   "message": "Gagal absen: Lokasi palsu / Fake GPS terdeteksi. Mohon matikan aplikasi lokasi palsu."
+}
+```
+
+5. **Gagal: Verifikasi Wajah Tidak Cocok / Tidak Terdeteksi (400 Bad Request)**:
+```json
+{
+  "success": false,
+  "message": "Absen ditolak: Wajah Anda tidak cocok dengan foto terdaftar (Kemiripan: 24%)."
 }
 ```
 
@@ -336,18 +386,22 @@ Mendapatkan akumulasi persentase dan rincian kehadiran individu.
 ## 👨‍🏫 3. Fitur Dewan Guru & Wali Kelas
 
 ### 3.1 Cari & Tampilkan Siswa untuk Absensi (`GET /api/mobile/students-attendance`)
-Cari siswa di seluruh sekolah berdasarkan kelas atau kata kunci Nama / NISN untuk diisi absensinya.
+Cari siswa di seluruh sekolah berdasarkan kelas atau kata kunci Nama / NIS / NISN untuk diisi absensinya.
 
 - **URL**: `/api/mobile/students-attendance`
 - **Method**: `GET`
-- **Auth**: Bearer Token
+- **Auth**: Bearer Token (Role: `guru`, `waka`, `kurikulum`, `admin`, `super_admin`)
 - **Query Parameters**:
   - `tanggal` (optional, default hari ini): `10-09-2026`
-  - `kelas_id` (optional): `1` *(Dapat digunakan untuk memfilter seluruh siswa per kelas langsung tanpa kata kunci)*
-  - `q` (optional): `Ahmad` *(Pencarian nama atau NIS/NISN, minimal 2 karakter)*
+  - `kelas_id` (optional): `1` *(Untuk memfilter siswa dalam satu kelas tertentu tanpa kata kunci pencarian)*
+  - `q` (optional): `Ahmad` *(Kata kunci pencarian nama atau NIS/NISN, minimal 2 karakter)*
+  - `strict_class` (optional boolean, default `false`): Jika diset `true`, pencarian tetap dibatasi hanya di dalam `kelas_id` yang dipilih.
+- **Logika Pencarian Multi-Kelas**:
+  - Untuk pengguna dengan role **Guru, Waka, Kurikulum, atau Admin**: Ketika parameter pencarian `q` diisi, server otomatis melakukan pencarian ke **seluruh siswa di sekolah** tanpa dibatasi hanya kelas tempat guru tersebut menjadi wali kelas.
+  - Setiap data siswa yang ditemukan menyertakan `kelas_name` dan `kelas_id` aslinya.
 - **Contoh Request**:
-  - Filter per kelas: `GET /api/mobile/students-attendance?tanggal=10-09-2026&kelas_id=1&q=`
-  - Cari nama/NISN: `GET /api/mobile/students-attendance?tanggal=10-09-2026&q=Ahmad`
+  - Filter per kelas: `GET /api/mobile/students-attendance?tanggal=10-09-2026&kelas_id=1`
+  - Cari nama/NISN satu sekolah: `GET /api/mobile/students-attendance?tanggal=10-09-2026&q=Ahmad`
 - **Response Success (200 OK)**:
 ```json
 {
@@ -516,3 +570,150 @@ Mendapatkan statistik akumulasi absensi siswa tingkat sekolah atau per kelas unt
   }
 }
 ```
+
+---
+
+## 👤 5. Biometrik Face ID (Universal Guru & Siswa)
+
+Sistem Face ID menggunakan ekstraksi vektor 512-dimensi (FaceNet deep learning). Endpoint berikut berlaku universal baik untuk akun **Guru/Pegawai** maupun **Siswa**.
+
+### 5.1 Cek Status Registrasi Face ID (`GET /api/mobile/face-status`)
+Digunakan oleh aplikasi mobile untuk mengecek apakah pengguna yang sedang login sudah memiliki master Face ID terdaftar.
+
+- **URL**: `/api/mobile/face-status`
+- **Method**: `GET`
+- **Auth**: Bearer Token
+- **Response Success (200 OK)**:
+```json
+{
+  "success": true,
+  "data": {
+    "has_face_registered": true,
+    "is_verified": true,
+    "sample_photo_url": "http://absen.jagattech.my.id/storage/faces/sample_123.jpg",
+    "registered_at": "2026-10-12 08:30:00"
+  }
+}
+```
+*Jika belum terdaftar, `has_face_registered` bernilai `false` dan `sample_photo_url` bernilai `null`.*
+
+---
+
+### 5.2 Registrasi Master Wajah Face ID (`POST /api/mobile/face-register`)
+Mendaftarkan foto wajah asli pengguna sebagai referensi embedding biometrik saat absen.
+
+- **URL**: `/api/mobile/face-register`
+- **Method**: `POST`
+- **Content-Type**: `multipart/form-data`
+- **Auth**: Bearer Token
+- **Body Request**:
+  - `photo` (file, required): File gambar wajah menghadap lurus ke kamera (maks 10MB, format JPG/PNG).
+- **Aturan Proteksi Anti-Duplikasi**:
+  - Jika wajah **sudah pernah didaftarkan**, sistem akan **menolak** pendaftaran ulang dengan status `422 Unprocessable Entity`.
+  - Pendaftaran ulang hanya dapat dilakukan jika admin/operator sekolah telah mereset Face ID melalui dashboard web.
+
+- **Response Success (200 OK)**:
+```json
+{
+  "success": true,
+  "message": "Registrasi wajah master berhasil disimpan.",
+  "data": {
+    "is_verified": true,
+    "sample_photo_url": "http://absen.jagattech.my.id/storage/faces/abc123xyz.jpg",
+    "registered_at": "2026-10-12 08:35:12"
+  }
+}
+```
+
+- **Response Error (422 - Wajah Sudah Pernah Terdaftar)**:
+```json
+{
+  "success": false,
+  "message": "Pendaftaran ditolak: Wajah Anda sudah terdaftar di sistem. Silakan hubungi admin sekolah jika ingin mereset/mendaftarkan ulang data Face ID."
+}
+```
+
+- **Response Error (400 - Wajah Tidak Terdeteksi / Buram)**:
+```json
+{
+  "success": false,
+  "message": "Wajah tidak terdeteksi pada foto. Pastikan wajah terlihat jelas menghadap kamera."
+}
+```
+
+---
+
+## 📸 6. Upload Foto Profil (Siswa & Guru)
+
+Endpoint untuk memperbarui foto profil identitas di sistem. Otomatis melakukan kompresi cerdas GD (maks. 600x800 px) dan menghapus file foto fisik lama dari disk storage server saat diperbarui.
+
+### 6.1 Upload Foto Siswa (`POST /api/mobile/student/photo` atau `/mobile/student/upload-photo`)
+Dapat dipanggil oleh Siswa yang sedang login (untuk fotonya sendiri) atau oleh Guru / Admin (dengan menyertakan `student_id`).
+
+- **URL**: `/api/mobile/student/photo` atau `/api/mobile/student/upload-photo`
+- **Method**: `POST`
+- **Content-Type**: `multipart/form-data`
+- **Auth**: Bearer Token
+- **Body Request**:
+  - `photo` / `foto` (file, required): File gambar profil (maks 10MB).
+  - `student_id` (integer, optional): Wajib diisi jika diunggah oleh akun guru/admin.
+  - `sync_face` (boolean, optional, default: `true`): Jika bernilai `true` dan wajah terdeteksi, otomatis didaftarkan sebagai master Face ID (selama Face ID belum pernah terdaftar sebelumnya).
+
+- **Response Success (200 OK)**:
+```json
+{
+  "success": true,
+  "message": "Foto siswa berhasil diperbarui dan didaftarkan untuk Face ID.",
+  "data": {
+    "student_id": 15,
+    "nama": "Ahmad Rizky",
+    "nis": "1001",
+    "foto": "siswa/foto_1001_1728723948.jpg",
+    "foto_url": "http://absen.jagattech.my.id/storage/siswa/foto_1001_1728723948.jpg",
+    "face_registered": true,
+    "face_message": "Wajah berhasil dideteksi dan didaftarkan sebagai master Face ID."
+  }
+}
+```
+
+---
+
+### 6.2 Upload Foto Guru (`POST /api/mobile/teacher/photo` atau `/mobile/guru/photo`)
+Dapat dipanggil oleh Guru yang sedang login (untuk fotonya sendiri) atau oleh Admin sekolah (dengan menyertakan `guru_id` / `teacher_id`).
+
+- **URL**: `/api/mobile/teacher/photo` atau `/api/mobile/guru/photo`
+- **Method**: `POST`
+- **Content-Type**: `multipart/form-data`
+- **Auth**: Bearer Token
+- **Body Request**:
+  - `photo` / `foto` (file, required): File gambar profil (maks 10MB).
+  - `guru_id` / `teacher_id` (integer, optional): ID guru jika diunggah oleh admin sekolah.
+  - `sync_face` (boolean, optional, default: `true`): Jika `true`, otomatis mendaftarkan master Face ID jika wajah terdeteksi dan belum pernah terdaftar.
+
+- **Response Success (200 OK)**:
+```json
+{
+  "success": true,
+  "message": "Foto guru berhasil diperbarui dan didaftarkan untuk Face ID.",
+  "data": {
+    "guru_id": 8,
+    "nama": "Budi Santoso, S.Pd",
+    "nip": "198501012010011002",
+    "foto": "guru/foto_guru_8_1728723948.jpg",
+    "foto_url": "http://absen.jagattech.my.id/storage/guru/foto_guru_8_1728723948.jpg",
+    "face_registered": true,
+    "face_message": "Wajah berhasil dideteksi dan didaftarkan sebagai master Face ID."
+  }
+}
+```
+
+---
+
+## 🛠️ 7. Tombol Reset / Hapus Face ID (Web Dashboard Admin)
+
+Untuk menjaga keamanan agar siswa atau guru tidak dapat sembarangan mendaftarkan wajah orang lain, Face ID yang sudah terdaftar hanya dapat dihapus melalui Web Dashboard Admin:
+
+- **Menu Data Siswa**: Terdapat tombol aksi **Hapus Face ID** (`POST /siswa/{id}/delete-face`).
+- **Menu Data Guru**: Terdapat tombol aksi **Hapus Face ID** (`POST /guru/{id}/delete-face`).
+- **Validasi Keamanan**: Diperiksa dengan validasi multi-tenant (`school_id`). Menghapus record biometrik embedding sekaligus menghapus file foto sample master di folder storage.
+

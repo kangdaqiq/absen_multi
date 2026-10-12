@@ -14,6 +14,9 @@ class Guru extends Model
     protected static function booted()
     {
         static::deleting(function ($guru) {
+            if ($guru->foto) {
+                self::deletePhotoFile($guru->foto);
+            }
             $fingerIds = $guru->fingerprints()->pluck('finger_id')->toArray();
             if ($guru->id_finger && !in_array($guru->id_finger, $fingerIds)) {
                 $fingerIds[] = (int)$guru->id_finger;
@@ -25,7 +28,110 @@ class Guru extends Model
         });
     }
 
-    protected $fillable = ['nama', 'nip', 'tgl_lahir', 'no_wa', 'bot_access', 'is_global_report', 'is_teacher_report', 'id_finger', 'uid_rfid', 'enroll_status', 'enroll_finger_status', 'created_at', 'updated_at', 'school_id', 'default_shift_id', 'user_id', 'telegram_chat_id', 'last_seen'];
+    protected $fillable = [
+        'nama',
+        'nip',
+        'tgl_lahir',
+        'no_wa',
+        'foto',
+        'bot_access',
+        'is_global_report',
+        'is_teacher_report',
+        'id_finger',
+        'uid_rfid',
+        'enroll_status',
+        'enroll_finger_status',
+        'created_at',
+        'updated_at',
+        'school_id',
+        'default_shift_id',
+        'user_id',
+        'telegram_chat_id',
+        'last_seen'
+    ];
+
+    protected $appends = ['foto_url'];
+
+    public function getFotoUrlAttribute(): string
+    {
+        if (!empty($this->foto)) {
+            if (\Illuminate\Support\Str::startsWith($this->foto, ['http://', 'https://'])) {
+                return $this->foto;
+            }
+
+            if (file_exists(public_path('storage/' . $this->foto))) {
+                return asset('storage/' . $this->foto);
+            }
+
+            if (file_exists(public_path($this->foto))) {
+                return asset($this->foto);
+            }
+
+            $diskPath = self::getPhotoDiskPath($this->foto);
+            if ($diskPath && file_exists($diskPath)) {
+                return asset('storage/' . ltrim(str_replace(['\\', '/'], '/', $this->foto), '/'));
+            }
+        }
+
+        $name = urlencode($this->nama ?? 'Guru');
+        return "https://ui-avatars.com/api/?name={$name}&background=10b981&color=fff&size=256&bold=true";
+    }
+
+    public static function getPhotoDiskPath(?string $photo): ?string
+    {
+        if (empty($photo)) {
+            return null;
+        }
+
+        $cleanPhoto = str_replace(['..', "\0"], '', $photo);
+        $cleanPhoto = ltrim($cleanPhoto, '/\\');
+        $baseName = basename($cleanPhoto);
+
+        $storageDirect = storage_path('app/public/' . $cleanPhoto);
+        if (file_exists($storageDirect)) {
+            return $storageDirect;
+        }
+
+        $storageBase = storage_path('app/public/guru/' . $baseName);
+        if (file_exists($storageBase)) {
+            return $storageBase;
+        }
+
+        $publicDirect = public_path('storage/' . $cleanPhoto);
+        if (file_exists($publicDirect)) {
+            return $publicDirect;
+        }
+
+        return null;
+    }
+
+    public static function deletePhotoFile(?string $photo): void
+    {
+        if (empty($photo)) {
+            return;
+        }
+
+        $diskPath = self::getPhotoDiskPath($photo);
+        if ($diskPath && file_exists($diskPath)) {
+            @unlink($diskPath);
+        }
+    }
+
+    public function faceData()
+    {
+        return $this->hasOne(UserFaceData::class, 'guru_id');
+    }
+
+    public function getHasFaceRegisteredAttribute(): bool
+    {
+        if ($this->relationLoaded('faceData') && $this->faceData) {
+            return true;
+        }
+        if ($this->relationLoaded('user') && $this->user && $this->user->relationLoaded('faceData') && $this->user->faceData) {
+            return true;
+        }
+        return $this->faceData()->exists() || ($this->user_id && UserFaceData::where('user_id', $this->user_id)->exists());
+    }
 
     protected $casts = [
         'bot_access' => 'boolean',

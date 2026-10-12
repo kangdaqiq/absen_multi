@@ -14,6 +14,7 @@ class UserFaceData extends Model
     protected $fillable = [
         'user_id',
         'siswa_id',
+        'guru_id',
         'face_embedding',
         'sample_photo_path',
         'is_verified',
@@ -31,5 +32,10 @@ class UserFaceData extends Model
     public function siswa()
     {
         return $this->belongsTo(Siswa::class, 'siswa_id');
+    }
+
+    public function guru()
+    {
+        return $this->belongsTo(Guru::class, 'guru_id');
     }
 }

@@ -85,21 +85,26 @@
                             <p class="text-gray-500 dark:text-gray-400">{{ $loop->iteration + $guru->firstItem() - 1 }}</p>
                         </td>
                         <td class="border-b border-gray-100 px-4 py-4 dark:border-gray-800">
-                            <p class="font-medium text-gray-800 dark:text-white/90">{{ $g->nama }}</p>
-                            @if($g->is_global_report || $g->is_teacher_report)
-                                <div class="flex flex-wrap gap-1 mt-1">
-                                    @if($g->is_global_report)
-                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" title="Terima Laporan Global Siswa">
-                                            Laporan Global
-                                        </span>
-                                    @endif
-                                    @if($g->is_teacher_report)
-                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300" title="Terima Laporan Absensi Guru">
-                                            Laporan Guru
-                                        </span>
+                            <div class="flex items-center gap-3">
+                                <img src="{{ $g->foto_url }}" alt="{{ $g->nama }}" class="w-9 h-9 rounded-full object-cover border border-gray-200 dark:border-gray-700 shrink-0">
+                                <div>
+                                    <p class="font-medium text-gray-800 dark:text-white/90">{{ $g->nama }}</p>
+                                    @if($g->is_global_report || $g->is_teacher_report)
+                                        <div class="flex flex-wrap gap-1 mt-1">
+                                            @if($g->is_global_report)
+                                                <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" title="Terima Laporan Global Siswa">
+                                                    Laporan Global
+                                                </span>
+                                            @endif
+                                            @if($g->is_teacher_report)
+                                                <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300" title="Terima Laporan Absensi Guru">
+                                                    Laporan Guru
+                                                </span>
+                                            @endif
+                                        </div>
                                     @endif
                                 </div>
-                            @endif
+                            </div>
                         </td>
                         <td class="border-b border-gray-100 px-4 py-4 dark:border-gray-800">
                             <p class="text-gray-500 dark:text-gray-400">{{ $g->nip ?: '-' }}</p>
@@ -184,9 +189,21 @@
                                     <i class="fas fa-fingerprint"></i>
                                 </button>
                                 
+                                <!-- Face ID Action (Delete/Reset) -->
+                                @if($g->has_face_registered)
+                                    <button type="button" class="btnDeleteFace text-purple-600 hover:text-purple-800 hover:bg-purple-50 dark:hover:bg-purple-900/20 p-2 rounded-lg transition" 
+                                        data-id="{{ $g->id }}" data-nama="{{ $g->nama }}" title="Face ID Terdaftar (Klik untuk Hapus / Reset)">
+                                        <i class="fas fa-smile-beam"></i>
+                                    </button>
+                                @else
+                                    <span class="text-gray-300 dark:text-gray-600 p-2 inline-flex cursor-not-allowed" title="Face ID belum didaftarkan">
+                                        <i class="fas fa-smile"></i>
+                                    </span>
+                                @endif
+                                
                                 <!-- Edit -->
                                 <button class="btnEdit text-warning-500 hover:text-warning-700 hover:bg-warning-50 p-2 rounded-lg transition" 
-                                    data-id="{{ $g->id }}" data-nama="{{ $g->nama }}" data-nip="{{ $g->nip }}" data-wa="{{ $g->no_wa }}" data-rfid="{{ $g->uid_rfid }}" data-shift="{{ $g->default_shift_id }}" data-is-global="{{ $g->is_global_report ? 1 : 0 }}" data-is-teacher="{{ $g->is_teacher_report ? 1 : 0 }}" data-tgl_lahir="{{ $g->tgl_lahir }}" data-telegram="{{ $g->telegram_chat_id }}"
+                                    data-id="{{ $g->id }}" data-nama="{{ $g->nama }}" data-nip="{{ $g->nip }}" data-wa="{{ $g->no_wa }}" data-rfid="{{ $g->uid_rfid }}" data-shift="{{ $g->default_shift_id }}" data-is-global="{{ $g->is_global_report ? 1 : 0 }}" data-is-teacher="{{ $g->is_teacher_report ? 1 : 0 }}" data-tgl_lahir="{{ $g->tgl_lahir }}" data-telegram="{{ $g->telegram_chat_id }}" data-foto="{{ $g->foto ? $g->foto_url : '' }}"
                                     @click="$dispatch('open-modal', 'modalEditGuru')" title="Edit">
                                     <i class="fas fa-edit"></i>
                                 </button>
@@ -226,9 +243,21 @@
             <h3 class="text-xl font-bold text-gray-800 dark:text-white/90">Tambah {{ $labelKaryawan }}</h3>
             <button @click="open = false" class="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white"><i class="fas fa-times"></i></button>
         </div>
-        <form action="{{ route('guru.store') }}" method="POST">
+        <form action="{{ route('guru.store') }}" method="POST" enctype="multipart/form-data">
             @csrf
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="sm:col-span-2">
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Foto {{ $labelKaryawan }} <span class="text-gray-400 font-normal">(opsional - otomatis dikompresi)</span></label>
+                    <div class="flex items-center gap-3">
+                        <div id="previewTambahWrapper" class="hidden w-14 h-18 aspect-[3/4] rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 shrink-0 bg-gray-50 dark:bg-gray-800 shadow-xs">
+                            <img id="previewTambahImg" src="" class="w-full h-full object-cover object-top">
+                        </div>
+                        <div class="flex-1">
+                            <input type="file" name="foto" id="inputFotoTambah" accept="image/*" onchange="handlePhotoUploadCompress(this, 'previewTambahImg', 'previewTambahWrapper')" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-brand-50 file:text-brand-600 hover:file:bg-brand-100 dark:file:bg-brand-900/30 dark:file:text-brand-400 cursor-pointer">
+                            <span class="text-[11px] text-gray-400 block mt-1"><i class="fas fa-magic text-brand-500 mr-1"></i>Foto akan dikompresi otomatis agar ukuran ringan & seragam</span>
+                        </div>
+                    </div>
+                </div>
                 <div>
                     <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Nama Lengkap <span class="text-error-500">*</span></label>
                     <input type="text" name="nama" required class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
@@ -285,10 +314,22 @@
             <h3 class="text-xl font-bold text-gray-800 dark:text-white/90">Edit {{ $labelKaryawan }}</h3>
             <button @click="open = false" class="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white"><i class="fas fa-times"></i></button>
         </div>
-        <form action="#" method="POST" id="formEditGuru">
+        <form action="#" method="POST" id="formEditGuru" enctype="multipart/form-data">
             @csrf
             @method('PUT')
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="sm:col-span-2">
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Ganti Foto {{ $labelKaryawan }} <span class="text-gray-400 font-normal">(opsional - biarkan kosong jika tidak ingin mengubah)</span></label>
+                    <div class="flex items-center gap-3">
+                        <div id="previewEditWrapper" class="hidden w-14 h-18 aspect-[3/4] rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 shrink-0 bg-gray-50 dark:bg-gray-800 shadow-xs">
+                            <img id="previewEditImg" src="" class="w-full h-full object-cover object-top">
+                        </div>
+                        <div class="flex-1">
+                            <input type="file" name="foto" id="inputFotoEdit" accept="image/*" onchange="handlePhotoUploadCompress(this, 'previewEditImg', 'previewEditWrapper')" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-brand-50 file:text-brand-600 hover:file:bg-brand-100 dark:file:bg-brand-900/30 dark:file:text-brand-400 cursor-pointer">
+                            <span class="text-[11px] text-gray-400 block mt-1"><i class="fas fa-magic text-brand-500 mr-1"></i>Foto akan dikompresi otomatis agar ukuran ringan & seragam</span>
+                        </div>
+                    </div>
+                </div>
                 <div>
                     <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Nama Lengkap <span class="text-error-500">*</span></label>
                     <input type="text" name="nama" id="edit_nama" required class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
@@ -610,6 +651,16 @@
                 $('#edit_global_report').prop('checked', isGlobal == 1);
                 $('#edit_teacher_report').prop('checked', isTeacher == 1);
 
+                var fotoUrl = $(this).data('foto');
+                if (fotoUrl) {
+                    $('#previewEditImg').attr('src', fotoUrl);
+                    $('#previewEditWrapper').removeClass('hidden');
+                } else {
+                    $('#previewEditImg').attr('src', '');
+                    $('#previewEditWrapper').addClass('hidden');
+                }
+                $('#inputFotoEdit').val('');
+
                 $('#formEditGuru').attr('action', '{{ url('guru') }}/' + id);
             });
 
@@ -871,7 +922,83 @@
                     }
                 });
             });
+
+            // Delete Face ID handler for Guru
+            $(document).on('click', '.btnDeleteFace', function () {
+                var id = $(this).data('id');
+                var nama = $(this).data('nama');
+                if (!id) return;
+
+                if (!confirm('Hapus/Reset data Face ID "' + nama + '"?\n\nSetelah dihapus, yang bersangkutan dapat mendaftarkan wajah baru melalui aplikasi mobile.')) {
+                    return;
+                }
+
+                var $btn = $(this);
+                $btn.prop('disabled', true).addClass('opacity-50');
+
+                $.post('{{ url('guru') }}/' + id + '/delete-face', {
+                    _token: '{{ csrf_token() }}'
+                }, function (res) {
+                    if (res.ok || res.success) {
+                        alert('Face ID ' + nama + ' berhasil dihapus.');
+                        location.reload();
+                    } else {
+                        alert('Gagal: ' + (res.message || 'Terjadi kesalahan'));
+                        $btn.prop('disabled', false).removeClass('opacity-50');
+                    }
+                }).fail(function (xhr) {
+                    var msg = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : 'Gagal menghubungi server.';
+                    alert(msg);
+                    $btn.prop('disabled', false).removeClass('opacity-50');
+                });
+            });
         });
+
+        // Automatic Client-Side Photo Compression & Preview
+        function handlePhotoUploadCompress(input, imgId, wrapperId) {
+            if (!input.files || !input.files[0]) return;
+            const file = input.files[0];
+            const imgEl = document.getElementById(imgId);
+            const wrapperEl = document.getElementById(wrapperId);
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                if (imgEl && wrapperEl) {
+                    imgEl.src = e.target.result;
+                    wrapperEl.classList.remove('hidden');
+                }
+
+                // Compress on canvas to max 600px width / 800px height with 0.8 JPEG quality
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    const maxW = 600;
+                    const maxH = 800;
+                    let w = img.width;
+                    let h = img.height;
+
+                    const ratio = Math.min(maxW / w, maxH / h, 1.0);
+                    w = Math.round(w * ratio);
+                    h = Math.round(h * ratio);
+
+                    canvas.width = w;
+                    canvas.height = h;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, w, h);
+
+                    canvas.toBlob(function(blob) {
+                        if (blob && window.DataTransfer) {
+                            const dt = new DataTransfer();
+                            const newFile = new File([blob], file.name.replace(/\.[^/.]+$/, "") + ".jpg", { type: "image/jpeg" });
+                            dt.items.add(newFile);
+                            input.files = dt.files;
+                        }
+                    }, 'image/jpeg', 0.8);
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
 
         // Alpine component for handling import progress
         function importFormGuru() {

@@ -305,6 +305,8 @@ class MobileAttendanceController extends Controller
                     'id' => $user->guru->id,
                     'nama' => $user->guru->nama,
                     'nip' => $user->guru->nip,
+                    'foto' => $user->guru->foto,
+                    'foto_url' => $user->guru->foto_url,
                 ] : null,
                 'student' => $studentData
             ]
@@ -587,9 +589,13 @@ class MobileAttendanceController extends Controller
 
         // 2. Face Recognition & Liveness Verification
         $studentUser = $user?->student ?? Siswa::where('user_id', $user?->id)->first();
+        $teacherUser = $user?->guru ?? Guru::where('user_id', $user?->id)->first();
         $faceData = UserFaceData::where('user_id', $user?->id)
             ->when($studentUser, function ($q) use ($studentUser) {
                 $q->orWhere('siswa_id', $studentUser->id);
+            })
+            ->when($teacherUser, function ($q) use ($teacherUser) {
+                $q->orWhere('guru_id', $teacherUser->id);
             })
             ->first();
 
@@ -1321,8 +1327,12 @@ class MobileAttendanceController extends Controller
     {
         $user = $request->user();
 
-        if (!$user || (!in_array($user->role, ['guru', 'teacher', 'wali_kelas', 'admin']) && !$user->guru)) {
-            return response()->json(['success' => false, 'message' => 'Akses khusus dewan guru'], 403);
+        $allowedRoles = ['guru', 'teacher', 'wali_kelas', 'waka', 'kurikulum', 'admin', 'super_admin'];
+        $userRole = strtolower($user?->role ?? '');
+        $isStaff = in_array($userRole, $allowedRoles) || !empty($user?->guru);
+
+        if (!$user || !$isStaff) {
+            return response()->json(['success' => false, 'message' => 'Akses khusus dewan guru dan staf sekolah'], 403);
         }
 
         $guru = $user->guru;
@@ -1335,7 +1345,7 @@ class MobileAttendanceController extends Controller
                 $kelasQuery->where('school_id', $user->school_id);
             }
 
-            if ($guru && !in_array($user->role, ['admin', 'super_admin'])) {
+            if ($guru && !in_array($userRole, ['admin', 'super_admin', 'waka', 'kurikulum'])) {
                 // Cari kelas di mana guru adalah wali kelas 1 atau 2, atau fallback ke kelas di sekolah yang sama
                 $kelasWali = (clone $kelasQuery)->where(function ($q) use ($guru) {
                     $q->where('wali_kelas_id', $guru->id)
@@ -1418,8 +1428,12 @@ class MobileAttendanceController extends Controller
     {
         $user = $request->user();
 
-        if (!$user || (!in_array($user->role, ['guru', 'teacher', 'wali_kelas', 'admin']) && !$user->guru)) {
-            return response()->json(['success' => false, 'message' => 'Akses khusus dewan guru'], 403);
+        $allowedRoles = ['guru', 'teacher', 'wali_kelas', 'waka', 'kurikulum', 'admin', 'super_admin'];
+        $userRole = strtolower($user?->role ?? '');
+        $isStaff = in_array($userRole, $allowedRoles) || !empty($user?->guru);
+
+        if (!$user || !$isStaff) {
+            return response()->json(['success' => false, 'message' => 'Akses khusus dewan guru dan staf sekolah'], 403);
         }
 
         $rawTanggal = $request->query('tanggal', Carbon::today()->format('Y-m-d'));
@@ -1431,10 +1445,28 @@ class MobileAttendanceController extends Controller
 
         $kelasId = $request->query('kelas_id');
         $queryStr = trim($request->query('q', ''));
+        $hasSearchQuery = strlen($queryStr) >= 2;
 
-        // Jika tidak ada kelas_id DAN query pencarian kosong/kurang dari 2 karakter, kembalikan array kosong
-        if (empty($kelasId) && strlen($queryStr) < 2) {
-            return response()->json(['success' => true, 'data' => []]);
+        // Jika tidak ada kelas_id DAN query pencarian kosong/kurang dari 2 karakter
+        if (empty($kelasId) && !$hasSearchQuery) {
+            // Jika guru adalah wali kelas dan belum memilih kelas, default ke kelas walinya
+            if ($user->guru) {
+                $kelasWali = Kelas::where(function ($q) use ($user) {
+                    $q->where('wali_kelas_id', $user->guru->id)
+                      ->orWhere('wali_kelas_2_id', $user->guru->id);
+                });
+                if ($user->school_id) {
+                    $kelasWali->where('school_id', $user->school_id);
+                }
+                $waliKelasObj = $kelasWali->first();
+                if ($waliKelasObj) {
+                    $kelasId = $waliKelasObj->id;
+                }
+            }
+
+            if (empty($kelasId)) {
+                return response()->json(['success' => true, 'data' => []]);
+            }
         }
 
         $siswaQuery = Siswa::with('kelas');
@@ -1443,11 +1475,22 @@ class MobileAttendanceController extends Controller
             $siswaQuery->where('school_id', $schoolId);
         }
 
-        if (!empty($kelasId)) {
-            $siswaQuery->where('kelas_id', $kelasId);
+        // Role yang berhak mencari ke seluruh siswa di sekolah tanpa dibatasi kelas wali kelas:
+        // guru, teacher, waka, kurikulum, admin, super_admin, wali_kelas
+        $allowGlobalSchoolSearch = in_array($userRole, ['guru', 'teacher', 'waka', 'kurikulum', 'admin', 'super_admin', 'wali_kelas']) || !empty($user->guru);
+
+        // Jika user melakukan pencarian (parameter q diisi) dan memiliki hak akses guru/waka/kurikulum/admin,
+        // server mengizinkan pencarian ke SELURUH siswa di sekolah (tanpa dibatasi hanya kelas tempat guru menjadi wali kelas),
+        // kecuali jika client secara eksplisit meminta strict_class / filter_by_class = true.
+        $strictClass = $request->boolean('strict_class') || $request->boolean('filter_by_class');
+
+        if (!empty($kelasId) && $kelasId !== 'all' && $kelasId !== 'semua' && $kelasId !== '0') {
+            if (!$hasSearchQuery || (!$allowGlobalSchoolSearch || $strictClass)) {
+                $siswaQuery->where('kelas_id', $kelasId);
+            }
         }
 
-        if (strlen($queryStr) >= 2) {
+        if ($hasSearchQuery) {
             $siswaQuery->where(function ($q) use ($queryStr) {
                 $q->where('nama', 'like', "%{$queryStr}%")
                   ->orWhere('nis', 'like', "%{$queryStr}%");
@@ -1496,8 +1539,12 @@ class MobileAttendanceController extends Controller
     {
         $user = $request->user();
 
-        if (!$user || (!in_array($user->role, ['guru', 'teacher', 'wali_kelas', 'admin']) && !$user->guru)) {
-            return response()->json(['success' => false, 'message' => 'Akses khusus dewan guru'], 403);
+        $allowedRoles = ['guru', 'teacher', 'wali_kelas', 'waka', 'kurikulum', 'admin', 'super_admin'];
+        $userRole = strtolower($user?->role ?? '');
+        $isStaff = in_array($userRole, $allowedRoles) || !empty($user?->guru);
+
+        if (!$user || !$isStaff) {
+            return response()->json(['success' => false, 'message' => 'Akses khusus dewan guru dan staf sekolah'], 403);
         }
 
         $request->validate([
@@ -1577,8 +1624,12 @@ class MobileAttendanceController extends Controller
     {
         $user = $request->user();
 
-        if (!$user || (!in_array($user->role, ['guru', 'teacher', 'wali_kelas', 'admin']) && !$user->guru)) {
-            return response()->json(['success' => false, 'message' => 'Akses khusus dewan guru'], 403);
+        $allowedRoles = ['guru', 'teacher', 'wali_kelas', 'waka', 'kurikulum', 'admin', 'super_admin'];
+        $userRole = strtolower($user?->role ?? '');
+        $isStaff = in_array($userRole, $allowedRoles) || !empty($user?->guru);
+
+        if (!$user || !$isStaff) {
+            return response()->json(['success' => false, 'message' => 'Akses khusus dewan guru dan staf sekolah'], 403);
         }
 
         $request->validate([
@@ -1758,10 +1809,12 @@ class MobileAttendanceController extends Controller
         }
 
         $student = $user->student ?? Siswa::where('user_id', $user->id)->first();
+        $teacher = $user->guru ?? Guru::where('user_id', $user->id)->first();
 
         // Khusus Face ID: Jika sudah terdaftar, tolak pendaftaran berikutnya
         $existingFace = UserFaceData::where('user_id', $user->id)
             ->when($student, fn($q) => $q->orWhere('siswa_id', $student->id))
+            ->when($teacher, fn($q) => $q->orWhere('guru_id', $teacher->id))
             ->first();
 
         if ($existingFace && !empty($existingFace->face_embedding)) {
@@ -1789,6 +1842,7 @@ class MobileAttendanceController extends Controller
             ['user_id' => $user->id],
             [
                 'siswa_id' => $student?->id,
+                'guru_id' => $teacher?->id,
                 'face_embedding' => json_encode($extractResult['embedding']),
                 'sample_photo_path' => $storedPath,
                 'is_verified' => true,
@@ -1829,10 +1883,17 @@ class MobileAttendanceController extends Controller
         }
 
         $faceData = UserFaceData::where('user_id', $user->id)->first();
-        if (!$faceData && ($user->student || in_array($user->role, ['student', 'siswa']))) {
-            $student = $user->student ?? Siswa::where('user_id', $user->id)->first();
-            if ($student) {
-                $faceData = UserFaceData::where('siswa_id', $student->id)->first();
+        if (!$faceData) {
+            if ($user->student || in_array($user->role, ['student', 'siswa'])) {
+                $student = $user->student ?? Siswa::where('user_id', $user->id)->first();
+                if ($student) {
+                    $faceData = UserFaceData::where('siswa_id', $student->id)->first();
+                }
+            } elseif ($user->guru || in_array($user->role, ['guru', 'teacher', 'wali_kelas'])) {
+                $teacher = $user->guru ?? Guru::where('user_id', $user->id)->first();
+                if ($teacher) {
+                    $faceData = UserFaceData::where('guru_id', $teacher->id)->first();
+                }
             }
         }
 
@@ -2096,6 +2157,314 @@ class MobileAttendanceController extends Controller
                 'face_registered' => $faceRegistered,
                 'face_message' => $faceMessage,
             ]
+        ]);
+    }
+
+    /**
+     * Endpoint Upload Foto Guru / Pegawai (POST /api/mobile/guru/photo atau /api/mobile/teacher/photo)
+     * Dapat dipanggil oleh dewan guru sendiri atau admin dengan menyertakan guru_id.
+     * Otomatis sinkronkan ke Face ID jika wajah terdeteksi dan belum pernah didaftarkan.
+     */
+    public function uploadTeacherPhoto(Request $request)
+    {
+        $fileKey = $request->hasFile('photo') ? 'photo' : ($request->hasFile('foto') ? 'foto' : null);
+        if (!$fileKey) {
+            return response()->json([
+                'success' => false,
+                'message' => 'File foto wajib diunggah (gunakan key: photo atau foto).'
+            ], 422);
+        }
+
+        $request->validate([
+            $fileKey => 'required|image|max:10240', // max 10MB
+            'guru_id' => 'nullable|integer',
+            'teacher_id' => 'nullable|integer',
+            'sync_face' => 'nullable|boolean',
+        ]);
+
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated'], 401);
+        }
+
+        $teacherId = $request->input('guru_id', $request->input('teacher_id'));
+        $guru = null;
+        $isAdmin = in_array($user->role, ['admin', 'super_admin']);
+
+        if ($teacherId) {
+            $guru = Guru::find($teacherId);
+            if (!$guru) {
+                return response()->json(['success' => false, 'message' => 'Data guru tidak ditemukan.'], 404);
+            }
+
+            if (!$isAdmin && $guru->user_id !== $user->id && $user->guru?->id !== $guru->id) {
+                return response()->json(['success' => false, 'message' => 'Akses ditolak: Anda hanya dapat mengubah foto profil Anda sendiri.'], 403);
+            }
+        } else {
+            $guru = $user->guru ?? Guru::where('user_id', $user->id)->first();
+            if (!$guru) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Parameter guru_id diperlukan jika diunggah oleh akun admin.'
+                ], 422);
+            }
+        }
+
+        // Hapus file foto lama dari disk jika ada
+        if (!empty($guru->foto)) {
+            Guru::deletePhotoFile($guru->foto);
+        }
+
+        $uploadedFile = $request->file($fileKey);
+        $randomName = \Illuminate\Support\Str::random(40) . '.jpg';
+        $destDir = storage_path('app/public/guru');
+        $destinationPath = $destDir . DIRECTORY_SEPARATOR . $randomName;
+        $newPhotoPath = 'guru/' . $randomName;
+
+        if (!file_exists($destDir)) {
+            @mkdir($destDir, 0755, true);
+        }
+
+        if (extension_loaded('gd')) {
+            try {
+                $filePath = $uploadedFile->getRealPath();
+                $imageInfo = @getimagesize($filePath);
+                if ($imageInfo) {
+                    $mime = $imageInfo['mime'];
+                    $src = match ($mime) {
+                        'image/jpeg', 'image/jpg' => @imagecreatefromjpeg($filePath),
+                        'image/png' => @imagecreatefrompng($filePath),
+                        'image/webp' => @imagecreatefromwebp($filePath),
+                        default => null,
+                    };
+
+                    if ($src) {
+                        if (function_exists('exif_read_data') && ($mime === 'image/jpeg' || $mime === 'image/jpg')) {
+                            $exif = @exif_read_data($filePath);
+                            if (!empty($exif['Orientation'])) {
+                                $src = match ($exif['Orientation']) {
+                                    3 => imagerotate($src, 180, 0),
+                                    6 => imagerotate($src, -90, 0),
+                                    8 => imagerotate($src, 90, 0),
+                                    default => $src,
+                                };
+                            }
+                        }
+
+                        $origW = imagesx($src);
+                        $origH = imagesy($src);
+                        $maxW = 600;
+                        $maxH = 800;
+                        $ratio = min($maxW / $origW, $maxH / $origH, 1.0);
+                        $targetW = (int) round($origW * $ratio);
+                        $targetH = (int) round($origH * $ratio);
+
+                        $dst = imagecreatetruecolor($targetW, $targetH);
+                        $white = imagecolorallocate($dst, 255, 255, 255);
+                        imagefill($dst, 0, 0, $white);
+                        imagecopyresampled($dst, $src, 0, 0, 0, 0, $targetW, $targetH, $origW, $origH);
+                        imagejpeg($dst, $destinationPath, 80);
+                        imagedestroy($src);
+                        imagedestroy($dst);
+                    } else {
+                        $uploadedFile->storeAs('guru', $randomName, 'public');
+                    }
+                } else {
+                    $uploadedFile->storeAs('guru', $randomName, 'public');
+                }
+            } catch (\Throwable $e) {
+                $uploadedFile->storeAs('guru', $randomName, 'public');
+            }
+        } else {
+            $uploadedFile->storeAs('guru', $randomName, 'public');
+        }
+
+        $guru->foto = $newPhotoPath;
+        $guru->save();
+
+        // Sinkronisasi otomatis ke Face ID jika wajah terdeteksi (opsional, default: true)
+        $faceRegistered = false;
+        $faceMessage = null;
+        $syncFace = $request->boolean('sync_face', true);
+
+        if ($syncFace) {
+            $existingFace = UserFaceData::where('guru_id', $guru->id)
+                ->when($guru->user_id, fn($q) => $q->orWhere('user_id', $guru->user_id))
+                ->first();
+
+            if ($existingFace && !empty($existingFace->face_embedding)) {
+                $faceRegistered = false;
+                $faceMessage = 'Wajah sudah terdaftar sebelumnya. Pendaftaran Face ID baru ditolak (hubungi admin untuk reset Face ID).';
+            } else {
+                try {
+                    $extractResult = FaceRecognitionService::extractVector($uploadedFile);
+                    if (!empty($extractResult['success']) && !empty($extractResult['embedding'])) {
+                        $targetUserId = $guru->user_id ?: ($user->guru?->id === $guru->id ? $user->id : null);
+                        if (!$targetUserId) {
+                            $targetUserId = $user->id;
+                        }
+
+                        UserFaceData::updateOrCreate(
+                            ['user_id' => $targetUserId],
+                            [
+                                'guru_id' => $guru->id,
+                                'face_embedding' => json_encode($extractResult['embedding']),
+                                'sample_photo_path' => $newPhotoPath,
+                                'is_verified' => true,
+                            ]
+                        );
+                        $faceRegistered = true;
+                        $faceMessage = 'Wajah berhasil dideteksi dan didaftarkan sebagai master Face ID.';
+                    } else {
+                        $faceMessage = $extractResult['message'] ?? 'Wajah tidak terdeteksi untuk pendaftaran Face ID otomatis.';
+                    }
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::info('Sync face error during teacher photo upload: ' . $e->getMessage());
+                    $faceMessage = 'Layanan Face Engine offline, foto guru tetap tersimpan.';
+                }
+            }
+        }
+
+        ApiLog::create([
+            'school_id' => $guru->school_id ?: $user->school_id,
+            'api_key' => 'MOBILE_APP',
+            'action' => 'mobile_upload_teacher_photo',
+            'uid' => $guru->nip ?: $guru->nama,
+            'success' => true,
+            'message' => "Upload foto guru berhasil: {$guru->nama}" . ($faceRegistered ? " + Face ID terdaftar" : ""),
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent() ?? 'Android Mobile App',
+            'created_at' => now(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Foto guru berhasil diperbarui' . ($faceRegistered ? ' dan didaftarkan untuk Face ID.' : '.'),
+            'data' => [
+                'guru_id' => $guru->id,
+                'nama' => $guru->nama,
+                'nip' => $guru->nip,
+                'foto' => $guru->foto,
+                'foto_url' => $guru->foto_url,
+                'face_registered' => $faceRegistered,
+                'face_message' => $faceMessage,
+            ]
+        ]);
+    }
+
+    /**
+     * Endpoint Ganti Password Akun Mobile (POST /api/mobile/change-password atau /api/mobile/ganti-password)
+     * Dapat digunakan oleh akun Guru, Pegawai, maupun Siswa.
+     */
+    public function changePassword(Request $request)
+    {
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated'], 401);
+        }
+
+        // Support format key bahasa Inggris dan Indonesia
+        $currentPassword = (string) $request->input('current_password', $request->input('password_lama', ''));
+        $newPassword = (string) $request->input('new_password', $request->input('password_baru', ''));
+        $newPasswordConfirmation = (string) $request->input('new_password_confirmation', $request->input('konfirmasi_password', $request->input('password_baru_confirmation', '')));
+
+        if (trim($currentPassword) === '') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Password saat ini (lama) wajib diisi.'
+            ], 422);
+        }
+
+        if (trim($newPassword) === '') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Password baru wajib diisi.'
+            ], 422);
+        }
+
+        if (strlen($newPassword) < 6) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Password baru minimal terdiri dari 6 karakter.'
+            ], 422);
+        }
+
+        if ($newPasswordConfirmation !== '' && $newPassword !== $newPasswordConfirmation) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Konfirmasi password baru tidak cocok.'
+            ], 422);
+        }
+
+        // 1. Verifikasi kecocokan password saat ini
+        $isCurrentValid = Hash::check($currentPassword, $user->password_hash ?? $user->password);
+
+        // Fallback untuk Siswa: jika hash belum cocok dan user adalah siswa, cek format tanggal lahir siswa
+        if (!$isCurrentValid && ($user->student || in_array($user->role, ['student', 'siswa']))) {
+            $siswa = $user->student ?? Siswa::where('user_id', $user->id)->first();
+            if (!$siswa) {
+                $cleanNis = str_replace('siswa_', '', $user->username);
+                $siswa = Siswa::where('nis', $cleanNis)->first();
+            }
+
+            if ($siswa && !empty($siswa->tgl_lahir)) {
+                try {
+                    $birthDate = Carbon::parse($siswa->tgl_lahir);
+                    $cleanInput = preg_replace('/[^0-9]/', '', $currentPassword);
+                    $validFormats = [
+                        $birthDate->format('Y-m-d'),
+                        $birthDate->format('d-m-Y'),
+                        $birthDate->format('Y/m/d'),
+                        $birthDate->format('d/m/Y'),
+                        $birthDate->format('Ymd'),
+                        $birthDate->format('dmY'),
+                    ];
+                    $isCurrentValid = in_array($currentPassword, $validFormats) ||
+                                      in_array($cleanInput, [$birthDate->format('Ymd'), $birthDate->format('dmY')]);
+                } catch (\Exception $e) {
+                    $isCurrentValid = false;
+                }
+            }
+        }
+
+        if (!$isCurrentValid) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Password saat ini (lama) yang Anda masukkan salah.'
+            ], 422);
+        }
+
+        // 2. Pastikan password baru tidak sama persis dengan password saat ini
+        if ($currentPassword === $newPassword) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Password baru tidak boleh sama dengan password saat ini.'
+            ], 422);
+        }
+
+        // 3. Update password hash
+        $hashed = Hash::make($newPassword);
+        $user->password_hash = $hashed;
+        if (\Illuminate\Support\Facades\Schema::hasColumn('users', 'password')) {
+            $user->password = $hashed;
+        }
+        $user->save();
+
+        ApiLog::create([
+            'school_id' => $user->school_id,
+            'api_key' => 'MOBILE_APP',
+            'action' => 'mobile_change_password',
+            'uid' => $user->username ?? $user->email,
+            'success' => true,
+            'message' => "Ganti password berhasil untuk pengguna: {$user->full_name} ({$user->role})",
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent() ?? 'Android Mobile App',
+            'created_at' => now(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Password akun berhasil diubah. Silakan gunakan password baru ini untuk login berikutnya.'
         ]);
     }
 

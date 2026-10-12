@@ -48,10 +48,46 @@ class AttendanceController extends Controller
         $totalMasuk = (clone $attendanceQuery)->whereNotNull('jam_masuk')->count();
         $totalTepatWaktu = (clone $attendanceQuery)->where('status', 'H')->count();
         $totalTerlambat = (clone $attendanceQuery)->where('status', 'T')->count();
+        $totalIzinSakit = (clone $attendanceQuery)->whereIn('status', ['I', 'S'])->count();
         $totalPulang = (clone $attendanceQuery)->whereNotNull('jam_pulang')->count();
+        $totalSudahAbsen = (clone $attendanceQuery)->count();
         $totalBelumAbsen = max(0, $totalSiswa - $totalMasuk);
 
-        $recentAttendances = $attendanceQuery->orderBy('updated_at', 'desc')->limit(15)->get();
+        $recentAttendances = (clone $attendanceQuery)->orderBy('updated_at', 'desc')->limit(50)->get();
+
+        $initialAttendances = $recentAttendances->map(function($att) {
+            $student = $att->student;
+            $masukFormatted = $att->jam_masuk ? \Carbon\Carbon::parse($att->jam_masuk)->format('H:i') : '--:--';
+            $pulangFormatted = $att->jam_pulang ? \Carbon\Carbon::parse($att->jam_pulang)->format('H:i') : '--:--';
+            $waktuFormatted = $att->updated_at ? \Carbon\Carbon::parse($att->updated_at)->format('H:i') : ($pulangFormatted !== '--:--' ? $pulangFormatted : $masukFormatted);
+
+            $statusLabel = 'Hadir';
+            $statusType = 'success';
+            if ($att->jam_pulang) {
+                $statusLabel = 'Pulang';
+                $statusType = 'pulang';
+            } elseif ($att->status === 'T') {
+                $statusLabel = 'Terlambat';
+                $statusType = 'warning';
+            } elseif (in_array($att->status, ['I', 'S'])) {
+                $statusLabel = $att->status === 'S' ? 'Sakit' : 'Izin';
+                $statusType = 'info';
+            }
+
+            return [
+                'id' => $att->id,
+                'waktu' => $waktuFormatted,
+                'nama' => $student->nama ?? 'Siswa',
+                'nis' => $student->nis ?? '-',
+                'foto' => $student->foto_url ?? null,
+                'kelas' => $student?->kelas?->nama_kelas ?? '-',
+                'masuk' => $masukFormatted,
+                'pulang' => $pulangFormatted,
+                'status' => $statusLabel,
+                'statusType' => $statusType,
+                'keterangan' => $att->keterangan ?: ($statusLabel === 'Terlambat' ? 'Terlambat' : 'Tepat Waktu'),
+            ];
+        })->values()->toArray();
 
         $indexHari = (int) now()->format('N');
         $jadwal = Jadwal::where('index_hari', $indexHari)
@@ -60,7 +96,7 @@ class AttendanceController extends Controller
             ->first();
 
         return view('absensi.scanner-usb', compact(
-            'today', 'totalSiswa', 'totalMasuk', 'totalTepatWaktu', 'totalTerlambat', 'totalPulang', 'totalBelumAbsen', 'recentAttendances', 'jadwal'
+            'today', 'totalSiswa', 'totalMasuk', 'totalTepatWaktu', 'totalTerlambat', 'totalIzinSakit', 'totalPulang', 'totalSudahAbsen', 'totalBelumAbsen', 'recentAttendances', 'initialAttendances', 'jadwal'
         ));
     }
 
@@ -803,10 +839,15 @@ class AttendanceController extends Controller
                     'message' => "Siswa {$siswa->nama} sudah lengkap absen Masuk & Pulang hari ini.",
                     'data' => [
                         'nama' => $siswa->nama,
+                        'nis' => $siswa->nis ?? '-',
+                        'foto' => $siswa->foto_url ?? null,
                         'role' => 'Siswa',
                         'kelas' => $siswa->kelas->nama_kelas ?? '-',
                         'status' => 'Sudah Lengkap',
                         'jam' => $now->format('H:i:s'),
+                        'jam_masuk' => $att->jam_masuk ? Carbon::parse($att->jam_masuk)->format('H:i') : '--:--',
+                        'jam_pulang' => $att->jam_pulang ? Carbon::parse($att->jam_pulang)->format('H:i') : '--:--',
+                        'keterangan' => 'Sudah lengkap Masuk & Pulang',
                         'uid' => $uid,
                     ]
                 ]);
@@ -829,10 +870,15 @@ class AttendanceController extends Controller
                         'message' => "Siswa {$siswa->nama} sudah absen masuk (Kepulangan dinonaktifkan).",
                         'data' => [
                             'nama' => $siswa->nama,
+                            'nis' => $siswa->nis ?? '-',
+                            'foto' => $siswa->foto_url ?? null,
                             'role' => 'Siswa',
                             'kelas' => $siswa->kelas->nama_kelas ?? '-',
                             'status' => 'Sudah Masuk',
                             'jam' => $now->format('H:i:s'),
+                            'jam_masuk' => $att->jam_masuk ? Carbon::parse($att->jam_masuk)->format('H:i') : '--:--',
+                            'jam_pulang' => '--:--',
+                            'keterangan' => 'Sudah absen masuk',
                             'uid' => $uid,
                         ]
                     ]);
@@ -919,10 +965,15 @@ class AttendanceController extends Controller
                             'message' => "Siswa {$siswa->nama} sudah absen masuk (Jam Pulang belum dimulai).",
                             'data' => [
                                 'nama' => $siswa->nama,
+                                'nis' => $siswa->nis ?? '-',
+                                'foto' => $siswa->foto_url ?? null,
                                 'role' => 'Siswa',
                                 'kelas' => $siswa->kelas->nama_kelas ?? '-',
                                 'status' => 'Sudah Masuk',
                                 'jam' => $now->format('H:i:s'),
+                                'jam_masuk' => $att->jam_masuk ? Carbon::parse($att->jam_masuk)->format('H:i') : '--:--',
+                                'jam_pulang' => '--:--',
+                                'keterangan' => 'Sudah absen masuk',
                                 'uid' => $uid,
                             ]
                         ]);
@@ -992,10 +1043,14 @@ class AttendanceController extends Controller
                     'message' => "Absen Pulang Berhasil: {$siswa->nama}",
                     'data' => [
                         'nama' => $siswa->nama,
+                        'nis' => $siswa->nis ?? '-',
+                        'foto' => $siswa->foto_url ?? null,
                         'role' => 'Siswa',
                         'kelas' => $siswa->kelas->nama_kelas ?? '-',
                         'status' => 'Pulang',
                         'jam' => $now->format('H:i:s'),
+                        'jam_masuk' => $att->jam_masuk ? Carbon::parse($att->jam_masuk)->format('H:i') : '--:--',
+                        'jam_pulang' => $now->format('H:i'),
                         'keterangan' => "Total Belajar: {$hours}j {$mins}m",
                         'uid' => $uid,
                     ]
@@ -1118,10 +1173,14 @@ class AttendanceController extends Controller
                     'message' => "Absen Masuk Berhasil: {$siswa->nama} ({$statusLabel})",
                     'data' => [
                         'nama' => $siswa->nama,
+                        'nis' => $siswa->nis ?? '-',
+                        'foto' => $siswa->foto_url ?? null,
                         'role' => 'Siswa',
                         'kelas' => $siswa->kelas->nama_kelas ?? '-',
                         'status' => $status === 'T' ? 'Terlambat' : 'Hadir',
                         'jam' => $now->format('H:i:s'),
+                        'jam_masuk' => $now->format('H:i'),
+                        'jam_pulang' => '--:--',
                         'keterangan' => $keterangan ?: 'Tepat Waktu',
                         'uid' => $uid,
                     ]

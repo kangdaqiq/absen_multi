@@ -265,7 +265,8 @@ class AttendanceController extends Controller
             'count' => count($descriptors),
             'descriptors' => $descriptors,
             'students' => $studentsList,
-        ]);
+        ])->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+          ->header('Pragma', 'no-cache');
     }
 
     public function scanFaceAttendance(Request $request)

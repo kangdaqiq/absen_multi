@@ -38,6 +38,7 @@ class AppServiceProvider extends ServiceProvider
         // Force HTTPS if accessed via secure proxy, explicitly secure, or if FORCE_HTTPS is true in .env
         // Removed app()->environment('production') so it doesn't force HTTPS on local LAN servers
         if (request()->header('x-forwarded-proto') === 'https' ||
+            str_contains(request()->header('cf-visitor', ''), 'https') ||
             request()->isSecure() ||
             env('FORCE_HTTPS', false)) {
             URL::forceScheme('https');

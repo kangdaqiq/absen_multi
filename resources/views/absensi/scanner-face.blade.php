@@ -886,6 +886,7 @@ function faceScannerApp() {
 
         // Debounce map: personId -> timestamp
         recentScans: {},
+        holdMessageUntil: 0,
         audioCtx: null,
 
         async init() {
@@ -933,7 +934,7 @@ function faceScannerApp() {
 
         async loadDescriptors() {
             try {
-                const res = await fetch('{{ route('absensi.face-descriptors') }}');
+                const res = await fetch('{{ route('absensi.face-descriptors', [], false) }}', { cache: 'no-store' });
                 const data = await res.json();
                 if (data.ok) {
                     this.descriptors = data.descriptors || [];
@@ -1062,7 +1063,7 @@ function faceScannerApp() {
                             }
 
                             // Only proceed to match if face is stable for 2 frames
-                            if (stableCount >= 2 && !this.isProcessing) {
+                            if (stableCount >= 2 && !this.isProcessing && Date.now() > this.holdMessageUntil) {
                                 this.detectionMessage = 'Wajah terdeteksi! Memverifikasi...';
                                 await this.matchAndAttend(detection.descriptor);
                                 stableCount = 0;
@@ -1070,7 +1071,9 @@ function faceScannerApp() {
                         } else {
                             this.faceDetected = false;
                             stableCount = 0;
-                            this.detectionMessage = 'Posisikan wajah di dalam bingkai oval';
+                            if (Date.now() > this.holdMessageUntil) {
+                                this.detectionMessage = 'Posisikan wajah di dalam bingkai oval';
+                            }
                             if (canvas) {
                                 const ctx = canvas.getContext('2d');
                                 ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -1093,6 +1096,7 @@ function faceScannerApp() {
         async matchAndAttend(descriptor) {
             if (this.descriptors.length === 0) {
                 this.detectionMessage = 'Belum ada Face ID terdaftar di sistem';
+                this.holdMessageUntil = Date.now() + 3000;
                 return;
             }
 
@@ -1110,6 +1114,7 @@ function faceScannerApp() {
 
             if (!bestMatch) {
                 this.detectionMessage = 'Wajah tidak dikenali dalam database';
+                this.holdMessageUntil = Date.now() + 2500;
                 return;
             }
 
@@ -1118,6 +1123,7 @@ function faceScannerApp() {
             const lastScan = this.recentScans[bestMatch.id] || 0;
             if (nowTime - lastScan < 5000) {
                 this.detectionMessage = bestMatch.nama + ' baru saja dipindai';
+                this.holdMessageUntil = Date.now() + 2500;
                 return;
             }
 
@@ -1132,10 +1138,11 @@ function faceScannerApp() {
             const similarityScore = Math.max(0, 1 - minDistance);
 
             try {
-                const response = await fetch('{{ route('absensi.scan-face') }}', {
+                const response = await fetch('{{ route('absensi.scan-face', [], false) }}', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
+                        'Accept': 'application/json',
                         'X-CSRF-TOKEN': '{{ csrf_token() }}'
                     },
                     body: JSON.stringify({
@@ -1147,10 +1154,22 @@ function faceScannerApp() {
                     })
                 });
 
+                if (!response.ok) {
+                    const errJson = await response.json().catch(() => null);
+                    const msg = errJson?.message || ('Server error (' + response.status + ')');
+                    this.detectionMessage = msg;
+                    this.holdMessageUntil = Date.now() + 4000;
+                    this.playTone('error');
+                    return;
+                }
+
                 const res = await response.json();
                 this.handleScanResponse(res, bestMatch, similarityScore);
+                this.holdMessageUntil = Date.now() + 3500;
             } catch (err) {
                 console.error('Scan attend error:', err);
+                this.detectionMessage = 'Gagal mengirim absensi: ' + (err.message || 'Koneksi terputus');
+                this.holdMessageUntil = Date.now() + 4000;
                 this.playTone('error');
             } finally {
                 setTimeout(() => {
@@ -1248,7 +1267,7 @@ function faceScannerApp() {
                 const descriptorArray = Array.from(detection.descriptor);
                 const snapshot = this.captureFrameSnapshot();
 
-                const response = await fetch('{{ route('absensi.register-face-kiosk') }}', {
+                const response = await fetch('{{ route('absensi.register-face-kiosk', [], false) }}', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

@@ -219,10 +219,9 @@ class AttendanceController extends Controller
         foreach ($faceRecords as $fr) {
             $embedding = json_decode($fr->face_embedding);
             if (is_string($embedding)) {
-                $embedding = json_decode($embedding); // Handle double encoded json
+                $embedding = json_decode($embedding);
             }
-            // Kiosk web scanner uses 128-d embeddings (face-api.js). Skip 512-d (mobile InsightFace)
-            if (!$embedding || !is_array($embedding) || count($embedding) !== 128) {
+            if (!$embedding || !is_array($embedding)) {
                 continue;
             }
 
@@ -286,7 +285,7 @@ class AttendanceController extends Controller
         }
 
         $request->validate([
-            'person_id' => 'required',
+            'person_id' => 'nullable',
             'type' => 'nullable|string|in:siswa,guru',
             'similarity' => 'nullable|numeric',
             'mode' => 'nullable|string|in:auto,masuk,pulang',
@@ -298,6 +297,66 @@ class AttendanceController extends Controller
         $similarity = (float) $request->input('similarity', 0.85);
         $reqMode = $request->input('mode', 'auto');
         $photoSnapshot = $request->input('photo_snapshot');
+
+        $schoolId = auth()->user()?->school_id;
+
+        // Jika person_id kosong, coba identifikasi server-side (512-dimensi InsightFace)
+        if (empty($personId) && !empty($photoSnapshot)) {
+            try {
+                $imageParts = explode(';base64,', $photoSnapshot);
+                $imgData = base64_decode($imageParts[1] ?? $photoSnapshot);
+                $tempPath = sys_get_temp_dir() . '/kiosk_scan_' . uniqid() . '.jpg';
+                file_put_contents($tempPath, $imgData);
+
+                $extractRes = \App\Services\FaceRecognitionService::extractVector($tempPath);
+                @unlink($tempPath);
+
+                if (!empty($extractRes['success']) && !empty($extractRes['embedding'])) {
+                    $snapVector = $extractRes['embedding'];
+                    $bestScore = 0.0;
+                    $matchedRecord = null;
+
+                    $candidates = UserFaceData::whereNotNull('face_embedding')
+                        ->with(['siswa', 'guru'])
+                        ->when($schoolId, function ($q) use ($schoolId) {
+                            $q->where(function ($sub) use ($schoolId) {
+                                $sub->whereHas('siswa', fn($s) => $s->where('school_id', $schoolId))
+                                    ->orWhereHas('guru', fn($g) => $g->where('school_id', $schoolId));
+                            });
+                        })
+                        ->get();
+
+                    foreach ($candidates as $cand) {
+                        $candEmb = json_decode($cand->face_embedding);
+                        if (is_string($candEmb)) $candEmb = json_decode($candEmb);
+                        if (!is_array($candEmb) || count($candEmb) !== 512) continue;
+
+                        $sim = $this->calculateCosineSimilarity($snapVector, $candEmb);
+                        if ($sim > $bestScore && $sim >= 0.70) {
+                            $bestScore = $sim;
+                            $matchedRecord = $cand;
+                        }
+                    }
+
+                    if ($matchedRecord) {
+                        $personId = $matchedRecord->siswa_id ?: $matchedRecord->guru_id;
+                        $type = $matchedRecord->siswa_id ? 'siswa' : 'guru';
+                        $similarity = (float) $bestScore;
+                    }
+                }
+            } catch (\Throwable $e) {
+                Log::error('Server 512-d recognition error: ' . $e->getMessage());
+            }
+        }
+
+        if (empty($personId)) {
+            return response()->json([
+                'ok' => false,
+                'status' => 'warning',
+                'sound' => 'warning',
+                'message' => 'Wajah tidak dikenali dalam database sistem.',
+            ], 404);
+        }
 
         $schoolId = auth()->user()?->school_id;
         $schoolTz = Setting::where('school_id', $schoolId)->where('setting_key', 'timezone')->value('setting_value') ?: config('app.timezone', 'Asia/Jakarta');
@@ -2726,5 +2785,19 @@ class AttendanceController extends Controller
             }
         }
         return $recordedKegiatans;
+    }
+
+    private function calculateCosineSimilarity(array $vecA, array $vecB): float
+    {
+        $dot = 0.0;
+        $normA = 0.0;
+        $normB = 0.0;
+        $len = min(count($vecA), count($vecB));
+        for ($i = 0; $i < $len; $i++) {
+            $dot += $vecA[$i] * $vecB[$i];
+            $normA += $vecA[$i] * $vecA[$i];
+            $normB += $vecB[$i] * $vecB[$i];
+        }
+        return ($normA > 0 && $normB > 0) ? ($dot / (sqrt($normA) * sqrt($normB))) : 0.0;
     }
 }

@@ -412,9 +412,9 @@
 
                     <!-- Face ID Count Pill -->
                     <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold border transition"
-                        :class="descriptors.filter(d => d.embedding && d.embedding.length === 128).length > 0 ? 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-900/20 dark:text-indigo-300 dark:border-indigo-800/40' : 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-900/20 dark:text-rose-300 dark:border-rose-800/40'">
+                        :class="descriptors.length > 0 ? 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-900/20 dark:text-indigo-300 dark:border-indigo-800/40' : 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-900/20 dark:text-rose-300 dark:border-rose-800/40'">
                         <i class="fas fa-users text-[10px]"></i>
-                        <span x-text="descriptors.filter(d => d.embedding && d.embedding.length === 128).length + ' Face ID Siap'">Memuat Data...</span>
+                        <span x-text="descriptors.length + ' Face ID Siap'">Memuat Data...</span>
                     </span>
                 </div>
                 <p class="text-xs text-gray-500 dark:text-gray-400">
@@ -1135,7 +1135,7 @@ function faceScannerApp() {
 
                 if (validDescriptors.length === 0) {
                     this.lastScanError = true;
-                    this.detectionMessage = 'Belum ada Face ID Kiosk yang cocok (' + this.descriptors.length + ' data di server beda format/dimensi)';
+                    this.detectionMessage = 'Tidak ada Face ID yang cocok';
                     this.holdMessageUntil = Date.now() + 3500;
                     return;
                 }

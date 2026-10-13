@@ -2242,7 +2242,6 @@ class MobileAttendanceController extends Controller
         $student = $matchedRecord->siswa;
         $studentSchoolId = $student->school_id ?: $schoolId;
         $kelasName = $student->kelas ? ($student->kelas->nama_kelas ?? $student->kelas->nama) : '-';
-        $fotoUrl = $student->foto_url ?? null;
 
         // 4. Cek Jadwal Harian Sekolah
         $indexHari = (int) $targetCarbon->format('N');
@@ -2316,7 +2315,6 @@ class MobileAttendanceController extends Controller
                         'nama' => $student->nama,
                         'nis' => (string) ($student->nis ?? '-'),
                         'kelas_name' => $kelasName,
-                        'foto_url' => $fotoUrl,
                         'confidence' => round($bestScore, 3),
                         'status' => $att->status,
                         'jam_masuk' => $att->jam_masuk,
@@ -2424,7 +2422,6 @@ class MobileAttendanceController extends Controller
                     'nama' => $student->nama,
                     'nis' => (string) ($student->nis ?? '-'),
                     'kelas_name' => $kelasName,
-                    'foto_url' => $fotoUrl,
                     'confidence' => round($bestScore, 3),
                     'status' => $att->status,
                     'jam_pulang' => $nowTime,
@@ -2448,7 +2445,6 @@ class MobileAttendanceController extends Controller
                     'nama' => $student->nama,
                     'nis' => (string) ($student->nis ?? '-'),
                     'kelas_name' => $kelasName,
-                    'foto_url' => $fotoUrl,
                     'confidence' => round($bestScore, 3),
                     'status' => $att->status,
                     'jam_masuk' => $att->jam_masuk,
@@ -2555,7 +2551,6 @@ class MobileAttendanceController extends Controller
                 'nama' => $student->nama,
                 'nis' => (string) ($student->nis ?? '-'),
                 'kelas_name' => $kelasName,
-                'foto_url' => $fotoUrl,
                 'confidence' => round($bestScore, 3),
                 'status' => $status,
                 'jam_masuk' => $nowTime,

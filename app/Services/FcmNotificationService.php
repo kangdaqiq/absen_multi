@@ -88,6 +88,8 @@ class FcmNotificationService
             'body'         => (string) $message,
             'message'      => (string) $message,
             'click_action' => 'FLUTTER_NOTIFICATION_CLICK',
+            'channel_id'   => 'high_importance_channel',
+            'priority'     => 'high',
             'type'         => 'attendance_alert'
         ], $data);
 
@@ -156,6 +158,8 @@ class FcmNotificationService
                 'body'         => (string) $message,
                 'message'      => (string) $message,
                 'click_action' => 'FLUTTER_NOTIFICATION_CLICK',
+                'channel_id'   => 'high_importance_channel',
+                'priority'     => 'high',
                 'type'         => 'attendance_alert',
             ], array_map('strval', $data));
 

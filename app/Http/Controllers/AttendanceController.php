@@ -1607,14 +1607,28 @@ class AttendanceController extends Controller
                         $student,
                         "Pemberitahuan Tidak Hadir (Alpha)",
                         "Halo {$student->nama}, status absensi Anda untuk tanggal {$date} telah dicatat sebagai Alpha.",
-                        ['type' => 'attendance_alpha', 'status' => 'Alpha', 'tanggal' => $date]
+                        [
+                            'type' => 'checkin_siswa',
+                            'status' => 'Alpha',
+                            'jam' => now()->format('H:i'),
+                            'tanggal' => $date,
+                            'sub_type' => 'attendance_alpha',
+                            'category' => 'alpha_siswa',
+                        ]
                     );
                 } elseif ($status === 'B') {
                     FcmNotificationService::sendToSiswa(
                         $student,
                         "Peringatan Bolos",
                         "Halo {$student->nama}, status absensi Anda untuk tanggal {$date} telah dicatat sebagai Bolos.",
-                        ['type' => 'attendance_bolos', 'status' => 'Bolos', 'tanggal' => $date]
+                        [
+                            'type' => 'checkout_siswa',
+                            'status' => 'Bolos',
+                            'jam' => now()->format('H:i'),
+                            'tanggal' => $date,
+                            'sub_type' => 'attendance_bolos',
+                            'category' => 'bolos_siswa',
+                        ]
                     );
                 }
             }

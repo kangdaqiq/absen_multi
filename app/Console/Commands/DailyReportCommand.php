@@ -114,12 +114,12 @@ class DailyReportCommand extends Command
             ->where('is_active_attendance', true)
             ->exists();
 
-        if ($kelasWithGroupId->isEmpty() && !$targetJid && !$hasWaliKelas) {
-            $this->warn("No report targets (Groups, Admin, or Wali Kelas) found for this school. Skipped.");
-            return;
+        $hasReportTargets = ($kelasWithGroupId->isNotEmpty() || !empty($targetJid) || $hasWaliKelas);
+        if (!$hasReportTargets) {
+            $this->warn("No report targets (Groups, Admin, or Wali Kelas) found for school ID $schoolId. Skipping WhatsApp reports, but proceeding with attendance & FCM processing.");
         }
 
-        $this->info("Generating report...");
+        $this->info("Generating report & processing attendance...");
 
         // --- AUTO-EXTEND SAKIT ---
         $maxSakitDays = (int) (Setting::where('school_id', $schoolId)->where('setting_key', 'sakit_max_days')->value('setting_value') ?? 2);
@@ -191,7 +191,7 @@ class DailyReportCommand extends Command
         $siswaAll = Siswa::where('school_id', $schoolId)
             ->whereHas('kelas', function ($q) {
                 $q->where('is_active_attendance', true);
-            })->with(['kelas', 'kelas.jurusan'])->orderBy('nama')->get();
+            })->with(['kelas', 'kelas.jurusan', 'user'])->orderBy('nama')->get();
 
         // Get Attendance SCOPED (Implicit by student_id, but good to optimize)
         // We can just fetch all attendance for today and filter by student IDs in memory or query
@@ -290,9 +290,12 @@ class DailyReportCommand extends Command
                             "Pemberitahuan Tidak Hadir (Alpha)",
                             "Halo {$s->nama}, Anda tidak tercatat melakukan presensi hari ini dan status kehadiran Anda tercatat sebagai Alpha (Tanpa Keterangan).",
                             [
-                                'type' => 'attendance_alpha',
+                                'type' => 'checkin_siswa',
                                 'status' => 'Alpha',
+                                'jam' => $nowTimeStr,
                                 'tanggal' => $today,
+                                'sub_type' => 'attendance_alpha',
+                                'category' => 'alpha_siswa',
                             ]
                         );
                     } catch (\Throwable $e) {

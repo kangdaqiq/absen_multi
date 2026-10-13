@@ -120,7 +120,7 @@ class AutoBolosCommand extends Command
             ]);
 
             // Load Siswa models for FCM Push Notifications
-            $bolosSiswaModels = Siswa::whereIn('id', $bolosStudents->pluck('id'))->get()->keyBy('id');
+            $bolosSiswaModels = Siswa::with('user')->whereIn('id', $bolosStudents->pluck('id'))->get()->keyBy('id');
 
             // Queue personal notifications for Bolos students
             $telegramEnabled = $school->telegram_enabled;
@@ -132,7 +132,7 @@ class AutoBolosCommand extends Command
             $teleOrtuEnabled = \App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'notification_tele_ortu')->value('setting_value') !== 'false';
 
             foreach ($bolosStudents as $bs) {
-                // 1. FCM Push Notification to Mobile App (sama dengan absen)
+                // 1. FCM Push Notification to Mobile App (sama dengan absen pulang checkout_siswa)
                 $siswaModel = $bolosSiswaModels->get($bs->id);
                 if ($siswaModel) {
                     try {
@@ -141,10 +141,12 @@ class AutoBolosCommand extends Command
                             "Peringatan Bolos",
                             "Halo {$siswaModel->nama}, Anda terdeteksi belum melakukan absen pulang hari ini sehingga status kehadiran tercatat sebagai Bolos (B).",
                             [
-                                'type' => 'attendance_bolos',
+                                'type' => 'checkout_siswa',
                                 'status' => 'Bolos',
                                 'jam' => $nowTime,
                                 'tanggal' => $today,
+                                'sub_type' => 'attendance_bolos',
+                                'category' => 'bolos_siswa',
                             ]
                         );
                     } catch (\Throwable $e) {
@@ -213,7 +215,7 @@ class AutoBolosCommand extends Command
             ->whereHas('kelas', function ($q) {
                 $q->where('is_active_attendance', true);
             })
-            ->with('kelas')
+            ->with(['kelas', 'user'])
             ->get();
 
         $countA = 0;
@@ -241,16 +243,19 @@ class AutoBolosCommand extends Command
                 ]);
                 $countA++;
 
-                // FCM Push Notification to Mobile App (sama dengan absen)
+                // FCM Push Notification to Mobile App (sama dengan absen masuk checkin_siswa)
                 try {
                     FcmNotificationService::sendToSiswa(
                         $s,
                         "Pemberitahuan Tidak Hadir (Alpha)",
                         "Halo {$s->nama}, Anda tidak tercatat melakukan presensi hari ini dan status kehadiran Anda tercatat sebagai Alpha (Tanpa Keterangan).",
                         [
-                            'type' => 'attendance_alpha',
+                            'type' => 'checkin_siswa',
                             'status' => 'Alpha',
+                            'jam' => $nowTime,
                             'tanggal' => $today,
+                            'sub_type' => 'attendance_alpha',
+                            'category' => 'alpha_siswa',
                         ]
                     );
                 } catch (\Throwable $e) {

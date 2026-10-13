@@ -218,6 +218,9 @@ class AttendanceController extends Controller
         $descriptors = [];
         foreach ($faceRecords as $fr) {
             $embedding = json_decode($fr->face_embedding);
+            if (is_string($embedding)) {
+                $embedding = json_decode($embedding); // Handle double encoded json
+            }
             // Kiosk web scanner uses 128-d embeddings (face-api.js). Skip 512-d (mobile InsightFace)
             if (!$embedding || !is_array($embedding) || count($embedding) !== 128) {
                 continue;

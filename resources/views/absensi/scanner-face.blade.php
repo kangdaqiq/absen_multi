@@ -538,8 +538,9 @@
 
                 <!-- Footer Bar below Video -->
                 <div class="p-3 bg-gray-900 border-t border-gray-800 flex items-center justify-between text-xs text-gray-300">
-                    <div class="flex items-center gap-2">
-                        <span class="inline-block w-2 h-2 rounded-full bg-emerald-400"></span>
+                    <div class="flex items-center gap-2 overflow-hidden text-ellipsis whitespace-nowrap">
+                        <span class="inline-block w-2 h-2 rounded-full bg-emerald-400 shrink-0"></span>
+                        <span class="text-[11px] font-mono text-gray-400 truncate max-w-[320px] sm:max-w-[450px]" x-text="debugInfo">Memulai Kiosk...</span>
                     </div>
                     <button type="button" @click="openEnrollModal()"
                         class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-white font-semibold transition active:scale-95 shadow-sm"
@@ -896,6 +897,7 @@ function faceScannerApp() {
         recentScans: {},
         holdMessageUntil: 0,
         lastScanError: false,
+        debugInfo: 'Kiosk Siap & Memuat Data...',
         audioCtx: null,
 
         async init() {
@@ -1116,16 +1118,24 @@ function faceScannerApp() {
         // CLIENT-SIDE 1:N MATCHING (Takes < 5ms in JavaScript!)
         async matchAndAttend(descriptor) {
             try {
-                // Saring hanya embedding 128 dimensi (model face-api.js kiosk).
-                // Lewati embedding 512 dimensi (dari mobile app InsightFace) agar euclideanDistance tidak crash!
+                // Saring dan normalisasi embedding (tangani jika tersimpan sebagai JSON string)
                 const targetDim = descriptor.length; // 128
-                const validDescriptors = this.descriptors.filter(item => 
-                    item.embedding && Array.isArray(item.embedding) && item.embedding.length === targetDim
-                );
+                const validDescriptors = [];
+                for (const item of this.descriptors) {
+                    let emb = item.embedding;
+                    if (typeof emb === 'string') {
+                        try { emb = JSON.parse(emb); } catch (e) {}
+                    }
+                    if (Array.isArray(emb) && emb.length === targetDim) {
+                        validDescriptors.push({ ...item, embedding: emb });
+                    }
+                }
+
+                this.debugInfo = validDescriptors.length + ' dari ' + this.descriptors.length + ' wajah valid (' + targetDim + '-d)';
 
                 if (validDescriptors.length === 0) {
                     this.lastScanError = true;
-                    this.detectionMessage = 'Belum ada Face ID Kiosk yang cocok (Daftarkan wajah lewat tombol di bawah)';
+                    this.detectionMessage = 'Belum ada Face ID Kiosk yang cocok (' + this.descriptors.length + ' data di server beda format/dimensi)';
                     this.holdMessageUntil = Date.now() + 3500;
                     return;
                 }

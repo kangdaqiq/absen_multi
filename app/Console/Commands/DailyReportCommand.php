@@ -295,9 +295,9 @@ class DailyReportCommand extends Command
                     ]
                 );
 
-                if ($attRecord->wasRecentlyCreated) {
+                if ($attRecord->wasRecentlyCreated || $this->option('force')) {
                     try {
-                        FcmNotificationService::sendToSiswa(
+                        $sentFcm = FcmNotificationService::sendToSiswa(
                             $s,
                             "Pemberitahuan Tidak Hadir (Alpha)",
                             "Halo {$s->nama}, Anda tidak tercatat melakukan presensi hari ini dan status kehadiran Anda tercatat sebagai Alpha (Tanpa Keterangan).",
@@ -310,8 +310,14 @@ class DailyReportCommand extends Command
                                 'category' => 'alpha_siswa',
                             ]
                         );
+
+                        if ($sentFcm) {
+                            $this->info("Push Notification (FCM) terkirim ke Siswa: {$s->nama}");
+                        } else {
+                            $this->line("<comment>[FCM]</comment> Siswa {$s->nama} belum login di aplikasi / belum ada token perangkat.");
+                        }
                     } catch (\Throwable $e) {
-                        // ignore
+                        $this->warn("Gagal mengirimkan Push Notification ke {$s->nama}: " . $e->getMessage());
                     }
                 }
             }

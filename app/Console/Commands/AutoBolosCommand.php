@@ -259,7 +259,7 @@ class AutoBolosCommand extends Command
 
                 // FCM Push Notification to Mobile App (sama dengan absen masuk checkin_siswa)
                 try {
-                    FcmNotificationService::sendToSiswa(
+                    $sentFcm = FcmNotificationService::sendToSiswa(
                         $s,
                         "Pemberitahuan Tidak Hadir (Alpha)",
                         "Halo {$s->nama}, Anda tidak tercatat melakukan presensi hari ini dan status kehadiran Anda tercatat sebagai Alpha (Tanpa Keterangan).",
@@ -272,6 +272,10 @@ class AutoBolosCommand extends Command
                             'category' => 'alpha_siswa',
                         ]
                     );
+
+                    if ($sentFcm) {
+                        $this->info("Push Notification (FCM) terkirim ke Siswa: {$s->nama}");
+                    }
                 } catch (\Throwable $e) {
                     Log::error("FCM Alpha Error for Siswa ID {$s->id}: " . $e->getMessage());
                 }

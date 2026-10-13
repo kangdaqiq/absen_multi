@@ -191,6 +191,11 @@
                                                                         pro
                                                                     </span>
                                                                 @endif
+                                                                @if (!empty($subItem['locked']))
+                                                                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20" title="Fitur terkunci - Hubungi SuperAdmin">
+                                                                        <i class="fas fa-lock text-[8px] mr-1"></i> Pro
+                                                                    </span>
+                                                                @endif
                                                             </span>
                                                         </a>
                                                     </li>
@@ -224,6 +229,11 @@
                                                     <span
                                                         class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-brand-500 text-white">
                                                         new
+                                                    </span>
+                                                @endif
+                                                @if (!empty($item['locked']))
+                                                    <span class="ml-auto inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20" title="Fitur terkunci - Hubungi SuperAdmin">
+                                                        <i class="fas fa-lock text-[8px] mr-1"></i> Pro
                                                     </span>
                                                 @endif
                                             </span>

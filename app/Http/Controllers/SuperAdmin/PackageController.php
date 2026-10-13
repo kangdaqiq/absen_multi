@@ -31,11 +31,15 @@ class PackageController extends Controller
             'history_quota_months' => 'nullable|integer|min:0',
             'wa_enabled' => 'nullable|boolean',
             'bot_enabled' => 'nullable|boolean',
+            'photo_enabled' => 'nullable|boolean',
+            'face_enabled' => 'nullable|boolean',
             'is_active' => 'nullable|boolean',
         ]);
 
         $validated['wa_enabled'] = $request->has('wa_enabled');
         $validated['bot_enabled'] = $request->has('bot_enabled');
+        $validated['photo_enabled'] = $request->has('photo_enabled');
+        $validated['face_enabled'] = $request->has('face_enabled');
         $validated['is_active'] = $request->has('is_active');
         
         // Convert null strings to actual null for limits (0 means unlimited in DB logic, but null is safer for empty)
@@ -65,10 +69,17 @@ class PackageController extends Controller
             'teacher_limit' => 'nullable|integer|min:0',
             'bot_user_limit' => 'nullable|integer|min:0',
             'history_quota_months' => 'nullable|integer|min:0',
+            'wa_enabled' => 'nullable|boolean',
+            'bot_enabled' => 'nullable|boolean',
+            'photo_enabled' => 'nullable|boolean',
+            'face_enabled' => 'nullable|boolean',
+            'is_active' => 'nullable|boolean',
         ]);
 
         $validated['wa_enabled'] = $request->has('wa_enabled');
         $validated['bot_enabled'] = $request->has('bot_enabled');
+        $validated['photo_enabled'] = $request->has('photo_enabled');
+        $validated['face_enabled'] = $request->has('face_enabled');
         $validated['is_active'] = $request->has('is_active');
 
         $validated['student_limit'] = $validated['student_limit'] ?? 0;

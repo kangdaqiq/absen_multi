@@ -32,6 +32,7 @@
                     <th class="py-4 px-4 border-b border-stroke dark:border-strokedark">Status</th>
                     <th class="py-4 px-4 text-center border-b border-stroke dark:border-strokedark">Bot WA</th>
                     <th class="py-4 px-4 text-center border-b border-stroke dark:border-strokedark">Foto Siswa</th>
+                    <th class="py-4 px-4 text-center border-b border-stroke dark:border-strokedark">Scanner Wajah</th>
                     <th class="py-4 px-4 border-b border-stroke dark:border-strokedark">Aksi</th>
                 </tr>
             </thead>
@@ -131,6 +132,25 @@
                                 {{ ($school->photo_enabled ?? true) ? 'Aktif' : 'Mati' }}
                             </p>
                         </td>
+                        {{-- Toggle Face ID --}}
+                        <td class="border-b border-[#eee] py-5 px-4 dark:border-strokedark align-top text-center">
+                            <label class="inline-flex items-center cursor-pointer" title="{{ ($school->face_enabled ?? true) ? 'Klik untuk nonaktifkan fitur Scanner Face ID' : 'Klik untuk aktifkan fitur Scanner Face ID' }}">
+                                <input
+                                    type="checkbox"
+                                    class="sr-only face-toggle"
+                                    data-school-id="{{ $school->id }}"
+                                    data-school-name="{{ $school->name }}"
+                                    data-url="{{ route('super-admin.schools.toggle-face', $school) }}"
+                                    {{ ($school->face_enabled ?? true) ? 'checked' : '' }}
+                                />
+                                <div class="face-toggle-track relative w-11 h-6 rounded-full transition-colors duration-300 {{ ($school->face_enabled ?? true) ? 'bg-brand-500' : 'bg-gray-300 dark:bg-meta-4' }}">
+                                    <div class="face-toggle-thumb absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-300" style="{{ ($school->face_enabled ?? true) ? 'transform: translateX(20px);' : '' }}"></div>
+                                </div>
+                            </label>
+                            <p class="text-xs mt-1 {{ ($school->face_enabled ?? true) ? 'text-brand-500 font-medium' : 'text-gray-400 dark:text-gray-500' }}">
+                                {{ ($school->face_enabled ?? true) ? 'Aktif' : 'Mati' }}
+                            </p>
+                        </td>
                         <td class="border-b border-[#eee] py-5 px-4 dark:border-strokedark align-top">
                             <div class="flex items-center space-x-3">
                                 <a href="{{ route('super-admin.schools.edit', $school) }}" class="text-warning-500 hover:text-warning-700 hover:bg-warning-50 p-2 rounded-lg transition" title="Edit">
@@ -157,7 +177,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td class="border-b border-[#eee] py-5 px-4 dark:border-strokedark text-center">
+                        <td colspan="11" class="border-b border-[#eee] py-5 px-4 dark:border-strokedark text-center text-gray-500">
                             Belum ada sekolah
                         </td>
                     </tr>
@@ -293,6 +313,63 @@
                         } else {
                             this.checked = !isChecked;
                             showToast('Gagal mengubah status fitur foto.', 'error');
+                        }
+                    })
+                    .catch(() => {
+                        this.checked = !isChecked;
+                        showToast('Terjadi kesalahan jaringan.', 'error');
+                    })
+                    .finally(() => {
+                        this.disabled = false;
+                    });
+                });
+            });
+
+            // ── AJAX Toggle Scanner Face ID ─────────────────────────────────
+            document.querySelectorAll('.face-toggle').forEach(function (toggle) {
+                toggle.addEventListener('change', function () {
+                    const isChecked    = this.checked;
+                    const url          = this.dataset.url;
+                    const schoolName   = this.dataset.schoolName;
+                    const container    = this.closest('td');
+                    const track        = container.querySelector('.face-toggle-track');
+                    const thumb        = container.querySelector('.face-toggle-thumb');
+                    const statusText   = container.querySelector('p');
+                    const csrfToken    = document.querySelector('meta[name="csrf-token"]').content;
+
+                    this.disabled = true;
+
+                    fetch(url, {
+                        method: 'PATCH',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': csrfToken,
+                            'Accept': 'application/json',
+                        },
+                    })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.success) {
+                            const active = data.face_enabled;
+
+                            if (active) {
+                                track.classList.remove('bg-gray-300', 'dark:bg-meta-4');
+                                track.classList.add('bg-brand-500');
+                                thumb.style.transform = 'translateX(20px)';
+                                statusText.textContent = 'Aktif';
+                                statusText.className = 'text-xs mt-1 text-brand-500 font-medium';
+                            } else {
+                                track.classList.remove('bg-brand-500');
+                                track.classList.add('bg-gray-300', 'dark:bg-meta-4');
+                                thumb.style.transform = 'translateX(0)';
+                                statusText.textContent = 'Mati';
+                                statusText.className = 'text-xs mt-1 text-gray-400 dark:text-gray-500';
+                            }
+
+                            showToast(data.message, active ? 'success' : 'warning');
+                        } else {
+                            this.checked = !isChecked;
+                            showToast('Gagal mengubah status fitur scanner face id.', 'error');
                         }
                     })
                     .catch(() => {

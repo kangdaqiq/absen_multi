@@ -18,6 +18,7 @@ class School extends Model
         'domain',
         'is_active',
         'photo_enabled',
+        'face_enabled',
         'wa_enabled',
         'bot_enabled',
         'bot_user_limit',
@@ -33,6 +34,7 @@ class School extends Model
     protected $casts = [
         'is_active'            => 'boolean',
         'photo_enabled'        => 'boolean',
+        'face_enabled'         => 'boolean',
         'wa_enabled'           => 'boolean',
         'bot_enabled'          => 'boolean',
         'bot_user_limit'       => 'integer',

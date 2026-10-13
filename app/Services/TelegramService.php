@@ -15,7 +15,7 @@ class TelegramService
         }
 
         $school = School::find($schoolId);
-        if (!$school || !$school->telegram_enabled || !$school->telegram_bot_token) {
+        if (!$school || !$school->wa_enabled || !$school->telegram_enabled || !$school->telegram_bot_token) {
             return;
         }
         $token = $school->telegram_bot_token;
@@ -55,7 +55,7 @@ class TelegramService
         }
 
         $school = School::find($schoolId);
-        if (!$school || !$school->telegram_enabled || !$school->telegram_bot_token) {
+        if (!$school || !$school->wa_enabled || !$school->telegram_enabled || !$school->telegram_bot_token) {
             return;
         }
         $token = $school->telegram_bot_token;
@@ -139,7 +139,7 @@ class TelegramService
         }
 
         $school = School::find($schoolId);
-        if (!$school || !$school->telegram_enabled || !$school->telegram_bot_token) {
+        if (!$school || !$school->wa_enabled || !$school->telegram_enabled || !$school->telegram_bot_token) {
             return;
         }
         $token = $school->telegram_bot_token;
@@ -187,7 +187,7 @@ class TelegramService
         ?string $chatIdOrtu = null
     ): void {
         $school = School::find($schoolId);
-        if (!$school || !$school->telegram_enabled || !$school->telegram_bot_token) {
+        if (!$school || !$school->wa_enabled || !$school->telegram_enabled || !$school->telegram_bot_token) {
             return;
         }
         $token = $school->telegram_bot_token;

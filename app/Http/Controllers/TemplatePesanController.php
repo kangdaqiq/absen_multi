@@ -38,6 +38,8 @@ class TemplatePesanController extends Controller
 
         $schools = auth()->user()->isSuperAdmin() ? School::all() : collect();
         $currentSchool = School::find($schoolId);
+        $school = $currentSchool;
+        $isTemplateEnabled = $currentSchool ? (bool) $currentSchool->wa_enabled : true;
 
         return view('settings.templates.index', compact(
             'templates',
@@ -45,7 +47,9 @@ class TemplatePesanController extends Controller
             'placeholders',
             'schoolId',
             'schools',
-            'currentSchool'
+            'currentSchool',
+            'school',
+            'isTemplateEnabled'
         ));
     }
 
@@ -71,6 +75,11 @@ class TemplatePesanController extends Controller
 
         if (!$schoolId) {
             return back()->with('error', 'School ID tidak ditemukan.');
+        }
+
+        $school = School::find($schoolId);
+        if ($school && !$school->wa_enabled && !auth()->user()->isSuperAdmin()) {
+            return back()->with('error', 'Fitur Template Pesan terkunci karena fitur WhatsApp/Notifikasi dinonaktifkan.');
         }
 
         // Count existing variations in this category to generate title if empty
@@ -105,6 +114,11 @@ class TemplatePesanController extends Controller
             abort(403, 'Akses ditolak.');
         }
 
+        $school = School::find($schoolId);
+        if ($school && !$school->wa_enabled && !auth()->user()->isSuperAdmin()) {
+            return back()->with('error', 'Fitur Template Pesan terkunci karena fitur WhatsApp/Notifikasi dinonaktifkan.');
+        }
+
         $request->validate([
             'title'     => 'nullable|string|max:100',
             'content'   => 'required|string',
@@ -130,6 +144,11 @@ class TemplatePesanController extends Controller
             abort(403, 'Akses ditolak.');
         }
 
+        $school = School::find($schoolId);
+        if ($school && !$school->wa_enabled && !auth()->user()->isSuperAdmin()) {
+            return back()->with('error', 'Fitur Template Pesan terkunci karena fitur WhatsApp/Notifikasi dinonaktifkan.');
+        }
+
         $template->update([
             'is_active' => !$template->is_active
         ]);
@@ -145,6 +164,11 @@ class TemplatePesanController extends Controller
         $schoolId = auth()->user()->school_id ?? 0;
         if ($template->school_id !== $schoolId && !auth()->user()->isSuperAdmin()) {
             abort(403, 'Akses ditolak.');
+        }
+
+        $school = School::find($schoolId);
+        if ($school && !$school->wa_enabled && !auth()->user()->isSuperAdmin()) {
+            return back()->with('error', 'Fitur Template Pesan terkunci karena fitur WhatsApp/Notifikasi dinonaktifkan.');
         }
 
         $template->delete();
@@ -164,6 +188,11 @@ class TemplatePesanController extends Controller
         $schoolId = auth()->user()->school_id ?? 0;
         if (auth()->user()->isSuperAdmin() && $request->filled('school_id')) {
             $schoolId = (int) $request->school_id;
+        }
+
+        $school = School::find($schoolId);
+        if ($school && !$school->wa_enabled && !auth()->user()->isSuperAdmin()) {
+            return back()->with('error', 'Fitur Template Pesan terkunci karena fitur WhatsApp/Notifikasi dinonaktifkan.');
         }
 
         NotificationTemplate::where('school_id', $schoolId)

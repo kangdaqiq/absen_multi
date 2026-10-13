@@ -3,7 +3,18 @@
 @section('title', 'Template Pesan Notifikasi')
 
 @section('content')
-<div x-data="templateManager()" class="space-y-6">
+<div class="relative w-full min-h-[550px]">
+@if(isset($isTemplateEnabled) && !$isTemplateEnabled)
+    <x-feature-locked-overlay
+        title="Fitur Template Pesan Terkunci"
+        featureName="Template Pesan Notifikasi"
+        description="Fitur Template Pesan belum diaktifkan untuk sekolah ini. Hubungi Admin untuk mengaktifkan modul notifikasi pesan WhatsApp / Bot."
+        :school="$currentSchool ?? ($school ?? null)"
+        icon="fas fa-comments"
+    />
+@endif
+
+<div x-data="templateManager()" class="space-y-6 w-full" @if(isset($isTemplateEnabled) && !$isTemplateEnabled) style="filter: blur(8px); pointer-events: none; user-select: none; opacity: 0.55;" @endif>
     <!-- Header -->
     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -339,6 +350,7 @@
             </div>
         </div>
     </div>
+</div>
 </div>
 
 <script>

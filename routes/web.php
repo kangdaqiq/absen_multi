@@ -76,6 +76,7 @@ Route::middleware(['auth', 'self_hosted_guard'])->prefix('super-admin')->name('s
         Route::resource('schools', App\Http\Controllers\SuperAdmin\SchoolController::class);
         Route::patch('schools/{school}/toggle-bot', [App\Http\Controllers\SuperAdmin\SchoolController::class, 'toggleBot'])->name('schools.toggle-bot');
         Route::patch('schools/{school}/toggle-photo', [App\Http\Controllers\SuperAdmin\SchoolController::class, 'togglePhoto'])->name('schools.toggle-photo');
+        Route::patch('schools/{school}/toggle-face', [App\Http\Controllers\SuperAdmin\SchoolController::class, 'toggleFace'])->name('schools.toggle-face');
         Route::post('schools/{school}/send-invoice-wa', function (\App\Models\School $school, \App\Services\SubscriptionNotificationService $service) {
             $res = $service->sendRenewalInvoiceWhatsApp($school);
             return back()->with($res['success'] ? 'success' : 'error', $res['message']);
@@ -102,6 +103,7 @@ Route::middleware(['auth', 'self_hosted_guard'])->prefix('super-admin')->name('s
         // Licenses (Self-Hosted)
         Route::patch('licenses/{license}/regenerate', [App\Http\Controllers\SuperAdmin\LicenseController::class, 'regenerate'])->name('licenses.regenerate');
         Route::patch('licenses/{license}/toggle-photo', [App\Http\Controllers\SuperAdmin\LicenseController::class, 'togglePhoto'])->name('licenses.toggle-photo');
+        Route::patch('licenses/{license}/toggle-face', [App\Http\Controllers\SuperAdmin\LicenseController::class, 'toggleFace'])->name('licenses.toggle-face');
         Route::get('licenses/{license}/download-backup', [App\Http\Controllers\SuperAdmin\LicenseController::class, 'downloadBackup'])->name('licenses.download-backup');
         Route::resource('licenses', App\Http\Controllers\SuperAdmin\LicenseController::class)->only(['index', 'store', 'update', 'destroy']);
 
@@ -163,6 +165,10 @@ Route::middleware('auth')->group(function () {
         Route::get('/absensi', [App\Http\Controllers\AttendanceController::class, 'index'])->name('absensi.index');
         Route::get('/absensi/scanner-usb', [App\Http\Controllers\AttendanceController::class, 'scannerUsbView'])->name('absensi.scanner-usb');
         Route::post('/absensi/scan-usb', [App\Http\Controllers\AttendanceController::class, 'scanUsbRfid'])->name('absensi.scan-usb');
+        Route::get('/absensi/scanner-face', [App\Http\Controllers\AttendanceController::class, 'scannerFaceView'])->name('absensi.scanner-face');
+        Route::get('/absensi/face-descriptors', [App\Http\Controllers\AttendanceController::class, 'getFaceDescriptors'])->name('absensi.face-descriptors');
+        Route::post('/absensi/scan-face', [App\Http\Controllers\AttendanceController::class, 'scanFaceAttendance'])->name('absensi.scan-face');
+        Route::post('/absensi/register-face-kiosk', [App\Http\Controllers\AttendanceController::class, 'registerFaceKiosk'])->name('absensi.register-face-kiosk');
         Route::get('/absensi/guru', [App\Http\Controllers\TeacherAttendanceReportController::class, 'index'])->name('absensi-guru.index');
         Route::post('/absensi/guru/store', [App\Http\Controllers\TeacherAttendanceReportController::class, 'store'])->name('absensi-guru.store');
         Route::delete('/absensi/guru/destroy', [App\Http\Controllers\TeacherAttendanceReportController::class, 'destroy'])->name('absensi-guru.destroy');
@@ -327,14 +333,16 @@ Route::middleware('auth')->group(function () {
         Route::get('/broadcast', [App\Http\Controllers\BroadcastController::class, 'index'])->name('broadcast.index');
         Route::post('/broadcast/send', [App\Http\Controllers\BroadcastController::class, 'send'])->name('broadcast.send');
 
-        // WhatsApp Features (Protected by wa_enabled check)
+        // WhatsApp Device View (Always accessible to render locked view or active view)
+        Route::get('/whatsapp-device', [App\Http\Controllers\WhatsappDeviceController::class, 'index'])->name('whatsapp.device.index');
+
+        // WhatsApp Features (Protected by wa_enabled check for actions/APIs)
         Route::middleware([\App\Http\Middleware\CheckWaFeature::class])->group(function () {
 
             // WA Groups Proxy
             Route::get('/api/whatsapp/groups', [App\Http\Controllers\Api\WhatsappController::class, 'getGroups'])->name('api.whatsapp.groups');
 
-            // WhatsApp Device Management
-            Route::get('/whatsapp-device', [App\Http\Controllers\WhatsappDeviceController::class, 'index'])->name('whatsapp.device.index');
+            // WhatsApp Device Actions & APIs
             Route::get('/whatsapp-device/status', [App\Http\Controllers\WhatsappDeviceController::class, 'status'])->name('whatsapp.device.status');
             Route::get('/whatsapp-device/check', [App\Http\Controllers\WhatsappDeviceController::class, 'check'])->name('whatsapp.device.check');
             Route::post('/whatsapp-device/login-with-code', [App\Http\Controllers\WhatsappDeviceController::class, 'loginWithCode'])->name('whatsapp.device.login-with-code');

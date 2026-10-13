@@ -17,6 +17,7 @@ class Package extends Model
         'wa_enabled',
         'bot_enabled',
         'photo_enabled',
+        'face_enabled',
         'is_active',
     ];
 
@@ -26,6 +27,7 @@ class Package extends Model
         'wa_enabled' => 'boolean',
         'bot_enabled' => 'boolean',
         'photo_enabled' => 'boolean',
+        'face_enabled' => 'boolean',
         'is_active' => 'boolean',
     ];
 

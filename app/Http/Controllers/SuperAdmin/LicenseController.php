@@ -31,6 +31,7 @@ class LicenseController extends Controller
         $validated['license_key']          = License::generateKey();
         $validated['is_active']            = $request->has('is_active');
         $validated['photo_enabled']        = $request->has('photo_enabled');
+        $validated['face_enabled']         = $request->has('face_enabled');
         $validated['history_quota_months'] = empty($request->history_quota_months) ? null : (int) $request->history_quota_months;
 
         License::create($validated);
@@ -55,6 +56,7 @@ class LicenseController extends Controller
 
         $validated['is_active']            = $request->has('is_active');
         $validated['photo_enabled']        = $request->has('photo_enabled');
+        $validated['face_enabled']         = $request->has('face_enabled');
         $validated['history_quota_months'] = empty($request->history_quota_months) ? null : (int) $request->history_quota_months;
 
         $license->update($validated);
@@ -77,6 +79,23 @@ class LicenseController extends Controller
             'success'       => true,
             'photo_enabled' => $license->photo_enabled,
             'message'       => "Fitur Foto Siswa untuk lisensi {$license->client_name} berhasil di{$status}kan.",
+        ]);
+    }
+
+    /**
+     * Toggle face_enabled for a license (AJAX, superadmin only)
+     */
+    public function toggleFace(License $license)
+    {
+        $license->face_enabled = !$license->face_enabled;
+        $license->save();
+
+        $status = $license->face_enabled ? 'aktif' : 'nonaktif';
+
+        return response()->json([
+            'success'      => true,
+            'face_enabled' => $license->face_enabled,
+            'message'      => "Fitur Scanner Face ID untuk lisensi {$license->client_name} berhasil di{$status}kan.",
         ]);
     }
 

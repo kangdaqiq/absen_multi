@@ -160,8 +160,12 @@ class SettingsController extends Controller
 
     public function telegramIndex()
     {
-        if (auth()->user() && !auth()->user()->isSuperAdmin()) {
-            $schoolId = auth()->user()->school_id;
+        $user = auth()->user();
+        $school = $user?->school;
+        $isTelegramEnabled = $school ? (bool) $school->wa_enabled : true;
+
+        if ($user && !$user->isSuperAdmin()) {
+            $schoolId = $user->school_id;
 
             // Only get settings for this specific school
             $settings = Setting::where('school_id', $schoolId)
@@ -184,11 +188,17 @@ class SettingsController extends Controller
                 ->pluck('setting_value', 'setting_key');
         }
 
-        return view('settings.telegram', compact('settings'));
+        return view('settings.telegram', compact('settings', 'isTelegramEnabled', 'school'));
     }
 
     public function telegramUpdate(Request $request)
     {
+        $user = auth()->user();
+        $school = $user?->school;
+        if ($school && !$school->wa_enabled) {
+            return back()->with('error', 'Fitur Telegram Bot terkunci karena modul WhatsApp/Bot dinonaktifkan untuk sekolah ini.');
+        }
+
         $data = $request->except(['_token', '_method']);
 
         // Handle checkboxes (they don't send data when unchecked)

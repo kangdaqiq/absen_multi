@@ -137,6 +137,18 @@
                             </div>
                             <span class="text-sm font-medium text-black dark:text-white">Aktifkan Fitur Foto Siswa</span>
                         </label>
+
+                        <label for="face_enabled" class="flex cursor-pointer select-none items-center">
+                            <div class="relative">
+                                <input type="checkbox" id="face_enabled" name="face_enabled" value="1" checked class="sr-only" />
+                                <div class="box mr-4 flex h-5 w-5 items-center justify-center rounded border border-stroke dark:border-strokedark bg-white dark:bg-boxdark">
+                                    <span class="opacity-0">
+                                        <i class="fas fa-check text-xs text-brand-500"></i>
+                                    </span>
+                                </div>
+                            </div>
+                            <span class="text-sm font-medium text-black dark:text-white">Aktifkan Scanner Face ID</span>
+                        </label>
                     </div>
 
                     <button type="submit" class="flex w-full justify-center rounded bg-brand-500 p-3 font-medium text-white hover:bg-opacity-90 transition">
@@ -167,6 +179,7 @@
                             <th class="py-4 px-4 font-medium text-black dark:text-white">Expired</th>
                             <th class="py-4 px-4 font-medium text-black dark:text-white text-center">Backup Database</th>
                             <th class="py-4 px-4 font-medium text-black dark:text-white text-center">Foto Siswa</th>
+                            <th class="py-4 px-4 font-medium text-black dark:text-white text-center">Scanner Wajah</th>
                             <th class="py-4 px-4 font-medium text-black dark:text-white">Status</th>
                             <th class="py-4 px-4 font-medium text-black dark:text-white text-center">Aksi</th>
                         </tr>
@@ -248,6 +261,24 @@
                                     </label>
                                     <p class="text-[11px] mt-0.5 {{ ($license->photo_enabled ?? true) ? 'text-brand-500 font-medium' : 'text-gray-400 dark:text-gray-500' }}">
                                         {{ ($license->photo_enabled ?? true) ? 'Aktif' : 'Mati' }}
+                                    </p>
+                                </td>
+                                <td class="border-b border-[#eee] py-5 px-4 dark:border-strokedark text-center align-top">
+                                    <label class="inline-flex items-center cursor-pointer" title="{{ ($license->face_enabled ?? true) ? 'Klik untuk nonaktifkan Scanner Face ID' : 'Klik untuk aktifkan Scanner Face ID' }}">
+                                        <input
+                                            type="checkbox"
+                                            class="sr-only license-face-toggle"
+                                            data-license-id="{{ $license->id }}"
+                                            data-client-name="{{ $license->client_name }}"
+                                            data-url="{{ route('super-admin.licenses.toggle-face', $license) }}"
+                                            {{ ($license->face_enabled ?? true) ? 'checked' : '' }}
+                                        />
+                                        <div class="lic-face-track relative w-10 h-5 rounded-full transition-colors duration-300 {{ ($license->face_enabled ?? true) ? 'bg-brand-500' : 'bg-gray-300 dark:bg-meta-4' }}">
+                                            <div class="lic-face-thumb absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-300" style="{{ ($license->face_enabled ?? true) ? 'transform: translateX(20px);' : '' }}"></div>
+                                        </div>
+                                    </label>
+                                    <p class="text-[11px] mt-0.5 {{ ($license->face_enabled ?? true) ? 'text-brand-500 font-medium' : 'text-gray-400 dark:text-gray-500' }}">
+                                        {{ ($license->face_enabled ?? true) ? 'Aktif' : 'Mati' }}
                                     </p>
                                 </td>
                                 <td class="border-b border-[#eee] py-5 px-4 dark:border-strokedark align-top">
@@ -386,6 +417,18 @@
                             </div>
                             <span class="text-sm font-medium text-black dark:text-white">Aktifkan Fitur Foto Siswa</span>
                         </label>
+
+                        <label for="edit_face_enabled" class="flex cursor-pointer select-none items-center">
+                            <div class="relative">
+                                <input type="checkbox" id="edit_face_enabled" name="face_enabled" value="1" x-model="editData.face_enabled" class="sr-only" />
+                                <div class="box mr-4 flex h-5 w-5 items-center justify-center rounded border border-stroke dark:border-strokedark bg-white dark:bg-boxdark">
+                                    <span class="opacity-0">
+                                        <i class="fas fa-check text-xs text-brand-500"></i>
+                                    </span>
+                                </div>
+                            </div>
+                            <span class="text-sm font-medium text-black dark:text-white">Aktifkan Scanner Face ID</span>
+                        </label>
                     </div>
 
                     <div class="flex justify-end gap-4.5">
@@ -441,7 +484,8 @@ function licenseManager() {
             allowed_hostname: '',
             notes: '',
             is_active: true,
-            photo_enabled: true
+            photo_enabled: true,
+            face_enabled: true
         },
         openEditModal(license) {
             this.editData = {
@@ -456,7 +500,8 @@ function licenseManager() {
                 allowed_hostname: license.allowed_hostname ?? '',
                 notes: license.notes ?? '',
                 is_active: !!license.is_active,
-                photo_enabled: license.photo_enabled !== undefined ? !!license.photo_enabled : true
+                photo_enabled: license.photo_enabled !== undefined ? !!license.photo_enabled : true,
+                face_enabled: license.face_enabled !== undefined ? !!license.face_enabled : true
             };
             this.isEditModalOpen = true;
         }
@@ -510,6 +555,63 @@ document.addEventListener('DOMContentLoaded', function () {
                 } else {
                     this.checked = !isChecked;
                     alert('Gagal mengubah status fitur foto.');
+                }
+            })
+            .catch(() => {
+                this.checked = !isChecked;
+                alert('Terjadi kesalahan jaringan.');
+            })
+            .finally(() => {
+                this.disabled = false;
+            });
+        });
+    });
+
+    // ── AJAX Toggle Scanner Face ID untuk Lisensi ───────────────────────────
+    document.querySelectorAll('.license-face-toggle').forEach(function (toggle) {
+        toggle.addEventListener('change', function () {
+            const isChecked  = this.checked;
+            const url        = this.dataset.url;
+            const clientName = this.dataset.clientName;
+            const container  = this.closest('td');
+            const track      = container.querySelector('.lic-face-track');
+            const thumb      = container.querySelector('.lic-face-thumb');
+            const statusText = container.querySelector('p');
+            const csrfToken  = document.querySelector('meta[name="csrf-token"]').content;
+
+            this.disabled = true;
+
+            fetch(url, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                    'Accept': 'application/json',
+                },
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    const active = data.face_enabled;
+
+                    if (active) {
+                        track.classList.remove('bg-gray-300', 'dark:bg-meta-4');
+                        track.classList.add('bg-brand-500');
+                        thumb.style.transform = 'translateX(20px)';
+                        statusText.textContent = 'Aktif';
+                        statusText.className = 'text-[11px] mt-0.5 text-brand-500 font-medium';
+                    } else {
+                        track.classList.remove('bg-brand-500');
+                        track.classList.add('bg-gray-300', 'dark:bg-meta-4');
+                        thumb.style.transform = 'translateX(0)';
+                        statusText.textContent = 'Mati';
+                        statusText.className = 'text-[11px] mt-0.5 text-gray-400 dark:text-gray-500';
+                    }
+
+                    alert(data.message);
+                } else {
+                    this.checked = !isChecked;
+                    alert('Gagal mengubah status fitur scanner face id.');
                 }
             })
             .catch(() => {

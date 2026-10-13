@@ -28,8 +28,11 @@ class BroadcastController extends Controller
         }
 
         $kelas = $kelasQuery->get();
+        $school = $user?->school;
+        // Fitur Broadcast Pesan terkunci jika fitur WhatsApp nonaktif
+        $isBroadcastEnabled = $school ? (bool) $school->wa_enabled : true;
 
-        return view('broadcast.index', compact('kelas'));
+        return view('broadcast.index', compact('kelas', 'isBroadcastEnabled', 'school'));
     }
 
     /**
@@ -46,6 +49,11 @@ class BroadcastController extends Controller
         ]);
 
         $user            = auth()->user();
+        $school          = $user?->school;
+        if ($school && !$school->wa_enabled) {
+            return back()->with('error', 'Fitur Broadcast Pesan terkunci karena fitur WhatsApp nonaktif untuk sekolah ini.');
+        }
+
         $targetClassIds  = $request->target_class_ids;
         $channel         = $request->channel;
         $targetRecipient = $request->target_recipient;

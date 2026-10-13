@@ -91,6 +91,13 @@
                 <i class="fas fa-compress text-brand-500 text-sm" x-show="isFullscreen" style="display: none;"></i>
             </button>
 
+            <!-- Link ke Scanner Wajah -->
+            <a href="{{ route('absensi.scanner-face') }}"
+                class="inline-flex items-center gap-2 rounded-xl border border-purple-200 bg-purple-50 px-3.5 py-2 text-xs font-semibold text-purple-700 hover:bg-purple-100 shadow-theme-xs transition dark:border-purple-800/40 dark:bg-purple-900/20 dark:text-purple-300">
+                <i class="fas fa-camera text-purple-500"></i>
+                <span>Scanner Wajah</span>
+            </a>
+
             <!-- Link Kembali ke Data Tabel Absensi -->
             <a href="{{ route('absensi.index') }}"
                 class="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3.5 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 shadow-theme-xs transition dark:border-gray-800 dark:bg-gray-dark dark:text-gray-300 dark:hover:bg-gray-800">
@@ -372,6 +379,7 @@ function usbScannerApp() {
     return {
         uidInput: '',
         inputBuffer: '',
+        scanMode: 'auto',
         debounceTimer: null,
         resetTimer: null,
         timerPercent: 0,
@@ -645,7 +653,7 @@ function usbScannerApp() {
                         "X-CSRF-TOKEN": document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
                         "Accept": "application/json"
                     },
-                    body: JSON.stringify({ uid: uid })
+                    body: JSON.stringify({ uid: uid, mode: this.scanMode })
                 });
 
                 const res = await response.json();

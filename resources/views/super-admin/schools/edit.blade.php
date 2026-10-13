@@ -310,6 +310,18 @@
                             <span class="text-sm font-medium text-black dark:text-white">Aktifkan Fitur Foto Siswa</span>
                         </label>
 
+                        <label for="face_enabled" class="flex cursor-pointer select-none items-center">
+                            <div class="relative">
+                                <input type="checkbox" id="face_enabled" name="face_enabled" value="1" {{ old('face_enabled', $school->face_enabled ?? true) ? 'checked' : '' }} class="sr-only" />
+                                <div id="face_enabled_box" class="box mr-4 flex h-5 w-5 items-center justify-center rounded border border-stroke dark:border-strokedark bg-white dark:bg-boxdark">
+                                    <span class="opacity-0">
+                                        <i class="fas fa-check text-xs text-brand-500"></i>
+                                    </span>
+                                </div>
+                            </div>
+                            <span class="text-sm font-medium text-black dark:text-white">Aktifkan Fitur Scanner Face ID (Wajah)</span>
+                        </label>
+
                         {{-- Toggle Bot WA — hanya superadmin, admin sekolah tidak bisa melihat/mengubah ini --}}
                         <div class="rounded-md border border-stroke dark:border-strokedark p-4 bg-gray-2/40 dark:bg-meta-4/40">
                             <div class="flex items-center justify-between">
@@ -449,6 +461,7 @@ document.addEventListener('DOMContentLoaded', function () {
         waEnabled: document.getElementById('wa_enabled'),
         waEnabledBox: document.getElementById('wa_enabled_box'),
         photoEnabled: document.getElementById('photo_enabled'),
+        faceEnabled: document.getElementById('face_enabled'),
     };
 
     function applyPackageValues() {

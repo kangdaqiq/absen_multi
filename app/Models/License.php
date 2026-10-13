@@ -18,6 +18,7 @@ class License extends Model
         'expired_at',
         'is_active',
         'photo_enabled',
+        'face_enabled',
         'allowed_hostname',
         'notes',
         'last_ping_at',
@@ -29,6 +30,7 @@ class License extends Model
     protected $casts = [
         'is_active'      => 'boolean',
         'photo_enabled'  => 'boolean',
+        'face_enabled'   => 'boolean',
         'expired_at'    => 'date',
         'last_ping_at'   => 'datetime',
         'last_backup_at' => 'datetime',

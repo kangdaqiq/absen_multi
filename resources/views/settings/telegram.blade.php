@@ -3,6 +3,18 @@
 @section('title', 'Pengaturan Telegram Bot')
 
 @section('content')
+<div class="relative w-full min-h-[550px]">
+@if(isset($isTelegramEnabled) && !$isTelegramEnabled)
+    <x-feature-locked-overlay
+        title="Fitur Telegram Bot Terkunci"
+        featureName="Telegram Bot Notifikasi"
+        description="Fitur Telegram Bot belum diaktifkan untuk sekolah ini. Hubungi Admin untuk mengaktifkan modul notifikasi bot."
+        :school="$school ?? null"
+        icon="fab fa-telegram-plane"
+    />
+@endif
+
+<div class="w-full" @if(isset($isTelegramEnabled) && !$isTelegramEnabled) style="filter: blur(8px); pointer-events: none; user-select: none; opacity: 0.55;" @endif>
     <div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 class="text-title-md2 font-semibold text-gray-800 dark:text-white/90">
             Pengaturan Telegram Bot
@@ -133,8 +145,9 @@
                     </div>
                 </div>
             </div>
-        </div>
     </div>
+</div>
+</div>
 @endsection
 
 @push('styles')

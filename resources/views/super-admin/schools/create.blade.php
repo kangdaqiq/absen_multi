@@ -281,6 +281,18 @@
                             </div>
                             <span class="text-sm font-medium text-black dark:text-white">Aktifkan Fitur Foto Siswa</span>
                         </label>
+
+                        <label for="face_enabled" class="flex cursor-pointer select-none items-center">
+                            <div class="relative">
+                                <input type="checkbox" id="face_enabled" name="face_enabled" value="1" {{ old('face_enabled', true) ? 'checked' : '' }} class="sr-only" />
+                                <div id="face_enabled_box" class="box mr-4 flex h-5 w-5 items-center justify-center rounded border border-stroke dark:border-strokedark bg-white dark:bg-boxdark">
+                                    <span class="opacity-0">
+                                        <i class="fas fa-check text-xs text-brand-500"></i>
+                                    </span>
+                                </div>
+                            </div>
+                            <span class="text-sm font-medium text-black dark:text-white">Aktifkan Fitur Scanner Face ID (Wajah)</span>
+                        </label>
                     </div>
 
                     <div class="flex justify-end gap-4.5 border-t border-stroke pt-5 dark:border-strokedark">
@@ -369,7 +381,8 @@ document.addEventListener('DOMContentLoaded', function() {
         historyQuota: document.getElementById('input_history_quota'),
         waEnabled: document.getElementById('wa_enabled'),
         botEnabled: document.getElementById('bot_enabled'),
-        photoEnabled: document.getElementById('photo_enabled')
+        photoEnabled: document.getElementById('photo_enabled'),
+        faceEnabled: document.getElementById('face_enabled')
     };
 
     function applyPackageValues() {

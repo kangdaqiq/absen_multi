@@ -96,9 +96,13 @@ class MenuHelper
             if ($role === 'admin') {
                 $schoolItems[] = ['icon' => 'user-profile', 'name' => "Data $labelKaryawan", 'path' => route('guru.index', [], false)];
 
-                if ($school && ($school->wa_enabled || $school->telegram_enabled)) {
-                    $schoolItems[] = ['icon' => 'chat', 'name' => 'Broadcast Pesan', 'path' => route('broadcast.index', [], false)];
-                }
+                $isBroadcastLocked = $school && !($school->wa_enabled);
+                $schoolItems[] = [
+                    'icon' => 'chat',
+                    'name' => 'Broadcast Pesan',
+                    'path' => route('broadcast.index', [], false),
+                    'locked' => $isBroadcastLocked
+                ];
 
                 if (!$isPesantren) {
                     $schoolItems[] = ['icon' => 'user-profile', 'name' => 'Kartu Gerbang', 'path' => route('gate-cards.index', [], false)];
@@ -118,9 +122,15 @@ class MenuHelper
             $absensiSubItems = [];
             if (!$isOffice && !$isPesantren) {
                 $absensiSubItems[] = ['name' => 'Absensi Siswa', 'path' => route('absensi.index', [], false)];
-                // Scanner Absensi USB hanya untuk admin
+                // Scanner Absensi Wajah & USB hanya untuk admin
                 if ($role === 'admin') {
-                    $absensiSubItems[] = ['name' => 'Scanner Absensi', 'path' => route('absensi.scanner-usb', [], false)];
+                    $isFaceLocked = $school && !($school->face_enabled ?? true);
+                    $absensiSubItems[] = [
+                        'name' => 'Scanner Face ID',
+                        'path' => route('absensi.scanner-face', [], false),
+                        'locked' => $isFaceLocked
+                    ];
+                    $absensiSubItems[] = ['name' => 'Scanner USB RFID', 'path' => route('absensi.scanner-usb', [], false)];
                 }
                 $absensiSubItems[] = ['name' => 'Pengajuan Izin', 'path' => route('student-leaves.index', [], false)];
             }
@@ -221,11 +231,22 @@ class MenuHelper
             $pengaturanSubItems = [];
             $pengaturanSubItems[] = ['name' => 'Device / Mesin', 'path' => route('devices.index', [], false)];
             $pengaturanSubItems[] = ['name' => 'Pengaturan Umum', 'path' => route('settings.index', [], false)];
-            $pengaturanSubItems[] = ['name' => 'Template Pesan', 'path' => route('settings.templates.index', [], false)];
-            if ($school && $school->wa_enabled) {
-                $pengaturanSubItems[] = ['name' => 'WhatsApp Device', 'path' => route('whatsapp.device.index', [], false)];
-            }
-            $pengaturanSubItems[] = ['name' => 'Telegram Bot', 'path' => route('settings.telegram', [], false)];
+            $isWaLocked = $school && !($school->wa_enabled);
+            $pengaturanSubItems[] = [
+                'name' => 'Template Pesan',
+                'path' => route('settings.templates.index', [], false),
+                'locked' => $isWaLocked
+            ];
+            $pengaturanSubItems[] = [
+                'name' => 'WhatsApp Device',
+                'path' => route('whatsapp.device.index', [], false),
+                'locked' => $isWaLocked
+            ];
+            $pengaturanSubItems[] = [
+                'name' => 'Telegram Bot',
+                'path' => route('settings.telegram', [], false),
+                'locked' => $isWaLocked
+            ];
 
             $konfigItems[] = [
                 'name' => 'Konfigurasi',

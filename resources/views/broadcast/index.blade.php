@@ -3,6 +3,18 @@
 @section('title', 'Broadcast Pesan Massal')
 
 @section('content')
+<div class="relative w-full min-h-[550px]">
+@if(isset($isBroadcastEnabled) && !$isBroadcastEnabled)
+    <x-feature-locked-overlay
+        title="Fitur Broadcast Pesan Terkunci"
+        featureName="Broadcast Massal (WhatsApp)"
+        description="Fitur Broadcast Pesan Massal belum diaktifkan untuk sekolah Anda karena modul WhatsApp belum diaktifkan. Hubungi Admin untuk mengaktifkan fitur ini."
+        :school="$school ?? null"
+        icon="fas fa-bullhorn"
+    />
+@endif
+
+<div class="w-full" @if(isset($isBroadcastEnabled) && !$isBroadcastEnabled) style="filter: blur(8px); pointer-events: none; user-select: none; opacity: 0.55;" @endif>
 <div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
     <div>
         <h2 class="text-title-md2 font-semibold text-gray-800 dark:text-white/90">
@@ -262,6 +274,8 @@
             </div>
         </div>
     </div>
+</div>
+</div>
 </div>
 
 <style>

@@ -3,6 +3,18 @@
 @section('title', 'WhatsApp Device')
 
 @section('content')
+<div class="relative w-full min-h-[550px]">
+@if(isset($isWaEnabled) && !$isWaEnabled)
+    <x-feature-locked-overlay
+        title="Fitur WhatsApp Device Terkunci"
+        featureName="WhatsApp Device & Gateway"
+        description="Fitur WhatsApp Device belum diaktifkan untuk sekolah ini. Hubungi SuperAdmin untuk mengaktifkan modul notifikasi WhatsApp."
+        :school="$school ?? null"
+        icon="fab fa-whatsapp"
+    />
+@endif
+
+<div class="w-full" @if(isset($isWaEnabled) && !$isWaEnabled) style="filter: blur(8px); pointer-events: none; user-select: none; opacity: 0.55;" @endif>
     <div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
             <h2 class="text-title-md2 font-semibold text-gray-800 dark:text-white/90">
@@ -229,6 +241,8 @@
             </div>
         </div>
     </div>
+</div>
+</div>
 @endsection
 
 @push('scripts')
@@ -520,6 +534,10 @@
         }
 
         // Init on page load
-        document.addEventListener('DOMContentLoaded', () => checkStatus());
+        document.addEventListener('DOMContentLoaded', () => {
+            const isWaEnabled = {{ (isset($isWaEnabled) && !$isWaEnabled) ? 'false' : 'true' }};
+            if (!isWaEnabled) return;
+            checkStatus();
+        });
     </script>
 @endpush

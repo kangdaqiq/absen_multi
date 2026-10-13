@@ -386,4 +386,29 @@ class LicenseService
 
         return true;
     }
+
+    /**
+     * Periksa apakah fitur scanner wajah (Face ID) aktif.
+     * - Pada mode self_hosted: diperiksa dari status lisensi (face_enabled).
+     * - Pada mode hosted (SaaS / Super Admin): diperiksa dari pengaturan sekolah (school->face_enabled).
+     */
+    public function isFaceFeatureEnabled(?\App\Models\School $school = null): bool
+    {
+        if (config('app.mode', 'hosted') === 'self_hosted') {
+            $license = $this->validate();
+            return isset($license['face_enabled']) ? (bool) $license['face_enabled'] : true;
+        }
+
+        if (!$school) {
+            $user = auth()->user();
+            $school = $user?->school;
+        }
+
+        if ($school) {
+            return (bool) ($school->face_enabled ?? true);
+        }
+
+        return true;
+    }
 }
+

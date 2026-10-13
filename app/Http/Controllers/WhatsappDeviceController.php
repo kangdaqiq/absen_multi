@@ -33,7 +33,11 @@ class WhatsappDeviceController extends Controller
 
     public function index()
     {
-        return view('whatsapp.device');
+        $user = Auth::user();
+        $school = $user?->school;
+        $isWaEnabled = $school ? (bool) $school->wa_enabled : true;
+
+        return view('whatsapp.device', compact('isWaEnabled', 'school'));
     }
 
     /**

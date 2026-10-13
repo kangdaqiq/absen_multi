@@ -724,6 +724,14 @@ Endpoint pencarian 1:N untuk melakukan absensi otomatis (Masuk atau Pulang) sisw
 }
 ```
 
+- **Response Error (422 Unprocessable Entity — Di Luar Jadwal Sekolah)**:
+  - *Belum Buka Absen Masuk*: `{"success": false, "message": "Absen masuk belum dibuka (Dibuka pukul 05:30)", "data": null}`
+  - *Tutup Absen Masuk*: `{"success": false, "message": "Batas waktu absen masuk sudah ditutup (Pukul 09:00)", "data": null}`
+  - *Belum Buka Absen Pulang*: `{"success": false, "message": "Belum masuk waktu absen pulang (Dibuka pukul 15:30)", "data": null}`
+  - *Tutup Absen Pulang*: `{"success": false, "message": "Batas waktu absen pulang sudah ditutup (Pukul 17:00)", "data": null}`
+  - *Hari Libur*: `{"success": false, "message": "Hari ini adalah hari libur sekolah (tidak ada jadwal aktif)", "data": null}`
+  - *Belum Pernah Masuk Saat Hendak Pulang*: `{"success": false, "message": "Siswa Ahmad Rizky belum melakukan absen masuk hari ini", "data": null}`
+
 ---
 
 ## 📸 6. Upload Foto Profil (Siswa & Guru)

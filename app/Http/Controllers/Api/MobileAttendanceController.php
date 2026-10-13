@@ -2251,112 +2251,136 @@ class MobileAttendanceController extends Controller
             ->when($studentSchoolId, fn($q, $sId) => $q->where('school_id', $sId))
             ->first();
 
-        // 5. Penentuan Otomatis Masuk vs Pulang
+        if (!$jadwal && $studentSchoolId > 0) {
+            $jadwal = Jadwal::where('index_hari', $indexHari)->where('is_active', 1)->first();
+        }
+
+        if (!$jadwal) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Hari ini adalah hari libur sekolah (tidak ada jadwal aktif)',
+                'data' => null
+            ], 422);
+        }
+
+        // Cek apakah absensi dinonaktifkan untuk kelas siswa
+        if ($student->kelas && isset($student->kelas->is_active_attendance) && !$student->kelas->is_active_attendance) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Absensi dinonaktifkan untuk kelas ' . ($student->kelas->nama_kelas ?? $student->kelas->nama),
+                'data' => null
+            ], 422);
+        }
+
+        // 5. Penentuan Otomatis Masuk vs Pulang Mengikuti Jadwal Sekolah
+        $reqMode = $request->input('mode', 'auto');
         $att = Attendance::where('student_id', $student->id)
             ->where('tanggal', $targetDate)
             ->first();
 
+        // Tentukan apakah proses ini Pulang atau Masuk
+        $isPulangAction = false;
+        if ($reqMode === 'pulang') {
+            $isPulangAction = true;
+        } elseif ($reqMode === 'masuk') {
+            $isPulangAction = false;
+        } else {
+            // Mode Auto: Jika sudah memiliki jam masuk, aksinya adalah Pulang
+            $isPulangAction = ($att && !empty($att->jam_masuk));
+        }
+
         $timeFormatted = $now->format('H:i');
         $msgTime = "{$timeFormatted} {$tzSuffix}";
 
-        // Kondisi 1: Siswa belum ada catatan absen masuk (Check-in)
-        if (!$att || empty($att->jam_masuk)) {
-            $status = 'H';
-            $jamMasukJadwal = $jadwal?->jam_masuk;
-
-            if ($jamMasukJadwal && $nowTime > $jamMasukJadwal) {
-                $status = 'T';
-                $diffSeconds = Carbon::parse($targetDate . ' ' . $nowTime)->diffInSeconds(Carbon::parse($targetDate . ' ' . $jamMasukJadwal));
-                $jam = floor($diffSeconds / 3600);
-                $menit = floor(($diffSeconds % 3600) / 60);
-                $durasi = $jam > 0 ? "{$jam} jam {$menit} menit" : "{$menit} menit";
-                $keterangan = "Telat {$durasi} - Face Scan Mobile";
-            } else {
-                $status = 'H';
-                $keterangan = "Tepat Waktu - Face Scan Mobile";
+        // ==========================================
+        // PROSES ABSEN PULANG (CHECK-OUT)
+        // ==========================================
+        if ($isPulangAction) {
+            // A. Siswa belum pernah absen masuk
+            if (!$att || empty($att->jam_masuk)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Siswa {$student->nama} belum melakukan absen masuk hari ini",
+                    'data' => null
+                ], 422);
             }
 
-            $successMsg = "Absen Masuk Berhasil ({$msgTime})";
-
-            // Simpan record attendance tanpa simpan foto fisik ke storage
-            $att = Attendance::updateOrCreate(
-                [
-                    'student_id' => $student->id,
-                    'tanggal' => $targetDate,
-                ],
-                [
-                    'school_id' => $studentSchoolId,
-                    'jam_masuk' => $nowTime,
-                    'status' => $status,
-                    'keterangan' => $keterangan,
-                    'face_similarity_score' => round($bestScore, 4),
-                    'is_face_matched' => true,
-                    'photo_checkin_path' => null,
-                    'updated_at' => $now,
-                ]
-            );
-
-            // Notifikasi WhatsApp
-            try {
-                $wa = app(\App\Services\WhatsAppService::class);
-                $wa->sendCheckIn($student->nama, $student->no_wa, $now->format('H:i'), $status, $studentSchoolId, $keterangan, $student->wa_ortu, $kelasName);
-            } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::warning("WA Face Scan Checkin Error: " . $e->getMessage());
+            // B. Siswa sudah absen pulang sebelumnya (lengkap)
+            if (!empty($att->jam_pulang)) {
+                $alreadyMsg = "Siswa sudah lengkap absen Masuk & Pulang hari ini";
+                return response()->json([
+                    'success' => true,
+                    'message' => $alreadyMsg,
+                    'data' => [
+                        'student_id' => $student->id,
+                        'nama' => $student->nama,
+                        'nis' => (string) ($student->nis ?? '-'),
+                        'kelas_name' => $kelasName,
+                        'foto_url' => $fotoUrl,
+                        'confidence' => round($bestScore, 3),
+                        'status' => $att->status,
+                        'jam_masuk' => $att->jam_masuk,
+                        'jam_pulang' => $att->jam_pulang,
+                        'message' => $alreadyMsg,
+                    ]
+                ], 200);
             }
 
-            // Notifikasi FCM
-            try {
-                $readableStatus = $status === 'T' ? 'Terlambat' : 'Hadir';
-                FcmNotificationService::sendToSiswa($student, "Presensi Masuk Tercatat", "Halo {$student->nama}, absensi masuk Anda berhasil dicatat pukul {$now->format('H:i')} (Status: {$readableStatus}).", [
-                    'type' => 'checkin_siswa',
-                    'status' => $readableStatus,
-                    'jam' => $now->format('H:i'),
-                ]);
-            } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::warning("FCM Face Scan Checkin Error: " . $e->getMessage());
+            // C. Cek fitur kepulangan di pengaturan sekolah
+            $checkoutEnabled = Setting::where('school_id', $studentSchoolId)
+                ->where('setting_key', 'enable_checkout_attendance')
+                ->value('setting_value') ?? 'true';
+
+            if ($checkoutEnabled === 'false') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Fitur absensi kepulangan dinonaktifkan oleh sekolah.',
+                    'data' => null
+                ], 422);
             }
 
-            ApiLog::create([
-                'school_id' => $studentSchoolId,
-                'api_key' => 'MOBILE_APP',
-                'action' => 'mobile_student_scan_face_in',
-                'uid' => $student->nis ?? $student->nama,
-                'success' => true,
-                'message' => "Face Scan Masuk: {$student->nama} (" . round($bestScore * 100, 1) . "%)",
-                'ip_address' => $request->ip(),
-                'user_agent' => $request->userAgent() ?? 'Android Mobile App',
-                'created_at' => now(),
-            ]);
+            // D. Validasi Jadwal Kepulangan (jam_pulang & akhir_absen_pulang)
+            $jamPulang = $jadwal->jam_pulang;
+            $akhirAbsenPulang = $jadwal->akhir_absen_pulang;
 
-            return response()->json([
-                'success' => true,
-                'message' => $successMsg,
-                'data' => [
-                    'student_id' => $student->id,
-                    'nama' => $student->nama,
-                    'nis' => (string) ($student->nis ?? '-'),
-                    'kelas_name' => $kelasName,
-                    'foto_url' => $fotoUrl,
-                    'confidence' => round($bestScore, 3),
-                    'status' => $status,
-                    'jam_masuk' => $nowTime,
-                    'message' => $successMsg,
-                ]
-            ], 200);
-        }
+            if ($jamPulang && $nowTime < $jamPulang) {
+                $jamBuka = Carbon::parse($jamPulang)->format('H:i');
+                return response()->json([
+                    'success' => false,
+                    'message' => "Belum masuk waktu absen pulang (Dibuka pukul {$jamBuka})",
+                    'data' => null
+                ], 422);
+            }
 
-        // Kondisi 2: Siswa sudah ada jam_masuk, tetapi belum ada jam_pulang (Check-out)
-        if (empty($att->jam_pulang)) {
+            if ($akhirAbsenPulang && $nowTime > $akhirAbsenPulang) {
+                $jamTutup = Carbon::parse($akhirAbsenPulang)->format('H:i');
+                return response()->json([
+                    'success' => false,
+                    'message' => "Batas waktu absen pulang sudah ditutup (Pukul {$jamTutup})",
+                    'data' => null
+                ], 422);
+            }
+
+            // Simpan data kepulangan
             $masukCarbon = Carbon::parse($att->tanggal . ' ' . $att->jam_masuk);
             $totalSeconds = abs($masukCarbon->diffInSeconds($now, false));
             $hours = floor($totalSeconds / 3600);
             $mins = floor(($totalSeconds % 3600) / 60);
+
+            $newStatus = $att->status;
+            $newKeterangan = $att->keterangan;
+            if ($att->status === 'B') {
+                $newStatus = ($att->jam_masuk > ($jadwal->jam_masuk ?? '07:30')) ? 'T' : 'H';
+                $newKeterangan = trim(str_replace('[Auto: Tidak Absen Pulang]', '', $newKeterangan ?? ''));
+            }
 
             $successMsg = "Absen Pulang Berhasil ({$msgTime})";
 
             $att->update([
                 'jam_pulang' => $nowTime,
                 'total_seconds' => $totalSeconds,
+                'status' => $newStatus,
+                'keterangan' => $newKeterangan,
                 'face_similarity_score' => round($bestScore, 4),
                 'is_face_matched' => true,
                 'updated_at' => $now,
@@ -2409,11 +2433,123 @@ class MobileAttendanceController extends Controller
             ], 200);
         }
 
-        // Kondisi 3: Siswa sudah lengkap absen masuk dan pulang
-        $alreadyMsg = "Siswa sudah lengkap absen Masuk & Pulang hari ini";
+        // ==========================================
+        // PROSES ABSEN MASUK (CHECK-IN)
+        // ==========================================
+
+        // A. Cek apakah sudah pernah absen masuk hari ini
+        if ($att && !empty($att->jam_masuk)) {
+            $jamMasukFormatted = Carbon::parse($att->jam_masuk)->format('H:i');
+            return response()->json([
+                'success' => false,
+                'message' => "Siswa {$student->nama} sudah melakukan absen masuk hari ini (Pukul {$jamMasukFormatted})",
+                'data' => [
+                    'student_id' => $student->id,
+                    'nama' => $student->nama,
+                    'nis' => (string) ($student->nis ?? '-'),
+                    'kelas_name' => $kelasName,
+                    'foto_url' => $fotoUrl,
+                    'confidence' => round($bestScore, 3),
+                    'status' => $att->status,
+                    'jam_masuk' => $att->jam_masuk,
+                    'jam_pulang' => $att->jam_pulang,
+                    'message' => "Sudah absen masuk pukul {$jamMasukFormatted}",
+                ]
+            ], 422);
+        }
+
+        // B. Validasi Jadwal Waktu Masuk (awal_absen_masuk & akhir_absen_masuk)
+        $awalAbsenMasuk = $jadwal->awal_absen_masuk;
+        $akhirAbsenMasuk = $jadwal->akhir_absen_masuk;
+        $jamMasukJadwal = $jadwal->jam_masuk;
+
+        if ($awalAbsenMasuk && $nowTime < $awalAbsenMasuk) {
+            $jamBuka = Carbon::parse($awalAbsenMasuk)->format('H:i');
+            return response()->json([
+                'success' => false,
+                'message' => "Absen masuk belum dibuka (Dibuka pukul {$jamBuka})",
+                'data' => null
+            ], 422);
+        }
+
+        if ($akhirAbsenMasuk && $nowTime > $akhirAbsenMasuk) {
+            $jamTutup = Carbon::parse($akhirAbsenMasuk)->format('H:i');
+            return response()->json([
+                'success' => false,
+                'message' => "Batas waktu absen masuk sudah ditutup (Pukul {$jamTutup})",
+                'data' => null
+            ], 422);
+        }
+
+        // C. Hitung Tepat Waktu ('H') vs Terlambat ('T')
+        $status = 'H';
+        if ($jamMasukJadwal && $nowTime > $jamMasukJadwal) {
+            $status = 'T';
+            $diffSeconds = Carbon::parse($targetDate . ' ' . $nowTime)->diffInSeconds(Carbon::parse($targetDate . ' ' . $jamMasukJadwal));
+            $jam = floor($diffSeconds / 3600);
+            $menit = floor(($diffSeconds % 3600) / 60);
+            $durasi = $jam > 0 ? "{$jam} jam {$menit} menit" : "{$menit} menit";
+            $keterangan = "Telat {$durasi} - Face Scan Mobile";
+        } else {
+            $status = 'H';
+            $keterangan = "Tepat Waktu - Face Scan Mobile";
+        }
+
+        $successMsg = "Absen Masuk Berhasil ({$msgTime})";
+
+        // Simpan record attendance tanpa simpan foto fisik ke storage
+        $att = Attendance::updateOrCreate(
+            [
+                'student_id' => $student->id,
+                'tanggal' => $targetDate,
+            ],
+            [
+                'school_id' => $studentSchoolId,
+                'jam_masuk' => $nowTime,
+                'status' => $status,
+                'keterangan' => $keterangan,
+                'face_similarity_score' => round($bestScore, 4),
+                'is_face_matched' => true,
+                'photo_checkin_path' => null,
+                'updated_at' => $now,
+            ]
+        );
+
+        // Notifikasi WhatsApp
+        try {
+            $wa = app(\App\Services\WhatsAppService::class);
+            $wa->sendCheckIn($student->nama, $student->no_wa, $now->format('H:i'), $status, $studentSchoolId, $keterangan, $student->wa_ortu, $kelasName);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning("WA Face Scan Checkin Error: " . $e->getMessage());
+        }
+
+        // Notifikasi FCM
+        try {
+            $readableStatus = $status === 'T' ? 'Terlambat' : 'Hadir';
+            FcmNotificationService::sendToSiswa($student, "Presensi Masuk Tercatat", "Halo {$student->nama}, absensi masuk Anda berhasil dicatat pukul {$now->format('H:i')} (Status: {$readableStatus}).", [
+                'type' => 'checkin_siswa',
+                'status' => $readableStatus,
+                'jam' => $now->format('H:i'),
+            ]);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning("FCM Face Scan Checkin Error: " . $e->getMessage());
+        }
+
+        ApiLog::create([
+            'school_id' => $studentSchoolId,
+            'api_key' => 'MOBILE_APP',
+            'action' => 'mobile_student_scan_face_in',
+            'uid' => $student->nis ?? $student->nama,
+            'success' => true,
+            'message' => "Face Scan Masuk: {$student->nama} (" . round($bestScore * 100, 1) . "%)",
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent() ?? 'Android Mobile App',
+            'created_at' => now(),
+        ]);
+
         return response()->json([
             'success' => true,
-            'message' => $alreadyMsg,
+            'message' => $successMsg,
             'data' => [
                 'student_id' => $student->id,
                 'nama' => $student->nama,
@@ -2421,10 +2557,9 @@ class MobileAttendanceController extends Controller
                 'kelas_name' => $kelasName,
                 'foto_url' => $fotoUrl,
                 'confidence' => round($bestScore, 3),
-                'status' => $att->status,
-                'jam_masuk' => $att->jam_masuk,
-                'jam_pulang' => $att->jam_pulang,
-                'message' => $alreadyMsg,
+                'status' => $status,
+                'jam_masuk' => $nowTime,
+                'message' => $successMsg,
             ]
         ], 200);
     }

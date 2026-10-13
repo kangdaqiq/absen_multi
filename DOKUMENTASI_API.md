@@ -48,7 +48,15 @@ Digunakan untuk autentikasi awal pegawai, guru, wali kelas, maupun **siswa**.
   "school": {
     "id": 1,
     "nama": "SMK Negeri 1 Jagat",
-    "domain": "smkn1jagat.sch.id"
+    "name": "SMK Negeri 1 Jagat",
+    "domain": "smkn1jagat.sch.id",
+    "latitude": -6.175392,
+    "longitude": 106.827153,
+    "lat": -6.175392,
+    "long": 106.827153,
+    "radius": 100,
+    "geofence_radius": 100,
+    "geofence_enabled": true
   }
 }
 ```

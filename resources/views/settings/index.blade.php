@@ -580,6 +580,43 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- Pengaturan Link Download Aplikasi Mobile Android Jagat Absen -->
+                    <div class="mt-6 pt-6 border-t border-gray-200 dark:border-gray-800">
+                        <div class="flex items-center gap-3 mb-3">
+                            <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400">
+                                <i class="fab fa-android text-lg"></i>
+                            </div>
+                            <div>
+                                <h4 class="text-sm font-semibold text-gray-800 dark:text-white/90">
+                                    Link Unduhan Aplikasi Android Jagat Absen (APK)
+                                </h4>
+                                <p class="text-xs text-gray-500 dark:text-gray-400">
+                                    Tentukan tautan eksternal (Google Drive / Cloud Storage) atau biarkan kosong untuk menggunakan file APK server default (<code>/downloads/jagat-absen.apk</code>).
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
+                            <div class="md:col-span-8">
+                                <div class="relative">
+                                    <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-gray-400 dark:text-gray-500">
+                                        <i class="fas fa-link text-emerald-500 text-xs"></i>
+                                    </div>
+                                    <input type="url" id="android_apk_url" name="android_apk_url"
+                                        placeholder="https://drive.google.com/... atau https://domain.com/app.apk (Opsional)"
+                                        value="{{ $settings['android_apk_url'] ?? '' }}"
+                                        class="w-full rounded-lg border border-gray-200 bg-transparent pl-10 pr-4 py-2.5 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white text-xs sm:text-sm">
+                                </div>
+                            </div>
+                            <div class="md:col-span-4 flex items-center gap-2">
+                                <a href="{{ route('public.download.android') }}" target="_blank"
+                                    class="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-xs font-semibold text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 transition">
+                                    <i class="fas fa-external-link-alt text-[10px]"></i> Tes Link Download
+                                </a>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="mt-8 border-t border-gray-200 pt-6 dark:border-gray-800">

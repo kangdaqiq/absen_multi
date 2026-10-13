@@ -15,12 +15,26 @@ use Carbon\Carbon;
 
 class AutoBolosCommand extends Command
 {
-    protected $signature = 'absen:process-daily {--force}';
+    protected $signature = 'absen:process-daily {--force} {--school= : ID sekolah khusus (opsional)}';
     protected $description = 'Process daily attendance: Mark Bolos (B) if no checkout, and Alpha (A) if no checkin by 13:30';
 
     public function handle()
     {
-        $schools = \App\Models\School::where('is_active', true)->get();
+        $schoolId = $this->option('school');
+
+        $query = \App\Models\School::query();
+        if ($schoolId) {
+            $query->where('id', $schoolId);
+        } else {
+            $query->where('is_active', true);
+        }
+
+        $schools = $query->get();
+
+        if ($schools->isEmpty()) {
+            $this->warn("Tidak ada sekolah ditemukan" . ($schoolId ? " dengan ID $schoolId." : "."));
+            return;
+        }
 
         foreach ($schools as $school) {
             $this->processSchool($school);

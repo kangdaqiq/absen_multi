@@ -235,6 +235,17 @@ class DashboardController extends Controller
                 });
         }
 
+        // 6. Android App Download Info
+        $androidApkUrl = \App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'android_apk_url')->value('setting_value')
+            ?: \App\Models\Setting::where('school_id', 0)->where('setting_key', 'android_apk_url')->value('setting_value')
+            ?: config('app.android_apk_url')
+            ?: route('public.download.android');
+
+        $hasLocalApk = file_exists(public_path('downloads/jagat-absen.apk'))
+            || file_exists(storage_path('app/public/downloads/jagat-absen.apk'));
+
+        $isFaceEnabled = app(\App\Services\LicenseService::class)->isFaceFeatureEnabled($user?->school);
+
         return view('dashboard', compact(
             'countSiswa',
             'countGuru',
@@ -246,7 +257,53 @@ class DashboardController extends Controller
             'chartData',
             'announcements',
             'popupAnnouncements',
-            'kegiatanHariIni'
+            'kegiatanHariIni',
+            'androidApkUrl',
+            'hasLocalApk',
+            'isFaceEnabled'
         ));
+    }
+
+    /**
+     * Download Android App Jagat Absen (APK)
+     */
+    public function downloadAndroidApp(Request $request)
+    {
+        $user = auth()->user();
+        $school = $user?->school;
+
+        // Validasi: Kunci download jika fitur Face ID dinonaktifkan
+        $isFaceEnabled = app(\App\Services\LicenseService::class)->isFaceFeatureEnabled($school);
+        if (!$isFaceEnabled) {
+            return redirect()->route('dashboard')->with('error', 'Download aplikasi Jagat Absen dikunci karena fitur Face ID sekolah sedang dinonaktifkan.');
+        }
+
+        $schoolId = $user?->school_id ?? 0;
+
+        $customUrl = \App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'android_apk_url')->value('setting_value')
+            ?: \App\Models\Setting::where('school_id', 0)->where('setting_key', 'android_apk_url')->value('setting_value')
+            ?: config('app.android_apk_url');
+
+        if ($customUrl && filter_var($customUrl, FILTER_VALIDATE_URL)) {
+            return redirect()->away($customUrl);
+        }
+
+        $candidates = [
+            public_path('downloads/jagat-absen.apk'),
+            storage_path('app/public/downloads/jagat-absen.apk'),
+            public_path('downloads/jagat-absen-latest.apk'),
+            public_path('apk/jagat-absen.apk'),
+        ];
+
+        foreach ($candidates as $filePath) {
+            if (file_exists($filePath)) {
+                return response()->download($filePath, 'Jagat-Absen.apk', [
+                    'Content-Type' => 'application/vnd.android.package-archive',
+                    'Cache-Control' => 'no-cache, must-revalidate',
+                ]);
+            }
+        }
+
+        return redirect()->route('dashboard')->with('info', 'File APK Jagat Absen sedang disiapkan oleh administrator. Silakan hubungi admin sekolah atau atur URL download APK di menu Pengaturan.');
     }
 }

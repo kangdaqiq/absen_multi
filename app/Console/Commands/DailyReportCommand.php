@@ -15,15 +15,27 @@ use Carbon\Carbon;
 
 class DailyReportCommand extends Command
 {
-    protected $signature = 'absen:daily-report {targetJid?} {--force}';
+    protected $signature = 'absen:daily-report {targetJid?} {--force} {--school= : ID sekolah khusus (opsional)}';
     protected $description = 'Generate daily attendance report and send to WhatsApp Group';
 
     public function handle()
     {
         $targetJid = $this->argument('targetJid');
+        $schoolId = $this->option('school');
 
-        // Iterate through ALL Active Schools
-        $schools = \App\Models\School::where('is_active', true)->get();
+        $query = \App\Models\School::query();
+        if ($schoolId) {
+            $query->where('id', $schoolId);
+        } else {
+            $query->where('is_active', true);
+        }
+
+        $schools = $query->get();
+
+        if ($schools->isEmpty()) {
+            $this->warn("Tidak ada sekolah ditemukan" . ($schoolId ? " dengan ID $schoolId." : "."));
+            return;
+        }
 
         foreach ($schools as $school) {
             $this->processSchoolReport($school, $targetJid);

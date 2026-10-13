@@ -119,7 +119,7 @@ class MobileAttendanceController extends Controller
                 ],
                 'is_wali_kelas' => $isWaliKelas,
                 'wali_kelases' => $waliKelases,
-                'school' => $user->school
+                'school' => $this->formatSchoolResponse($user->school, $user->school_id)
             ]);
         }
 
@@ -246,11 +246,7 @@ class MobileAttendanceController extends Controller
                             ]
                         ],
                         'is_wali_kelas' => false,
-                        'school' => $siswa->school ? [
-                            'id' => $siswa->school->id,
-                            'nama' => $siswa->school->name ?? $siswa->school->nama,
-                            'domain' => $siswa->school->domain ?? null,
-                        ] : null
+                        'school' => $this->formatSchoolResponse($siswa->school, $siswa->school_id)
                     ]);
                 }
             }
@@ -349,7 +345,8 @@ class MobileAttendanceController extends Controller
                 'role' => $user->role,
                 'school_id' => $user->school_id,
                 'guru' => $guruData,
-                'student' => $studentData
+                'student' => $studentData,
+                'school' => $this->formatSchoolResponse($user->school, $user->school_id)
             ]
         ]);
     }
@@ -511,6 +508,55 @@ class MobileAttendanceController extends Controller
             cos($latFrom) * cos($latTo) * pow(sin($lonDelta / 2), 2)));
 
         return $angle * $earthRadius;
+    }
+
+    /**
+     * Format data sekolah beserta koordinat lokasi latitude dan longitude untuk respon mobile.
+     */
+    private function formatSchoolResponse($school, ?int $schoolId = null): ?array
+    {
+        if (!$school && !$schoolId) {
+            return null;
+        }
+
+        $id = $school?->id ?? $schoolId;
+
+        $schoolLat = Setting::where('school_id', $id)->where('setting_key', 'school_latitude')->value('setting_value');
+        if ($schoolLat === null && $id > 0) {
+            $schoolLat = Setting::where('school_id', 0)->where('setting_key', 'school_latitude')->value('setting_value');
+        }
+
+        $schoolLng = Setting::where('school_id', $id)->where('setting_key', 'school_longitude')->value('setting_value');
+        if ($schoolLng === null && $id > 0) {
+            $schoolLng = Setting::where('school_id', 0)->where('setting_key', 'school_longitude')->value('setting_value');
+        }
+
+        $radiusVal = Setting::where('school_id', $id)->where('setting_key', 'geofence_radius')->value('setting_value');
+        if ($radiusVal === null && $id > 0) {
+            $radiusVal = Setting::where('school_id', 0)->where('setting_key', 'geofence_radius')->value('setting_value');
+        }
+        $radius = (float) ($radiusVal ?? 100);
+        $isGeoEnabled = $this->isGeofenceEnabled($id);
+
+        $lat = $schoolLat !== null ? (float) $schoolLat : null;
+        $long = $schoolLng !== null ? (float) $schoolLng : null;
+
+        $baseData = $school ? (is_array($school) ? $school : $school->toArray()) : [];
+
+        return array_merge($baseData, [
+            'id' => $id,
+            'nama' => $school?->name ?? $school?->nama ?? 'Sekolah',
+            'name' => $school?->name ?? $school?->nama ?? 'Sekolah',
+            'domain' => $school?->domain ?? null,
+            'latitude' => $lat,
+            'longitude' => $long,
+            'lat' => $lat,
+            'long' => $long,
+            'lng' => $long,
+            'radius' => $radius,
+            'geofence_radius' => $radius,
+            'geofence_enabled' => $isGeoEnabled,
+        ]);
     }
 
     /**

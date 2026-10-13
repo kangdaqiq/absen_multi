@@ -51,6 +51,10 @@ Route::get('/portal-izin/search', [App\Http\Controllers\PortalIzinController::cl
 Route::post('/pengajuan-izin', [App\Http\Controllers\PortalIzinController::class, 'store'])->name('portal-izin.store');
 Route::get('/pengajuan-izin/status/{code}', [App\Http\Controllers\PortalIzinController::class, 'status'])->name('portal-izin.status');
 
+// ── Download Aplikasi Mobile Android Jagat Absen (Publik via QR & Direct Link) ────────────
+Route::get('/app/download', [DashboardController::class, 'downloadAndroidApp'])->name('public.download.android');
+Route::get('/download/android', [DashboardController::class, 'downloadAndroidApp']);
+
 // ── Log Request Inspector (Wajib Login & Multi-Tenant Scoped) ────────────
 Route::middleware(['auth'])->group(function () {
     Route::get('/log-request', [App\Http\Controllers\PublicLogController::class, 'index'])->name('public-logs.index');
@@ -125,6 +129,7 @@ Route::get('/simulator/rfid', [App\Http\Controllers\RfidSimulatorController::cla
 Route::middleware('auth')->group(function () {
     // Common Routes (All Authenticated)
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/download/android-app', [DashboardController::class, 'downloadAndroidApp'])->name('download.android-app');
     Route::get('/profile', [App\Http\Controllers\ProfileController::class, 'edit'])->name('profile.edit');
     Route::put('/profile', [App\Http\Controllers\ProfileController::class, 'update'])->name('profile.update');
     Route::get('/support', [App\Http\Controllers\SupportController::class, 'index'])->name('support.index');

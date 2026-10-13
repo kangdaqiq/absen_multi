@@ -245,11 +245,10 @@ class SchoolController extends Controller
                     }
                     
                     // Extend expiration
-                    $expiredAt = $billingCycle === 'yearly' ? now()->addYear() : now()->addMonth();
-                    // If renewing an active subscription, add to existing expiration
-                    if ($activeSub && $activeSub->expired_at && $activeSub->expired_at > now()) {
-                        $expiredAt = $billingCycle === 'yearly' ? $activeSub->expired_at->addYear() : $activeSub->expired_at->addMonth();
-                    }
+                    $baseDate = ($activeSub && $activeSub->expired_at)
+                        ? clone $activeSub->expired_at
+                        : ($school->expired_at ? clone $school->expired_at : now());
+                    $expiredAt = $billingCycle === 'yearly' ? (clone $baseDate)->addYear() : (clone $baseDate)->addMonth();
                     $validated['expired_at'] = $expiredAt;
 
                     // Record new subscription
@@ -259,7 +258,7 @@ class SchoolController extends Controller
                         'amount' => $amount,
                         'status' => 'paid',
                         'billing_cycle' => $billingCycle,
-                        'started_at' => now(),
+                        'started_at' => $baseDate,
                         'expired_at' => $expiredAt,
                         'paid_at' => now(),
                         'payment_method' => 'manual',

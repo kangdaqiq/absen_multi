@@ -1720,6 +1720,43 @@ class MobileAttendanceController extends Controller
             'created_at' => $now,
         ]);
 
+        // Send FCM push notification for Alpha and Bolos
+        try {
+            $targetStudentIds = collect($request->attendances)
+                ->filter(fn($it) => in_array($it['status'] ?? '', ['A', 'Alpha', 'B', 'Bolos']))
+                ->pluck('student_id')
+                ->unique();
+
+            if ($targetStudentIds->isNotEmpty()) {
+                $targetStudents = Siswa::whereIn('id', $targetStudentIds)->get()->keyBy('id');
+                foreach ($request->attendances as $item) {
+                    $st = $item['status'] ?? '';
+                    if (!in_array($st, ['A', 'Alpha', 'B', 'Bolos'])) continue;
+
+                    $studentObj = $targetStudents->get($item['student_id']);
+                    if (!$studentObj) continue;
+
+                    if (in_array($st, ['A', 'Alpha'])) {
+                        FcmNotificationService::sendToSiswa(
+                            $studentObj,
+                            "Pemberitahuan Tidak Hadir (Alpha)",
+                            "Halo {$studentObj->nama}, status absensi Anda untuk tanggal {$tanggal} telah dicatat sebagai Alpha.",
+                            ['type' => 'attendance_alpha', 'status' => 'Alpha', 'tanggal' => $tanggal]
+                        );
+                    } else {
+                        FcmNotificationService::sendToSiswa(
+                            $studentObj,
+                            "Peringatan Bolos",
+                            "Halo {$studentObj->nama}, status absensi Anda untuk tanggal {$tanggal} telah dicatat sebagai Bolos.",
+                            ['type' => 'attendance_bolos', 'status' => 'Bolos', 'tanggal' => $tanggal]
+                        );
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            // ignore
+        }
+
         return response()->json([
             'success' => true,
             'message' => 'Absensi seluruh siswa berhasil disimpan',
@@ -1780,6 +1817,30 @@ class MobileAttendanceController extends Controller
                 'updated_at' => $now
             ]
         );
+
+        // Send FCM push notification if marked as Alpha or Bolos
+        try {
+            $student = Siswa::find($request->student_id);
+            if ($student) {
+                if (in_array($status, ['A', 'Alpha'])) {
+                    FcmNotificationService::sendToSiswa(
+                        $student,
+                        "Pemberitahuan Tidak Hadir (Alpha)",
+                        "Halo {$student->nama}, status absensi Anda untuk tanggal {$tanggal} telah dicatat sebagai Alpha.",
+                        ['type' => 'attendance_alpha', 'status' => 'Alpha', 'tanggal' => $tanggal]
+                    );
+                } elseif (in_array($status, ['B', 'Bolos'])) {
+                    FcmNotificationService::sendToSiswa(
+                        $student,
+                        "Peringatan Bolos",
+                        "Halo {$student->nama}, status absensi Anda untuk tanggal {$tanggal} telah dicatat sebagai Bolos.",
+                        ['type' => 'attendance_bolos', 'status' => 'Bolos', 'tanggal' => $tanggal]
+                    );
+                }
+            }
+        } catch (\Throwable $e) {
+            // ignore
+        }
 
         return response()->json(['success' => true, 'message' => 'Absensi siswa tersimpan secara realtime']);
     }

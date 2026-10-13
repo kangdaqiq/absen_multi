@@ -14,6 +14,7 @@ use App\Models\AbsensiGuru;
 use App\Models\Kegiatan;
 use App\Models\KegiatanAttendance;
 use App\Services\WhatsAppService;
+use App\Services\FcmNotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -260,6 +261,30 @@ class AttendanceController extends Controller
                 'jam_masuk' => $jamMasuk,
                 'jam_pulang' => $jamPulang
             ]);
+        }
+
+        // Send FCM Push Notification if status is Alpha or Bolos
+        try {
+            $student = Siswa::find($studentId);
+            if ($student) {
+                if ($status === 'A') {
+                    FcmNotificationService::sendToSiswa(
+                        $student,
+                        "Pemberitahuan Tidak Hadir (Alpha)",
+                        "Halo {$student->nama}, status absensi Anda untuk tanggal {$date} telah dicatat sebagai Alpha.",
+                        ['type' => 'attendance_alpha', 'status' => 'Alpha', 'tanggal' => $date]
+                    );
+                } elseif ($status === 'B') {
+                    FcmNotificationService::sendToSiswa(
+                        $student,
+                        "Peringatan Bolos",
+                        "Halo {$student->nama}, status absensi Anda untuk tanggal {$date} telah dicatat sebagai Bolos.",
+                        ['type' => 'attendance_bolos', 'status' => 'Bolos', 'tanggal' => $date]
+                    );
+                }
+            }
+        } catch (\Throwable $e) {
+            // ignore
         }
 
         return back()->with('success', 'Status absensi berhasil diperbarui.');
@@ -1035,6 +1060,16 @@ class AttendanceController extends Controller
                     Log::error("WA Student USB Checkout Error: " . $e->getMessage());
                 }
 
+                // Send FCM Push Notification
+                try {
+                    FcmNotificationService::sendToSiswa($siswa, "Presensi Pulang Tercatat", "Halo {$siswa->nama}, absensi pulang Anda berhasil dicatat pukul {$now->format('H:i')}.", [
+                        'type' => 'checkout_siswa',
+                        'jam' => $now->format('H:i'),
+                    ]);
+                } catch (\Throwable $e) {
+                    Log::error("FCM Student USB Checkout Error: " . $e->getMessage());
+                }
+
                 return response()->json([
                     'ok' => true,
                     'status' => 'success',
@@ -1163,6 +1198,18 @@ class AttendanceController extends Controller
                     $this->wa->sendCheckIn($siswa->nama, $siswa->no_wa, $now->format('H:i'), $status, $schoolId, $keterangan, $siswa->wa_ortu, $siswa->kelas->nama_kelas ?? '-');
                 } catch (\Exception $e) {
                     Log::error("WA Student USB Checkin Error: " . $e->getMessage());
+                }
+
+                // Send FCM Push Notification
+                try {
+                    $readableStatus = $status === 'T' ? 'Terlambat' : 'Hadir';
+                    FcmNotificationService::sendToSiswa($siswa, "Presensi Masuk Tercatat", "Halo {$siswa->nama}, absensi masuk Anda berhasil dicatat pukul {$now->format('H:i')} (Status: {$readableStatus}).", [
+                        'type' => 'checkin_siswa',
+                        'status' => $readableStatus,
+                        'jam' => $now->format('H:i'),
+                    ]);
+                } catch (\Throwable $e) {
+                    Log::error("FCM Student USB Checkin Error: " . $e->getMessage());
                 }
 
                 return response()->json([

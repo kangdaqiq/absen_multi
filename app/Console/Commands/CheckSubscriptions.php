@@ -39,12 +39,7 @@ class CheckSubscriptions extends Command
             ->get();
 
         foreach ($expiredSchools as $school) {
-            $this->info("School {$school->name} has expired. Deactivating premium features.");
-            
-            $school->update([
-                'wa_enabled' => false,
-                'bot_enabled' => false,
-            ]);
+            $this->info("School {$school->name} has expired. Sending invoice notification (WA features remain active).");
 
             // Notify admin with direct payment link
             $result = $notificationService->sendRenewalInvoiceWhatsApp($school, daysRemaining: -1);

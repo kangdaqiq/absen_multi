@@ -10,6 +10,7 @@ use App\Models\Setting;
 
 use App\Models\Kelas;
 use App\Services\WhatsAppMessageTemplates;
+use App\Services\FcmNotificationService;
 use Carbon\Carbon;
 
 class DailyReportCommand extends Command
@@ -267,7 +268,7 @@ class DailyReportCommand extends Command
 
                 $keterangan = $s->is_siswa_khusus ? 'Alpha (Tidak Hadir - Hari Masuk Khusus)' : 'Alpha';
 
-                Attendance::firstOrCreate(
+                $attRecord = Attendance::firstOrCreate(
                     ['student_id' => $s->id, 'tanggal' => $today],
                     [
                         'jam_masuk' => null,
@@ -281,6 +282,23 @@ class DailyReportCommand extends Command
                         'updated_at' => now(),
                     ]
                 );
+
+                if ($attRecord->wasRecentlyCreated) {
+                    try {
+                        FcmNotificationService::sendToSiswa(
+                            $s,
+                            "Pemberitahuan Tidak Hadir (Alpha)",
+                            "Halo {$s->nama}, Anda tidak tercatat melakukan presensi hari ini dan status kehadiran Anda tercatat sebagai Alpha (Tanpa Keterangan).",
+                            [
+                                'type' => 'attendance_alpha',
+                                'status' => 'Alpha',
+                                'tanggal' => $today,
+                            ]
+                        );
+                    } catch (\Throwable $e) {
+                        // ignore
+                    }
+                }
             }
         }
 

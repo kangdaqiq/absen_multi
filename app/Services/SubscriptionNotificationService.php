@@ -55,7 +55,7 @@ class SubscriptionNotificationService
         }
 
         $now = now();
-        $startedAt = ($school->expired_at && $school->expired_at > $now)
+        $startedAt = $school->expired_at
             ? clone $school->expired_at
             : $now;
 

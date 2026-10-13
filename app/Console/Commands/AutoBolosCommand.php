@@ -9,6 +9,8 @@ use App\Models\MessageQueue;
 use App\Models\Siswa;
 use App\Models\Attendance;
 use App\Services\WhatsAppMessageTemplates;
+use App\Services\FcmNotificationService;
+use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 
 class AutoBolosCommand extends Command
@@ -100,7 +102,15 @@ class AutoBolosCommand extends Command
                 ->whereNotIn('attendance.status', ['I', 'S'])
                 ->where('kelas.is_active_attendance', true);
 
-            $bolosStudents = $bolosStudentsQuery->select('siswa.nama', 'siswa.no_wa', 'siswa.wa_ortu', 'siswa.telegram_chat_id', 'siswa.telegram_ortu_chat_id', 'kelas.nama_kelas')->get();
+            $bolosStudents = $bolosStudentsQuery->select(
+                'siswa.id',
+                'siswa.nama',
+                'siswa.no_wa',
+                'siswa.wa_ortu',
+                'siswa.telegram_chat_id',
+                'siswa.telegram_ortu_chat_id',
+                'kelas.nama_kelas'
+            )->get();
 
             // Perform bulk update to mark as Bolos
             $countB = $bolosStudentsQuery->update([
@@ -108,6 +118,9 @@ class AutoBolosCommand extends Command
                 'attendance.keterangan' => DB::raw("CONCAT(IFNULL(attendance.keterangan, ''), ' [Auto: Tidak Absen Pulang]')"),
                 'attendance.updated_at' => now()
             ]);
+
+            // Load Siswa models for FCM Push Notifications
+            $bolosSiswaModels = Siswa::whereIn('id', $bolosStudents->pluck('id'))->get()->keyBy('id');
 
             // Queue personal notifications for Bolos students
             $telegramEnabled = $school->telegram_enabled;
@@ -119,6 +132,26 @@ class AutoBolosCommand extends Command
             $teleOrtuEnabled = \App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'notification_tele_ortu')->value('setting_value') !== 'false';
 
             foreach ($bolosStudents as $bs) {
+                // 1. FCM Push Notification to Mobile App (sama dengan absen)
+                $siswaModel = $bolosSiswaModels->get($bs->id);
+                if ($siswaModel) {
+                    try {
+                        FcmNotificationService::sendToSiswa(
+                            $siswaModel,
+                            "Peringatan Bolos",
+                            "Halo {$siswaModel->nama}, Anda terdeteksi belum melakukan absen pulang hari ini sehingga status kehadiran tercatat sebagai Bolos (B).",
+                            [
+                                'type' => 'attendance_bolos',
+                                'status' => 'Bolos',
+                                'jam' => $nowTime,
+                                'tanggal' => $today,
+                            ]
+                        );
+                    } catch (\Throwable $e) {
+                        Log::error("FCM Bolos Error for Siswa ID {$bs->id}: " . $e->getMessage());
+                    }
+                }
+
                 if (!empty($bs->no_wa) && $waSiswaEnabled) {
                     MessageQueue::create([
                         'school_id' => $schoolId,
@@ -207,6 +240,22 @@ class AutoBolosCommand extends Command
                     'updated_at' => now()
                 ]);
                 $countA++;
+
+                // FCM Push Notification to Mobile App (sama dengan absen)
+                try {
+                    FcmNotificationService::sendToSiswa(
+                        $s,
+                        "Pemberitahuan Tidak Hadir (Alpha)",
+                        "Halo {$s->nama}, Anda tidak tercatat melakukan presensi hari ini dan status kehadiran Anda tercatat sebagai Alpha (Tanpa Keterangan).",
+                        [
+                            'type' => 'attendance_alpha',
+                            'status' => 'Alpha',
+                            'tanggal' => $today,
+                        ]
+                    );
+                } catch (\Throwable $e) {
+                    Log::error("FCM Alpha Error for Siswa ID {$s->id}: " . $e->getMessage());
+                }
             }
         }
 

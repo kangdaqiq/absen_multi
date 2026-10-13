@@ -150,10 +150,7 @@ class SubscriptionController extends Controller
         }
 
         $now = now();
-        $startedAt = $now;
-        if ($school->expired_at && $school->expired_at > $now) {
-            $startedAt = clone $school->expired_at;
-        }
+        $startedAt = $school->expired_at ? clone $school->expired_at : $now;
         
         $expiredAt = $billingCycle === 'yearly'
             ? (clone $startedAt)->addYear()

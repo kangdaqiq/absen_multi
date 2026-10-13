@@ -44,11 +44,7 @@ class SchoolSubscriptionController extends Controller
 
         // Determine start and end date
         $now = now();
-        $startedAt = $now;
-        // If school has existing active expiration that is in the future, start from there
-        if ($school->expired_at && $school->expired_at > $now) {
-            $startedAt = clone $school->expired_at;
-        }
+        $startedAt = $school->expired_at ? clone $school->expired_at : $now;
         
         $expiredAt = (clone $startedAt)->addMonths($months);
 

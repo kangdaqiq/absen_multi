@@ -81,7 +81,7 @@ class QrisCallbackController extends Controller
 
                 $now = now();
                 $currentExpired = $school->expired_at;
-                $baseDate = ($currentExpired && $currentExpired > $now) ? $currentExpired : $now;
+                $baseDate = $currentExpired ? clone $currentExpired : $now;
 
                 $newExpiredAt = $matchedSubscription->billing_cycle === 'yearly'
                     ? (clone $baseDate)->addYear()

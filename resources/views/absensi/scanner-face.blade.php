@@ -412,9 +412,9 @@
 
                     <!-- Face ID Count Pill -->
                     <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold border transition"
-                        :class="descriptors.length > 0 ? 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-900/20 dark:text-indigo-300 dark:border-indigo-800/40' : 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-900/20 dark:text-rose-300 dark:border-rose-800/40'">
+                        :class="descriptors.filter(d => d.embedding && d.embedding.length === 128).length > 0 ? 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-900/20 dark:text-indigo-300 dark:border-indigo-800/40' : 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-900/20 dark:text-rose-300 dark:border-rose-800/40'">
                         <i class="fas fa-users text-[10px]"></i>
-                        <span x-text="descriptors.length + ' Face ID Dimuat'">Memuat Data...</span>
+                        <span x-text="descriptors.filter(d => d.embedding && d.embedding.length === 128).length + ' Face ID Siap'">Memuat Data...</span>
                     </span>
                 </div>
                 <p class="text-xs text-gray-500 dark:text-gray-400">
@@ -1115,99 +1115,116 @@ function faceScannerApp() {
 
         // CLIENT-SIDE 1:N MATCHING (Takes < 5ms in JavaScript!)
         async matchAndAttend(descriptor) {
-            if (this.descriptors.length === 0) {
-                this.lastScanError = true;
-                this.detectionMessage = 'Database Face ID kosong (0 wajah dimuat dari server)';
-                this.holdMessageUntil = Date.now() + 3000;
-                return;
-            }
-
-            let bestMatch = null;
-            let minDistance = 0.58; // Standard face-api threshold (0.58 toleran untuk kacamata & pencahayaan)
-            let closestDistance = 999;
-
-            for (const item of this.descriptors) {
-                if (!item.embedding || !Array.isArray(item.embedding)) continue;
-                const distance = faceapi.euclideanDistance(descriptor, item.embedding);
-                if (distance < closestDistance) {
-                    closestDistance = distance;
-                }
-                if (distance < minDistance) {
-                    minDistance = distance;
-                    bestMatch = item;
-                }
-            }
-
-            if (!bestMatch) {
-                this.lastScanError = true;
-                const distStr = closestDistance < 10 ? closestDistance.toFixed(2) : '-';
-                this.detectionMessage = 'Wajah tidak cocok (Jarak: ' + distStr + ', Target: < 0.58)';
-                this.holdMessageUntil = Date.now() + 2500;
-                return;
-            }
-
-            // Anti-duplicate debounce: prevent scanning same person within 5 seconds
-            const nowTime = Date.now();
-            const lastScan = this.recentScans[bestMatch.id] || 0;
-            if (nowTime - lastScan < 5000) {
-                this.lastScanError = false;
-                this.detectionMessage = bestMatch.nama + ' baru saja dipindai';
-                this.holdMessageUntil = Date.now() + 2500;
-                return;
-            }
-
-            // MATCH FOUND! Send to Server
-            this.lastScanError = false;
-            this.isProcessing = true;
-            this.recentScans[bestMatch.id] = nowTime;
-            this.detectionMessage = 'Kecocokan: ' + bestMatch.nama + ' (Mengirim data...)';
-
-            // Capture small snapshot from video for proof
-            const snapshot = this.captureFrameSnapshot();
-
-            const similarityScore = Math.max(0, 1 - minDistance);
-
             try {
-                const response = await fetch('{{ route('absensi.scan-face', [], false) }}', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                    },
-                    body: JSON.stringify({
-                        person_id: bestMatch.id,
-                        type: bestMatch.type || 'siswa',
-                        similarity: similarityScore,
-                        mode: this.scanMode,
-                        photo_snapshot: snapshot
-                    })
-                });
+                // Saring hanya embedding 128 dimensi (model face-api.js kiosk).
+                // Lewati embedding 512 dimensi (dari mobile app InsightFace) agar euclideanDistance tidak crash!
+                const targetDim = descriptor.length; // 128
+                const validDescriptors = this.descriptors.filter(item => 
+                    item.embedding && Array.isArray(item.embedding) && item.embedding.length === targetDim
+                );
 
-                if (!response.ok) {
+                if (validDescriptors.length === 0) {
                     this.lastScanError = true;
-                    const errJson = await response.json().catch(() => null);
-                    const msg = errJson?.message || ('Server error (HTTP ' + response.status + ')');
-                    this.detectionMessage = msg;
-                    this.holdMessageUntil = Date.now() + 4000;
-                    this.playTone('error');
+                    this.detectionMessage = 'Belum ada Face ID Kiosk yang cocok (Daftarkan wajah lewat tombol di bawah)';
+                    this.holdMessageUntil = Date.now() + 3500;
                     return;
                 }
 
-                const res = await response.json();
-                this.handleScanResponse(res, bestMatch, similarityScore);
-                this.holdMessageUntil = Date.now() + 3500;
-            } catch (err) {
-                console.error('Scan attend error:', err);
-                this.lastScanError = true;
-                this.detectionMessage = 'Gagal mengirim absensi: ' + (err.message || 'Koneksi terputus');
-                this.holdMessageUntil = Date.now() + 4000;
-                this.playTone('error');
-            } finally {
-                setTimeout(() => {
-                    this.isProcessing = false;
+                let bestMatch = null;
+                let minDistance = 0.58; // Standard face-api threshold (0.58 toleran untuk kacamata & pencahayaan)
+                let closestDistance = 999;
+
+                for (const item of validDescriptors) {
+                    try {
+                        const distance = faceapi.euclideanDistance(descriptor, item.embedding);
+                        if (distance < closestDistance) {
+                            closestDistance = distance;
+                        }
+                        if (distance < minDistance) {
+                            minDistance = distance;
+                            bestMatch = item;
+                        }
+                    } catch (distErr) {
+                        console.warn('Distance calc error for', item.nama, distErr);
+                    }
+                }
+
+                if (!bestMatch) {
+                    this.lastScanError = true;
+                    const distStr = closestDistance < 10 ? closestDistance.toFixed(2) : '-';
+                    this.detectionMessage = 'Wajah tidak cocok (Jarak: ' + distStr + ', Target: < 0.58)';
+                    this.holdMessageUntil = Date.now() + 2500;
+                    return;
+                }
+
+                // Anti-duplicate debounce: prevent scanning same person within 5 seconds
+                const nowTime = Date.now();
+                const lastScan = this.recentScans[bestMatch.id] || 0;
+                if (nowTime - lastScan < 5000) {
                     this.lastScanError = false;
-                }, 1500);
+                    this.detectionMessage = bestMatch.nama + ' baru saja dipindai';
+                    this.holdMessageUntil = Date.now() + 2500;
+                    return;
+                }
+
+                // MATCH FOUND! Send to Server
+                this.lastScanError = false;
+                this.isProcessing = true;
+                this.recentScans[bestMatch.id] = nowTime;
+                this.detectionMessage = 'Kecocokan: ' + bestMatch.nama + ' (Mengirim data...)';
+
+                // Capture small snapshot from video for proof
+                const snapshot = this.captureFrameSnapshot();
+
+                const similarityScore = Math.max(0, 1 - minDistance);
+
+                try {
+                    const response = await fetch('{{ route('absensi.scan-face', [], false) }}', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                        },
+                        body: JSON.stringify({
+                            person_id: bestMatch.id,
+                            type: bestMatch.type || 'siswa',
+                            similarity: similarityScore,
+                            mode: this.scanMode,
+                            photo_snapshot: snapshot
+                        })
+                    });
+
+                    if (!response.ok) {
+                        this.lastScanError = true;
+                        const errJson = await response.json().catch(() => null);
+                        const msg = errJson?.message || ('Server error (HTTP ' + response.status + ')');
+                        this.detectionMessage = msg;
+                        this.holdMessageUntil = Date.now() + 4000;
+                        this.playTone('error');
+                        return;
+                    }
+
+                    const res = await response.json();
+                    this.handleScanResponse(res, bestMatch, similarityScore);
+                    this.holdMessageUntil = Date.now() + 3500;
+                } catch (err) {
+                    console.error('Scan attend error:', err);
+                    this.lastScanError = true;
+                    this.detectionMessage = 'Gagal mengirim absensi: ' + (err.message || 'Koneksi terputus');
+                    this.holdMessageUntil = Date.now() + 4000;
+                    this.playTone('error');
+                } finally {
+                    setTimeout(() => {
+                        this.isProcessing = false;
+                        this.lastScanError = false;
+                    }, 1500);
+                }
+            } catch (fatalErr) {
+                console.error('Fatal matching error:', fatalErr);
+                this.lastScanError = true;
+                this.detectionMessage = 'Galat: ' + fatalErr.message;
+                this.holdMessageUntil = Date.now() + 3500;
             }
         },
 

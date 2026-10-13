@@ -55,6 +55,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/mobile/fcm-token', [MobileAttendanceController::class, 'updateFcmToken']);
     Route::post('/mobile/student/photo', [MobileAttendanceController::class, 'uploadStudentPhoto']);
     Route::post('/mobile/student/upload-photo', [MobileAttendanceController::class, 'uploadStudentPhoto']);
+    Route::post('/mobile/student/scan-face', [MobileAttendanceController::class, 'scanFaceStudent']);
     Route::post('/mobile/teacher/photo', [MobileAttendanceController::class, 'uploadTeacherPhoto']);
     Route::post('/mobile/guru/photo', [MobileAttendanceController::class, 'uploadTeacherPhoto']);
     Route::post('/mobile/face-register', [MobileAttendanceController::class, 'registerFace']);

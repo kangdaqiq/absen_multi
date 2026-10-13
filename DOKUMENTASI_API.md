@@ -666,6 +666,66 @@ Mendaftarkan foto wajah asli pengguna sebagai referensi embedding biometrik saat
 
 ---
 
+### 5.3 Scan Wajah Absensi Siswa 1:N (`POST /api/mobile/student/scan-face`)
+Endpoint pencarian 1:N untuk melakukan absensi otomatis (Masuk atau Pulang) siswa berdasarkan tangkapan kamera mobile. Server mencocokkan vektor embedding wajah dengan seluruh master Face ID siswa di unit sekolah tersebut tanpa perlu menyimpan file foto hasil scan ke disk storage server.
+
+- **URL**: `/api/mobile/student/scan-face`
+- **Method**: `POST`
+- **Content-Type**: `multipart/form-data`
+- **Auth**: Bearer Token
+- **Body Request**:
+  - `photo` (file, required): File foto hasil tangkapan kamera dari aplikasi mobile.
+  - `tanggal` (string, optional, contoh: `"13-10-2026"` atau `"2026-10-13"`): Tanggal absensi (default: tanggal hari ini).
+
+- **Response Success (200 OK) — Absen Masuk**:
+```json
+{
+  "success": true,
+  "message": "Absen Masuk Berhasil (07:15 WIB)",
+  "data": {
+    "student_id": 102,
+    "nama": "Ahmad Rizky",
+    "nis": "20240012",
+    "kelas_name": "XII IPA 1",
+    "foto_url": "http://absen.jagattech.my.id/storage/students/ahmad.jpg",
+    "confidence": 0.985,
+    "status": "H",
+    "jam_masuk": "07:15:30",
+    "message": "Absen Masuk Berhasil (07:15 WIB)"
+  }
+}
+```
+
+- **Response Success (200 OK) — Absen Pulang**:
+```json
+{
+  "success": true,
+  "message": "Absen Pulang Berhasil (15:30 WIB)",
+  "data": {
+    "student_id": 102,
+    "nama": "Ahmad Rizky",
+    "nis": "20240012",
+    "kelas_name": "XII IPA 1",
+    "foto_url": "http://absen.jagattech.my.id/storage/students/ahmad.jpg",
+    "confidence": 0.985,
+    "status": "H",
+    "jam_pulang": "15:30:00",
+    "message": "Absen Pulang Berhasil (15:30 WIB)"
+  }
+}
+```
+
+- **Response Error (404 Not Found — Wajah Tidak Dikenali / Belum Terdaftar)**:
+```json
+{
+  "success": false,
+  "message": "Wajah siswa tidak terdaftar atau tidak cocok dalam database",
+  "data": null
+}
+```
+
+---
+
 ## 📸 6. Upload Foto Profil (Siswa & Guru)
 
 Endpoint untuk memperbarui foto profil identitas di sistem. Otomatis melakukan kompresi cerdas GD (maks. 600x800 px) dan menghapus file foto fisik lama dari disk storage server saat diperbarui.

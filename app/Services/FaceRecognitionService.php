@@ -147,4 +147,25 @@ class FaceRecognitionService
             ];
         }
     }
+
+    /**
+     * Calculate Cosine Similarity between two vector arrays
+     *
+     * @param array $vecA
+     * @param array $vecB
+     * @return float
+     */
+    public static function cosineSimilarity(array $vecA, array $vecB): float
+    {
+        $dot = 0.0;
+        $normA = 0.0;
+        $normB = 0.0;
+        $len = min(count($vecA), count($vecB));
+        for ($i = 0; $i < $len; $i++) {
+            $dot += $vecA[$i] * $vecB[$i];
+            $normA += $vecA[$i] * $vecA[$i];
+            $normB += $vecB[$i] * $vecB[$i];
+        }
+        return ($normA > 0 && $normB > 0) ? ($dot / (sqrt($normA) * sqrt($normB))) : 0.0;
+    }
 }

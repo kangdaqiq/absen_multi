@@ -2142,6 +2142,294 @@ class MobileAttendanceController extends Controller
     }
 
     /**
+     * Endpoint Scan Wajah Siswa 1:N (POST /api/mobile/student/scan-face)
+     * Otomatis mencari data siswa berdasarkan kecocokan vektor wajah,
+     * serta menentukan absensi masuk atau pulang tanpa menyimpan file foto ke server.
+     */
+    public function scanFaceStudent(Request $request)
+    {
+        $request->validate([
+            'photo' => 'required|file|image|max:10240',
+            'tanggal' => 'nullable|string',
+        ]);
+
+        $user = $request->user();
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthenticated',
+                'data' => null
+            ], 401);
+        }
+
+        $schoolId = $user->school_id;
+        $schoolTz = Setting::where('school_id', $schoolId)->where('setting_key', 'timezone')->value('setting_value') ?: config('app.timezone', 'Asia/Jakarta');
+        $now = Carbon::now($schoolTz);
+        $tzSuffix = match ($schoolTz) {
+            'Asia/Jayapura' => 'WIT',
+            'Asia/Makassar' => 'WITA',
+            default => 'WIB',
+        };
+
+        // 1. Parsing Tanggal Absensi (opsional, contoh: "13-10-2026" atau "2026-10-13")
+        $rawTanggal = trim((string) $request->input('tanggal', ''));
+        if (!empty($rawTanggal)) {
+            try {
+                if (preg_match('/^\d{2}-\d{2}-\d{4}$/', $rawTanggal)) {
+                    $targetCarbon = Carbon::createFromFormat('d-m-Y', $rawTanggal, $schoolTz)->startOfDay();
+                } else {
+                    $targetCarbon = Carbon::parse($rawTanggal, $schoolTz)->startOfDay();
+                }
+                $targetDate = $targetCarbon->format('Y-m-d');
+            } catch (\Throwable $e) {
+                $targetCarbon = $now->copy()->startOfDay();
+                $targetDate = $now->format('Y-m-d');
+            }
+        } else {
+            $targetCarbon = $now->copy()->startOfDay();
+            $targetDate = $now->format('Y-m-d');
+        }
+        $nowTime = $now->format('H:i:s');
+
+        // 2. Ekstraksi Vektor Wajah via Python Face Engine
+        $extractResult = FaceRecognitionService::extractVector($request->file('photo'));
+        if (empty($extractResult['success']) || empty($extractResult['embedding'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Wajah siswa tidak terdaftar atau tidak cocok dalam database',
+                'data' => null
+            ], 404);
+        }
+        $snapVector = $extractResult['embedding'];
+
+        // 3. Pencarian 1:N Master Face ID Siswa di Sekolah Tersebut
+        $candidates = UserFaceData::whereNotNull('face_embedding')
+            ->whereNotNull('siswa_id')
+            ->when($schoolId, function ($q) use ($schoolId) {
+                $q->whereHas('siswa', fn($s) => $s->where('school_id', $schoolId));
+            })
+            ->with(['siswa.kelas', 'siswa.school'])
+            ->get();
+
+        $threshold = FaceRecognitionService::getThreshold(); // Default 0.75 (75%)
+        $bestScore = 0.0;
+        $matchedRecord = null;
+
+        foreach ($candidates as $cand) {
+            $candEmb = json_decode($cand->face_embedding, true);
+            if (is_string($candEmb)) {
+                $candEmb = json_decode($candEmb, true);
+            }
+            if (!is_array($candEmb) || count($candEmb) !== 512) {
+                continue;
+            }
+
+            $sim = FaceRecognitionService::cosineSimilarity($snapVector, $candEmb);
+            if ($sim > $bestScore) {
+                $bestScore = $sim;
+                $matchedRecord = $cand;
+            }
+        }
+
+        if (!$matchedRecord || !$matchedRecord->siswa || $bestScore < $threshold) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Wajah siswa tidak terdaftar atau tidak cocok dalam database',
+                'data' => null
+            ], 404);
+        }
+
+        $student = $matchedRecord->siswa;
+        $studentSchoolId = $student->school_id ?: $schoolId;
+        $kelasName = $student->kelas ? ($student->kelas->nama_kelas ?? $student->kelas->nama) : '-';
+        $fotoUrl = $student->foto_url ?? null;
+
+        // 4. Cek Jadwal Harian Sekolah
+        $indexHari = (int) $targetCarbon->format('N');
+        $jadwal = Jadwal::where('index_hari', $indexHari)
+            ->where('is_active', 1)
+            ->when($studentSchoolId, fn($q, $sId) => $q->where('school_id', $sId))
+            ->first();
+
+        // 5. Penentuan Otomatis Masuk vs Pulang
+        $att = Attendance::where('student_id', $student->id)
+            ->where('tanggal', $targetDate)
+            ->first();
+
+        $timeFormatted = $now->format('H:i');
+        $msgTime = "{$timeFormatted} {$tzSuffix}";
+
+        // Kondisi 1: Siswa belum ada catatan absen masuk (Check-in)
+        if (!$att || empty($att->jam_masuk)) {
+            $status = 'H';
+            $jamMasukJadwal = $jadwal?->jam_masuk;
+
+            if ($jamMasukJadwal && $nowTime > $jamMasukJadwal) {
+                $status = 'T';
+                $diffSeconds = Carbon::parse($targetDate . ' ' . $nowTime)->diffInSeconds(Carbon::parse($targetDate . ' ' . $jamMasukJadwal));
+                $jam = floor($diffSeconds / 3600);
+                $menit = floor(($diffSeconds % 3600) / 60);
+                $durasi = $jam > 0 ? "{$jam} jam {$menit} menit" : "{$menit} menit";
+                $keterangan = "Telat {$durasi} - Face Scan Mobile";
+            } else {
+                $status = 'H';
+                $keterangan = "Tepat Waktu - Face Scan Mobile";
+            }
+
+            $successMsg = "Absen Masuk Berhasil ({$msgTime})";
+
+            // Simpan record attendance tanpa simpan foto fisik ke storage
+            $att = Attendance::updateOrCreate(
+                [
+                    'student_id' => $student->id,
+                    'tanggal' => $targetDate,
+                ],
+                [
+                    'school_id' => $studentSchoolId,
+                    'jam_masuk' => $nowTime,
+                    'status' => $status,
+                    'keterangan' => $keterangan,
+                    'face_similarity_score' => round($bestScore, 4),
+                    'is_face_matched' => true,
+                    'photo_checkin_path' => null,
+                    'updated_at' => $now,
+                ]
+            );
+
+            // Notifikasi WhatsApp
+            try {
+                $wa = app(\App\Services\WhatsAppService::class);
+                $wa->sendCheckIn($student->nama, $student->no_wa, $now->format('H:i'), $status, $studentSchoolId, $keterangan, $student->wa_ortu, $kelasName);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning("WA Face Scan Checkin Error: " . $e->getMessage());
+            }
+
+            // Notifikasi FCM
+            try {
+                $readableStatus = $status === 'T' ? 'Terlambat' : 'Hadir';
+                FcmNotificationService::sendToSiswa($student, "Presensi Masuk Tercatat", "Halo {$student->nama}, absensi masuk Anda berhasil dicatat pukul {$now->format('H:i')} (Status: {$readableStatus}).", [
+                    'type' => 'checkin_siswa',
+                    'status' => $readableStatus,
+                    'jam' => $now->format('H:i'),
+                ]);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning("FCM Face Scan Checkin Error: " . $e->getMessage());
+            }
+
+            ApiLog::create([
+                'school_id' => $studentSchoolId,
+                'api_key' => 'MOBILE_APP',
+                'action' => 'mobile_student_scan_face_in',
+                'uid' => $student->nis ?? $student->nama,
+                'success' => true,
+                'message' => "Face Scan Masuk: {$student->nama} (" . round($bestScore * 100, 1) . "%)",
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent() ?? 'Android Mobile App',
+                'created_at' => now(),
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => $successMsg,
+                'data' => [
+                    'student_id' => $student->id,
+                    'nama' => $student->nama,
+                    'nis' => (string) ($student->nis ?? '-'),
+                    'kelas_name' => $kelasName,
+                    'foto_url' => $fotoUrl,
+                    'confidence' => round($bestScore, 3),
+                    'status' => $status,
+                    'jam_masuk' => $nowTime,
+                    'message' => $successMsg,
+                ]
+            ], 200);
+        }
+
+        // Kondisi 2: Siswa sudah ada jam_masuk, tetapi belum ada jam_pulang (Check-out)
+        if (empty($att->jam_pulang)) {
+            $masukCarbon = Carbon::parse($att->tanggal . ' ' . $att->jam_masuk);
+            $totalSeconds = abs($masukCarbon->diffInSeconds($now, false));
+            $hours = floor($totalSeconds / 3600);
+            $mins = floor(($totalSeconds % 3600) / 60);
+
+            $successMsg = "Absen Pulang Berhasil ({$msgTime})";
+
+            $att->update([
+                'jam_pulang' => $nowTime,
+                'total_seconds' => $totalSeconds,
+                'face_similarity_score' => round($bestScore, 4),
+                'is_face_matched' => true,
+                'updated_at' => $now,
+            ]);
+
+            // Notifikasi WhatsApp Checkout
+            try {
+                $wa = app(\App\Services\WhatsAppService::class);
+                $wa->sendCheckOut($student->nama, $student->no_wa, $now->format('H:i'), $hours, $mins, 'Face Scan Mobile', $studentSchoolId, Carbon::parse($att->jam_masuk)->format('H:i'), $student->wa_ortu, $targetCarbon->format('d/m/Y'));
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning("WA Face Scan Checkout Error: " . $e->getMessage());
+            }
+
+            // Notifikasi FCM Checkout
+            try {
+                FcmNotificationService::sendToSiswa($student, "Presensi Pulang Tercatat", "Halo {$student->nama}, absensi pulang Anda berhasil dicatat pukul {$now->format('H:i')}.", [
+                    'type' => 'checkout_siswa',
+                    'jam' => $now->format('H:i'),
+                ]);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning("FCM Face Scan Checkout Error: " . $e->getMessage());
+            }
+
+            ApiLog::create([
+                'school_id' => $studentSchoolId,
+                'api_key' => 'MOBILE_APP',
+                'action' => 'mobile_student_scan_face_out',
+                'uid' => $student->nis ?? $student->nama,
+                'success' => true,
+                'message' => "Face Scan Pulang: {$student->nama} (" . round($bestScore * 100, 1) . "%)",
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent() ?? 'Android Mobile App',
+                'created_at' => now(),
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => $successMsg,
+                'data' => [
+                    'student_id' => $student->id,
+                    'nama' => $student->nama,
+                    'nis' => (string) ($student->nis ?? '-'),
+                    'kelas_name' => $kelasName,
+                    'foto_url' => $fotoUrl,
+                    'confidence' => round($bestScore, 3),
+                    'status' => $att->status,
+                    'jam_pulang' => $nowTime,
+                    'message' => $successMsg,
+                ]
+            ], 200);
+        }
+
+        // Kondisi 3: Siswa sudah lengkap absen masuk dan pulang
+        $alreadyMsg = "Siswa sudah lengkap absen Masuk & Pulang hari ini";
+        return response()->json([
+            'success' => true,
+            'message' => $alreadyMsg,
+            'data' => [
+                'student_id' => $student->id,
+                'nama' => $student->nama,
+                'nis' => (string) ($student->nis ?? '-'),
+                'kelas_name' => $kelasName,
+                'foto_url' => $fotoUrl,
+                'confidence' => round($bestScore, 3),
+                'status' => $att->status,
+                'jam_masuk' => $att->jam_masuk,
+                'jam_pulang' => $att->jam_pulang,
+                'message' => $alreadyMsg,
+            ]
+        ], 200);
+    }
+
+    /**
      * Kompresi dan simpan foto profil siswa (GD Library, auto-orient, max 600x800).
      */
     private function processAndStoreSiswaFoto($file): string

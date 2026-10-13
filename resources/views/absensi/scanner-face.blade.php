@@ -1118,33 +1118,38 @@ function faceScannerApp() {
         // CLIENT-SIDE 1:N MATCHING (Takes < 5ms in JavaScript!)
         async matchAndAttend(descriptor) {
             try {
-                // Saring dan normalisasi embedding (tangani jika tersimpan sebagai JSON string)
+                if (this.descriptors.length === 0) {
+                    this.lastScanError = true;
+                    this.detectionMessage = 'Belum ada Face ID terdaftar di sistem';
+                    this.holdMessageUntil = Date.now() + 3000;
+                    return;
+                }
+
+                // Pisahkan descriptor berdasarkan dimensi (128-d Kiosk vs 512-d Mobile Engine)
                 const targetDim = descriptor.length; // 128
-                const validDescriptors = [];
+                const descriptors128 = [];
+                const descriptors512 = [];
+
                 for (const item of this.descriptors) {
                     let emb = item.embedding;
                     if (typeof emb === 'string') {
                         try { emb = JSON.parse(emb); } catch (e) {}
                     }
-                    if (Array.isArray(emb) && emb.length === targetDim) {
-                        validDescriptors.push({ ...item, embedding: emb });
+                    if (Array.isArray(emb)) {
+                        if (emb.length === targetDim) {
+                            descriptors128.push({ ...item, embedding: emb });
+                        } else if (emb.length === 512) {
+                            descriptors512.push({ ...item, embedding: emb });
+                        }
                     }
                 }
 
-                this.debugInfo = validDescriptors.length + ' dari ' + this.descriptors.length + ' wajah valid (' + targetDim + '-d)';
-
-                if (validDescriptors.length === 0) {
-                    this.lastScanError = true;
-                    this.detectionMessage = 'Tidak ada Face ID yang cocok';
-                    this.holdMessageUntil = Date.now() + 3500;
-                    return;
-                }
-
                 let bestMatch = null;
-                let minDistance = 0.58; // Standard face-api threshold (0.58 toleran untuk kacamata & pencahayaan)
+                let minDistance = 0.55; // Threshold kesamaan wajah dikembalikan ke 0.55
                 let closestDistance = 999;
 
-                for (const item of validDescriptors) {
+                // 1. Coba pencocokan client-side 128-d (jika ada data 128-d)
+                for (const item of descriptors128) {
                     try {
                         const distance = faceapi.euclideanDistance(descriptor, item.embedding);
                         if (distance < closestDistance) {
@@ -1159,77 +1164,125 @@ function faceScannerApp() {
                     }
                 }
 
-                if (!bestMatch) {
-                    this.lastScanError = true;
-                    const distStr = closestDistance < 10 ? closestDistance.toFixed(2) : '-';
-                    this.detectionMessage = 'Wajah tidak cocok (Jarak: ' + distStr + ', Target: < 0.58)';
-                    this.holdMessageUntil = Date.now() + 2500;
-                    return;
-                }
-
-                // Anti-duplicate debounce: prevent scanning same person within 5 seconds
-                const nowTime = Date.now();
-                const lastScan = this.recentScans[bestMatch.id] || 0;
-                if (nowTime - lastScan < 5000) {
-                    this.lastScanError = false;
-                    this.detectionMessage = bestMatch.nama + ' baru saja dipindai';
-                    this.holdMessageUntil = Date.now() + 2500;
-                    return;
-                }
-
-                // MATCH FOUND! Send to Server
-                this.lastScanError = false;
-                this.isProcessing = true;
-                this.recentScans[bestMatch.id] = nowTime;
-                this.detectionMessage = 'Kecocokan: ' + bestMatch.nama + ' (Mengirim data...)';
-
-                // Capture small snapshot from video for proof
-                const snapshot = this.captureFrameSnapshot();
-
-                const similarityScore = Math.max(0, 1 - minDistance);
-
-                try {
-                    const response = await fetch('{{ route('absensi.scan-face', [], false) }}', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Accept': 'application/json',
-                            'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                        },
-                        body: JSON.stringify({
-                            person_id: bestMatch.id,
-                            type: bestMatch.type || 'siswa',
-                            similarity: similarityScore,
-                            mode: this.scanMode,
-                            photo_snapshot: snapshot
-                        })
-                    });
-
-                    if (!response.ok) {
-                        this.lastScanError = true;
-                        const errJson = await response.json().catch(() => null);
-                        const msg = errJson?.message || ('Server error (HTTP ' + response.status + ')');
-                        this.detectionMessage = msg;
-                        this.holdMessageUntil = Date.now() + 4000;
-                        this.playTone('error');
+                // 2. Jika cocok dengan data 128-d:
+                if (bestMatch) {
+                    const nowTime = Date.now();
+                    const lastScan = this.recentScans[bestMatch.id] || 0;
+                    if (nowTime - lastScan < 5000) {
+                        this.lastScanError = false;
+                        this.detectionMessage = bestMatch.nama + ' baru saja dipindai';
+                        this.holdMessageUntil = Date.now() + 2500;
                         return;
                     }
 
-                    const res = await response.json();
-                    this.handleScanResponse(res, bestMatch, similarityScore);
-                    this.holdMessageUntil = Date.now() + 3500;
-                } catch (err) {
-                    console.error('Scan attend error:', err);
-                    this.lastScanError = true;
-                    this.detectionMessage = 'Gagal mengirim absensi: ' + (err.message || 'Koneksi terputus');
-                    this.holdMessageUntil = Date.now() + 4000;
-                    this.playTone('error');
-                } finally {
-                    setTimeout(() => {
-                        this.isProcessing = false;
-                        this.lastScanError = false;
-                    }, 1500);
+                    this.lastScanError = false;
+                    this.isProcessing = true;
+                    this.recentScans[bestMatch.id] = nowTime;
+                    this.detectionMessage = 'Kecocokan: ' + bestMatch.nama + ' (Mengirim data...)';
+
+                    const snapshot = this.captureFrameSnapshot();
+                    const similarityScore = Math.max(0, 1 - minDistance);
+
+                    try {
+                        const response = await fetch('{{ route('absensi.scan-face', [], false) }}', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                            },
+                            body: JSON.stringify({
+                                person_id: bestMatch.id,
+                                type: bestMatch.type || 'siswa',
+                                similarity: similarityScore,
+                                mode: this.scanMode,
+                                photo_snapshot: snapshot
+                            })
+                        });
+
+                        if (!response.ok) {
+                            this.lastScanError = true;
+                            const errJson = await response.json().catch(() => null);
+                            const msg = errJson?.message || ('Server error (HTTP ' + response.status + ')');
+                            this.detectionMessage = msg;
+                            this.holdMessageUntil = Date.now() + 4000;
+                            this.playTone('error');
+                            return;
+                        }
+
+                        const res = await response.json();
+                        this.handleScanResponse(res, bestMatch, similarityScore);
+                        this.holdMessageUntil = Date.now() + 3500;
+                    } catch (err) {
+                        console.error('Scan attend error:', err);
+                        this.lastScanError = true;
+                        this.detectionMessage = 'Gagal mengirim absensi: ' + (err.message || 'Koneksi terputus');
+                        this.holdMessageUntil = Date.now() + 4000;
+                        this.playTone('error');
+                    } finally {
+                        setTimeout(() => {
+                            this.isProcessing = false;
+                            this.lastScanError = false;
+                        }, 1500);
+                    }
+                    return;
                 }
+
+                // 3. Jika tidak cocok 128-d TETAPI ada data 512-d di server:
+                // Kirim snapshot ke server untuk diverifikasi langsung oleh Face Engine 512-d!
+                if (descriptors512.length > 0) {
+                    this.isProcessing = true;
+                    this.detectionMessage = 'Wajah terdeteksi! Memverifikasi ke server...';
+                    this.debugInfo = 'Verifikasi ' + descriptors512.length + ' wajah via Server Engine...';
+
+                    const snapshot = this.captureFrameSnapshot();
+
+                    try {
+                        const response = await fetch('{{ route('absensi.scan-face', [], false) }}', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                            },
+                            body: JSON.stringify({
+                                mode: this.scanMode,
+                                photo_snapshot: snapshot
+                            })
+                        });
+
+                        const res = await response.json();
+                        if (response.ok && res.ok) {
+                            this.lastScanError = false;
+                            this.handleScanResponse(res, res.data || {}, 0.85);
+                            this.holdMessageUntil = Date.now() + 3500;
+                        } else {
+                            this.lastScanError = true;
+                            const msg = res.message || ('Server error HTTP ' + response.status);
+                            this.detectionMessage = msg;
+                            this.holdMessageUntil = Date.now() + 3000;
+                            this.playTone('warning');
+                        }
+                    } catch (err) {
+                        console.error('512-d server scan error:', err);
+                        this.lastScanError = true;
+                        this.detectionMessage = 'Gagal koneksi ke server: ' + (err.message || 'Koneksi terputus');
+                        this.holdMessageUntil = Date.now() + 3500;
+                        this.playTone('error');
+                    } finally {
+                        setTimeout(() => {
+                            this.isProcessing = false;
+                            this.lastScanError = false;
+                        }, 1500);
+                    }
+                    return;
+                }
+
+                // 4. Jika tidak cocok sama sekali:
+                this.lastScanError = true;
+                const distStr = closestDistance < 10 ? closestDistance.toFixed(2) : '-';
+                this.detectionMessage = 'Wajah tidak cocok (Jarak: ' + distStr + ', Target: < 0.55)';
+                this.holdMessageUntil = Date.now() + 2500;
             } catch (fatalErr) {
                 console.error('Fatal matching error:', fatalErr);
                 this.lastScanError = true;

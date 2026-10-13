@@ -409,6 +409,13 @@
                             :class="cameraReady && !modelLoading ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500 animate-ping'"></span>
                         <span x-text="statusText">Memuat Model AI...</span>
                     </span>
+
+                    <!-- Face ID Count Pill -->
+                    <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold border transition"
+                        :class="descriptors.length > 0 ? 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-900/20 dark:text-indigo-300 dark:border-indigo-800/40' : 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-900/20 dark:text-rose-300 dark:border-rose-800/40'">
+                        <i class="fas fa-users text-[10px]"></i>
+                        <span x-text="descriptors.length + ' Face ID Dimuat'">Memuat Data...</span>
+                    </span>
                 </div>
                 <p class="text-xs text-gray-500 dark:text-gray-400">
                     Arahkan wajah ke kamera
@@ -516,11 +523,12 @@
                     </div>
 
                     <!-- Live HUD Detection Feedback Label -->
-                    <div class="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 pointer-events-none">
-                        <div class="px-4 py-1 rounded-full text-xs font-bold tracking-wide backdrop-blur-md border shadow-lg transition-all"
+                    <div class="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 pointer-events-none max-w-[90%] text-center">
+                        <div class="px-4 py-1.5 rounded-full text-xs font-bold tracking-wide backdrop-blur-md border shadow-lg transition-all"
                             :class="{
                                 'bg-black/60 text-white border-white/20': !faceDetected && !isProcessing,
-                                'bg-emerald-500/80 text-white border-emerald-400': faceDetected && !isProcessing,
+                                'bg-emerald-600/90 text-white border-emerald-400': faceDetected && !isProcessing && !lastScanError,
+                                'bg-rose-600/95 text-white border-rose-400': lastScanError,
                                 'bg-amber-500/90 text-white border-amber-300 animate-pulse': isProcessing
                             }">
                             <span x-text="detectionMessage">Posisikan wajah di dalam bingkai oval</span>
@@ -887,6 +895,7 @@ function faceScannerApp() {
         // Debounce map: personId -> timestamp
         recentScans: {},
         holdMessageUntil: 0,
+        lastScanError: false,
         audioCtx: null,
 
         async init() {
@@ -934,15 +943,27 @@ function faceScannerApp() {
 
         async loadDescriptors() {
             try {
-                const res = await fetch('{{ route('absensi.face-descriptors', [], false) }}', { cache: 'no-store' });
+                const res = await fetch('{{ route('absensi.face-descriptors', [], false) }}', { 
+                    headers: { 'Accept': 'application/json' },
+                    cache: 'no-store' 
+                });
+                if (!res.ok) {
+                    console.error('Failed to load descriptors HTTP', res.status);
+                    this.statusText = 'Gagal memuat Face ID (HTTP ' + res.status + ')';
+                    return;
+                }
                 const data = await res.json();
                 if (data.ok) {
                     this.descriptors = data.descriptors || [];
                     this.allStudents = data.students || [];
                     console.log('Loaded Face Descriptors:', this.descriptors.length);
+                    if (this.descriptors.length === 0) {
+                        this.statusText = '0 Face ID terdaftar';
+                    }
                 }
             } catch (err) {
                 console.error('Failed to load descriptors:', err);
+                this.statusText = 'Gagal koneksi Face ID: ' + (err.message || 'Error');
             }
         },
 
@@ -1095,17 +1116,22 @@ function faceScannerApp() {
         // CLIENT-SIDE 1:N MATCHING (Takes < 5ms in JavaScript!)
         async matchAndAttend(descriptor) {
             if (this.descriptors.length === 0) {
-                this.detectionMessage = 'Belum ada Face ID terdaftar di sistem';
+                this.lastScanError = true;
+                this.detectionMessage = 'Database Face ID kosong (0 wajah dimuat dari server)';
                 this.holdMessageUntil = Date.now() + 3000;
                 return;
             }
 
             let bestMatch = null;
-            let minDistance = 0.55; // Threshold kesamaan wajah (Euclidean distance < 0.55)
+            let minDistance = 0.58; // Standard face-api threshold (0.58 toleran untuk kacamata & pencahayaan)
+            let closestDistance = 999;
 
             for (const item of this.descriptors) {
                 if (!item.embedding || !Array.isArray(item.embedding)) continue;
                 const distance = faceapi.euclideanDistance(descriptor, item.embedding);
+                if (distance < closestDistance) {
+                    closestDistance = distance;
+                }
                 if (distance < minDistance) {
                     minDistance = distance;
                     bestMatch = item;
@@ -1113,7 +1139,9 @@ function faceScannerApp() {
             }
 
             if (!bestMatch) {
-                this.detectionMessage = 'Wajah tidak dikenali dalam database';
+                this.lastScanError = true;
+                const distStr = closestDistance < 10 ? closestDistance.toFixed(2) : '-';
+                this.detectionMessage = 'Wajah tidak cocok (Jarak: ' + distStr + ', Target: < 0.58)';
                 this.holdMessageUntil = Date.now() + 2500;
                 return;
             }
@@ -1122,15 +1150,17 @@ function faceScannerApp() {
             const nowTime = Date.now();
             const lastScan = this.recentScans[bestMatch.id] || 0;
             if (nowTime - lastScan < 5000) {
+                this.lastScanError = false;
                 this.detectionMessage = bestMatch.nama + ' baru saja dipindai';
                 this.holdMessageUntil = Date.now() + 2500;
                 return;
             }
 
             // MATCH FOUND! Send to Server
+            this.lastScanError = false;
             this.isProcessing = true;
             this.recentScans[bestMatch.id] = nowTime;
-            this.detectionMessage = 'Kecocokan ditemukan: ' + bestMatch.nama;
+            this.detectionMessage = 'Kecocokan: ' + bestMatch.nama + ' (Mengirim data...)';
 
             // Capture small snapshot from video for proof
             const snapshot = this.captureFrameSnapshot();
@@ -1155,8 +1185,9 @@ function faceScannerApp() {
                 });
 
                 if (!response.ok) {
+                    this.lastScanError = true;
                     const errJson = await response.json().catch(() => null);
-                    const msg = errJson?.message || ('Server error (' + response.status + ')');
+                    const msg = errJson?.message || ('Server error (HTTP ' + response.status + ')');
                     this.detectionMessage = msg;
                     this.holdMessageUntil = Date.now() + 4000;
                     this.playTone('error');
@@ -1168,12 +1199,14 @@ function faceScannerApp() {
                 this.holdMessageUntil = Date.now() + 3500;
             } catch (err) {
                 console.error('Scan attend error:', err);
+                this.lastScanError = true;
                 this.detectionMessage = 'Gagal mengirim absensi: ' + (err.message || 'Koneksi terputus');
                 this.holdMessageUntil = Date.now() + 4000;
                 this.playTone('error');
             } finally {
                 setTimeout(() => {
                     this.isProcessing = false;
+                    this.lastScanError = false;
                 }, 1500);
             }
         },

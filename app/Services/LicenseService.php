@@ -146,6 +146,7 @@ class LicenseService
                     'max_teachers'         => $data['max_teachers'] ?? 0,
                     'max_bot_users'        => $data['max_bot_users'] ?? 0,
                     'photo_enabled'        => $data['photo_enabled'] ?? true,
+                    'face_enabled'         => $data['face_enabled'] ?? true,
                     'history_quota_months' => $data['history_quota_months'] ?? null,
                     'message'              => 'Lisensi telah expired pada ' . $expiredAt->format('d M Y') . '. Hubungi provider untuk perpanjangan.',
                     'grace_remaining_days' => 0,
@@ -162,6 +163,7 @@ class LicenseService
                 'max_teachers'         => $data['max_teachers'] ?? 0,
                 'max_bot_users'        => $data['max_bot_users'] ?? 0,
                 'photo_enabled'        => $data['photo_enabled'] ?? true,
+                'face_enabled'         => $data['face_enabled'] ?? true,
                 'history_quota_months' => $data['history_quota_months'] ?? null,
                 'message'              => 'Lisensi aktif.',
                 'grace_remaining_days' => 0,
@@ -184,6 +186,7 @@ class LicenseService
             'max_teachers'         => 0,   // 0 = unlimited
             'max_bot_users'        => 0,   // 0 = unlimited
             'photo_enabled'        => true,
+            'face_enabled'         => true,
             'history_quota_months' => null,
             'message'              => $message,
             'grace_remaining_days' => 0,
@@ -207,6 +210,7 @@ class LicenseService
             'max_teachers'         => 0,
             'max_bot_users'        => 0,
             'photo_enabled'        => false,
+            'face_enabled'         => false,
             'history_quota_months' => null,
             'message'              => $message,
             'grace_remaining_days' => 0,

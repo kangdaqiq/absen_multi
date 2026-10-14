@@ -701,8 +701,9 @@ class MobileAttendanceController extends Controller
 
         $faceSimilarity = null;
         $isFaceMatched = false;
+        $isFaceEnabled = app(\App\Services\LicenseService::class)->isFaceFeatureEnabled($user?->school);
 
-        if ($faceData) {
+        if ($faceData && $isFaceEnabled) {
             if (!$request->hasFile('photo')) {
                 return response()->json([
                     'success' => false,
@@ -2087,6 +2088,14 @@ class MobileAttendanceController extends Controller
             return response()->json(['success' => false, 'message' => 'Unauthenticated'], 401);
         }
 
+        $isFaceEnabled = app(\App\Services\LicenseService::class)->isFaceFeatureEnabled($user?->school);
+        if (!$isFaceEnabled) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Fitur Face Recognition dinonaktifkan oleh administrator.'
+            ], 403);
+        }
+
         $student = $user->student ?? Siswa::where('user_id', $user->id)->first();
         $teacher = $user->guru ?? Guru::where('user_id', $user->id)->first();
 
@@ -2206,6 +2215,15 @@ class MobileAttendanceController extends Controller
                 'message' => 'Unauthenticated',
                 'data' => null
             ], 401);
+        }
+
+        $isFaceEnabled = app(\App\Services\LicenseService::class)->isFaceFeatureEnabled($user?->school);
+        if (!$isFaceEnabled) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Fitur Face Recognition scanner dinonaktifkan oleh administrator.',
+                'data' => null
+            ], 403);
         }
 
         $schoolId = $user->school_id;
@@ -2767,8 +2785,9 @@ class MobileAttendanceController extends Controller
         $faceRegistered = false;
         $faceMessage = null;
         $syncFace = $request->boolean('sync_face', true);
+        $isFaceEnabled = app(\App\Services\LicenseService::class)->isFaceFeatureEnabled($siswa?->school);
 
-        if ($syncFace) {
+        if ($syncFace && $isFaceEnabled) {
             // Cek apakah siswa sudah punya data Face ID terdaftar. Jika sudah, tolak pendaftaran berikutnya!
             $existingFace = UserFaceData::where('siswa_id', $siswa->id)
                 ->when($siswa->user_id, fn($q) => $q->orWhere('user_id', $siswa->user_id))
@@ -2983,8 +3002,9 @@ class MobileAttendanceController extends Controller
         $faceRegistered = false;
         $faceMessage = null;
         $syncFace = $request->boolean('sync_face', true);
+        $isFaceEnabled = app(\App\Services\LicenseService::class)->isFaceFeatureEnabled($guru?->school);
 
-        if ($syncFace) {
+        if ($syncFace && $isFaceEnabled) {
             $existingFace = UserFaceData::where('guru_id', $guru->id)
                 ->when($guru->user_id, fn($q) => $q->orWhere('user_id', $guru->user_id))
                 ->first();

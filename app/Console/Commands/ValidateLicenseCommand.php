@@ -38,6 +38,8 @@ class ValidateLicenseCommand extends Command
             $this->line("   Max Guru   : " . (($result['max_teachers'] ?? 0) === 0 ? 'Unlimited' : $result['max_teachers']));
             $this->line("   Max Bot    : " . (($result['max_bot_users'] ?? 0) === 0 ? 'Unlimited' : $result['max_bot_users']));
             $this->line("   Histori    : " . (is_null($result['history_quota_months'] ?? null) ? 'Unlimited' : $result['history_quota_months'] . ' Bulan'));
+            $this->line("   Fitur Foto : " . (!empty($result['photo_enabled']) ? 'Aktif' : 'Nonaktif'));
+            $this->line("   Fitur Face : " . (!empty($result['face_enabled']) ? 'Aktif' : 'Nonaktif'));
         } elseif ($result['expired']) {
             $this->error('⛔ Lisensi EXPIRED: ' . $result['message']);
             return 1;

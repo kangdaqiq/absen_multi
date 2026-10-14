@@ -124,7 +124,7 @@ class MenuHelper
                 $absensiSubItems[] = ['name' => 'Absensi Siswa', 'path' => route('absensi.index', [], false)];
                 // Scanner Absensi Wajah & USB hanya untuk admin
                 if ($role === 'admin') {
-                    $isFaceLocked = $school && !($school->face_enabled ?? true);
+                    $isFaceLocked = !app(\App\Services\LicenseService::class)->isFaceFeatureEnabled($school);
                     $absensiSubItems[] = [
                         'name' => 'Scanner Face ID',
                         'path' => route('absensi.scanner-face', [], false),

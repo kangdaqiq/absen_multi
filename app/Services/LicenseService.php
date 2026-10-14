@@ -308,11 +308,20 @@ class LicenseService
     }
 
     /**
+     * Check if app is running in self-hosted client mode
+     */
+    public function isSelfHosted(): bool
+    {
+        return file_exists(storage_path('app/license_integrity.json'))
+            || config('app.mode', 'hosted') === 'self_hosted';
+    }
+
+    /**
      * Check if global teacher quota is available (for self_hosted mode)
      */
     public function hasGlobalTeacherQuota(): bool
     {
-        if (config('app.mode', 'hosted') !== 'self_hosted') {
+        if (!$this->isSelfHosted()) {
             return true; // only enforced in self_hosted
         }
 
@@ -332,7 +341,7 @@ class LicenseService
      */
     public function hasGlobalBotQuota(): bool
     {
-        if (config('app.mode', 'hosted') !== 'self_hosted') {
+        if (!$this->isSelfHosted()) {
             return true; // only enforced in self_hosted
         }
 
@@ -352,7 +361,7 @@ class LicenseService
      */
     public function hasGlobalStudentQuota(): bool
     {
-        if (config('app.mode', 'hosted') !== 'self_hosted') {
+        if (!$this->isSelfHosted()) {
             return true; // only enforced in self_hosted
         }
 
@@ -374,7 +383,7 @@ class LicenseService
      */
     public function isPhotoFeatureEnabled(?\App\Models\School $school = null): bool
     {
-        if (config('app.mode', 'hosted') === 'self_hosted') {
+        if ($this->isSelfHosted()) {
             $license = $this->validate();
             return isset($license['photo_enabled']) ? (bool) $license['photo_enabled'] : true;
         }
@@ -398,7 +407,7 @@ class LicenseService
      */
     public function isFaceFeatureEnabled(?\App\Models\School $school = null): bool
     {
-        if (config('app.mode', 'hosted') === 'self_hosted') {
+        if ($this->isSelfHosted()) {
             $license = $this->validate();
             return isset($license['face_enabled']) ? (bool) $license['face_enabled'] : true;
         }

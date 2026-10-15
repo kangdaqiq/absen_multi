@@ -68,35 +68,51 @@ class ClientBackupController extends Controller
         }
 
         try {
-            $clientSlug = Str::slug($license->client_name, '_');
-            if (empty($clientSlug)) {
-                $clientSlug = 'client_' . $license->id;
+            $schoolSlug = Str::slug($license->client_name, '_');
+            if (empty($schoolSlug)) {
+                $schoolSlug = 'client_' . $license->id;
             }
 
-            $disk = Storage::disk('local');
-            $clientDir = "client_backups/{$clientSlug}";
+            // Ekstensi file
+            $extension = $uploadedFile->getClientOriginalExtension() ?: 'sql';
+
+            // Format nama backup: nama_sekolah_tgl (contoh: smpn_1_jakarta_15-10-2026_163000.sql)
+            $tgl = now()->format('d-m-Y_His');
+            $fileName = "{$schoolSlug}_{$tgl}.{$extension}";
+
+            // Simpan di 1 folder bersama backup server utama: storage/app/backups
+            $backupDir = storage_path('app/backups');
+            if (!file_exists($backupDir)) {
+                mkdir($backupDir, 0755, true);
+            }
 
             // Kebijakan: HANYA 1 backup per client.
-            // Hapus semua file backup lama milik client ini jika ada.
-            if ($disk->exists($clientDir)) {
-                $existingFiles = $disk->files($clientDir);
+            // Hapus file backup lama milik client ini di folder backups (pola nama_sekolah_*)
+            $existingFiles = glob("{$backupDir}/{$schoolSlug}_*.*");
+            if (!empty($existingFiles)) {
                 foreach ($existingFiles as $existingFile) {
-                    $disk->delete($existingFile);
+                    if (is_file($existingFile)) {
+                        @unlink($existingFile);
+                    }
                 }
-            } else {
-                $disk->makeDirectory($clientDir);
             }
 
-            // Hapus juga file backup sebelumnya jika path tercatat berbeda
-            if (!empty($license->backup_file) && $disk->exists($license->backup_file)) {
-                $disk->delete($license->backup_file);
+            // Hapus juga file backup sebelumnya jika path tercatat berbeda (misal legacy di storage/app/private/client_backups)
+            if (!empty($license->backup_file)) {
+                $prevFullPath = storage_path('app/' . $license->backup_file);
+                if (file_exists($prevFullPath) && is_file($prevFullPath)) {
+                    @unlink($prevFullPath);
+                }
+                if (Storage::disk('local')->exists($license->backup_file)) {
+                    Storage::disk('local')->delete($license->backup_file);
+                }
             }
 
-            $extension = $uploadedFile->getClientOriginalExtension() ?: 'sql';
-            $fileName = "{$clientSlug}_latest.{$extension}";
-            $storedPath = $uploadedFile->storeAs($clientDir, $fileName, 'local');
-
-            $fileSize = $uploadedFile->getSize();
+            // Pindahkan file backup ke storage/app/backups
+            $uploadedFile->move($backupDir, $fileName);
+            $storedPath = "backups/{$fileName}";
+            $fullFilePath = "{$backupDir}/{$fileName}";
+            $fileSize = file_exists($fullFilePath) ? filesize($fullFilePath) : $uploadedFile->getSize();
 
             // Simpan informasi backup ke database
             $license->update([
@@ -105,7 +121,7 @@ class ClientBackupController extends Controller
                 'backup_size'    => $fileSize,
             ]);
 
-            Log::info("[ClientBackup] Backup client '{$license->client_name}' berhasil disimpan. Path: {$storedPath}, Size: {$fileSize} bytes.");
+            Log::info("[ClientBackup] Backup client '{$license->client_name}' berhasil disimpan di 1 folder backups: {$fileName} ({$fileSize} bytes).");
 
             return response()->json([
                 'success' => true,

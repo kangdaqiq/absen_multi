@@ -124,13 +124,26 @@ class LicenseController extends Controller
      */
     public function downloadBackup(License $license)
     {
-        if (empty($license->backup_file) || !\Illuminate\Support\Facades\Storage::disk('local')->exists($license->backup_file)) {
+        if (empty($license->backup_file)) {
             return redirect()->route('super-admin.licenses.index')
-                ->with('error', 'File backup untuk lisensi ' . $license->client_name . ' belum tersedia atau tidak ditemukan di server.');
+                ->with('error', 'File backup untuk lisensi ' . $license->client_name . ' belum tersedia di server.');
         }
 
-        $fullPath = \Illuminate\Support\Facades\Storage::disk('local')->path($license->backup_file);
-        $downloadName = basename($license->backup_file);
+        $fullPath = null;
+        if (file_exists(storage_path('app/' . $license->backup_file))) {
+            $fullPath = storage_path('app/' . $license->backup_file);
+        } elseif (\Illuminate\Support\Facades\Storage::disk('local')->exists($license->backup_file)) {
+            $fullPath = \Illuminate\Support\Facades\Storage::disk('local')->path($license->backup_file);
+        } elseif (file_exists($license->backup_file)) {
+            $fullPath = $license->backup_file;
+        }
+
+        if (!$fullPath || !file_exists($fullPath)) {
+            return redirect()->route('super-admin.licenses.index')
+                ->with('error', 'File backup untuk lisensi ' . $license->client_name . ' tidak ditemukan di server.');
+        }
+
+        $downloadName = basename($fullPath);
 
         return response()->download($fullPath, $downloadName);
     }

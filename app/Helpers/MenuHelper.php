@@ -338,6 +338,7 @@ class MenuHelper
         // 5. SISTEM
         if (in_array($role, ['admin', 'super_admin'])) {
             $sistemSubItems = [
+                ['name' => 'Update Sistem', 'path' => route('system.update', [], false)],
                 ['name' => 'Manajemen Admin', 'path' => route('users.index', [], false)],
                 ['name' => 'Backup & Restore', 'path' => route('backup.index', [], false)],
             ];

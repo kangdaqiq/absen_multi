@@ -333,6 +333,11 @@ Route::middleware('auth')->group(function () {
         Route::post('/gate-cards/{id}/delete-finger', [App\Http\Controllers\GateCardController::class, 'deleteFingerId']);
 
         // Backups
+        // Update Sistem (Web Console & Updater)
+        Route::get('/system/update', [App\Http\Controllers\SystemUpdateController::class, 'index'])->name('system.update');
+        Route::get('/system/update/stream', [App\Http\Controllers\SystemUpdateController::class, 'stream'])->name('system.update.stream');
+
+        // Backups
         Route::get('/backups', [App\Http\Controllers\BackupController::class, 'index'])->name('backups.index');
         Route::post('/backups', [App\Http\Controllers\BackupController::class, 'create'])->name('backups.create');
         Route::get('/backups/{filename}', [App\Http\Controllers\BackupController::class, 'download'])->name('backups.download');

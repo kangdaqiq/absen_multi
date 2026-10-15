@@ -129,6 +129,8 @@ Route::get('/simulator/rfid', [App\Http\Controllers\RfidSimulatorController::cla
 Route::middleware('auth')->group(function () {
     // Common Routes (All Authenticated)
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/dashboard/guru', [DashboardController::class, 'guruDashboard'])->name('dashboard.guru');
+    Route::post('/dashboard/guru/quick-jurnal', [DashboardController::class, 'storeQuickJurnal'])->name('dashboard.guru.quick-jurnal');
     Route::get('/download/android-app', [DashboardController::class, 'downloadAndroidApp'])->name('download.android-app');
     Route::get('/profile', [App\Http\Controllers\ProfileController::class, 'edit'])->name('profile.edit');
     Route::put('/profile', [App\Http\Controllers\ProfileController::class, 'update'])->name('profile.update');
@@ -158,6 +160,12 @@ Route::middleware('auth')->group(function () {
         Route::delete('kelas/bulk-destroy', [KelasController::class, 'bulkDestroy'])->name('kelas.bulk-destroy');
         Route::resource('jurusan', App\Http\Controllers\JurusanController::class)->except(['create', 'show', 'edit']);
         Route::resource('kelas', KelasController::class)->except(['create', 'show', 'edit']);
+        Route::resource('mapel', App\Http\Controllers\MapelController::class)->except(['create', 'show', 'edit']);
+        Route::post('jam-pelajaran/{id}/toggle-status', [App\Http\Controllers\JamPelajaranController::class, 'toggleStatus'])->name('jam-pelajaran.toggle-status');
+        Route::post('jam-pelajaran/generate-presets', [App\Http\Controllers\JamPelajaranController::class, 'generatePresets'])->name('jam-pelajaran.generate-presets');
+        Route::put('jam-pelajaran/bulk-update', [App\Http\Controllers\JamPelajaranController::class, 'bulkUpdate'])->name('jam-pelajaran.bulk-update');
+        Route::delete('jam-pelajaran/bulk-destroy', [App\Http\Controllers\JamPelajaranController::class, 'bulkDestroy'])->name('jam-pelajaran.bulk-destroy');
+        Route::resource('jam-pelajaran', App\Http\Controllers\JamPelajaranController::class)->except(['create', 'show', 'edit']);
         Route::resource('guru', GuruController::class)->except(['create', 'show', 'edit']);
         Route::patch('guru/{id}/toggle-bot-access', [GuruController::class, 'toggleBotAccess'])->name('guru.toggle-bot-access');
         Route::match(['post', 'delete'], 'guru/{id}/delete-face', [GuruController::class, 'deleteFaceId'])->name('guru.delete-face');
@@ -166,6 +174,19 @@ Route::middleware('auth')->group(function () {
 
     // Absensi & Rekap Routes (Includes Wali Kelas & Waka Kurikulum)
     Route::middleware('role:admin,teacher,wali_kelas,waka_kurikulum')->group(function () {
+        // Jadwal Pembelajaran
+        Route::delete('jadwal-pelajaran/bulk-destroy', [App\Http\Controllers\JadwalPelajaranController::class, 'bulkDestroy'])->name('jadwal-pelajaran.bulk-destroy');
+        Route::resource('jadwal-pelajaran', App\Http\Controllers\JadwalPelajaranController::class)->except(['create', 'show', 'edit']);
+
+        // Absensi Siswa Per Jam Pelajaran & Jurnal KBM
+        Route::get('/absensi-pelajaran', [App\Http\Controllers\AbsensiPelajaranController::class, 'index'])->name('absensi-pelajaran.index');
+        Route::get('/absensi-pelajaran/{jadwal}/presensi', [App\Http\Controllers\AbsensiPelajaranController::class, 'presensi'])->name('absensi-pelajaran.presensi');
+        Route::post('/absensi-pelajaran/{jadwal}/presensi', [App\Http\Controllers\AbsensiPelajaranController::class, 'storePresensi'])->name('absensi-pelajaran.store');
+        Route::post('/absensi-pelajaran/{jadwal}/jurnal', [App\Http\Controllers\AbsensiPelajaranController::class, 'storeJurnalOnly'])->name('absensi-pelajaran.jurnal');
+        Route::post('/absensi-pelajaran/update-single', [App\Http\Controllers\AbsensiPelajaranController::class, 'updateSingle'])->name('absensi-pelajaran.update-single');
+        Route::post('/absensi-pelajaran/set-all', [App\Http\Controllers\AbsensiPelajaranController::class, 'setAllHadir'])->name('absensi-pelajaran.set-all');
+        Route::get('/absensi-pelajaran-rekap', [App\Http\Controllers\AbsensiPelajaranController::class, 'rekap'])->name('absensi-pelajaran.rekap');
+
         // Absensi
         Route::get('/absensi', [App\Http\Controllers\AttendanceController::class, 'index'])->name('absensi.index');
         Route::get('/absensi/scanner-usb', [App\Http\Controllers\AttendanceController::class, 'scannerUsbView'])->name('absensi.scanner-usb');
@@ -318,6 +339,7 @@ Route::middleware('auth')->group(function () {
         Route::delete('/backups/{filename}', [App\Http\Controllers\BackupController::class, 'delete'])->name('backups.delete');
 
         // Users
+        Route::post('/users/generate-guru', [App\Http\Controllers\UserController::class, 'generateGuruAccounts'])->name('users.generate-guru');
         Route::delete('/users/bulk-destroy', [App\Http\Controllers\UserController::class, 'bulkDestroy'])->name('users.bulk-destroy');
         Route::resource('users', App\Http\Controllers\UserController::class)->except(['show']);
 

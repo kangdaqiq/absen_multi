@@ -3,14 +3,11 @@
 @section('title', 'Absen Kegiatan')
 
 @section('content')
-<div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-    <div>
-        <h2 class="text-title-md2 font-semibold text-gray-800 dark:text-white/90">
-            🎯 Absen Kegiatan
-        </h2>
-        <p class="text-sm text-gray-500 dark:text-gray-400">Pencatatan Kehadiran Siswa Secara Manual & Real-time</p>
-    </div>
-</div>
+<x-page-header 
+    title="Absen Kegiatan" 
+    subtitle="Pencatatan Kehadiran Siswa Secara Manual & Real-time" 
+    icon="fas fa-user-check" 
+/>
 
 {{-- Notification Toast Container --}}
 <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2"></div>
@@ -85,7 +82,7 @@
     <div class="mb-6 rounded-2xl border border-brand-200 bg-brand-50 p-5 dark:border-brand-500/30 dark:bg-brand-500/10 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
             <h5 class="text-lg font-bold text-brand-800 dark:text-brand-400 flex items-center gap-2">
-                <span>{{ $kegiatan->kategori === 'ekskul' ? '⚽' : '🎯' }} {{ $kegiatan->nama_kegiatan }}</span>
+                <span>{{ $kegiatan->nama_kegiatan }}</span>
                 @if($kegiatan->kategori === 'ekskul')
                     <span class="text-xs px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300 font-semibold">
                         <i class="fas fa-futbol mr-1"></i>Ekskul {{ $kegiatan->pembina ? '• ' . $kegiatan->pembina->nama : '' }}

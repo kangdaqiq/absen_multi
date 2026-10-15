@@ -93,6 +93,64 @@ class User extends Authenticatable
      */
     public function isAdmin()
     {
-        return $this->role === 'admin';
+        return in_array($this->role, ['admin', 'super_admin']);
+    }
+
+    /**
+     * Check if user is guru / teacher
+     */
+    public function isGuru()
+    {
+        return in_array($this->role, ['guru', 'teacher']);
+    }
+
+    public function isTeacher()
+    {
+        return $this->isGuru();
+    }
+
+    public function isWaliKelas()
+    {
+        if ($this->isAdmin() || $this->isSuperAdmin()) {
+            return false;
+        }
+
+        if ($this->role === 'wali_kelas') {
+            return true;
+        }
+
+        if ($this->isGuru() && $this->guru) {
+            return \App\Models\Kelas::where('school_id', $this->school_id)
+                ->where(function ($q) {
+                    $q->where('wali_kelas_id', $this->guru->id)
+                      ->orWhere('wali_kelas_2_id', $this->guru->id);
+                })->exists();
+        }
+
+        return false;
+    }
+
+    /**
+     * Get array of class IDs managed by this wali kelas / guru (supports 1, 2, 3, 4+ classes)
+     *
+     * @return array
+     */
+    public function getManagedKelasIds()
+    {
+        $guru = $this->guru;
+        if (!$guru) {
+            return [];
+        }
+
+        return \App\Models\Kelas::where('school_id', $this->school_id)
+            ->where(function ($q) use ($guru) {
+                $q->where('wali_kelas_id', $guru->id)
+                  ->orWhere('wali_kelas_2_id', $guru->id);
+            })->pluck('id')->toArray();
+    }
+
+    public function isWakaKurikulum()
+    {
+        return $this->role === 'waka_kurikulum';
     }
 }

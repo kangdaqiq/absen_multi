@@ -9,27 +9,33 @@ use App\Models\Guru;
 use App\Models\Kelas;
 use App\Models\Attendance;
 use App\Models\Announcement;
+use App\Models\JadwalPelajaran;
+use App\Models\JurnalPelajaran;
+use App\Models\AbsensiPelajaran;
+use App\Models\AbsensiGuru;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         $user = auth()->user();
+
+        // Jika user adalah Guru / Teacher / Wali Kelas atau meminta view=guru, arahkan ke Dashboard Guru
+        if (in_array($user->role, ['teacher', 'guru', 'wali_kelas']) || $user->isWaliKelas() || ($user->guru && !$user->isAdmin()) || $request->query('view') === 'guru') {
+            return $this->guruDashboard($request);
+        }
+
         $today = Carbon::today();
         $isSuperAdmin = $user->isSuperAdmin();
         $schoolId = $isSuperAdmin ? null : $user->school_id;
-        $isWaliKelas = $user->role === 'wali_kelas';
+        $isWaliKelas = $user->isWaliKelas();
         $managedKelasIds = [];
 
         if ($isWaliKelas) {
-            $guru = $user->guru;
-            if ($guru) {
-                $managedKelasIds = \App\Models\Kelas::where(function($q) use ($guru) {
-                    $q->where('wali_kelas_id', $guru->id)
-                      ->orWhere('wali_kelas_2_id', $guru->id);
-                })->pluck('id')->toArray();
-            } else {
+            $managedKelasIds = $user->getManagedKelasIds();
+            if (empty($managedKelasIds)) {
                 $managedKelasIds = [-1]; // No classes
             }
         }
@@ -305,5 +311,217 @@ class DashboardController extends Controller
         }
 
         return redirect()->route('dashboard')->with('info', 'File APK Jagat Absen sedang disiapkan oleh administrator. Silakan hubungi admin sekolah atau atur URL download APK di menu Pengaturan.');
+    }
+
+    /**
+     * Dashboard Khusus Guru / KBM (Input Absen & Jurnal)
+     */
+    public function guruDashboard(Request $request)
+    {
+        $user = auth()->user();
+        $schoolId = $user->school_id;
+
+        // Dapatkan data guru terkait
+        $guru = $user->guru;
+
+        // Jika admin / waka / super_admin mengakses dashboard guru untuk simulasi
+        $canSwitchGuru = in_array($user->role, ['admin', 'super_admin', 'waka_kurikulum']);
+        $allGurus = collect();
+
+        if ($canSwitchGuru) {
+            $allGurus = Guru::where('school_id', $schoolId)->orderBy('nama')->get();
+            if ($request->filled('guru_id')) {
+                $guru = Guru::where('school_id', $schoolId)->find($request->guru_id) ?? $guru;
+            } elseif (!$guru && $allGurus->isNotEmpty()) {
+                $guru = $allGurus->first();
+            }
+        }
+
+        // Tanggal & Hari Aktif
+        $tanggal = $request->query('tanggal', Carbon::today()->format('Y-m-d'));
+        try {
+            $parsedDate = Carbon::parse($tanggal);
+        } catch (\Exception $e) {
+            $parsedDate = Carbon::today();
+            $tanggal = $parsedDate->format('Y-m-d');
+        }
+
+        $hariIndonesia = [
+            1 => 'Senin',
+            2 => 'Selasa',
+            3 => 'Rabu',
+            4 => 'Kamis',
+            5 => 'Jumat',
+            6 => 'Sabtu',
+            7 => 'Minggu',
+        ];
+        $namaHari = $hariIndonesia[$parsedDate->dayOfWeekIso] ?? 'Senin';
+        $filterHari = $request->query('hari', $namaHari);
+
+        // Jadwal Mengajar Guru Hari Tersebut
+        $jadwals = collect();
+        if ($guru) {
+            $jadwals = JadwalPelajaran::where('school_id', $schoolId)
+                ->where('guru_id', $guru->id)
+                ->where('hari', $filterHari)
+                ->with(['kelas.siswas', 'mapel', 'jamPelajaran'])
+                ->orderBy('jam_mulai', 'asc')
+                ->get();
+
+            $jadwalIds = $jadwals->pluck('id');
+            $jurnals = JurnalPelajaran::where('school_id', $schoolId)
+                ->whereIn('jadwal_pelajaran_id', $jadwalIds)
+                ->where('tanggal', $tanggal)
+                ->get()
+                ->keyBy('jadwal_pelajaran_id');
+
+            $absensiCounts = AbsensiPelajaran::where('school_id', $schoolId)
+                ->whereIn('jadwal_pelajaran_id', $jadwalIds)
+                ->where('tanggal', $tanggal)
+                ->selectRaw('jadwal_pelajaran_id, 
+                    COUNT(*) as total_absen,
+                    SUM(CASE WHEN status = "H" THEN 1 ELSE 0 END) as count_h,
+                    SUM(CASE WHEN status = "S" THEN 1 ELSE 0 END) as count_s,
+                    SUM(CASE WHEN status = "I" THEN 1 ELSE 0 END) as count_i,
+                    SUM(CASE WHEN status = "A" THEN 1 ELSE 0 END) as count_a,
+                    SUM(CASE WHEN status = "T" THEN 1 ELSE 0 END) as count_t,
+                    SUM(CASE WHEN status = "D" THEN 1 ELSE 0 END) as count_d')
+                ->groupBy('jadwal_pelajaran_id')
+                ->get()
+                ->keyBy('jadwal_pelajaran_id');
+
+            $now = Carbon::now();
+            $nowHm = $now->format('H:i');
+            $isToday = ($tanggal === Carbon::today()->format('Y-m-d'));
+
+            foreach ($jadwals as $jadwal) {
+                $jadwal->jurnal_today = $jurnals->get($jadwal->id);
+                $jadwal->absensi_summary = $absensiCounts->get($jadwal->id);
+                $jadwal->is_attended = !empty($jadwal->absensi_summary) && $jadwal->absensi_summary->total_absen > 0;
+                $jadwal->is_jurnal_filled = !empty($jadwal->jurnal_today) && !empty($jadwal->jurnal_today->materi);
+
+                $jMulai = substr($jadwal->jam_mulai, 0, 5);
+                $jSelesai = substr($jadwal->jam_selesai, 0, 5);
+
+                $jadwal->is_live = ($isToday && $nowHm >= $jMulai && $nowHm <= $jSelesai);
+                $jadwal->is_passed = ($isToday && $nowHm > $jSelesai);
+                $jadwal->is_upcoming = ($isToday && $nowHm < $jMulai);
+            }
+        }
+
+        // Metrik KBM
+        $totalSesi = $jadwals->count();
+        $sudahDiabsen = $jadwals->where('is_attended', true)->count();
+        $belumDiabsen = $totalSesi - $sudahDiabsen;
+        $jurnalTerisi = $jadwals->where('is_jurnal_filled', true)->count();
+
+        // Absensi Mandiri Guru (Check-in gerbang/sekolah)
+        $todayGuruAttendance = $guru
+            ? AbsensiGuru::where('guru_id', $guru->id)->whereDate('tanggal', Carbon::today())->first()
+            : null;
+        $shiftGuru = $guru ? $guru->getShiftForDate() : null;
+
+        // Riwayat Jurnal Terakhir
+        $recentJurnals = $guru
+            ? JurnalPelajaran::where('school_id', $schoolId)
+                ->where('guru_id', $guru->id)
+                ->with(['jadwal.kelas', 'jadwal.mapel'])
+                ->orderBy('tanggal', 'desc')
+                ->orderBy('created_at', 'desc')
+                ->take(5)
+                ->get()
+            : collect();
+
+        // Jadwal Mingguan
+        $jadwalMingguan = $guru
+            ? JadwalPelajaran::where('school_id', $schoolId)
+                ->where('guru_id', $guru->id)
+                ->with(['kelas', 'mapel', 'jamPelajaran'])
+                ->orderBy('jam_mulai')
+                ->get()
+                ->groupBy('hari')
+            : collect();
+
+        $hariList = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
+        $announcements = Announcement::where('is_active', true)->latest()->take(3)->get();
+
+        // Hitung jumlah sesi per hari dalam seminggu
+        $sesiPerHari = [];
+        foreach ($hariList as $h) {
+            $sesiPerHari[$h] = isset($jadwalMingguan[$h]) ? $jadwalMingguan[$h]->count() : 0;
+        }
+        $totalSesiMingguan = $jadwalMingguan->flatten()->count();
+        $nextDayWithJadwal = collect($hariList)->first(fn($h) => ($sesiPerHari[$h] ?? 0) > 0);
+
+        return view('dashboard-guru', compact(
+            'guru',
+            'jadwals',
+            'tanggal',
+            'namaHari',
+            'filterHari',
+            'totalSesi',
+            'sudahDiabsen',
+            'belumDiabsen',
+            'jurnalTerisi',
+            'todayGuruAttendance',
+            'shiftGuru',
+            'recentJurnals',
+            'jadwalMingguan',
+            'hariList',
+            'sesiPerHari',
+            'totalSesiMingguan',
+            'nextDayWithJadwal',
+            'announcements',
+            'canSwitchGuru',
+            'allGurus'
+        ));
+    }
+
+    /**
+     * Quick Input / Update Jurnal KBM dari Dashboard Guru
+     */
+    public function storeQuickJurnal(Request $request)
+    {
+        $user = auth()->user();
+        $schoolId = $user->school_id;
+
+        $request->validate([
+            'jadwal_pelajaran_id' => 'required|exists:jadwal_pelajaran,id',
+            'tanggal'             => 'required|date',
+            'materi'              => 'required|string|max:1000',
+            'catatan'             => 'nullable|string|max:1000',
+        ], [
+            'materi.required' => 'Materi Pembelajaran / Jurnal KBM wajib diisi.'
+        ]);
+
+        $jadwal = JadwalPelajaran::where('school_id', $schoolId)->findOrFail($request->jadwal_pelajaran_id);
+
+        $guruId = $user->guru?->id ?? $jadwal->guru_id;
+
+        $jurnal = JurnalPelajaran::updateOrCreate(
+            [
+                'jadwal_pelajaran_id' => $jadwal->id,
+                'tanggal'             => Carbon::parse($request->tanggal)->format('Y-m-d'),
+            ],
+            [
+                'school_id'    => $schoolId,
+                'guru_id'      => $guruId,
+                'jam_ke'       => $jadwal->jam_ke,
+                'materi'       => trim($request->materi),
+                'catatan'      => $request->catatan ? trim($request->catatan) : null,
+                'jam_mulai'    => $jadwal->jam_mulai,
+                'jam_selesai'  => $jadwal->jam_selesai,
+            ]
+        );
+
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Jurnal KBM berhasil disimpan.',
+                'jurnal'  => $jurnal
+            ]);
+        }
+
+        return back()->with('success', 'Jurnal KBM untuk ' . ($jadwal->mapel?->nama_mapel ?? 'Mata Pelajaran') . ' berhasil disimpan.');
     }
 }

@@ -4,24 +4,24 @@
 
 @section('content')
 <div x-data="bulkSiswaActions()">
-<div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-    <h2 class="text-title-md2 font-semibold text-gray-800 dark:text-white/90">
-        Data Siswa
-    </h2>
+<x-page-header 
+    title="Data Siswa" 
+    subtitle="Kelola data induk siswa, NISN, status, dan rombongan belajar" 
+    icon="fas fa-user-graduate">
     <div class="flex flex-wrap gap-2">
         @if($photoEnabled)
         <button @click="$dispatch('open-modal', 'modalImportFotoZip')" class="inline-flex items-center justify-center gap-2.5 rounded-lg bg-indigo-600 px-4 py-2 text-center font-medium text-white hover:bg-indigo-700 transition shadow-xs">
             <i class="fas fa-file-archive"></i> Import Foto
         </button>
         @endif
-        <button @click="$dispatch('open-modal', 'modalImportSiswa')" class="inline-flex items-center justify-center gap-2.5 rounded-lg bg-success-500 px-4 py-2 text-center font-medium text-white hover:bg-success-600 transition">
+        <button @click="$dispatch('open-modal', 'modalImportSiswa')" class="inline-flex items-center justify-center gap-2.5 rounded-lg bg-success-500 px-4 py-2 text-center font-medium text-white hover:bg-success-600 transition shadow-xs">
             <i class="fas fa-file-excel"></i> Import Excel
         </button>
-        <button @click="$dispatch('open-modal', 'modalTambahSiswa')" class="inline-flex items-center justify-center gap-2.5 rounded-lg bg-brand-500 px-4 py-2 text-center font-medium text-white hover:bg-brand-600 transition">
+        <button @click="$dispatch('open-modal', 'modalTambahSiswa')" class="inline-flex items-center justify-center gap-2.5 rounded-lg bg-brand-500 px-4 py-2 text-center font-medium text-white hover:bg-brand-600 transition shadow-xs">
             <i class="fas fa-plus"></i> Tambah Siswa
         </button>
     </div>
-</div>
+</x-page-header>
 
 <div class="rounded-2xl border border-gray-200 bg-white shadow-theme-sm dark:border-gray-800 dark:bg-gray-dark">
     {{-- Alert Success / Error --}}

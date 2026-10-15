@@ -3,15 +3,15 @@
 @section('title', 'Manajemen Kartu Gerbang')
 
 @section('content')
-    <div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h2 class="text-title-md2 font-semibold text-gray-800 dark:text-white/90">
-            <i class="fas fa-id-badge text-brand-500 mr-2"></i> Manajemen Kartu Gerbang
-        </h2>
+    <x-page-header 
+        title="Manajemen Kartu Gerbang" 
+        subtitle="Kelola mapping kartu RFID akses gerbang masuk & keluar sekolah" 
+        icon="fas fa-id-badge">
         <button @click="$dispatch('open-modal', 'modalTambahKartu')"
-            class="inline-flex items-center justify-center gap-2.5 rounded-md bg-brand-500 px-6 py-3 text-center font-medium text-white hover:bg-opacity-90 transition">
+            class="inline-flex items-center justify-center gap-2.5 rounded-lg bg-brand-500 px-5 py-2.5 text-center text-sm font-medium text-white hover:bg-brand-600 transition shadow-xs">
             <i class="fas fa-plus"></i> Tambah Kartu
         </button>
-    </div>
+    </x-page-header>
 
     @if (session('success'))
         <div

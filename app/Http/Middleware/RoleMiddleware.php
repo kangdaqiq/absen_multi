@@ -21,8 +21,17 @@ class RoleMiddleware
 
         $user = auth()->user();
 
+        // Expand role aliases: guru <-> teacher
+        $effectiveRoles = $roles;
+        if (in_array('teacher', $roles) && !in_array('guru', $effectiveRoles)) {
+            $effectiveRoles[] = 'guru';
+        }
+        if (in_array('guru', $roles) && !in_array('teacher', $effectiveRoles)) {
+            $effectiveRoles[] = 'teacher';
+        }
+
         // Check if user has one of the allowed roles
-        if (in_array($user->role, $roles)) {
+        if (in_array($user->role, $effectiveRoles)) {
             return $next($request);
         }
 

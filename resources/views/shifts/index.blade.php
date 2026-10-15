@@ -3,15 +3,10 @@
 @section('title', 'Master Shift Guru & Staff')
 
 @section('content')
-<div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-    <div>
-        <h2 class="text-title-md2 font-semibold text-gray-800 dark:text-white/90">
-            ⏰ Kelola Shift Guru & Staff
-        </h2>
-        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            Atur jam kerja, hari berlaku, toleransi keterlambatan, dan rentang waktu scan kartu/jari.
-        </p>
-    </div>
+<x-page-header 
+    title="Kelola Shift Guru & Staff" 
+    subtitle="Atur jam kerja, hari berlaku, toleransi keterlambatan, dan rentang waktu scan" 
+    icon="fas fa-business-time">
     <div class="flex items-center gap-2">
         <a href="{{ route('shifts.mapping') }}"
             class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700 transition shadow-sm">
@@ -22,7 +17,7 @@
             <i class="fas fa-plus"></i> Tambah Shift Baru
         </button>
     </div>
-</div>
+</x-page-header>
 
 @if(session('success'))
     <div class="mb-4 flex items-center gap-3 rounded-xl border border-success-200 bg-success-50 px-4 py-3 text-success-700 dark:border-success-500/30 dark:bg-success-500/15 dark:text-success-400">

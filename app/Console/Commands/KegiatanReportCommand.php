@@ -36,6 +36,11 @@ class KegiatanReportCommand extends Command
         $today = $now->format('Y-m-d');
         $nowTime = $now->format('H:i');
 
+        // Cek masa aktif WA sekolah (nonaktif jika kedaluwarsa > 3 hari, sebelum 3 hari masih normal)
+        if (!$school->isWaActive()) {
+            return;
+        }
+
         // Fetch active activities
         $activeKegiatans = Kegiatan::where('school_id', $schoolId)
             ->where('is_active', true)

@@ -3,17 +3,16 @@
 @section('title', 'Manajemen Jurusan')
 
 @section('content')
-    <div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between" x-data="{}">
-        <h2 class="text-title-md2 font-semibold text-gray-800 dark:text-white/90">
-            Manajemen Jurusan
-        </h2>
-        <div class="flex flex-wrap gap-2">
-            <button @click="$dispatch('open-modal', 'modalTambahJurusan')"
-                class="inline-flex items-center justify-center gap-2.5 rounded-lg bg-brand-500 px-4 py-2 text-center font-medium text-white hover:bg-brand-600 transition">
-                <i class="fas fa-plus"></i> Tambah Jurusan
-            </button>
-        </div>
-    </div>
+    <x-page-header 
+        title="Manajemen Jurusan" 
+        subtitle="Kelola kompetensi keahlian dan program peminatan siswa" 
+        icon="fas fa-graduation-cap"
+        x-data="{}">
+        <button @click="$dispatch('open-modal', 'modalTambahJurusan')"
+            class="inline-flex items-center justify-center gap-2.5 rounded-lg bg-brand-500 px-4 py-2 text-center font-medium text-white hover:bg-brand-600 transition shadow-xs">
+            <i class="fas fa-plus"></i> Tambah Jurusan
+        </button>
+    </x-page-header>
 
     <div class="rounded-2xl border border-gray-200 bg-white shadow-theme-sm dark:border-gray-800 dark:bg-gray-dark">
         <!-- Header & Search -->

@@ -3,24 +3,19 @@
 @section('title', 'Data Absensi Harian')
 
 @section('content')
-<div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-    <div>
-        <h2 class="text-title-md2 font-semibold text-gray-800 dark:text-white/90">
-            Absensi Harian
-        </h2>
-        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Kelola dan pantau kehadiran siswa & guru harian</p>
-    </div>
-    <div class="flex flex-wrap items-center gap-3">
-        <a href="{{ route('absensi.scanner-face') }}" class="inline-flex items-center gap-2.5 rounded-xl bg-gradient-to-r from-purple-600 via-pink-600 to-rose-600 px-5 py-2.5 text-sm font-semibold text-white shadow-theme-sm hover:from-purple-700 hover:to-rose-700 transition active:scale-95">
-            <i class="fas fa-camera text-lg animate-pulse"></i>
-            <span>Buka Scanner Wajah (Webcam)</span>
-        </a>
-        <a href="{{ route('absensi.scanner-usb') }}" class="inline-flex items-center gap-2.5 rounded-xl bg-gradient-to-r from-brand-500 via-indigo-500 to-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-theme-sm hover:from-brand-600 hover:to-indigo-700 transition active:scale-95">
-            <i class="fas fa-id-card-clip text-lg"></i>
-            <span>Scanner USB RFID</span>
-        </a>
-    </div>
-</div>
+<x-page-header 
+    title="Absensi Harian" 
+    subtitle="Kelola dan pantau kehadiran siswa & guru harian" 
+    icon="fas fa-clipboard-check">
+    <a href="{{ route('absensi.scanner-face') }}" class="inline-flex items-center gap-2.5 rounded-xl bg-gradient-to-r from-purple-600 via-pink-600 to-rose-600 px-5 py-2.5 text-sm font-semibold text-white shadow-theme-sm hover:from-purple-700 hover:to-rose-700 transition active:scale-95">
+        <i class="fas fa-camera text-lg animate-pulse"></i>
+        <span>Buka Scanner Wajah (Webcam)</span>
+    </a>
+    <a href="{{ route('absensi.scanner-usb') }}" class="inline-flex items-center gap-2.5 rounded-xl bg-gradient-to-r from-brand-500 via-indigo-500 to-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-theme-sm hover:from-brand-600 hover:to-indigo-700 transition active:scale-95">
+        <i class="fas fa-id-card-clip text-lg"></i>
+        <span>Scanner USB RFID</span>
+    </a>
+</x-page-header>
 
 <!-- Filter Card -->
 <div class="mb-6 rounded-2xl border border-gray-200 bg-white shadow-theme-sm dark:border-gray-800 dark:bg-gray-dark">

@@ -21,6 +21,15 @@ class MessageQueue extends Model
             // Clean up attributes if bypass_last_seen was dynamically set into attributes
             unset($messageQueue->attributes['bypass_last_seen']);
 
+            // Validasi masa aktif WA sekolah (nonaktif jika kedaluwarsa > 3 hari, kecuali pesan sistem/invoice priority >= 20)
+            if ($messageQueue->school_id && ($messageQueue->priority ?? 0) < 20) {
+                $school = \App\Models\School::find($messageQueue->school_id);
+                if ($school && !$school->isWaActive()) {
+                    \Illuminate\Support\Facades\Log::warning("Skipped WA message queue for school ID {$school->id} ({$school->name}): WA disabled or expired > 3 days.");
+                    return false;
+                }
+            }
+
             // Check Last Seen rule (default 3 days / 72 hours) unless explicitly bypassed
             if (empty($messageQueue->bypass_last_seen)) {
                 $schoolId = $messageQueue->school_id;

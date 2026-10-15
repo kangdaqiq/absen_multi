@@ -5,22 +5,15 @@
 @section('content')
 <div>
     <!-- Page Header -->
-    <div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-            <h2 class="text-title-md2 font-semibold text-gray-800 dark:text-white/90">
-                Plotting Shift Guru & Karyawan
-            </h2>
-            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                Kelola daftar guru pada masing-masing shift kerja secara praktis.
-            </p>
-        </div>
-        <div class="flex items-center gap-2">
-            <a href="{{ route('shifts.index') }}"
-                class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700 transition shadow-sm">
-                <i class="fas fa-clock text-brand-500"></i> Kelola Master Shift
-            </a>
-        </div>
-    </div>
+    <x-page-header 
+        title="Plotting Shift Guru & Karyawan" 
+        subtitle="Kelola penempatan daftar guru dan staff pada masing-masing shift kerja" 
+        icon="fas fa-user-clock">
+        <a href="{{ route('shifts.index') }}"
+            class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700 transition shadow-sm">
+            <i class="fas fa-clock text-brand-500"></i> Kelola Master Shift
+        </a>
+    </x-page-header>
 
     <!-- Alert Notifications -->
     @if(session('success'))

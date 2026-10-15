@@ -183,4 +183,49 @@ class School extends Model
     {
         return $this->isOffice() ? 'ID Pegawai' : 'NIP';
     }
+
+    // ── Grace Period & WhatsApp Status ────────────────────────────────────
+
+    public const GRACE_PERIOD_DAYS = 3;
+
+    /**
+     * Cek apakah masa berlaku sekolah masih aktif atau dalam masa tenggang (grace period <= 3 hari).
+     * Jika expired_at bernilai null, berarti sekolah aktif tanpa batas waktu (lifetime).
+     */
+    public function isWithinGracePeriod(): bool
+    {
+        if (!$this->expired_at) {
+            return true;
+        }
+
+        // Aktif normal jika expired_at belum lewat
+        if ($this->expired_at->isFuture() || $this->expired_at->isToday()) {
+            return true;
+        }
+
+        // Dalam masa tenggang jika belum lewat 3 hari setelah tanggal expired_at (sampai 23:59:59 hari ke-3)
+        return now()->lte($this->expired_at->copy()->addDays(self::GRACE_PERIOD_DAYS)->endOfDay());
+    }
+
+    /**
+     * Cek apakah sekolah sudah kedaluwarsa LEBIH DARI 3 HARI.
+     */
+    public function isExpiredOverGracePeriod(): bool
+    {
+        return !$this->isWithinGracePeriod();
+    }
+
+    /**
+     * Cek apakah fitur WhatsApp sekolah aktif dan berhak beroperasi mengirim pesan:
+     * 1. wa_enabled harus bernilai true
+     * 2. Belum kedaluwarsa lebih dari 3 hari (toleransi/grace period 3 hari)
+     */
+    public function isWaActive(): bool
+    {
+        if (!$this->wa_enabled) {
+            return false;
+        }
+
+        return $this->isWithinGracePeriod();
+    }
 }

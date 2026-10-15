@@ -3,11 +3,11 @@
 @section('title', 'Rekap Absensi')
 
 @section('content')
-<div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-    <h2 class="text-title-md2 font-semibold text-gray-800 dark:text-white/90">
-        Rekap Absensi
-    </h2>
-</div>
+<x-page-header 
+    title="Rekap Absensi Siswa" 
+    subtitle="Laporan dan akumulasi rekapitulasi kehadiran siswa per periode dan kelas" 
+    icon="fas fa-file-invoice" 
+/>
 
 <!-- Filter Card -->
 <div class="mb-6 rounded-2xl border border-gray-200 bg-white shadow-theme-sm dark:border-gray-800 dark:bg-gray-dark">

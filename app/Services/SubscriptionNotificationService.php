@@ -197,14 +197,14 @@ class SubscriptionNotificationService
             }
         }
 
-        // Create Message Queue with priority and bypass_last_seen
+        // Create Message Queue with high priority (priority 20) and bypass_last_seen
         $mq = new MessageQueue([
             'school_id'    => $senderSchoolId,
             'phone_number' => $phone,
             'message'      => $message,
             'status'       => 'pending',
             'scheduled_at' => now(), // send immediately
-            'priority'     => 10,    // high priority for invoice
+            'priority'     => 20,    // high priority for invoice (bypasses grace period filter)
             'created_at'   => now(),
         ]);
         $mq->bypass_last_seen = true;

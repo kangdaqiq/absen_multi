@@ -3,15 +3,16 @@
 @section('title', 'Manajemen Device')
 
 @section('content')
-    <div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between" x-data>
-        <h2 class="text-title-md2 font-semibold text-gray-800 dark:text-white/90">
-            <i class="fas fa-microchip text-brand-500 mr-2"></i> Manajemen Device
-        </h2>
+    <x-page-header 
+        title="Manajemen Device RFID" 
+        subtitle="Kelola perangkat mesin scanner tap kartu RFID & biometric sekolah" 
+        icon="fas fa-microchip"
+        x-data>
         <button @click="$dispatch('open-modal', 'modalTambahDevice')"
-            class="inline-flex items-center justify-center gap-2.5 rounded-md bg-brand-500 px-10 py-3 text-center font-medium text-white hover:bg-opacity-90 lg:px-8 xl:px-10 transition">
+            class="inline-flex items-center justify-center gap-2.5 rounded-lg bg-brand-500 px-6 py-2.5 text-center text-sm font-medium text-white hover:bg-brand-600 transition shadow-xs">
             <i class="fas fa-plus"></i> Tambah Device
         </button>
-    </div>
+    </x-page-header>
 
     <div class="rounded-sm border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark">
         <div class="border-b border-stroke py-4 px-6.5 dark:border-strokedark">

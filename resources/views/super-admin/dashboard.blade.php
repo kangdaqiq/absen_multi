@@ -5,11 +5,11 @@
 @section('content')
 <x-announcement-modal :announcements="$popupAnnouncements ?? collect()" />
 
-<div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-  <h2 class="text-title-md2 font-semibold text-gray-800 dark:text-white/90">
-    <i class="fas fa-crown text-warning-500 mr-2"></i> Super Admin Dashboard
-  </h2>
-</div>
+<x-page-header 
+    title="Super Admin Dashboard" 
+    subtitle="Monitoring keseluruhan tenant sekolah, paket langganan, dan lisensi perangkat" 
+    icon="fas fa-crown" 
+/>
 
 <!-- Statistics Cards -->
 <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-6 xl:grid-cols-4 2xl:gap-7.5">

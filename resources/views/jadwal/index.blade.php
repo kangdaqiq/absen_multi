@@ -3,11 +3,11 @@
 @section('title', 'Manajemen Jadwal')
 
 @section('content')
-<div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-    <h2 class="text-title-md2 font-semibold text-gray-800 dark:text-white/90">
-        <i class="fas fa-clock text-brand-500 mr-2"></i> Manajemen Jadwal
-    </h2>
-</div>
+<x-page-header 
+    title="Manajemen Jadwal Masuk & Pulang" 
+    subtitle="Atur jam operasional bel sekolah, jam masuk, dan toleransi keterlambatan mingguan" 
+    icon="fas fa-clock" 
+/>
 
 <div class="rounded-sm border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark">
     <div class="border-b border-stroke py-4 px-6.5 dark:border-strokedark">

@@ -9,21 +9,14 @@
 @section('title', 'Absensi Harian ' . $labelKaryawan)
 
 @section('content')
-<div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-    <div>
-        <h2 class="text-title-md2 font-semibold text-gray-800 dark:text-white/90">
-            <i class="fas fa-calendar-check text-brand-500 mr-2"></i> Absensi Harian {{ $labelKaryawan }}
-        </h2>
-        <p class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-            Monitoring kehadiran harian dan evaluasi shift guru/staff.
-        </p>
-    </div>
-    <div class="flex items-center gap-2">
-        <a href="{{ route('shifts.mapping') }}" class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 transition shadow-sm">
-            <i class="fas fa-users-cog text-brand-500"></i> Plotting Shift
-        </a>
-    </div>
-</div>
+<x-page-header 
+    :title="'Absensi Harian ' . $labelKaryawan" 
+    subtitle="Monitoring kehadiran harian dan evaluasi shift guru & staff" 
+    icon="fas fa-calendar-check">
+    <a href="{{ route('shifts.mapping') }}" class="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 transition shadow-sm">
+        <i class="fas fa-users-cog text-brand-500"></i> Plotting Shift
+    </a>
+</x-page-header>
 
 {{-- Alert Success / Error --}}
 @if(session('success'))

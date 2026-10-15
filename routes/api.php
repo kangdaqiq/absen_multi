@@ -62,5 +62,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/mobile/face-status', [MobileAttendanceController::class, 'getFaceStatus']);
     Route::post('/mobile/change-password', [MobileAttendanceController::class, 'changePassword']);
     Route::post('/mobile/ganti-password', [MobileAttendanceController::class, 'changePassword']);
+
+    // --- Fitur Jadwal Pembelajaran & Absensi Siswa Per Jam Pelajaran (Apps Guru) ---
+    Route::get('/mobile/jadwal-pelajaran/hari-ini', [App\Http\Controllers\Api\MobileJadwalPelajaranController::class, 'getHariIni']);
+    Route::get('/mobile/jadwal-pelajaran/mingguan', [App\Http\Controllers\Api\MobileJadwalPelajaranController::class, 'getMingguan']);
+    Route::get('/mobile/jadwal-pelajaran/{id}/presensi', [App\Http\Controllers\Api\MobileJadwalPelajaranController::class, 'getPresensiDetail']);
+    Route::post('/mobile/jadwal-pelajaran/{id}/presensi', [App\Http\Controllers\Api\MobileJadwalPelajaranController::class, 'submitPresensi']);
+    Route::post('/mobile/jadwal-pelajaran/{id}/presensi-single', [App\Http\Controllers\Api\MobileJadwalPelajaranController::class, 'updateSinglePresensi']);
+    Route::get('/mobile/mapels', [App\Http\Controllers\Api\MobileJadwalPelajaranController::class, 'getMapels']);
+    Route::get('/mobile/jam-pelajaran', [App\Http\Controllers\Api\MobileJadwalPelajaranController::class, 'getJamPelajaran']);
+
     Route::post('/mobile/logout', [MobileAttendanceController::class, 'logout']);
 });

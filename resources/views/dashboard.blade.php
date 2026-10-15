@@ -10,16 +10,12 @@
 @endphp
 
 <div x-data="{ showAndroidModal: false, copied: false, faceEnabled: {{ $isFaceEnabled ? 'true' : 'false' }} }">
-  <div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-    <div>
-      <h2 class="text-title-md2 font-semibold text-gray-800 dark:text-white/90">
-        Dashboard
-      </h2>
-      <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Sistem Absensi Biometrik Sekolah</p>
-    </div>
+  <x-page-header 
+    title="Dashboard" 
+    subtitle="Ringkasan statistik kehadiran siswa & guru real-time" 
+    icon="fas fa-chart-pie" 
+  />
 
-  
-  </div>
 
   <!-- Hero Shortcut Banner: Jagat Absen Android App -->
   <div class="mb-6 rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-sm dark:border-gray-800 dark:bg-gray-dark md:p-6">

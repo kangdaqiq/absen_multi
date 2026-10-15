@@ -60,7 +60,11 @@
                 </label>
                 <div class="relative z-20 bg-transparent dark:bg-form-input">
                     <select name="role" required class="relative z-20 w-full appearance-none rounded border border-stroke bg-transparent py-3 px-5 outline-none transition focus:border-brand-500 active:border-brand-500 dark:border-form-strokedark dark:bg-form-input dark:focus:border-brand-500 @error('role') border-danger @enderror">
+                        <option value="guru" {{ in_array(old('role', $user->role), ['guru', 'teacher']) ? 'selected' : '' }}>Guru Pengajar</option>
                         <option value="admin" {{ old('role', $user->role) == 'admin' ? 'selected' : '' }}>Admin</option>
+                        @if(auth()->user() && auth()->user()->isSuperAdmin())
+                        <option value="super_admin" {{ old('role', $user->role) == 'super_admin' ? 'selected' : '' }}>Super Admin</option>
+                        @endif
                         <option value="wali_kelas" {{ old('role', $user->role) == 'wali_kelas' ? 'selected' : '' }}>Wali Kelas</option>
                         <option value="waka_kurikulum" {{ old('role', $user->role) == 'waka_kurikulum' ? 'selected' : '' }}>Waka Kurikulum</option>
                     </select>
@@ -76,17 +80,17 @@
             @php
                 $userGuru = \App\Models\Guru::where('user_id', $user->id)->first();
                 $currentGuruId = old('guru_id', $userGuru ? $userGuru->id : '');
-                $showGuru = in_array(old('role', $user->role), ['wali_kelas', 'waka_kurikulum']);
+                $showGuru = in_array(old('role', $user->role), ['guru', 'teacher', 'wali_kelas', 'waka_kurikulum']);
             @endphp
             <div class="mb-4.5" id="guru_select_container" style="display: {{ $showGuru ? 'block' : 'none' }};">
                 <label class="mb-2.5 block text-black dark:text-white">
-                    Pilih Guru <span class="text-meta-1">*</span> (Khusus Wali Kelas / Waka Kurikulum)
+                    Pilih Data Guru <span class="text-xs text-gray-500">(Khusus Akun Guru / Wali Kelas / Waka Kurikulum)</span>
                 </label>
                 <div class="relative z-20 bg-transparent dark:bg-form-input">
                     <select name="guru_id" class="relative z-20 w-full appearance-none rounded border border-stroke bg-transparent py-3 px-5 outline-none transition focus:border-brand-500 active:border-brand-500 dark:border-form-strokedark dark:bg-form-input dark:focus:border-brand-500">
-                        <option value="">-- Pilih Guru --</option>
+                        <option value="">-- Pilih Guru (Opsional) --</option>
                         @foreach($gurus as $guru)
-                            <option value="{{ $guru->id }}" {{ $currentGuruId == $guru->id ? 'selected' : '' }}>{{ $guru->nama }}</option>
+                            <option value="{{ $guru->id }}" {{ $currentGuruId == $guru->id ? 'selected' : '' }}>{{ $guru->nama }} {{ $guru->nip ? '('.$guru->nip.')' : '' }}</option>
                         @endforeach
                     </select>
                 </div>
@@ -129,7 +133,7 @@
         const guruContainer = document.getElementById('guru_select_container');
         
         roleSelect.addEventListener('change', function() {
-            if (this.value === 'wali_kelas' || this.value === 'waka_kurikulum') {
+            if (['guru', 'wali_kelas', 'waka_kurikulum'].includes(this.value)) {
                 guruContainer.style.display = 'block';
             } else {
                 guruContainer.style.display = 'none';

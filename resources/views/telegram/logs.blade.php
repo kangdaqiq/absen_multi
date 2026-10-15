@@ -3,11 +3,11 @@
 @section('title', 'Log Telegram')
 
 @section('content')
-<div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-    <h2 class="text-title-md2 font-semibold text-gray-800 dark:text-white/90">
-        Log Pengiriman Telegram
-    </h2>
-</div>
+<x-page-header 
+    title="Log Pengiriman Telegram" 
+    subtitle="Riwayat status pengiriman pesan notifikasi absensi via Telegram Bot" 
+    icon="fab fa-telegram-plane" 
+/>
 
 <!-- Delivery Notification Stats Today -->
 <div class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">

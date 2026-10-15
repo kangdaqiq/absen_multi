@@ -3,11 +3,11 @@
 @section('title', 'Pengaturan Sekolah')
 
 @section('content')
-    <div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h2 class="text-title-md2 font-semibold text-gray-800 dark:text-white/90">
-            Pengaturan Sekolah
-        </h2>
-    </div>
+    <x-page-header 
+        title="Pengaturan Sekolah" 
+        subtitle="Konfigurasi identitas sekolah, WhatsApp gateway, dan preferensi sistem" 
+        icon="fas fa-cog" 
+    />
 
     <form action="{{ route('settings.update') }}" method="POST" enctype="multipart/form-data">
         @csrf

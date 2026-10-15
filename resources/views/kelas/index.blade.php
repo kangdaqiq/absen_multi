@@ -3,21 +3,22 @@
 @section('title', 'Manajemen Kelas')
 
 @section('content')
-    <div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between" x-data="{}">
-        <h2 class="text-title-md2 font-semibold text-gray-800 dark:text-white/90">
-            Manajemen Kelas
-        </h2>
+    <x-page-header 
+        title="Manajemen Kelas" 
+        subtitle="Kelola tingkatan kelas, rombel, wali kelas, dan jurusan" 
+        icon="fas fa-school"
+        x-data="{}">
         <div class="flex flex-wrap gap-2">
             <button @click="$dispatch('open-modal', 'modalImportKelas')"
-                class="inline-flex items-center justify-center gap-2.5 rounded-lg border border-gray-200 bg-white px-4 py-2 text-center font-medium text-gray-700 hover:bg-gray-50 transition dark:border-gray-800 dark:bg-gray-dark dark:text-gray-300 dark:hover:bg-gray-800">
+                class="inline-flex items-center justify-center gap-2.5 rounded-lg border border-gray-200 bg-white px-4 py-2 text-center font-medium text-gray-700 hover:bg-gray-50 transition shadow-xs dark:border-gray-800 dark:bg-gray-dark dark:text-gray-300 dark:hover:bg-gray-800">
                 <i class="fas fa-file-import"></i> Impor Excel
             </button>
             <button @click="$dispatch('open-modal', 'modalTambahKelas')"
-                class="inline-flex items-center justify-center gap-2.5 rounded-lg bg-brand-500 px-4 py-2 text-center font-medium text-white hover:bg-brand-600 transition">
+                class="inline-flex items-center justify-center gap-2.5 rounded-lg bg-brand-500 px-4 py-2 text-center font-medium text-white hover:bg-brand-600 transition shadow-xs">
                 <i class="fas fa-plus"></i> Tambah Kelas
             </button>
         </div>
-    </div>
+    </x-page-header>
 
     <div class="rounded-2xl border border-gray-200 bg-white shadow-theme-sm dark:border-gray-800 dark:bg-gray-dark">
         <!-- Header & Search -->
@@ -37,14 +38,24 @@
                 </button>
             </div>
 
-            <form action="{{ route('kelas.index') }}" method="GET" class="relative w-full sm:w-64">
-                <input type="text" name="search" value="{{ request('search') }}" placeholder="Cari Kelas..."
-                    oninput="clearTimeout(this.delay); this.delay = setTimeout(() => { this.form.submit() }, 500);"
-                    class="w-full rounded-lg border border-gray-200 bg-transparent py-2 pl-4 pr-10 text-sm outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:focus:border-brand-500 text-gray-800 dark:text-white/90">
-                <button type="submit"
-                    class="absolute right-0 top-0 h-full px-3 text-gray-500 hover:text-brand-500 dark:text-gray-400">
-                    <i class="fas fa-search"></i>
-                </button>
+            <form action="{{ route('kelas.index') }}" method="GET" class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                <select name="tingkat" onchange="this.form.submit()"
+                    class="rounded-lg border border-gray-200 bg-white py-2 px-3 text-sm outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:focus:border-brand-500 text-gray-800 dark:text-white/90">
+                    <option value="">Semua Tingkatan Kelas</option>
+                    @for ($i = 1; $i <= 12; $i++)
+                        <option value="{{ $i }}" {{ request('tingkat') == (string)$i ? 'selected' : '' }}>Kelas {{ $i }}</option>
+                    @endfor
+                </select>
+
+                <div class="relative w-full sm:w-64">
+                    <input type="text" name="search" value="{{ request('search') }}" placeholder="Cari Kelas..."
+                        oninput="clearTimeout(this.delay); this.delay = setTimeout(() => { this.form.submit() }, 500);"
+                        class="w-full rounded-lg border border-gray-200 bg-transparent py-2 pl-4 pr-10 text-sm outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:focus:border-brand-500 text-gray-800 dark:text-white/90">
+                    <button type="submit"
+                        class="absolute right-0 top-0 h-full px-3 text-gray-500 hover:text-brand-500 dark:text-gray-400">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </div>
             </form>
         </div>
 
@@ -58,6 +69,7 @@
                         </th>
                         <th class="px-4 py-4 w-16">No</th>
                         <th class="px-4 py-4">Nama Kelas</th>
+                        <th class="px-4 py-4 text-center">Tingkatan Kelas</th>
                         <th class="px-4 py-4">Jurusan</th>
                         <th class="px-4 py-4">Wali Kelas</th>
                         @if(auth()->user()->school && auth()->user()->school->wa_enabled)
@@ -79,6 +91,15 @@
                             </td>
                             <td class="border-b border-gray-100 px-4 py-4 dark:border-gray-800">
                                 <p class="font-medium text-gray-800 dark:text-white/90">{{ $k->nama_kelas }}</p>
+                            </td>
+                            <td class="border-b border-gray-100 px-4 py-4 dark:border-gray-800 text-center">
+                                @if($k->tingkat)
+                                    <span class="inline-flex rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-semibold text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
+                                        Kelas {{ $k->tingkat }}
+                                    </span>
+                                @else
+                                    <span class="text-gray-400">-</span>
+                                @endif
                             </td>
                             <td class="border-b border-gray-100 px-4 py-4 dark:border-gray-800">
                                 <p class="text-gray-500 dark:text-gray-400">{{ $k->jurusan ? $k->jurusan->nama_jurusan : '-' }}</p>
@@ -150,6 +171,7 @@
                                     <button
                                         class="btnEdit text-warning-500 hover:text-warning-700 hover:bg-warning-50 p-2 rounded-lg transition"
                                         data-id="{{ $k->id }}" data-nama="{{ $k->nama_kelas }}"
+                                        data-tingkat="{{ $k->tingkat }}"
                                         data-wali="{{ $k->wali_kelas_id }}" data-wali2="{{ $k->wali_kelas_2_id }}" data-jurusan="{{ $k->jurusan_id }}" data-wa-group-id="{{ $k->wa_group_id }}"
                                         @click="$dispatch('open-modal', 'modalEditKelas')" title="Edit">
                                         <i class="fas fa-edit"></i>
@@ -167,7 +189,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="{{ auth()->user()->school && auth()->user()->school->wa_enabled ? '9' : '8' }}"
+                            <td colspan="{{ auth()->user()->school && auth()->user()->school->wa_enabled ? '10' : '9' }}"
                                 class="border-b border-gray-100 px-4 py-8 dark:border-gray-800 text-center text-gray-500 dark:text-gray-400">
                                 Tidak ada data kelas ditemukan.
                             </td>
@@ -199,8 +221,18 @@
                 <div class="space-y-4">
                     <div>
                         <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Nama Kelas</label>
-                        <input type="text" name="nama_kelas" required
+                        <input type="text" name="nama_kelas" required placeholder="Contoh: X IPA 1, 7A, 12 RPL"
                             class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                    </div>
+                    <div>
+                        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Tingkatan Kelas</label>
+                        <select name="tingkat"
+                            class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                            <option value="">-- Pilih Tingkatan Kelas (Opsional) --</option>
+                            @for ($i = 1; $i <= 12; $i++)
+                                <option value="{{ $i }}">Kelas {{ $i }}</option>
+                            @endfor
+                        </select>
                     </div>
                     <div>
                         <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Wali Kelas 1</label>
@@ -277,6 +309,16 @@
                         <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Nama Kelas</label>
                         <input type="text" name="nama_kelas" id="edit_nama_kelas" required
                             class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                    </div>
+                    <div>
+                        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Tingkatan Kelas</label>
+                        <select name="tingkat" id="edit_tingkat"
+                            class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                            <option value="">-- Pilih Tingkatan Kelas (Opsional) --</option>
+                            @for ($i = 1; $i <= 12; $i++)
+                                <option value="{{ $i }}">Kelas {{ $i }}</option>
+                            @endfor
+                        </select>
                     </div>
                     <div>
                         <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Wali Kelas 1</label>
@@ -410,6 +452,7 @@
                     <li>Gunakan template Excel yang telah disediakan.</li>
                     <li>Kolom <strong>Nama Kelas</strong> wajib diisi.</li>
                     <li>Kolom <strong>Wali Kelas</strong> bersifat opsional, pilih dari dropdown yang tersedia.</li>
+                    <li>Kolom <strong>Tingkatan Kelas</strong> bersifat opsional (angka 1 - 12).</li>
                     <li>Pastikan nama guru di kolom Wali Kelas sudah terdaftar di sistem.</li>
                 </ul>
             </div>
@@ -457,6 +500,17 @@
                 <div id="bulkEditIdsContainer"></div>
 
                 <div class="space-y-4">
+                    <div>
+                        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Tingkatan Kelas</label>
+                        <select name="tingkat"
+                            class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                            <option value="no_change">-- Jangan Ubah --</option>
+                            <option value="null">Kosongkan Tingkatan Kelas</option>
+                            @for ($i = 1; $i <= 12; $i++)
+                                <option value="{{ $i }}">Kelas {{ $i }}</option>
+                            @endfor
+                        </select>
+                    </div>
                     <div>
                         <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Jurusan</label>
                         <select name="jurusan_id"
@@ -538,12 +592,14 @@
             $('.btnEdit').on('click', function () {
                 var id = $(this).data('id');
                 var nama = $(this).data('nama');
+                var tingkat = $(this).data('tingkat');
                 var wali = $(this).data('wali');
                 var wali2 = $(this).data('wali2');
                 var jurusan = $(this).data('jurusan');
                 var waGroupId = $(this).data('wa-group-id');
 
                 $('#edit_nama_kelas').val(nama);
+                $('#edit_tingkat').val(tingkat || '');
                 $('#edit_wali_kelas').val(wali).trigger('change');
                 $('#edit_wali_kelas_2').val(wali2).trigger('change');
                 $('#edit_jurusan_id').val(jurusan).trigger('change');

@@ -3,15 +3,15 @@
 @section('title', 'Kelola Kegiatan')
 
 @section('content')
-<div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-    <h2 class="text-title-md2 font-semibold text-gray-800 dark:text-white/90">
-        🎯 Kelola Kegiatan
-    </h2>
+<x-page-header 
+    title="Kelola Kegiatan" 
+    subtitle="Manajemen agenda, jadwal, dan pembina kegiatan sekolah" 
+    icon="fas fa-calendar-check">
     <button @click="$dispatch('open-modal', 'modalTambahKegiatan')"
-        class="inline-flex items-center gap-2 rounded-lg bg-brand-500 px-5 py-2.5 text-sm font-medium text-white hover:bg-brand-600 transition">
+        class="inline-flex items-center gap-2 rounded-lg bg-brand-500 px-5 py-2.5 text-sm font-medium text-white hover:bg-brand-600 transition shadow-xs">
         <i class="fas fa-plus"></i> Tambah Kegiatan
     </button>
-</div>
+</x-page-header>
 
 @if(session('success'))
     <div class="mb-4 flex items-center gap-3 rounded-xl border border-success-200 bg-success-50 px-4 py-3 text-success-700 dark:border-success-500/30 dark:bg-success-500/15 dark:text-success-400">
@@ -32,21 +32,6 @@
     </div>
 @endif
 
-{{-- Kartu info cara kerja --}}
-<div class="mb-6 rounded-2xl border border-brand-200 bg-brand-50 p-5 dark:border-brand-500/30 dark:bg-brand-500/10">
-    <div class="flex items-start gap-3">
-        <div class="mt-0.5 text-brand-500 text-lg"><i class="fas fa-info-circle"></i></div>
-        <div>
-            <h6 class="font-semibold text-brand-700 dark:text-brand-400 mb-1">Cara Kerja Absensi Kegiatan</h6>
-            <ol class="text-sm text-brand-600 dark:text-brand-300 space-y-1 list-decimal list-inside">
-                <li>Buat kegiatan dan atur tanggal serta jadwal jam kegiatan (<strong>Jam Mulai</strong> & <strong>Jam Selesai</strong>).</li>
-                <li>Atur <strong>Cakupan Peserta</strong> (bisa <em>Semua Siswa</em>, <em>Pilih Kelas</em>, atau <em>Pilih Siswa Khusus</em>).</li>
-                <li>Pastikan status kegiatan diatur ke <strong>Aktif</strong>.</li>
-                <li>Siswa yang termasuk dalam cakupan dapat scan kartu RFID pada jam kegiatan tersebut untuk otomatis tercatat hadir.</li>
-            </ol>
-        </div>
-    </div>
-</div>
 
 {{-- Tabel Kegiatan --}}
 <div class="rounded-2xl border border-gray-200 bg-white shadow-theme-sm dark:border-gray-800 dark:bg-gray-dark">

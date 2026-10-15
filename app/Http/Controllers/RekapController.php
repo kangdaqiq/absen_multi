@@ -37,14 +37,10 @@ class RekapController extends Controller
             $siswaQuery->where('school_id', auth()->user()->school_id);
         }
 
-        // Apply Wali Kelas logic
-        if (auth()->user() && auth()->user()->role === 'wali_kelas') {
-            $guru = auth()->user()->guru;
-            if ($guru) {
-                $managedKelasIds = \App\Models\Kelas::where(function($q) use ($guru) {
-                    $q->where('wali_kelas_id', $guru->id)
-                      ->orWhere('wali_kelas_2_id', $guru->id);
-                })->pluck('id');
+        // Apply Wali Kelas logic (supports guru who also acts as wali kelas for 1 or more classes)
+        if (auth()->user() && auth()->user()->isWaliKelas()) {
+            $managedKelasIds = auth()->user()->getManagedKelasIds();
+            if (!empty($managedKelasIds)) {
                 $siswaQuery->whereIn('kelas_id', $managedKelasIds);
                 $kelasQuery = Kelas::whereIn('id', $managedKelasIds)->orderBy('nama_kelas');
             } else {
@@ -131,14 +127,10 @@ class RekapController extends Controller
             $siswaQuery->where('school_id', auth()->user()->school_id);
         }
 
-        // Apply Wali Kelas logic
-        if (auth()->user() && auth()->user()->role === 'wali_kelas') {
-            $guru = auth()->user()->guru;
-            if ($guru) {
-                $managedKelasIds = \App\Models\Kelas::where(function($q) use ($guru) {
-                    $q->where('wali_kelas_id', $guru->id)
-                      ->orWhere('wali_kelas_2_id', $guru->id);
-                })->pluck('id');
+        // Apply Wali Kelas logic (supports guru who also acts as wali kelas for 1 or more classes)
+        if (auth()->user() && auth()->user()->isWaliKelas()) {
+            $managedKelasIds = auth()->user()->getManagedKelasIds();
+            if (!empty($managedKelasIds)) {
                 $siswaQuery->whereIn('kelas_id', $managedKelasIds);
             } else {
                 $siswaQuery->where('id', -1);
@@ -312,14 +304,10 @@ class RekapController extends Controller
             $siswaQuery->where('school_id', auth()->user()->school_id);
         }
 
-        // Apply Wali Kelas logic
-        if (auth()->user() && auth()->user()->role === 'wali_kelas') {
-            $guru = auth()->user()->guru;
-            if ($guru) {
-                $managedKelasIds = \App\Models\Kelas::where(function($q) use ($guru) {
-                    $q->where('wali_kelas_id', $guru->id)
-                      ->orWhere('wali_kelas_2_id', $guru->id);
-                })->pluck('id');
+        // Apply Wali Kelas logic (supports guru who also acts as wali kelas for 1 or more classes)
+        if (auth()->user() && auth()->user()->isWaliKelas()) {
+            $managedKelasIds = auth()->user()->getManagedKelasIds();
+            if (!empty($managedKelasIds)) {
                 $siswaQuery->whereIn('kelas_id', $managedKelasIds);
             } else {
                 $siswaQuery->where('id', -1);

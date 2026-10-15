@@ -15,15 +15,11 @@
 @endif
 
 <div class="w-full" @if(isset($isWaEnabled) && !$isWaEnabled) style="filter: blur(8px); pointer-events: none; user-select: none; opacity: 0.55;" @endif>
-    <div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-            <h2 class="text-title-md2 font-semibold text-gray-800 dark:text-white/90">
-                WhatsApp Device
-            </h2>
-            <p class="text-sm font-medium text-gray-500 dark:text-gray-400 mt-1">Hubungkan nomor WhatsApp untuk pengiriman notifikasi
-            </p>
-        </div>
-    </div>
+    <x-page-header 
+        title="WhatsApp Gateway Device" 
+        subtitle="Hubungkan nomor WhatsApp untuk pengiriman notifikasi otomatis" 
+        icon="fab fa-whatsapp" 
+    />
 
     <div class="grid grid-cols-1 gap-6 xl:grid-cols-4">
         <div class="xl:col-span-3">

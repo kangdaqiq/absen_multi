@@ -39,7 +39,8 @@ class CheckSubscriptions extends Command
             ->get();
 
         foreach ($expiredSchools as $school) {
-            $this->info("School {$school->name} has expired. Sending invoice notification (WA features remain active).");
+            $graceInfo = $school->isWithinGracePeriod() ? "Masa tenggang <= 3 hari (WA tetap aktif)" : "Kedaluwarsa > 3 hari (WA nonaktif)";
+            $this->info("School {$school->name} has expired. Status: {$graceInfo}. Sending invoice notification...");
 
             // Notify admin with direct payment link
             $result = $notificationService->sendRenewalInvoiceWhatsApp($school, daysRemaining: -1);

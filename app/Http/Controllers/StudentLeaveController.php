@@ -37,14 +37,9 @@ class StudentLeaveController extends Controller
                 $q->where('school_id', $schoolId);
             });
 
-        // Jika wali kelas biasa (bukan admin / super admin), batasi ke kelas yang diwalikan
-        if ($user->role === 'wali_kelas' && $user->guru) {
-            $waliKelasIds = Kelas::where('school_id', $schoolId)
-                ->where(function ($q) use ($user) {
-                    $q->where('wali_kelas_id', $user->guru->id)
-                      ->orWhere('wali_kelas_2_id', $user->guru->id);
-                })
-                ->pluck('id');
+        // Jika wali kelas (bukan admin / super admin), batasi ke kelas yang diwalikan
+        if ($user->isWaliKelas() && $user->guru) {
+            $waliKelasIds = $user->getManagedKelasIds();
 
             $query->whereHas('student', function ($q) use ($waliKelasIds) {
                 $q->whereIn('kelas_id', $waliKelasIds);

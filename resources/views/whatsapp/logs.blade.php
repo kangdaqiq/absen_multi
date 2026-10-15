@@ -3,10 +3,10 @@
 @section('title', 'Log WhatsApp')
 
 @section('content')
-<div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-    <h2 class="text-title-md2 font-semibold text-gray-800 dark:text-white/90">
-        Log Pengiriman WhatsApp
-    </h2>
+<x-page-header 
+    title="Log Pengiriman WhatsApp" 
+    subtitle="Riwayat status pengiriman pesan notifikasi WhatsApp ke wali murid & guru" 
+    icon="fas fa-history">
     <div class="flex flex-wrap items-center gap-2">
         <a href="{{ route('whatsapp-logs.delivery-detail') }}" class="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 transition shadow-sm">
             <i class="fas fa-chart-pie"></i> Detail Delivery & Last Seen
@@ -24,7 +24,7 @@
             </button>
         </form>
     </div>
-</div>
+</x-page-header>
 
 @if(session('success'))
     <div class="mb-4 rounded-lg bg-success-50 border border-success-200 p-4 text-sm text-success-700 dark:bg-success-500/15 dark:text-success-400">

@@ -814,3 +814,278 @@ Untuk menjaga keamanan agar siswa atau guru tidak dapat sembarangan mendaftarkan
 - **Menu Data Guru**: Terdapat tombol aksi **Hapus Face ID** (`POST /guru/{id}/delete-face`).
 - **Validasi Keamanan**: Diperiksa dengan validasi multi-tenant (`school_id`). Menghapus record biometrik embedding sekaligus menghapus file foto sample master di folder storage.
 
+---
+
+## 📚 8. Fitur Jadwal Pembelajaran & Absensi Siswa Per Jam Pelajaran (Apps Guru Pengajar)
+
+Modul ini digunakan oleh Guru Pengajar pada aplikasi mobile untuk melihat jadwal mengajar hari ini/mingguan, mengisi jurnal KBM, dan melakukan absensi siswa per jam pelajaran.
+
+### 8.1 Jadwal Mengajar Hari Ini (`GET /api/mobile/jadwal-pelajaran/hari-ini`)
+Mengambil seluruh jadwal mengajar guru yang sedang login untuk hari ini (atau tanggal tertentu).
+
+- **URL**: `/api/mobile/jadwal-pelajaran/hari-ini`
+- **Method**: `GET`
+- **Auth**: Bearer Token
+- **Query Params**:
+  - `tanggal` *(opsional, format `YYYY-MM-DD`, default: hari ini)*
+- **Response Success (200 OK)**:
+```json
+{
+  "success": true,
+  "data": {
+    "tanggal": "2026-10-14",
+    "hari": "Rabu",
+    "guru": {
+      "id": 8,
+      "nama": "Budi Santoso, S.Pd",
+      "nip": "198501012010011002"
+    },
+    "jadwals": [
+      {
+        "id": 12,
+        "hari": "Rabu",
+        "jam_ke": "1-2",
+        "jam_mulai": "07:15",
+        "jam_selesai": "08:35",
+        "jam_format": "07:15 - 08:35",
+        "ruangan": "Lab Komputer 1",
+        "kelas_id": 3,
+        "kelas_nama": "X-RPL 1",
+        "mapel_id": 5,
+        "mapel_nama": "Pemrograman Web",
+        "is_attended": true,
+        "jurnal": {
+          "id": 4,
+          "materi": "Pengenalan HTML5 dan Semantic Tags",
+          "catatan": "Siswa mengerjakan latihan halaman 20"
+        },
+        "stats": {
+          "total": 32,
+          "h": 29,
+          "s": 1,
+          "i": 1,
+          "a": 1,
+          "t": 0,
+          "d": 0
+        }
+      }
+    ]
+  }
+}
+```
+
+---
+
+### 8.2 Jadwal Mengajar Mingguan (`GET /api/mobile/jadwal-pelajaran/mingguan`)
+Mengambil seluruh jadwal mengajar guru selama satu minggu, dikelompokkan per hari.
+
+- **URL**: `/api/mobile/jadwal-pelajaran/mingguan`
+- **Method**: `GET`
+- **Auth**: Bearer Token
+- **Response Success (200 OK)**:
+```json
+{
+  "success": true,
+  "data": {
+    "Senin": [ ... ],
+    "Rabu": [ ... ]
+  }
+}
+```
+
+---
+
+### 8.3 Detail Presensi & Daftar Siswa Kelas (`GET /api/mobile/jadwal-pelajaran/{id}/presensi`)
+Mengambil info jadwal, data jurnal KBM, dan daftar seluruh siswa di kelas tersebut beserta status absensi saat ini.
+
+- **URL**: `/api/mobile/jadwal-pelajaran/{id}/presensi`
+- **Method**: `GET`
+- **Auth**: Bearer Token
+- **Query Params**:
+  - `tanggal` *(opsional, format `YYYY-MM-DD`, default: hari ini)*
+- **Response Success (200 OK)**:
+```json
+{
+  "success": true,
+  "data": {
+    "jadwal": {
+      "id": 12,
+      "hari": "Rabu",
+      "jam_ke": "1-2",
+      "jam_mulai": "07:15",
+      "jam_selesai": "08:35",
+      "jam_format": "07:15 - 08:35",
+      "ruangan": "Lab Komputer 1",
+      "kelas": { "id": 3, "nama": "X-RPL 1" },
+      "mapel": { "id": 5, "nama": "Pemrograman Web" },
+      "guru": { "id": 8, "nama": "Budi Santoso, S.Pd" }
+    },
+    "tanggal": "2026-10-14",
+    "jurnal": {
+      "id": 4,
+      "materi": "Pengenalan HTML5",
+      "catatan": "Latihan modul 1"
+    },
+    "summary": {
+      "total": 32,
+      "h": 30,
+      "s": 1,
+      "i": 0,
+      "a": 1,
+      "t": 0,
+      "d": 0
+    },
+    "students": [
+      {
+        "id": 15,
+        "nama": "Ahmad Rizky",
+        "nis": "1001",
+        "foto": "http://domain.com/storage/siswa/1001.jpg",
+        "status": "H",
+        "status_label": "Hadir",
+        "keterangan": "",
+        "is_saved": true
+      }
+    ]
+  }
+}
+```
+
+---
+
+### 8.4 Simpan Presensi Batch & Jurnal KBM (`POST /api/mobile/jadwal-pelajaran/{id}/presensi`)
+Menyimpan materi jurnal KBM dan seluruh daftar kehadiran siswa dalam satu request secara serentak.
+
+- **URL**: `/api/mobile/jadwal-pelajaran/{id}/presensi`
+- **Method**: `POST`
+- **Auth**: Bearer Token
+- **Body Request (JSON)**:
+```json
+{
+  "tanggal": "2026-10-14",
+  "materi": "Bab 3: Pembuatan Layout dengan Flexbox dan CSS Grid",
+  "catatan": "Seluruh siswa berhasil menyelesaikan tugas latihan praktikum",
+  "attendances": [
+    {
+      "student_id": 15,
+      "status": "H",
+      "keterangan": ""
+    },
+    {
+      "student_id": 16,
+      "status": "S",
+      "keterangan": "Surat dokter menyusul"
+    },
+    {
+      "student_id": 17,
+      "status": "A",
+      "keterangan": "Tidak ada keterangan"
+    }
+  ]
+}
+```
+*Keterangan Status:* `H` = Hadir, `S` = Sakit, `I` = Izin, `A` = Alpa, `T` = Terlambat, `D` = Dispen.
+
+- **Response Success (200 OK)**:
+```json
+{
+  "success": true,
+  "message": "Presensi dan Jurnal KBM berhasil disimpan."
+}
+```
+
+---
+
+### 8.5 Update Presensi 1 Siswa Instan (`POST /api/mobile/jadwal-pelajaran/{id}/presensi-single`)
+Digunakan untuk interaksi tap langsung / update cepat 1 siswa dari layar mobile app.
+
+- **URL**: `/api/mobile/jadwal-pelajaran/{id}/presensi-single`
+- **Method**: `POST`
+- **Auth**: Bearer Token
+- **Body Request (JSON)**:
+```json
+{
+  "student_id": 15,
+  "tanggal": "2026-10-14",
+  "status": "S",
+  "keterangan": "Demam"
+}
+```
+- **Response Success (200 OK)**:
+```json
+{
+  "success": true,
+  "message": "Status siswa berhasil diperbarui.",
+  "data": {
+    "id": 105,
+    "student_id": 15,
+    "status": "S",
+    "status_label": "Sakit"
+  }
+}
+```
+
+---
+
+### 8.6 Daftar Mata Pelajaran (`GET /api/mobile/mapels`)
+Mengambil daftar mata pelajaran yang aktif untuk sekolah pengguna. Dapat difilter berdasarkan `kelas_id`.
+
+- **URL**: `/api/mobile/mapels?kelas_id=12`
+- **Method**: `GET`
+- **Auth**: Bearer Token
+- **Query Params**:
+  - `kelas_id` (opsional): ID kelas untuk mengambil mapel yang relevan/ter-mapping.
+- **Response Success (200 OK)**:
+```json
+{
+  "success": true,
+  "data": [
+    { "id": 1, "nama_mapel": "Matematika" },
+    { "id": 2, "nama_mapel": "Bahasa Indonesia" }
+  ]
+}
+```
+
+---
+
+### 8.7 Daftar Master Jam Pelajaran (`GET /api/mobile/jam-pelajaran`)
+Mengambil daftar master sesi jam pelajaran yang aktif (seperti master shift), sehingga aplikasi mobile dapat menampilkan pilihan sesi jam secara instan.
+
+- **URL**: `/api/mobile/jam-pelajaran` (opsional `?hari=Senin`)
+- **Method**: `GET`
+- **Auth**: Bearer Token
+- **Query Params**:
+  - `hari` (opsional): Nama hari jika ingin filter sesi khusus hari tertentu (misal: "Jumat").
+- **Response Success (200 OK)**:
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "nama_jam": "Jam Ke-1",
+      "jam_ke": "1",
+      "jam_mulai": "07:15",
+      "jam_selesai": "08:00",
+      "rentang": "07:15 - 08:00",
+      "durasi": 45,
+      "label": "Jam Ke-1 [Jam ke 1] (07:15 - 08:00)",
+      "hari": null
+    },
+    {
+      "id": 2,
+      "nama_jam": "Jam Ke-2",
+      "jam_ke": "2",
+      "jam_mulai": "08:00",
+      "jam_selesai": "08:45",
+      "rentang": "08:00 - 08:45",
+      "durasi": 45,
+      "label": "Jam Ke-2 [Jam ke 2] (08:00 - 08:45)",
+      "hari": null
+    }
+  ]
+}
+```
+
+
+

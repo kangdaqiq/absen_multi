@@ -75,8 +75,15 @@ class ProcessWhatsappQueue extends Command
             ->when(config('app.mode', 'hosted') !== 'self_hosted', function ($query) {
                 $query->where(function ($q) {
                     $q->whereNull('message_queues.school_id')
-                      ->orWhere('schools.wa_enabled', true)
-                      ->orWhere('message_queues.priority', '>=', 10);
+                      ->orWhere(function ($sq) {
+                          // WA aktif normal jika wa_enabled true DAN belum kedaluwarsa > 3 hari (toleransi 3 hari)
+                          $sq->where('schools.wa_enabled', true)
+                             ->where(function ($eq) {
+                                 $eq->whereNull('schools.expired_at')
+                                    ->orWhere('schools.expired_at', '>=', now()->subDays(School::GRACE_PERIOD_DAYS)->startOfDay());
+                             });
+                      })
+                      ->orWhere('message_queues.priority', '>=', 20);
                 });
             });
 
@@ -156,16 +163,16 @@ class ProcessWhatsappQueue extends Command
         }
 
         try {
-            // Guard: Pastikan fitur WA sekolah aktif (untuk mode hosted), kecuali jika ada antrean pesan prioritas tinggi (seperti tagihan)
+            // Guard: Pastikan fitur WA sekolah aktif (untuk mode hosted): wa_enabled true & kedaluwarsa <= 3 hari
             if ($schoolId !== null && config('app.mode', 'hosted') !== 'self_hosted') {
                 $school = School::find($schoolId);
                 $hasHighPriority = MessageQueue::where('school_id', $schoolId)
                     ->where('status', 'pending')
-                    ->where('priority', '>=', 10)
+                    ->where('priority', '>=', 20)
                     ->exists();
 
-                if ((!$school || !$school->wa_enabled) && !$hasHighPriority) {
-                    $this->warn("Sekolah ID {$schoolId} dinonaktifkan fitur WhatsApp-nya. Dilewati.");
+                if ((!$school || !$school->isWaActive()) && !$hasHighPriority) {
+                    $this->warn("Sekolah ID {$schoolId} dinonaktifkan fitur WhatsApp-nya (kedaluwarsa > 3 hari atau wa_enabled nonaktif). Dilewati.");
                     return 0;
                 }
             }
@@ -173,6 +180,9 @@ class ProcessWhatsappQueue extends Command
             $messages = [];
 
             DB::transaction(function () use ($schoolId, $limit, &$messages) {
+                $school = $schoolId ? School::find($schoolId) : null;
+                $isWaActive = $school ? $school->isWaActive() : true;
+
                 $candidates = MessageQueue::query()
                     ->where('status', 'pending')
                     ->where(function ($q) {
@@ -183,6 +193,10 @@ class ProcessWhatsappQueue extends Command
                         $q->whereNull('school_id');
                     }, function ($q) use ($schoolId) {
                         $q->where('school_id', $schoolId);
+                    })
+                    ->when(!$isWaActive && config('app.mode', 'hosted') !== 'self_hosted', function ($q) {
+                        // Jika sekolah kedaluwarsa > 3 hari, HANYA proses pesan prioritas tinggi / invoice (priority >= 20)
+                        $q->where('priority', '>=', 20);
                     })
                     ->orderBy('priority', 'desc')
                     ->orderBy('created_at', 'asc')

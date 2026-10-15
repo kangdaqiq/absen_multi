@@ -5,16 +5,10 @@
 @section('content')
 <div class="space-y-6" x-data="studentLeaveAdmin()">
     <!-- Header -->
-    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-            <h2 class="text-title-md2 font-bold text-gray-900 dark:text-white">
-                Pengajuan Izin & Sakit Siswa
-            </h2>
-            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                Kelola permohonan izin, sakit, dan dispensasi mandiri dari orang tua & siswa.
-            </p>
-        </div>
-
+    <x-page-header 
+        title="Pengajuan Izin & Sakit Siswa" 
+        subtitle="Kelola permohonan izin, sakit, dan dispensasi mandiri dari orang tua & siswa" 
+        icon="fas fa-envelope-open-text">
         <div class="flex flex-wrap items-center gap-3">
             <a href="{{ route('portal-izin.index', auth()->user()->school_id ?? 1) }}" target="_blank"
                class="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800 transition shadow-theme-xs">
@@ -26,7 +20,7 @@
                 <i class="fas fa-plus"></i> Input Izin Manual
             </button>
         </div>
-    </div>
+    </x-page-header>
 
     <!-- Stat Cards -->
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">

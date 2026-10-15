@@ -8,7 +8,17 @@ class Kelas extends Model
 {
     protected $table = 'kelas';
     public $timestamps = false;
-    protected $fillable = ['nama_kelas', 'wali_kelas_id', 'wali_kelas_2_id', 'wa_group_id', 'is_active_attendance', 'is_active_report', 'school_id', 'jurusan_id'];
+    protected $fillable = [
+        'nama_kelas',
+        'tingkat',
+        'wali_kelas_id',
+        'wali_kelas_2_id',
+        'wa_group_id',
+        'is_active_attendance',
+        'is_active_report',
+        'school_id',
+        'jurusan_id'
+    ];
 
     public function waliKelas()
     {
@@ -25,6 +35,21 @@ class Kelas extends Model
         return $this->hasMany(JadwalPelajaran::class, 'kelas_id');
     }
 
+    public function mapels()
+    {
+        return $this->belongsToMany(Mapel::class, 'kelas_mapel', 'kelas_id', 'mapel_id');
+    }
+
+    public function siswas()
+    {
+        return $this->hasMany(Siswa::class, 'kelas_id');
+    }
+
+    public function siswa()
+    {
+        return $this->hasMany(Siswa::class, 'kelas_id');
+    }
+
     public function school()
     {
         return $this->belongsTo(School::class, 'school_id');
@@ -38,5 +63,10 @@ class Kelas extends Model
     public function getNamaAttribute()
     {
         return $this->nama_kelas;
+    }
+
+    public function getTingkatLabelAttribute(): string
+    {
+        return $this->tingkat ? "Kelas {$this->tingkat}" : "-";
     }
 }

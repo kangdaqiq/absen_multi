@@ -3,14 +3,11 @@
 @section('title', 'Rekap Kehadiran Kegiatan')
 
 @section('content')
-<div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-    <div>
-        <h2 class="text-title-md2 font-semibold text-gray-800 dark:text-white/90">
-            📊 Rekap Kehadiran Kegiatan
-        </h2>
-        <p class="text-sm text-gray-500 dark:text-gray-400">Akumulasi & Laporan Kehadiran Kegiatan Siswa</p>
-    </div>
-</div>
+<x-page-header 
+    title="Rekap Kehadiran Kegiatan" 
+    subtitle="Akumulasi & Laporan Kehadiran Kegiatan Siswa" 
+    icon="fas fa-chart-bar" 
+/>
 
 {{-- Filter Card --}}
 <div class="mb-6 rounded-2xl border border-gray-200 bg-white shadow-theme-sm dark:border-gray-800 dark:bg-gray-dark">

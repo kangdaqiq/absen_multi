@@ -13,8 +13,18 @@ class Mapel extends Model
 
     protected $fillable = ['nama_mapel', 'school_id'];
 
+    public function school()
+    {
+        return $this->belongsTo(School::class, 'school_id');
+    }
+
     public function jadwals()
     {
         return $this->hasMany(JadwalPelajaran::class, 'mapel_id');
+    }
+
+    public function kelases()
+    {
+        return $this->belongsToMany(Kelas::class, 'kelas_mapel', 'mapel_id', 'kelas_id');
     }
 }

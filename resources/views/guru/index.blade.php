@@ -14,19 +14,20 @@
 @section('title', 'Data ' . $labelKaryawan)
 
 @section('content')
-<div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between" x-data="{}">
-    <h2 class="text-title-md2 font-semibold text-gray-800 dark:text-white/90">
-        Data {{ $labelKaryawan }}
-    </h2>
+<x-page-header 
+    :title="'Data ' . $labelKaryawan" 
+    subtitle="Kelola data pendidik, tenaga kependidikan, NIP, dan hak akses" 
+    icon="fas fa-chalkboard-teacher"
+    x-data="{}">
     <div class="flex flex-wrap gap-2">
-        <button @click="$dispatch('open-modal', 'modalImportGuru')" class="inline-flex items-center justify-center gap-2.5 rounded-lg bg-success-500 px-4 py-2 text-center font-medium text-white hover:bg-success-600 transition">
+        <button @click="$dispatch('open-modal', 'modalImportGuru')" class="inline-flex items-center justify-center gap-2.5 rounded-lg bg-success-500 px-4 py-2 text-center font-medium text-white hover:bg-success-600 transition shadow-xs">
             <i class="fas fa-file-excel"></i> Import Excel
         </button>
-        <button @click="$dispatch('open-modal', 'modalTambahGuru')" class="inline-flex items-center justify-center gap-2.5 rounded-lg bg-brand-500 px-4 py-2 text-center font-medium text-white hover:bg-brand-600 transition">
+        <button @click="$dispatch('open-modal', 'modalTambahGuru')" class="inline-flex items-center justify-center gap-2.5 rounded-lg bg-brand-500 px-4 py-2 text-center font-medium text-white hover:bg-brand-600 transition shadow-xs">
             <i class="fas fa-plus"></i> Tambah {{ $labelKaryawan }}
         </button>
     </div>
-</div>
+</x-page-header>
 
 <div class="rounded-2xl border border-gray-200 bg-white shadow-theme-sm dark:border-gray-800 dark:bg-gray-dark">
     {{-- Alert Success / Error --}}

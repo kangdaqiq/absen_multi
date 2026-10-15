@@ -8,8 +8,9 @@
         <a href="{{ route('kegiatan.index') }}" class="mb-1 inline-flex items-center gap-1 text-sm text-gray-500 hover:text-brand-500 dark:text-gray-400 dark:hover:text-brand-400 transition">
             <i class="fas fa-arrow-left text-xs"></i> Kembali ke Kegiatan
         </a>
-        <h2 class="text-title-md2 font-semibold text-gray-800 dark:text-white/90">
-            {{ $kegiatan->kategori === 'ekskul' ? '⚽' : '🎯' }} {{ $kegiatan->nama_kegiatan }}
+        <h2 class="text-title-md2 font-bold text-gray-800 dark:text-white/90 flex items-center gap-2.5">
+            <i class="{{ $kegiatan->kategori === 'ekskul' ? 'fas fa-futbol' : 'fas fa-calendar-check' }} text-brand-500"></i>
+            <span>{{ $kegiatan->nama_kegiatan }}</span>
         </h2>
         @if($kegiatan->deskripsi)
             <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">{{ $kegiatan->deskripsi }}</p>

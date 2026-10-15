@@ -9,16 +9,11 @@
 @section('title', 'Rekap Absensi ' . $labelKaryawan)
 
 @section('content')
-<div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-    <div>
-        <h2 class="text-title-md2 font-semibold text-gray-800 dark:text-white/90">
-            📊 Rekap Absensi {{ $labelKaryawan }}
-        </h2>
-        <p class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-            Laporan dan akumulasi kehadiran kerja {{ strtolower($labelKaryawan) }}/staff berdasarkan shift.
-        </p>
-    </div>
-</div>
+<x-page-header 
+    :title="'Rekap Absensi ' . $labelKaryawan" 
+    :subtitle="'Laporan dan akumulasi kehadiran kerja ' . strtolower($labelKaryawan) . '/staff berdasarkan shift.'" 
+    icon="fas fa-chart-line" 
+/>
 
 <!-- Stats Cards -->
 <div class="mb-6 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">

@@ -3,19 +3,19 @@
 @section('title', 'Pusat Bantuan (Support)')
 
 @section('content')
-    <div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h2 class="text-title-md2 font-semibold text-gray-800 dark:text-white/90">
-            Pusat Bantuan (Support)
-        </h2>
+    <x-page-header 
+        title="Pusat Bantuan & Dukungan" 
+        subtitle="Bantuan teknis, kontak customer support, dan panduan penggunaan sistem" 
+        icon="fas fa-headset">
         <nav>
-            <ol class="flex items-center gap-2">
+            <ol class="flex items-center gap-2 text-sm">
                 <li>
-                    <a class="font-medium text-gray-500 dark:text-gray-400" href="{{ route('dashboard') }}">Dashboard /</a>
+                    <a class="font-medium text-gray-500 hover:text-brand-500 dark:text-gray-400" href="{{ route('dashboard') }}">Dashboard /</a>
                 </li>
                 <li class="font-medium text-brand-500">Support</li>
             </ol>
         </nav>
-    </div>
+    </x-page-header>
 
     <div class="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
         <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-theme-sm dark:border-gray-800 dark:bg-gray-dark">

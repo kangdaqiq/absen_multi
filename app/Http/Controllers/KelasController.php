@@ -15,7 +15,9 @@ class KelasController extends Controller
 {
     public function index(Request $request)
     {
-        $kelasQuery = Kelas::with(['waliKelas', 'waliKelas2', 'jurusan'])->orderBy('nama_kelas');
+        $kelasQuery = Kelas::with(['waliKelas', 'waliKelas2', 'jurusan'])
+            ->orderByRaw('tingkat IS NULL, tingkat ASC')
+            ->orderBy('nama_kelas');
         $gurusQuery = \App\Models\Guru::orderBy('nama');
         $jurusansQuery = \App\Models\Jurusan::orderBy('nama_jurusan');
 
@@ -24,6 +26,11 @@ class KelasController extends Controller
             $kelasQuery->where('school_id', auth()->user()->school_id);
             $gurusQuery->where('school_id', auth()->user()->school_id);
             $jurusansQuery->where('school_id', auth()->user()->school_id);
+        }
+
+        // Filter by tingkat (1-12)
+        if ($request->filled('tingkat')) {
+            $kelasQuery->where('tingkat', $request->tingkat);
         }
 
         // Search functionality
@@ -51,6 +58,7 @@ class KelasController extends Controller
                     return $query->where('school_id', $schoolId);
                 })
             ],
+            'tingkat' => 'nullable|integer|between:1,12',
             'wali_kelas_id' => 'nullable|exists:guru,id',
             'wali_kelas_2_id' => 'nullable|exists:guru,id',
             'jurusan_id' => 'nullable|exists:jurusan,id',
@@ -87,6 +95,7 @@ class KelasController extends Controller
                     return $query->where('school_id', $schoolId);
                 })
             ],
+            'tingkat' => 'nullable|integer|between:1,12',
             'wali_kelas_id' => 'nullable|exists:guru,id',
             'wali_kelas_2_id' => 'nullable|exists:guru,id',
             'jurusan_id' => 'nullable|exists:jurusan,id',
@@ -194,6 +203,8 @@ class KelasController extends Controller
                 $namaKelas = trim((string)($row[0] ?? ''));
                 $namaWali = trim((string)($row[1] ?? ''));
                 $namaWali2 = trim((string)($row[2] ?? ''));
+                $tingkatRaw = trim((string)($row[3] ?? ''));
+                $tingkat = (is_numeric($tingkatRaw) && (int)$tingkatRaw >= 1 && (int)$tingkatRaw <= 12) ? (int)$tingkatRaw : null;
 
                 if ($namaKelas === '') {
                     $failures[] = [
@@ -227,6 +238,7 @@ class KelasController extends Controller
                 try {
                     Kelas::create([
                         'nama_kelas' => $namaKelas,
+                        'tingkat' => $tingkat,
                         'wali_kelas_id' => $waliKelasId,
                         'wali_kelas_2_id' => $waliKelas2Id,
                         'school_id' => $schoolId,
@@ -269,19 +281,22 @@ class KelasController extends Controller
         $sheet->setCellValue('A1', 'Nama Kelas');
         $sheet->setCellValue('B1', 'Wali Kelas');
         $sheet->setCellValue('C1', 'Wali Kelas 2');
+        $sheet->setCellValue('D1', 'Tingkatan Kelas (1-12)');
 
         // Style header
-        $sheet->getStyle('A1:C1')->getFont()->setBold(true);
-        $sheet->getStyle('A1:C1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB('FF3C50E0');
-        $sheet->getStyle('A1:C1')->getFont()->getColor()->setARGB('FFFFFFFF');
+        $sheet->getStyle('A1:D1')->getFont()->setBold(true);
+        $sheet->getStyle('A1:D1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB('FF3C50E0');
+        $sheet->getStyle('A1:D1')->getFont()->getColor()->setARGB('FFFFFFFF');
 
         // Set column width
         $sheet->getColumnDimension('A')->setWidth(25);
         $sheet->getColumnDimension('B')->setWidth(30);
         $sheet->getColumnDimension('C')->setWidth(30);
+        $sheet->getColumnDimension('D')->setWidth(24);
 
         // Example
         $sheet->setCellValue('A2', 'X TKJ 1');
+        $sheet->setCellValue('D2', 10);
         
         // Fetch teachers for dropdown
         $schoolId = auth()->user()->isSuperAdmin() ? null : auth()->user()->school_id;
@@ -338,6 +353,7 @@ class KelasController extends Controller
         $request->validate([
             'kelas_ids' => 'required|array',
             'kelas_ids.*' => 'exists:kelas,id',
+            'tingkat' => 'nullable|string',
             'jurusan_id' => 'nullable|string', // can be empty string for "Don't change"
             'is_active_attendance' => 'nullable|string',
             'is_active_report' => 'nullable|string',
@@ -345,6 +361,10 @@ class KelasController extends Controller
 
         $ids = $request->kelas_ids;
         $updates = [];
+
+        if ($request->filled('tingkat') && $request->tingkat !== 'no_change') {
+            $updates['tingkat'] = $request->tingkat === 'null' ? null : (int)$request->tingkat;
+        }
 
         if ($request->filled('jurusan_id') && $request->jurusan_id !== 'no_change') {
             $updates['jurusan_id'] = $request->jurusan_id === 'null' ? null : $request->jurusan_id;

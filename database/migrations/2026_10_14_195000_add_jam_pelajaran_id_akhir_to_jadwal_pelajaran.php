@@ -13,11 +13,15 @@ return new class extends Migration {
         if (Schema::hasTable('jadwal_pelajaran')) {
             Schema::table('jadwal_pelajaran', function (Blueprint $table) {
                 if (!Schema::hasColumn('jadwal_pelajaran', 'jam_pelajaran_id_akhir')) {
-                    $table->foreignId('jam_pelajaran_id_akhir')
-                        ->nullable()
-                        ->after('jam_pelajaran_id')
-                        ->constrained('jam_pelajaran')
-                        ->onDelete('set null');
+                    $column = $table->foreignId('jam_pelajaran_id_akhir')->nullable();
+
+                    if (Schema::hasColumn('jadwal_pelajaran', 'jam_pelajaran_id')) {
+                        $column->after('jam_pelajaran_id');
+                    }
+
+                    if (Schema::hasTable('jam_pelajaran')) {
+                        $column->constrained('jam_pelajaran')->onDelete('set null');
+                    }
                 }
             });
         }

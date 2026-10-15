@@ -19,7 +19,7 @@ return new class extends Migration {
                 $table->string('jam_ke', 50)->nullable(); // contoh: "1", "1-2"
                 $table->time('jam_mulai');
                 $table->time('jam_selesai');
-                $table->string('hari', 50)->nullable(); // null = berlaku semua hari, atau "Jumat", "Senin", dll.
+                $table->string('hari', 255)->nullable(); // null = berlaku semua hari, atau "Jumat", "Senin", dll.
                 $table->unsignedSmallInteger('urutan')->default(1);
                 $table->boolean('is_active')->default(true);
                 $table->string('keterangan', 255)->nullable();

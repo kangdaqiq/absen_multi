@@ -109,11 +109,18 @@ if (isset($_GET['action']) && $_GET['action'] === 'stream') {
             $execCommand = 'powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "absen ' . $subCommand . '" 2>&1';
         }
     } else {
-        // Linux / Armbian Execution (membutuhkan sudoers rule: www-data ALL=(ALL) NOPASSWD: /usr/local/bin/absen)
-        $execCommand = 'sudo /usr/local/bin/absen ' . $subCommand . ' 2>&1';
+        // Linux / Armbian Execution (membutuhkan sudoers rule NOPASSWD untuk /usr/local/bin/absen)
+        $absenBin = '/usr/local/bin/absen';
+        if (!file_exists($absenBin)) {
+            $whichAbsen = trim(@shell_exec('which absen 2>/dev/null') ?: '');
+            if ($whichAbsen) {
+                $absenBin = $whichAbsen;
+            }
+        }
+        $execCommand = 'sudo -n ' . $absenBin . ' ' . $subCommand . ' 2>&1';
     }
 
-    echo "data: [INFO] Memulai perintah: " . $subCommand . " (" . ($isWindows ? 'Windows Native' : 'Linux') . ")...\n\n";
+    echo "data: [INFO] Memulai perintah: " . $subCommand . " (" . ($isWindows ? 'Windows Native' : 'Linux / Armbian') . ")...\n\n";
     @ob_flush();
     flush();
 
@@ -125,6 +132,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'stream') {
 
     @putenv('JAGAT_WEB_INVOCATION=1');
     $process = proc_open($execCommand, $descriptors, $pipes);
+    $sudoErrorDetected = false;
 
     if (is_resource($process)) {
         fclose($pipes[0]); // Tutup stdin
@@ -146,6 +154,9 @@ if (isset($_GET['action']) && $_GET['action'] === 'stream') {
                         $clean = preg_replace('/\x1b\[[0-9;]*m/', '', $line);
                         $clean = trim($clean, "\r\n");
                         if ($clean !== '') {
+                            if (stripos($clean, 'password is required') !== false || stripos($clean, 'terminal is required') !== false) {
+                                $sudoErrorDetected = true;
+                            }
                             echo "data: " . $clean . "\n\n";
                             @ob_flush();
                             flush();
@@ -161,6 +172,9 @@ if (isset($_GET['action']) && $_GET['action'] === 'stream') {
                     $clean = preg_replace('/\x1b\[[0-9;]*m/', '', $line);
                     $clean = trim($clean, "\r\n");
                     if ($clean !== '') {
+                        if (stripos($clean, 'password is required') !== false || stripos($clean, 'terminal is required') !== false) {
+                            $sudoErrorDetected = true;
+                        }
                         echo "data: " . $clean . "\n\n";
                     }
                 }
@@ -168,6 +182,9 @@ if (isset($_GET['action']) && $_GET['action'] === 'stream') {
                     $clean = preg_replace('/\x1b\[[0-9;]*m/', '', $line);
                     $clean = trim($clean, "\r\n");
                     if ($clean !== '') {
+                        if (stripos($clean, 'password is required') !== false || stripos($clean, 'terminal is required') !== false) {
+                            $sudoErrorDetected = true;
+                        }
                         echo "data: " . $clean . "\n\n";
                     }
                 }
@@ -178,6 +195,24 @@ if (isset($_GET['action']) && $_GET['action'] === 'stream') {
         fclose($pipes[1]);
         fclose($pipes[2]);
         $exitCode = proc_close($process);
+
+        if ($sudoErrorDetected && !$isWindows) {
+            $webUser = trim(@shell_exec('whoami 2>/dev/null') ?: 'www-data');
+            echo "data: \n\n";
+            echo "data: ============================================================\n\n";
+            echo "data: [KENDALA IZIN SUDO DI ARMBIAN / LINUX]\n\n";
+            echo "data: Web server berjalan sebagai user '{$webUser}' dan membutuhkan\n\n";
+            echo "data: izin NOPASSWD untuk menjalankan /usr/local/bin/absen.\n\n";
+            echo "data: \n\n";
+            echo "data: Silakan buka terminal SSH Armbian Anda dan jalankan perintah ini:\n\n";
+            echo "data:   echo \"{$webUser} ALL=(ALL) NOPASSWD: /usr/local/bin/absen\" | sudo tee /etc/sudoers.d/jagat-absen-web\n\n";
+            echo "data:   sudo chmod 0440 /etc/sudoers.d/jagat-absen-web\n\n";
+            echo "data: \n\n";
+            echo "data: Setelah itu, klik kembali tombol perintah di atas.\n\n";
+            echo "data: ============================================================\n\n";
+            @ob_flush();
+            flush();
+        }
 
         echo "data: [SELESAI] Perintah selesai dieksekusi dengan kode keluar: " . $exitCode . "\n\n";
     } else {

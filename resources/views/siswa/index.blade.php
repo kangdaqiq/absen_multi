@@ -70,6 +70,19 @@
         <div class="flex flex-wrap items-center gap-3 w-full sm:w-auto">
             {{-- Form Filter & Search --}}
             <form action="{{ route('siswa.index') }}" method="GET" class="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+                {{-- Pilihan Jumlah Data Per Halaman --}}
+                <div class="relative">
+                    <select name="per_page" onchange="this.form.submit()" title="Jumlah data per halaman"
+                        class="appearance-none w-full sm:w-32 rounded-lg border border-gray-200 bg-transparent py-2 pl-3 pr-8 text-sm outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:focus:border-brand-500 text-gray-800 dark:text-white/90 cursor-pointer">
+                        @foreach ([10, 20, 50, 100, 250, 500] as $limit)
+                            <option value="{{ $limit }}" {{ request('per_page', 20) == $limit ? 'selected' : '' }}>{{ $limit }}</option>
+                        @endforeach
+                    </select>
+                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500">
+                        <i class="fas fa-chevron-down text-xs"></i>
+                    </div>
+                </div>
+
                 {{-- Filter Kelas --}}
                 <div class="relative">
                     <select name="kelas_id" onchange="this.form.submit()" 
@@ -417,6 +430,7 @@
         <form action="#" method="POST" id="formEditSiswa" enctype="multipart/form-data">
             @csrf
             @method('PUT')
+            <input type="hidden" name="redirect_to" value="{{ request()->fullUrl() }}">
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 @if($photoEnabled ?? true)
                 <div class="sm:col-span-2">
@@ -552,6 +566,7 @@
         <form action="#" method="POST" id="formHapusSiswa">
             @csrf
             @method('DELETE')
+            <input type="hidden" name="redirect_to" value="{{ request()->fullUrl() }}">
             <p class="text-gray-700 dark:text-gray-300 mb-6">Yakin ingin menghapus siswa: <strong id="hapus_nama" class="text-gray-900 dark:text-white"></strong>?</p>
             <div class="flex justify-end gap-3 pt-4 border-t border-gray-100 dark:border-gray-800">
                 <button type="button" @click="open = false" class="rounded-lg border border-gray-200 px-4 py-2 text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-gray-800">Batal</button>

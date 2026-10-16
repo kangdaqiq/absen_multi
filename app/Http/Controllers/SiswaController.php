@@ -45,7 +45,13 @@ class SiswaController extends Controller
             }
         }
 
-        $siswa = $query->paginate(20)->withQueryString();
+        $perPage = (int) $request->input('per_page', 20);
+        $allowedPerPage = [10, 20, 50, 100, 250, 500];
+        if (!in_array($perPage, $allowedPerPage)) {
+            $perPage = 20;
+        }
+
+        $siswa = $query->paginate($perPage)->withQueryString();
 
         // Also filter kelas by school
         $kelasQuery = Kelas::orderBy('nama_kelas');
@@ -251,10 +257,18 @@ class SiswaController extends Controller
 
         $siswa->update($input);
 
-        return redirect()->route('siswa.index')->with('success', 'Data siswa berhasil diperbarui.');
+        $redirectUrl = $request->input('redirect_to');
+        if ($redirectUrl) {
+            $parsedHost = parse_url($redirectUrl, PHP_URL_HOST);
+            if (empty($parsedHost) || $parsedHost === $request->getHost()) {
+                return redirect($redirectUrl)->with('success', 'Data siswa berhasil diperbarui.');
+            }
+        }
+
+        return redirect()->back()->with('success', 'Data siswa berhasil diperbarui.');
     }
 
-    public function destroy($id)
+    public function destroy(Request $request, $id)
     {
         $siswa = Siswa::findOrFail($id);
         $this->authorizeStudentAccess($siswa);
@@ -265,7 +279,15 @@ class SiswaController extends Controller
 
         $siswa->delete();
 
-        return redirect()->route('siswa.index')->with('success', 'Siswa berhasil dihapus.');
+        $redirectUrl = $request->input('redirect_to');
+        if ($redirectUrl) {
+            $parsedHost = parse_url($redirectUrl, PHP_URL_HOST);
+            if (empty($parsedHost) || $parsedHost === $request->getHost()) {
+                return redirect($redirectUrl)->with('success', 'Siswa berhasil dihapus.');
+            }
+        }
+
+        return redirect()->back()->with('success', 'Siswa berhasil dihapus.');
     }
 
     public function import(Request $request)

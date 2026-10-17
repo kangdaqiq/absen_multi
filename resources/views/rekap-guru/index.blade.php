@@ -42,11 +42,18 @@
 <!-- Filter Card -->
 <div class="mb-6 rounded-2xl border border-gray-200 bg-white shadow-theme-sm dark:border-gray-800 dark:bg-gray-dark">
     <div class="border-b border-gray-200 px-5 py-4 dark:border-gray-800 flex items-center justify-between">
-        <h6 class="font-semibold text-gray-800 dark:text-white/90">Filter Rekap</h6>
-        @if(request('sort_by'))
-            <a href="{{ route('rekap-guru.index', request()->except(['sort_by', 'sort_dir', 'page'])) }}" 
-               class="inline-flex items-center gap-1.5 text-xs text-brand-600 hover:text-brand-700 dark:text-brand-400 font-medium hover:underline">
-                <i class="fas fa-undo"></i> Reset Urutan ({{ ucfirst(str_replace('_', ' ', request('sort_by'))) }} {{ strtoupper(request('sort_dir', 'asc')) }})
+        <div class="flex items-center gap-2.5">
+            <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
+                <i class="fas fa-filter text-xs"></i>
+            </div>
+            <div>
+                <h6 class="font-semibold text-gray-800 dark:text-white/90 text-sm">Filter Rekap Kehadiran {{ $labelKaryawan }}</h6>
+            </div>
+        </div>
+        @if(request()->hasAny(['shift_id', 'guru_id', 'search', 'sort_by']) || (request('start_date') && request('start_date') !== now()->startOfMonth()->format('Y-m-d')) || (request('end_date') && request('end_date') !== now()->format('Y-m-d')))
+            <a href="{{ route('rekap-guru.index') }}" 
+               class="inline-flex items-center gap-1.5 text-xs text-error-600 hover:text-error-700 dark:text-error-400 font-medium hover:underline">
+                <i class="fas fa-times"></i> Reset Filter
             </a>
         @endif
     </div>
@@ -58,50 +65,65 @@
             @endif
 
             <div class="w-full md:w-auto">
-                <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Tanggal Mulai:</label>
-                <input type="date" name="start_date" value="{{ $startDate }}" required class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                <label class="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300">Tanggal Mulai:</label>
+                <input type="date" name="start_date" value="{{ $startDate }}" required class="w-full rounded-xl border border-gray-200 bg-transparent px-3.5 py-2.5 text-xs outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white {{ request('start_date') ? 'border-brand-500 bg-brand-50/20 font-semibold text-brand-600' : '' }}">
             </div>
             <div class="w-full md:w-auto">
-                <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Tanggal Akhir:</label>
-                <input type="date" name="end_date" value="{{ $endDate }}" required class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                <label class="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300">Tanggal Akhir:</label>
+                <input type="date" name="end_date" value="{{ $endDate }}" required class="w-full rounded-xl border border-gray-200 bg-transparent px-3.5 py-2.5 text-xs outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white {{ request('end_date') ? 'border-brand-500 bg-brand-50/20 font-semibold text-brand-600' : '' }}">
             </div>
             <div class="w-full md:w-auto min-w-[180px]">
-                <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Filter Shift:</label>
-                <select name="shift_id" class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
-                    <option value="">-- Semua Shift --</option>
-                    @foreach($shifts as $s)
-                        <option value="{{ $s->id }}" {{ $shiftId == $s->id ? 'selected' : '' }}>
-                            {{ $s->nama_shift }} ({{ $s->formatted_jam_masuk }}-{{ $s->formatted_jam_pulang }})
-                        </option>
-                    @endforeach
-                </select>
+                <label class="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300">Filter Shift:</label>
+                <div class="relative">
+                    <select name="shift_id" class="w-full appearance-none rounded-xl border border-gray-200 bg-transparent py-2.5 pl-3.5 pr-8 text-xs outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white cursor-pointer {{ request('shift_id') ? 'border-brand-500 bg-brand-50/20 font-semibold text-brand-600' : '' }}">
+                        <option value="">Semua Shift</option>
+                        @foreach($shifts as $s)
+                            <option value="{{ $s->id }}" {{ $shiftId == $s->id ? 'selected' : '' }}>
+                                {{ $s->nama_shift }} ({{ $s->formatted_jam_masuk }}-{{ $s->formatted_jam_pulang }})
+                            </option>
+                        @endforeach
+                    </select>
+                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-gray-400">
+                        <i class="fas fa-chevron-down text-[10px]"></i>
+                    </div>
+                </div>
             </div>
             <div class="w-full md:w-auto min-w-[200px]">
-                <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ $labelKaryawan }}:</label>
-                <select name="guru_id" class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white select2">
-                    <option value="">-- Semua {{ $labelKaryawan }} --</option>
-                    @foreach($gurusList ?? [] as $g)
-                        <option value="{{ $g->id }}" {{ $guruId == $g->id ? 'selected' : '' }}>
-                            {{ $g->nama }}
-                        </option>
-                    @endforeach
-                </select>
+                <label class="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300">{{ $labelKaryawan }}:</label>
+                <div class="relative">
+                    <select name="guru_id" class="w-full appearance-none rounded-xl border border-gray-200 bg-transparent py-2.5 pl-3.5 pr-8 text-xs outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white cursor-pointer select2 {{ request('guru_id') ? 'border-brand-500 bg-brand-50/20 font-semibold text-brand-600' : '' }}">
+                        <option value="">Semua {{ $labelKaryawan }}</option>
+                        @foreach($gurusList ?? [] as $g)
+                            <option value="{{ $g->id }}" {{ $guruId == $g->id ? 'selected' : '' }}>
+                                {{ $g->nama }}
+                            </option>
+                        @endforeach
+                    </select>
+                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-gray-400">
+                        <i class="fas fa-chevron-down text-[10px]"></i>
+                    </div>
+                </div>
             </div>
             <div class="w-full md:w-auto min-w-[220px]">
-                <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Cari {{ $labelKaryawan }}:</label>
-                <input type="text" name="search" value="{{ request('search') }}" placeholder="Ketik nama atau {{ $labelNIP }}..." 
-                    oninput="clearTimeout(this.delay); this.delay = setTimeout(() => { this.form.submit() }, 500);"
-                    class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                <label class="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300">Cari {{ $labelKaryawan }}:</label>
+                <div class="relative">
+                    <input type="text" name="search" value="{{ request('search') }}" placeholder="Ketik nama atau {{ $labelNIP }}..." 
+                        oninput="clearTimeout(this.delay); this.delay = setTimeout(() => { this.form.submit() }, 500);"
+                        class="w-full rounded-xl border border-gray-200 bg-transparent py-2.5 pl-3.5 pr-8 text-xs outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white {{ request('search') ? 'border-brand-500 bg-brand-50/20 font-semibold text-brand-600' : '' }}">
+                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-gray-400">
+                        <i class="fas fa-search text-xs"></i>
+                    </div>
+                </div>
             </div>
             
             <div class="w-full md:w-auto flex flex-wrap gap-2 mt-2 md:mt-0">
-                <button type="submit" class="inline-flex items-center justify-center gap-2 rounded-lg bg-brand-500 px-4 py-2 text-center font-medium text-white hover:bg-brand-600 transition shadow-sm">
+                <button type="submit" class="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-500 px-4 py-2.5 text-center text-xs font-medium text-white hover:bg-brand-600 transition shadow-sm cursor-pointer">
                     <i class="fas fa-search"></i> Tampilkan
                 </button>
-                <a href="{{ route('rekap-guru.export', request()->query()) }}" class="inline-flex items-center justify-center gap-2 rounded-lg bg-success-500 px-4 py-2 text-center font-medium text-white hover:bg-success-600 transition shadow-sm">
+                <a href="{{ route('rekap-guru.export', request()->query()) }}" class="inline-flex items-center justify-center gap-2 rounded-xl bg-success-500 px-4 py-2.5 text-center text-xs font-medium text-white hover:bg-success-600 transition shadow-sm cursor-pointer" style="background-color: #12b76a;">
                     <i class="fas fa-file-excel"></i> Excel
                 </a>
-                <a href="{{ route('rekap-guru.pdf', request()->query()) }}" target="_blank" class="inline-flex items-center justify-center gap-2 rounded-lg bg-error-500 px-4 py-2 text-center font-medium text-white hover:bg-error-600 transition shadow-sm">
+                <a href="{{ route('rekap-guru.pdf', request()->query()) }}" target="_blank" class="inline-flex items-center justify-center gap-2 rounded-xl bg-error-500 px-4 py-2.5 text-center text-xs font-medium text-white hover:bg-error-600 transition shadow-sm cursor-pointer">
                     <i class="fas fa-file-pdf"></i> PDF
                 </a>
             </div>

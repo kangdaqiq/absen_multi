@@ -102,6 +102,7 @@ Route::middleware(['auth', 'self_hosted_guard'])->prefix('super-admin')->name('s
         // Active Subscriptions per School
         Route::post('schools/{school}/subscriptions/quick-renew', [App\Http\Controllers\SuperAdmin\SchoolSubscriptionController::class, 'quickRenew'])->name('schools.subscriptions.quick-renew');
         Route::post('schools/{school}/subscriptions/{subscription}/confirm', [App\Http\Controllers\SuperAdmin\SchoolSubscriptionController::class, 'confirm'])->name('schools.subscriptions.confirm');
+        Route::post('schools/{school}/subscriptions/{subscription}/send-receipt-wa', [App\Http\Controllers\SuperAdmin\SchoolSubscriptionController::class, 'sendReceiptWhatsApp'])->name('schools.subscriptions.send-receipt-wa');
         Route::resource('schools.subscriptions', App\Http\Controllers\SuperAdmin\SchoolSubscriptionController::class)->except(['show']);
 
         // Licenses (Self-Hosted)
@@ -175,6 +176,8 @@ Route::middleware('auth')->group(function () {
     // Absensi & Rekap Routes (Includes Wali Kelas & Waka Kurikulum)
     Route::middleware('role:admin,teacher,wali_kelas,waka_kurikulum')->group(function () {
         // Jadwal Pembelajaran
+        Route::get('jadwal-pelajaran/download-template', [App\Http\Controllers\JadwalPelajaranController::class, 'downloadTemplate'])->name('jadwal-pelajaran.download-template');
+        Route::post('jadwal-pelajaran/import', [App\Http\Controllers\JadwalPelajaranController::class, 'import'])->name('jadwal-pelajaran.import');
         Route::delete('jadwal-pelajaran/bulk-destroy', [App\Http\Controllers\JadwalPelajaranController::class, 'bulkDestroy'])->name('jadwal-pelajaran.bulk-destroy');
         Route::resource('jadwal-pelajaran', App\Http\Controllers\JadwalPelajaranController::class)->except(['create', 'show', 'edit']);
 

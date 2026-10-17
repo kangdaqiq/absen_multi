@@ -23,8 +23,21 @@
 
     <!-- Filter Card -->
     <div class="mb-6 rounded-2xl border border-gray-200 bg-white shadow-theme-sm dark:border-gray-800 dark:bg-gray-dark">
-        <div class="border-b border-gray-200 px-5 py-4 dark:border-gray-800">
-            <h6 class="font-semibold text-gray-800 dark:text-white/90">Filter Periode Absensi</h6>
+        <div class="border-b border-gray-200 px-5 py-4 dark:border-gray-800 flex items-center justify-between">
+            <div class="flex items-center gap-2.5">
+                <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
+                    <i class="fas fa-filter text-xs"></i>
+                </div>
+                <div>
+                    <h6 class="font-semibold text-gray-800 dark:text-white/90 text-sm">Filter Periode Absensi</h6>
+                </div>
+            </div>
+            @if($search || $bulan != date('m') || $tahun != date('Y'))
+                <a href="{{ route('siswa.riwayat') }}" 
+                   class="inline-flex items-center gap-1.5 text-xs text-error-600 hover:text-error-700 dark:text-error-400 font-medium hover:underline">
+                    <i class="fas fa-times"></i> Reset Filter
+                </a>
+            @endif
         </div>
         <div class="p-5">
             <form action="{{ route('siswa.riwayat') }}" method="GET" class="flex flex-col flex-wrap gap-4 md:flex-row items-end">
@@ -36,40 +49,50 @@
                     ];
                 @endphp
                 <div class="w-full md:w-auto min-w-[180px]">
-                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Bulan:</label>
-                    <select name="bulan" class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
-                        @foreach($months as $num => $name)
-                            <option value="{{ $num }}" {{ (int)$bulan === $num ? 'selected' : '' }}>
-                                {{ $name }}
-                            </option>
-                        @endforeach
-                    </select>
+                    <label class="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300">Bulan:</label>
+                    <div class="relative">
+                        <select name="bulan" class="w-full appearance-none rounded-xl border border-gray-200 bg-transparent py-2.5 pl-3.5 pr-8 text-xs outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white cursor-pointer {{ (int)$bulan !== (int)date('m') ? 'border-brand-500 bg-brand-50/20 font-semibold text-brand-600' : '' }}">
+                            @foreach($months as $num => $name)
+                                <option value="{{ $num }}" {{ (int)$bulan === $num ? 'selected' : '' }}>
+                                    {{ $name }}
+                                </option>
+                            @endforeach
+                        </select>
+                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-gray-400">
+                            <i class="fas fa-chevron-down text-[10px]"></i>
+                        </div>
+                    </div>
                 </div>
                 <div class="w-full md:w-auto min-w-[140px]">
-                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Tahun:</label>
-                    <select name="tahun" class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
-                        @for($y = date('Y'); $y >= date('Y') - 3; $y--)
-                            <option value="{{ $y }}" {{ (int)$tahun === $y ? 'selected' : '' }}>
-                                {{ $y }}
-                            </option>
-                        @endfor
-                    </select>
+                    <label class="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300">Tahun:</label>
+                    <div class="relative">
+                        <select name="tahun" class="w-full appearance-none rounded-xl border border-gray-200 bg-transparent py-2.5 pl-3.5 pr-8 text-xs outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white cursor-pointer {{ (int)$tahun !== (int)date('Y') ? 'border-brand-500 bg-brand-50/20 font-semibold text-brand-600' : '' }}">
+                            @for($y = date('Y'); $y >= date('Y') - 3; $y--)
+                                <option value="{{ $y }}" {{ (int)$tahun === $y ? 'selected' : '' }}>
+                                    {{ $y }}
+                                </option>
+                            @endfor
+                        </select>
+                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-gray-400">
+                            <i class="fas fa-chevron-down text-[10px]"></i>
+                        </div>
+                    </div>
                 </div>
                 <div class="w-full md:w-auto min-w-[220px]">
-                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Kata Kunci:</label>
-                    <input type="text" name="q" value="{{ $search }}" placeholder="Status atau keterangan..."
-                        class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                    <label class="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300">Kata Kunci:</label>
+                    <div class="relative">
+                        <input type="text" name="q" value="{{ $search }}" placeholder="Status atau keterangan..."
+                            class="w-full rounded-xl border border-gray-200 bg-transparent py-2.5 pl-3.5 pr-8 text-xs outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white {{ $search ? 'border-brand-500 bg-brand-50/20 font-semibold text-brand-600' : '' }}">
+                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-gray-400">
+                            <i class="fas fa-search text-xs"></i>
+                        </div>
+                    </div>
                 </div>
                 
                 <div class="w-full md:w-auto flex flex-wrap gap-2 mt-2 md:mt-0">
-                    <button type="submit" class="inline-flex items-center justify-center gap-2 rounded-lg bg-brand-500 px-4 py-2 text-center font-medium text-white hover:bg-brand-600 transition">
+                    <button type="submit" class="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-500 px-5 py-2.5 text-center text-xs font-medium text-white hover:bg-brand-600 transition shadow-sm cursor-pointer">
                         <i class="fas fa-search"></i> Tampilkan
                     </button>
-                    @if($search || $bulan != date('m') || $tahun != date('Y'))
-                        <a href="{{ route('siswa.riwayat') }}" class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-center font-medium text-gray-600 hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-gray-800 transition">
-                            Reset
-                        </a>
-                    @endif
                 </div>
             </form>
         </div>

@@ -28,52 +28,80 @@
     @endif
 
     <!-- Filter & Date Card -->
-    <div class="mb-6 rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-sm dark:border-gray-800 dark:bg-gray-dark">
-        <form action="{{ route('absensi-pelajaran.index') }}" method="GET" class="flex flex-wrap items-end gap-4">
-            <!-- Tanggal -->
-            <div class="w-full sm:w-48">
-                <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Pilih Tanggal</label>
-                <input type="date" name="tanggal" value="{{ $tanggal }}" onchange="this.form.submit()"
-                    class="w-full rounded-lg border border-gray-200 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
-            </div>
-
-            <!-- Hari Aktif Info -->
-            <div class="flex items-center gap-2 pb-2">
-                <span class="inline-flex items-center gap-1.5 rounded-lg bg-brand-50 px-3 py-2 text-xs font-bold text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
-                    <i class="fas fa-calendar-day"></i> Hari: {{ $namaHari }}
-                </span>
-            </div>
-
-            @if($isAdminOrWaka)
-                <!-- Filter Guru (Khusus Admin/Waka) -->
-                <div class="w-full sm:w-56">
-                    <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Guru Pengajar</label>
-                    <select name="guru_id" onchange="this.form.submit()"
-                        class="w-full rounded-lg border border-gray-200 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
-                        <option value="">-- Semua Guru --</option>
-                        @foreach($gurus as $g)
-                            <option value="{{ $g->id }}" {{ request('guru_id') == $g->id ? 'selected' : '' }}>{{ $g->nama }}</option>
-                        @endforeach
-                    </select>
+    <div class="mb-6 rounded-2xl border border-gray-200 bg-white shadow-theme-sm dark:border-gray-800 dark:bg-gray-dark">
+        <div class="border-b border-gray-200 px-5 py-4 dark:border-gray-800 flex items-center justify-between">
+            <div class="flex items-center gap-2.5">
+                <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
+                    <i class="fas fa-filter text-xs"></i>
                 </div>
-
-                <!-- Filter Kelas -->
-                <div class="w-full sm:w-44">
-                    <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Kelas</label>
-                    <select name="kelas_id" onchange="this.form.submit()"
-                        class="w-full rounded-lg border border-gray-200 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
-                        <option value="">-- Semua Kelas --</option>
-                        @foreach($kelases as $k)
-                            <option value="{{ $k->id }}" {{ request('kelas_id') == $k->id ? 'selected' : '' }}>{{ $k->nama_kelas }}</option>
-                        @endforeach
-                    </select>
+                <div>
+                    <h6 class="font-semibold text-gray-800 dark:text-white/90 text-sm">Filter Absensi Pembelajaran</h6>
                 </div>
+            </div>
+            @if(request()->hasAny(['guru_id', 'kelas_id']) || (request('tanggal') && request('tanggal') !== date('Y-m-d')))
+                <a href="{{ route('absensi-pelajaran.index') }}" 
+                   class="inline-flex items-center gap-1.5 text-xs text-error-600 hover:text-error-700 dark:text-error-400 font-medium hover:underline">
+                    <i class="fas fa-times"></i> Reset Filter
+                </a>
             @endif
+        </div>
+        <div class="p-5">
+            <form action="{{ route('absensi-pelajaran.index') }}" method="GET" class="flex flex-wrap items-end gap-4">
+                <!-- Tanggal -->
+                <div class="w-full sm:w-48">
+                    <label class="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300">Pilih Tanggal</label>
+                    <input type="date" name="tanggal" value="{{ $tanggal }}" onchange="this.form.submit()"
+                        class="w-full rounded-xl border border-gray-200 bg-transparent px-3 py-2 text-xs outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                </div>
 
-            <div class="ml-auto pb-1 text-xs text-gray-500 dark:text-gray-400">
-                Menampilkan jadwal hari <strong class="text-gray-800 dark:text-white">{{ $namaHari }}</strong>, {{ \Carbon\Carbon::parse($tanggal)->translatedFormat('d F Y') }}
-            </div>
-        </form>
+                <!-- Hari Aktif Info -->
+                <div class="flex items-center gap-2 pb-0.5">
+                    <span class="inline-flex items-center gap-1.5 rounded-xl bg-brand-50 px-3 py-2 text-xs font-bold text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
+                        <i class="fas fa-calendar-day"></i> Hari: {{ $namaHari }}
+                    </span>
+                </div>
+
+                @if($isAdminOrWaka)
+                    <!-- Filter Guru (Khusus Admin/Waka) -->
+                    <div class="w-full sm:w-56">
+                        <label class="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300">Guru Pengajar</label>
+                        <div class="relative">
+                            <select name="guru_id" onchange="this.form.submit()"
+                                class="w-full appearance-none rounded-xl border border-gray-200 bg-transparent py-2 pl-3.5 pr-8 text-xs outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white cursor-pointer {{ request('guru_id') ? 'border-brand-500 bg-brand-50/20 font-semibold text-brand-600' : '' }}">
+                                <option value="">Semua Guru</option>
+                                @foreach($gurus as $g)
+                                    <option value="{{ $g->id }}" {{ request('guru_id') == $g->id ? 'selected' : '' }}>{{ $g->nama }}</option>
+                                @endforeach
+                            </select>
+                            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-gray-400">
+                                <i class="fas fa-chevron-down text-[10px]"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Filter Kelas -->
+                    <div class="w-full sm:w-44">
+                        <label class="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300">Kelas</label>
+                        <div class="relative">
+                            <select name="kelas_id" onchange="this.form.submit()"
+                                class="w-full appearance-none rounded-xl border border-gray-200 bg-transparent py-2 pl-3.5 pr-8 text-xs outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white cursor-pointer {{ request('kelas_id') ? 'border-brand-500 bg-brand-50/20 font-semibold text-brand-600' : '' }}">
+                                <option value="">Semua Kelas</option>
+                                @foreach($kelases as $k)
+                                    <option value="{{ $k->id }}" {{ request('kelas_id') == $k->id ? 'selected' : '' }}>{{ $k->nama_kelas }}</option>
+                                @endforeach
+                            </select>
+                            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-gray-400">
+                                <i class="fas fa-chevron-down text-[10px]"></i>
+                            </div>
+                        </div>
+                    </div>
+                @endif
+
+                <div class="ml-auto pb-1 text-xs text-gray-500 dark:text-gray-400">
+                    Jadwal hari <strong class="text-gray-800 dark:text-white">{{ $namaHari }}</strong>, {{ \Carbon\Carbon::parse($tanggal)->translatedFormat('d F Y') }}
+                </div>
+            </form>
+        </div>
     </div>
 
     <!-- Grid / Cards Jadwal Mengajar Hari Ini -->

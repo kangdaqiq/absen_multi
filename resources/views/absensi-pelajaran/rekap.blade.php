@@ -25,54 +25,82 @@
     </div>
 
     <!-- Filter Card -->
-    <div class="mb-6 rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-sm dark:border-gray-800 dark:bg-gray-dark no-print">
-        <form action="{{ route('absensi-pelajaran.rekap') }}" method="GET" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-            <!-- Dari Tanggal -->
-            <div>
-                <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Dari Tanggal</label>
-                <input type="date" name="start_date" value="{{ $startDate }}"
-                    class="w-full rounded-lg border border-gray-200 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+    <div class="mb-6 rounded-2xl border border-gray-200 bg-white shadow-theme-sm dark:border-gray-800 dark:bg-gray-dark no-print">
+        <div class="border-b border-gray-200 px-5 py-4 dark:border-gray-800 flex items-center justify-between">
+            <div class="flex items-center gap-2.5">
+                <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
+                    <i class="fas fa-filter text-xs"></i>
+                </div>
+                <div>
+                    <h6 class="font-semibold text-gray-800 dark:text-white/90 text-sm">Filter Rekap Pembelajaran</h6>
+                </div>
             </div>
+            @if(request()->hasAny(['start_date', 'end_date', 'kelas_id', 'mapel_id']))
+                <a href="{{ route('absensi-pelajaran.rekap') }}" 
+                   class="inline-flex items-center gap-1.5 text-xs text-error-600 hover:text-error-700 dark:text-error-400 font-medium hover:underline">
+                    <i class="fas fa-times"></i> Reset Filter
+                </a>
+            @endif
+        </div>
+        <div class="p-5">
+            <form action="{{ route('absensi-pelajaran.rekap') }}" method="GET" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                <!-- Dari Tanggal -->
+                <div>
+                    <label class="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300">Dari Tanggal</label>
+                    <input type="date" name="start_date" value="{{ $startDate }}"
+                        class="w-full rounded-xl border border-gray-200 bg-transparent px-3.5 py-2.5 text-xs outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white {{ request('start_date') ? 'border-brand-500 bg-brand-50/20 font-semibold text-brand-600' : '' }}">
+                </div>
 
-            <!-- Sampai Tanggal -->
-            <div>
-                <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Sampai Tanggal</label>
-                <input type="date" name="end_date" value="{{ $endDate }}"
-                    class="w-full rounded-lg border border-gray-200 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
-            </div>
+                <!-- Sampai Tanggal -->
+                <div>
+                    <label class="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300">Sampai Tanggal</label>
+                    <input type="date" name="end_date" value="{{ $endDate }}"
+                        class="w-full rounded-xl border border-gray-200 bg-transparent px-3.5 py-2.5 text-xs outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white {{ request('end_date') ? 'border-brand-500 bg-brand-50/20 font-semibold text-brand-600' : '' }}">
+                </div>
 
-            <!-- Filter Kelas -->
-            <div>
-                <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Kelas</label>
-                <select name="kelas_id"
-                    class="w-full rounded-lg border border-gray-200 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
-                    <option value="">-- Semua Kelas --</option>
-                    @foreach($kelases as $k)
-                        <option value="{{ $k->id }}" {{ $kelasId == $k->id ? 'selected' : '' }}>{{ $k->nama_kelas }}</option>
-                    @endforeach
-                </select>
-            </div>
+                <!-- Filter Kelas -->
+                <div>
+                    <label class="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300">Kelas</label>
+                    <div class="relative">
+                        <select name="kelas_id"
+                            class="w-full appearance-none rounded-xl border border-gray-200 bg-transparent py-2.5 pl-3.5 pr-8 text-xs outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white cursor-pointer {{ $kelasId ? 'border-brand-500 bg-brand-50/20 font-semibold text-brand-600' : '' }}">
+                            <option value="">Semua Kelas</option>
+                            @foreach($kelases as $k)
+                                <option value="{{ $k->id }}" {{ $kelasId == $k->id ? 'selected' : '' }}>{{ $k->nama_kelas }}</option>
+                            @endforeach
+                        </select>
+                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-gray-400">
+                            <i class="fas fa-chevron-down text-[10px]"></i>
+                        </div>
+                    </div>
+                </div>
 
-            <!-- Filter Mapel -->
-            <div>
-                <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Mata Pelajaran</label>
-                <select name="mapel_id"
-                    class="w-full rounded-lg border border-gray-200 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
-                    <option value="">-- Semua Mapel --</option>
-                    @foreach($mapels as $m)
-                        <option value="{{ $m->id }}" {{ $mapelId == $m->id ? 'selected' : '' }}>{{ $m->nama_mapel }}</option>
-                    @endforeach
-                </select>
-            </div>
+                <!-- Filter Mapel -->
+                <div>
+                    <label class="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300">Mata Pelajaran</label>
+                    <div class="relative">
+                        <select name="mapel_id"
+                            class="w-full appearance-none rounded-xl border border-gray-200 bg-transparent py-2.5 pl-3.5 pr-8 text-xs outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white cursor-pointer {{ $mapelId ? 'border-brand-500 bg-brand-50/20 font-semibold text-brand-600' : '' }}">
+                            <option value="">Semua Mapel</option>
+                            @foreach($mapels as $m)
+                                <option value="{{ $m->id }}" {{ $mapelId == $m->id ? 'selected' : '' }}>{{ $m->nama_mapel }}</option>
+                            @endforeach
+                        </select>
+                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-gray-400">
+                            <i class="fas fa-chevron-down text-[10px]"></i>
+                        </div>
+                    </div>
+                </div>
 
-            <!-- Button Submit Filter -->
-            <div class="flex items-end gap-2">
-                <button type="submit"
-                    class="w-full rounded-lg bg-brand-500 px-4 py-2.5 text-xs font-bold text-white hover:bg-brand-600 transition shadow-sm">
-                    <i class="fas fa-filter mr-1"></i> Terapkan Filter
-                </button>
-            </div>
-        </form>
+                <!-- Button Submit Filter -->
+                <div class="flex items-end">
+                    <button type="submit"
+                        class="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-brand-500 px-4 py-2.5 text-xs font-medium text-white hover:bg-brand-600 transition shadow-sm cursor-pointer">
+                        <i class="fas fa-filter"></i> Terapkan Filter
+                    </button>
+                </div>
+            </form>
+        </div>
     </div>
 
     <!-- Summary Metrics Ribbon -->

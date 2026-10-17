@@ -142,6 +142,13 @@
                                             <i class="fas fa-check-circle"></i>
                                         </button>
                                     </form>
+                                @elseif($sub->status === 'paid')
+                                    <form action="{{ route('super-admin.schools.subscriptions.send-receipt-wa', [$school, $sub]) }}" method="POST" class="inline-block" onsubmit="return confirm('Kirim kuitansi/bukti pembayaran via WhatsApp ke Admin sekolah ini?')">
+                                        @csrf
+                                        <button type="submit" class="text-brand-500 hover:text-brand-700 hover:bg-brand-50 p-2 rounded-lg transition" title="Kirim Kuitansi WA">
+                                            <i class="fab fa-whatsapp text-base"></i>
+                                        </button>
+                                    </form>
                                 @endif
                                 <a href="{{ route('super-admin.schools.subscriptions.edit', [$school, $sub]) }}" class="text-warning-500 hover:text-warning-700 hover:bg-warning-50 p-2 rounded-lg transition" title="Edit">
                                     <i class="fas fa-edit"></i>

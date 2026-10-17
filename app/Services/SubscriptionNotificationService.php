@@ -108,33 +108,61 @@ class SubscriptionNotificationService
     }
 
     /**
-     * Send renewal notification with direct public invoice link to school admin.
-     * Logic:
-     * 1. Check if SuperAdmin WA device is connected. If YES, send from SuperAdmin (school_id = null).
-     * 2. If SuperAdmin WA is NOT connected, fallback to send from the School's own WA device (school_id = $school->id).
+     * Resolve the primary recipient phone for a school (operator, school phone, or admin user).
      */
-    public function sendRenewalInvoiceWhatsApp(School $school, ?Subscription $subscription = null, ?int $daysRemaining = null): array
+    public function getSchoolAdminPhone(School $school): ?string
     {
         $phoneRaw = $school->operator_phone ?: $school->phone;
         if (empty($phoneRaw)) {
-            // Check if there's an admin user with a phone
             $adminUser = $school->users()->where('role', 'admin')->first();
             $phoneRaw = $adminUser?->guru?->no_wa;
         }
 
         if (empty($phoneRaw)) {
-            Log::warning("Cannot send renewal invoice to {$school->name}: No operator/admin phone.");
+            return null;
+        }
+
+        return $this->formatPhone($phoneRaw);
+    }
+
+    /**
+     * Determine Sender WA Device (SuperAdmin vs School fallback).
+     */
+    public function determineSenderDevice(School $school): array
+    {
+        $superAdminConnected = $this->isDeviceConnected('superadmin');
+        if ($superAdminConnected) {
             return [
-                'success' => false,
-                'message' => "Nomor WhatsApp admin/operator untuk sekolah {$school->name} tidak ditemukan."
+                'school_id' => null,
+                'label'     => 'WA SuperAdmin (Pusat)',
             ];
         }
 
-        $phone = $this->formatPhone($phoneRaw);
+        $schoolConnected = $this->isDeviceConnected((string) $school->id);
+        if ($schoolConnected || $school->wa_enabled) {
+            return [
+                'school_id' => $school->id,
+                'label'     => "WA Sekolah ({$school->name}) [Fallback]",
+            ];
+        }
+
+        return [
+            'school_id' => null,
+            'label'     => 'WA SuperAdmin (Pending Reconnect)',
+        ];
+    }
+
+    /**
+     * Send renewal notification with direct public invoice link to school admin.
+     */
+    public function sendRenewalInvoiceWhatsApp(School $school, ?Subscription $subscription = null, ?int $daysRemaining = null): array
+    {
+        $phone = $this->getSchoolAdminPhone($school);
         if (!$phone) {
+            Log::warning("Cannot send renewal invoice to {$school->name}: No operator/admin phone.");
             return [
                 'success' => false,
-                'message' => "Format nomor WhatsApp tidak valid ({$phoneRaw})."
+                'message' => "Nomor WhatsApp admin/operator untuk sekolah {$school->name} tidak ditemukan atau formatnya tidak valid."
             ];
         }
 
@@ -179,27 +207,11 @@ class SubscriptionNotificationService
             "_Pembayaran via QRIS (BCA, Mandiri, BRI, BNI, Dana, GoPay, OVO, ShopeePay) langsung diverifikasi sistem secara instan._\n\n" .
             "Terima kasih atas kerja samanya. 🙏";
 
-        // Determine Sender WA Device (SuperAdmin vs School fallback)
-        $superAdminConnected = $this->isDeviceConnected('superadmin');
-        $senderSchoolId = null; // null = superadmin device
-        $senderLabel = 'WA SuperAdmin (Pusat)';
-
-        if (!$superAdminConnected) {
-            // Fallback to School's own device if available
-            $schoolConnected = $this->isDeviceConnected((string)$school->id);
-            if ($schoolConnected || $school->wa_enabled) {
-                $senderSchoolId = $school->id;
-                $senderLabel = "WA Sekolah ({$school->name}) [Fallback]";
-            } else {
-                // Neither connected, keep as null so it sends when SuperAdmin reconnects
-                $senderSchoolId = null;
-                $senderLabel = 'WA SuperAdmin (Pending Reconnect)';
-            }
-        }
+        $sender = $this->determineSenderDevice($school);
 
         // Create Message Queue with high priority (priority 20) and bypass_last_seen
         $mq = new MessageQueue([
-            'school_id'    => $senderSchoolId,
+            'school_id'    => $sender['school_id'],
             'phone_number' => $phone,
             'message'      => $message,
             'status'       => 'pending',
@@ -210,13 +222,106 @@ class SubscriptionNotificationService
         $mq->bypass_last_seen = true;
         $mq->save();
 
-        Log::info("Renewal invoice queued for {$school->name} ({$phone}) via {$senderLabel}. Invoice: {$invoiceUrl}");
+        Log::info("Renewal invoice queued for {$school->name} ({$phone}) via {$sender['label']}. Invoice: {$invoiceUrl}");
 
         return [
             'success'        => true,
-            'message'        => "Invoice berhasil dikirim ke WhatsApp Admin {$school->name} ({$phone}) via {$senderLabel}.",
+            'message'        => "Invoice berhasil dikirim ke WhatsApp Admin {$school->name} ({$phone}) via {$sender['label']}.",
             'invoice_url'    => $invoiceUrl,
-            'sender'         => $senderLabel,
+            'sender'         => $sender['label'],
+            'invoice_number' => $subscription->invoice_number,
+            'total_amount'   => $subscription->amount,
+        ];
+    }
+
+    /**
+     * Send payment success notification and receipt via WhatsApp to school admin.
+     */
+    public function sendPaymentSuccessWhatsApp(Subscription $subscription): array
+    {
+        $school = $subscription->school;
+        if (!$school) {
+            $subscription->load('school');
+            $school = $subscription->school;
+        }
+
+        if (!$school) {
+            Log::warning("Cannot send payment success notification: School not found for subscription #{$subscription->id}");
+            return [
+                'success' => false,
+                'message' => "Sekolah untuk langganan ID #{$subscription->id} tidak ditemukan."
+            ];
+        }
+
+        $phone = $this->getSchoolAdminPhone($school);
+        if (!$phone) {
+            Log::warning("Cannot send payment success notification to {$school->name}: No operator/admin phone.");
+            return [
+                'success' => false,
+                'message' => "Nomor WhatsApp admin/operator untuk sekolah {$school->name} tidak ditemukan atau formatnya tidak valid."
+            ];
+        }
+
+        $subscription->ensureInvoiceDetails();
+        $subscription->loadMissing('package');
+
+        $packageName = $subscription->package?->name ?? 'Paket Langganan Sekolah';
+        $totalFormatted = 'Rp ' . number_format($subscription->amount, 0, ',', '.');
+        $billingCycleText = $subscription->billing_cycle === 'yearly' ? '1 Tahun' : '1 Bulan';
+
+        $paymentMethod = strtoupper($subscription->payment_method ?? 'QRIS');
+        if ($paymentMethod === 'MANUAL') {
+            $paymentMethod = 'Transfer Bank (Manual)';
+        }
+
+        $paidAt = $subscription->paid_at
+            ? $subscription->paid_at->translatedFormat('d F Y H:i')
+            : now()->translatedFormat('d F Y H:i');
+
+        $expiredAtFormatted = $school->expired_at
+            ? $school->expired_at->translatedFormat('d F Y')
+            : ($subscription->expired_at ? $subscription->expired_at->translatedFormat('d F Y') : '-');
+
+        $invoiceUrl = $subscription->public_invoice_url;
+
+        $message = "✅ *PEMBAYARAN PERPANJANGAN BERHASIL* ✅\n\n" .
+            "Yth. Pengelola / Admin *{$school->name}*,\n\n" .
+            "Alhamdulillah, pembayaran perpanjangan langganan sistem absensi sekolah Anda telah *berhasil diverifikasi* dan seluruh layanan aktif kembali secara otomatis.\n\n" .
+            "📋 *Rincian Pembayaran:*\n" .
+            "• No. Invoice: `{$subscription->invoice_number}`\n" .
+            "• Paket: *{$packageName}* ({$billingCycleText})\n" .
+            "• Total Pembayaran: *{$totalFormatted}*\n" .
+            "• Metode: *{$paymentMethod}*\n" .
+            "• Waktu Bayar: *{$paidAt} WIB*\n\n" .
+            "🗓️ *Masa Aktif Layanan Baru:*\n" .
+            "Aktif s/d: *{$expiredAtFormatted}*\n\n" .
+            "🧾 *Kuitansi Elektronik:*\n" .
+            "👉 {$invoiceUrl}\n\n" .
+            "_Seluruh fitur absensi, bot WhatsApp, dan pencatatan kehadiran sekolah Anda sudah dapat digunakan kembali secara normal._\n\n" .
+            "Terima kasih atas kerja sama dan kepercayaannya! 🙏";
+
+        $sender = $this->determineSenderDevice($school);
+
+        // Create Message Queue with high priority (priority 20) and bypass_last_seen
+        $mq = new MessageQueue([
+            'school_id'    => $sender['school_id'],
+            'phone_number' => $phone,
+            'message'      => $message,
+            'status'       => 'pending',
+            'scheduled_at' => now(), // send immediately
+            'priority'     => 20,    // high priority for payment receipt
+            'created_at'   => now(),
+        ]);
+        $mq->bypass_last_seen = true;
+        $mq->save();
+
+        Log::info("Payment success WhatsApp queued for {$school->name} ({$phone}) via {$sender['label']}. Invoice: {$subscription->invoice_number}");
+
+        return [
+            'success'        => true,
+            'message'        => "Kuitansi pembayaran berhasil dikirim ke WhatsApp Admin {$school->name} ({$phone}) via {$sender['label']}.",
+            'invoice_url'    => $invoiceUrl,
+            'sender'         => $sender['label'],
             'invoice_number' => $subscription->invoice_number,
             'total_amount'   => $subscription->amount,
         ];

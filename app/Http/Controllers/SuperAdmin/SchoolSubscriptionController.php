@@ -75,6 +75,13 @@ class SchoolSubscriptionController extends Controller
 
         $school->update($updateSchool);
 
+        // Kirim notifikasi sukses perpanjangan & kuitansi via WhatsApp ke Admin Sekolah
+        try {
+            app(\App\Services\SubscriptionNotificationService::class)->sendPaymentSuccessWhatsApp($subscription);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error("Failed to send quick renew WA for subscription #{$subscription->id}: " . $e->getMessage());
+        }
+
         return redirect()->route('super-admin.schools.subscriptions.index', $school)
             ->with('success', "Berhasil memperpanjang {$months} bulan dan mengaktifkan kembali seluruh fitur!");
     }
@@ -152,12 +159,22 @@ class SchoolSubscriptionController extends Controller
                 : $package->price_monthly;
         }
 
+        $oldStatus = $subscription->status;
         $subscription->update($validated);
 
         if ($validated['status'] === 'paid' && !empty($validated['expired_at'])) {
             $school->update([
                 'expired_at' => $validated['expired_at']
             ]);
+
+            // Kirim notifikasi jika status baru saja berubah menjadi paid
+            if ($oldStatus !== 'paid') {
+                try {
+                    app(\App\Services\SubscriptionNotificationService::class)->sendPaymentSuccessWhatsApp($subscription);
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::error("Failed to send payment success WA for subscription #{$subscription->id}: " . $e->getMessage());
+                }
+            }
         }
 
         return redirect()->route('super-admin.schools.subscriptions.index', $school)->with('success', 'Langganan berhasil diperbarui');
@@ -203,6 +220,23 @@ class SchoolSubscriptionController extends Controller
             $school->update($updateSchool);
         }
 
+        // Kirim notifikasi sukses perpanjangan & kuitansi via WhatsApp ke Admin Sekolah
+        try {
+            app(\App\Services\SubscriptionNotificationService::class)->sendPaymentSuccessWhatsApp($subscription);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error("Failed to send payment success WA for subscription #{$subscription->id}: " . $e->getMessage());
+        }
+
         return redirect()->route('super-admin.schools.subscriptions.index', $school)->with('success', 'Pembayaran berhasil dikonfirmasi dan seluruh fitur langganan aktif kembali.');
+    }
+
+    public function sendReceiptWhatsApp(School $school, Subscription $subscription, \App\Services\SubscriptionNotificationService $notificationService)
+    {
+        if ($subscription->school_id !== $school->id) {
+            abort(404);
+        }
+
+        $result = $notificationService->sendPaymentSuccessWhatsApp($subscription);
+        return back()->with($result['success'] ? 'success' : 'error', $result['message']);
     }
 }

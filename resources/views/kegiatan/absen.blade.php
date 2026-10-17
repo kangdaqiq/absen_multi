@@ -14,51 +14,76 @@
 
 {{-- Filter Card --}}
 <div class="mb-6 rounded-2xl border border-gray-200 bg-white shadow-theme-sm dark:border-gray-800 dark:bg-gray-dark">
-    <div class="border-b border-gray-200 px-5 py-4 dark:border-gray-800">
-        <h6 class="font-semibold text-gray-800 dark:text-white/90">Filter Pencarian & Kegiatan</h6>
+    <div class="border-b border-gray-200 px-5 py-4 dark:border-gray-800 flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+            <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
+                <i class="fas fa-filter text-xs"></i>
+            </div>
+            <div>
+                <h6 class="font-semibold text-gray-800 dark:text-white/90 text-sm">Filter Pencarian & Kegiatan</h6>
+            </div>
+        </div>
+        @if(request()->hasAny(['kegiatan_id', 'kelas_id', 'search']) || (request('tanggal') && request('tanggal') !== now()->format('Y-m-d')))
+            <a href="{{ route('kegiatan.absen') }}" 
+               class="inline-flex items-center gap-1.5 text-xs text-error-600 hover:text-error-700 dark:text-error-400 font-medium hover:underline">
+                <i class="fas fa-times"></i> Reset Filter
+            </a>
+        @endif
     </div>
     <div class="p-5">
         <form action="{{ route('kegiatan.absen') }}" method="GET" class="flex flex-col xl:flex-row gap-4 items-end">
             <div class="w-full xl:w-1/4">
-                <label for="kegiatan_id" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Pilih Kegiatan</label>
-                <select name="kegiatan_id" id="kegiatan_id" class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white" onchange="this.form.submit()">
-                    @forelse($kegiatans as $k)
-                        <option value="{{ $k->id }}" {{ $selectedKegiatanId == $k->id ? 'selected' : '' }}>
-                            {{ $k->nama_kegiatan }} ({{ $k->formatted_hari }})
-                        </option>
-                    @empty
-                        <option value="">-- Belum Ada Kegiatan Aktif --</option>
-                    @endforelse
-                </select>
+                <label for="kegiatan_id" class="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300">Pilih Kegiatan</label>
+                <div class="relative">
+                    <select name="kegiatan_id" id="kegiatan_id" class="w-full appearance-none rounded-xl border border-gray-200 bg-transparent py-2.5 pl-3.5 pr-8 text-xs outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white cursor-pointer {{ request('kegiatan_id') ? 'border-brand-500 bg-brand-50/20 font-semibold text-brand-600' : '' }}" onchange="this.form.submit()">
+                        @forelse($kegiatans as $k)
+                            <option value="{{ $k->id }}" {{ $selectedKegiatanId == $k->id ? 'selected' : '' }}>
+                                {{ $k->nama_kegiatan }} ({{ $k->formatted_hari }})
+                            </option>
+                        @empty
+                            <option value="">-- Belum Ada Kegiatan Aktif --</option>
+                        @endforelse
+                    </select>
+                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-gray-400">
+                        <i class="fas fa-chevron-down text-[10px]"></i>
+                    </div>
+                </div>
             </div>
             
             <div class="w-full xl:w-1/5">
-                <label for="tanggal" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Tanggal</label>
-                <input type="date" name="tanggal" id="tanggal" value="{{ $tanggal }}" class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white" onchange="this.form.submit()">
+                <label for="tanggal" class="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300">Tanggal</label>
+                <input type="date" name="tanggal" id="tanggal" value="{{ $tanggal }}" class="w-full rounded-xl border border-gray-200 bg-transparent px-3.5 py-2.5 text-xs outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white {{ (request('tanggal') && request('tanggal') !== now()->format('Y-m-d')) ? 'border-brand-500 bg-brand-50/20 font-semibold text-brand-600' : '' }}" onchange="this.form.submit()">
             </div>
 
             <div class="w-full xl:w-1/5">
-                <label for="kelas_id" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Kelas</label>
-                <select name="kelas_id" id="kelas_id" class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white" onchange="this.form.submit()">
-                    <option value="">Semua Kelas</option>
-                    @foreach($allKelas as $k)
-                        <option value="{{ $k->id }}" {{ $kelasId == $k->id ? 'selected' : '' }}>{{ $k->nama_kelas }}</option>
-                    @endforeach
-                </select>
+                <label for="kelas_id" class="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300">Kelas</label>
+                <div class="relative">
+                    <select name="kelas_id" id="kelas_id" class="w-full appearance-none rounded-xl border border-gray-200 bg-transparent py-2.5 pl-3.5 pr-8 text-xs outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white cursor-pointer {{ request('kelas_id') ? 'border-brand-500 bg-brand-50/20 font-semibold text-brand-600' : '' }}" onchange="this.form.submit()">
+                        <option value="">Semua Kelas</option>
+                        @foreach($allKelas as $k)
+                            <option value="{{ $k->id }}" {{ $kelasId == $k->id ? 'selected' : '' }}>{{ $k->nama_kelas }}</option>
+                        @endforeach
+                    </select>
+                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-gray-400">
+                        <i class="fas fa-chevron-down text-[10px]"></i>
+                    </div>
+                </div>
             </div>
 
             <div class="w-full xl:w-1/4 relative">
-                <label for="search" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Cari Siswa</label>
-                <input type="text" name="search" id="search" value="{{ request('search') }}" placeholder="Ketik nama siswa..." 
-                    oninput="clearTimeout(this.delay); this.delay = setTimeout(() => { this.form.submit() }, 600);"
-                    class="w-full rounded-lg border border-gray-200 bg-transparent py-2 pl-4 pr-10 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
-                <div class="absolute right-3 bottom-2 text-gray-400">
-                    <i class="fas fa-search"></i>
+                <label for="search" class="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300">Cari Siswa</label>
+                <div class="relative">
+                    <input type="text" name="search" id="search" value="{{ request('search') }}" placeholder="Ketik nama siswa..." 
+                        oninput="clearTimeout(this.delay); this.delay = setTimeout(() => { this.form.submit() }, 600);"
+                        class="w-full rounded-xl border border-gray-200 bg-transparent py-2.5 pl-3.5 pr-8 text-xs outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white {{ request('search') ? 'border-brand-500 bg-brand-50/20 font-semibold text-brand-600' : '' }}">
+                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-gray-400">
+                        <i class="fas fa-search text-xs"></i>
+                    </div>
                 </div>
             </div>
 
             <div class="w-full xl:w-auto">
-                <button type="submit" class="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-brand-500 px-6 py-2.5 text-center font-medium text-white hover:bg-brand-600 transition">
+                <button type="submit" class="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-brand-500 px-5 py-2.5 text-center text-xs font-medium text-white hover:bg-brand-600 transition shadow-sm cursor-pointer">
                     <i class="fas fa-filter"></i> Saring
                 </button>
             </div>

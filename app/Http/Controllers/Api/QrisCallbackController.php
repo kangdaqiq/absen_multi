@@ -115,6 +115,13 @@ class QrisCallbackController extends Controller
                 $school->update($updateSchool);
 
                 Log::info("QRIS Subscription activated for School #{$school->id} ({$school->name}) - Package: " . ($package?->name ?? 'Custom') . " until {$newExpiredAt->format('Y-m-d')}");
+
+                // Send payment success notification & receipt via WhatsApp to School Admin
+                try {
+                    app(\App\Services\SubscriptionNotificationService::class)->sendPaymentSuccessWhatsApp($matchedSubscription);
+                } catch (\Throwable $e) {
+                    Log::error("Failed to send payment success WA for subscription #{$matchedSubscription->id}: " . $e->getMessage());
+                }
             }
         }
 

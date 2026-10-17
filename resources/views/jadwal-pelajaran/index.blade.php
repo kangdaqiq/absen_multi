@@ -18,8 +18,13 @@
                 <i class="fas fa-clipboard-check text-brand-500"></i> Absensi Hari Ini
             </a>
             @if(in_array(auth()->user()->role, ['admin', 'super_admin', 'waka_kurikulum']))
+                <button type="button" @click="$dispatch('open-modal', 'modalImportJadwal')"
+                    class="inline-flex items-center justify-center gap-2 rounded-lg border border-success-300 bg-success-50 px-3.5 py-2.5 text-center font-medium text-success-700 hover:bg-success-100 dark:border-success-500/20 dark:bg-success-500/10 dark:text-success-400 transition shadow-sm text-sm cursor-pointer"
+                    style="border-color: #a6f4c5; color: #027a48; background-color: #ecfdf3;">
+                    <i class="fas fa-file-excel text-success-600 dark:text-success-400" style="color: #12b76a;"></i> Import Excel
+                </button>
                 <button @click="$dispatch('open-modal', 'modalTambahJadwal')"
-                    class="inline-flex items-center justify-center gap-2.5 rounded-lg bg-brand-500 px-4 py-2.5 text-center font-medium text-white hover:bg-brand-600 transition shadow-sm text-sm">
+                    class="inline-flex items-center justify-center gap-2.5 rounded-lg bg-brand-500 px-4 py-2.5 text-center font-medium text-white hover:bg-brand-600 transition shadow-sm text-sm cursor-pointer">
                     <i class="fas fa-plus"></i> Tambah Jadwal
                 </button>
             @endif
@@ -33,76 +38,156 @@
         </div>
     @endif
 
+    @if(session('warning'))
+        <div class="mb-6 flex items-center gap-3 rounded-xl border border-warning-200 bg-warning-50 p-4 dark:border-warning-500/20 dark:bg-warning-500/10 text-warning-800 dark:text-warning-400">
+            <i class="fas fa-exclamation-circle text-lg"></i>
+            <span class="text-sm font-medium">{{ session('warning') }}</span>
+        </div>
+    @endif
+
     @if(session('error'))
         <div class="mb-6 flex items-center gap-3 rounded-xl border border-error-200 bg-error-50 p-4 dark:border-error-500/20 dark:bg-error-500/10 text-error-800 dark:text-error-400">
-            <i class="fas fa-exclamation-circle text-lg"></i>
+            <i class="fas fa-times-circle text-lg"></i>
             <span class="text-sm font-medium">{{ session('error') }}</span>
         </div>
     @endif
 
+    @if(session('import_errors') && count(session('import_errors')) > 0)
+        <div class="mb-6 rounded-2xl border border-warning-200 bg-warning-50/70 p-5 dark:border-warning-500/20 dark:bg-warning-500/10 text-gray-800 dark:text-gray-200" x-data="{ showDetails: true }">
+            <div class="flex items-center justify-between mb-2">
+                <div class="flex items-center gap-2.5 text-warning-800 dark:text-warning-300 font-semibold text-sm">
+                    <i class="fas fa-exclamation-triangle text-base text-warning-600"></i>
+                    <span>Terdapat {{ count(session('import_errors')) }} baris data jadwal yang dilewati saat impor:</span>
+                </div>
+                <button type="button" @click="showDetails = !showDetails" class="text-xs text-brand-600 dark:text-brand-400 hover:underline font-medium cursor-pointer">
+                    <span x-text="showDetails ? 'Sembunyikan Rincian' : 'Lihat Rincian Baris'"></span>
+                </button>
+            </div>
+            <div x-show="showDetails" class="mt-3 max-h-56 overflow-y-auto rounded-lg border border-warning-200 bg-white dark:border-gray-800 dark:bg-gray-900 text-xs">
+                <table class="w-full text-left">
+                    <thead class="bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 font-medium">
+                        <tr>
+                            <th class="px-3 py-2 text-center w-16">Baris</th>
+                            <th class="px-3 py-2 w-44">Info Data</th>
+                            <th class="px-3 py-2">Alasan Penolakan</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                        @foreach(session('import_errors') as $err)
+                            <tr>
+                                <td class="px-3 py-2 text-center font-bold text-gray-700 dark:text-gray-300">{{ $err['row'] ?? '-' }}</td>
+                                <td class="px-3 py-2 font-medium text-gray-800 dark:text-gray-200">{{ $err['info'] ?? '-' }}</td>
+                                <td class="px-3 py-2 text-error-600 dark:text-error-400">{{ $err['reason'] ?? '-' }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    @endif
+
     <!-- Filter Card -->
-    <div class="mb-6 rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-sm dark:border-gray-800 dark:bg-gray-dark">
-        <form action="{{ route('jadwal-pelajaran.index') }}" method="GET" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            <!-- Filter Hari -->
-            <div>
-                <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Hari</label>
-                <select name="hari" onchange="this.form.submit()"
-                    class="w-full rounded-lg border border-gray-200 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
-                    <option value="">-- Semua Hari --</option>
-                    @foreach($hariList as $h)
-                        <option value="{{ $h }}" {{ request('hari') == $h ? 'selected' : '' }}>{{ $h }}</option>
-                    @endforeach
-                </select>
-            </div>
-
-            <!-- Filter Kelas -->
-            <div>
-                <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Kelas</label>
-                <select name="kelas_id" onchange="this.form.submit()"
-                    class="w-full rounded-lg border border-gray-200 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
-                    <option value="">-- Semua Kelas --</option>
-                    @foreach($kelases as $k)
-                        <option value="{{ $k->id }}" {{ request('kelas_id') == $k->id ? 'selected' : '' }}>{{ $k->nama_kelas }}</option>
-                    @endforeach
-                </select>
-            </div>
-
-            <!-- Filter Guru -->
-            <div>
-                <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Guru Pengajar</label>
-                <select name="guru_id" onchange="this.form.submit()"
-                    class="w-full rounded-lg border border-gray-200 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
-                    <option value="">-- Semua Guru --</option>
-                    @foreach($gurus as $g)
-                        <option value="{{ $g->id }}" {{ request('guru_id') == $g->id ? 'selected' : '' }}>{{ $g->nama }}</option>
-                    @endforeach
-                </select>
-            </div>
-
-            <!-- Filter Mapel -->
-            <div>
-                <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Mata Pelajaran</label>
-                <select name="mapel_id" onchange="this.form.submit()"
-                    class="w-full rounded-lg border border-gray-200 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
-                    <option value="">-- Semua Mapel --</option>
-                    @foreach($mapels as $m)
-                        <option value="{{ $m->id }}" {{ request('mapel_id') == $m->id ? 'selected' : '' }}>{{ $m->nama_mapel }}</option>
-                    @endforeach
-                </select>
-            </div>
-
-            <!-- Cari -->
-            <div>
-                <label class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">Cari Kata Kunci</label>
-                <div class="relative">
-                    <input type="text" name="search" value="{{ request('search') }}" placeholder="Cari..."
-                        class="w-full rounded-lg border border-gray-200 bg-transparent py-2 pl-3 pr-8 text-sm outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
-                    <button type="submit" class="absolute right-2 top-2.5 text-gray-400 hover:text-brand-500">
-                        <i class="fas fa-search text-xs"></i>
-                    </button>
+    <div class="mb-6 rounded-2xl border border-gray-200 bg-white shadow-theme-sm dark:border-gray-800 dark:bg-gray-dark">
+        <div class="border-b border-gray-200 px-5 py-4 dark:border-gray-800 flex items-center justify-between">
+            <div class="flex items-center gap-2.5">
+                <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
+                    <i class="fas fa-filter text-xs"></i>
+                </div>
+                <div>
+                    <h6 class="font-semibold text-gray-800 dark:text-white/90 text-sm">Filter Jadwal Pelajaran</h6>
                 </div>
             </div>
-        </form>
+            @if(request()->hasAny(['hari', 'kelas_id', 'guru_id', 'mapel_id', 'search']))
+                <a href="{{ route('jadwal-pelajaran.index') }}" 
+                   class="inline-flex items-center gap-1.5 text-xs text-error-600 hover:text-error-700 dark:text-error-400 font-medium hover:underline">
+                    <i class="fas fa-times"></i> Reset Filter
+                </a>
+            @endif
+        </div>
+        <div class="p-5">
+            <form action="{{ route('jadwal-pelajaran.index') }}" method="GET" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                <!-- Filter Hari -->
+                <div>
+                    <label class="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300">Hari</label>
+                    <div class="relative">
+                        <select name="hari" onchange="this.form.submit()"
+                            class="w-full appearance-none rounded-xl border border-gray-200 bg-transparent py-2.5 pl-3.5 pr-8 text-xs outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white cursor-pointer {{ request('hari') ? 'border-brand-500 bg-brand-50/20 font-semibold text-brand-600' : '' }}">
+                            <option value="">Semua Hari</option>
+                            @foreach($hariList as $h)
+                                <option value="{{ $h }}" {{ request('hari') == $h ? 'selected' : '' }}>{{ $h }}</option>
+                            @endforeach
+                        </select>
+                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-gray-400">
+                            <i class="fas fa-chevron-down text-[10px]"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Filter Kelas -->
+                <div>
+                    <label class="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300">Kelas</label>
+                    <div class="relative">
+                        <select name="kelas_id" onchange="this.form.submit()"
+                            class="w-full appearance-none rounded-xl border border-gray-200 bg-transparent py-2.5 pl-3.5 pr-8 text-xs outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white cursor-pointer {{ request('kelas_id') ? 'border-brand-500 bg-brand-50/20 font-semibold text-brand-600' : '' }}">
+                            <option value="">Semua Kelas</option>
+                            @foreach($kelases as $k)
+                                <option value="{{ $k->id }}" {{ request('kelas_id') == $k->id ? 'selected' : '' }}>{{ $k->nama_kelas }}</option>
+                            @endforeach
+                        </select>
+                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-gray-400">
+                            <i class="fas fa-chevron-down text-[10px]"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Filter Guru -->
+                <div>
+                    <label class="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300">Guru Pengajar</label>
+                    <div class="relative">
+                        <select name="guru_id" onchange="this.form.submit()"
+                            class="w-full appearance-none rounded-xl border border-gray-200 bg-transparent py-2.5 pl-3.5 pr-8 text-xs outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white cursor-pointer {{ request('guru_id') ? 'border-brand-500 bg-brand-50/20 font-semibold text-brand-600' : '' }}">
+                            <option value="">Semua Guru</option>
+                            @foreach($gurus as $g)
+                                <option value="{{ $g->id }}" {{ request('guru_id') == $g->id ? 'selected' : '' }}>{{ $g->nama }}</option>
+                            @endforeach
+                        </select>
+                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-gray-400">
+                            <i class="fas fa-chevron-down text-[10px]"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Filter Mapel -->
+                <div>
+                    <label class="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300">Mata Pelajaran</label>
+                    <div class="relative">
+                        <select name="mapel_id" onchange="this.form.submit()"
+                            class="w-full appearance-none rounded-xl border border-gray-200 bg-transparent py-2.5 pl-3.5 pr-8 text-xs outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white cursor-pointer {{ request('mapel_id') ? 'border-brand-500 bg-brand-50/20 font-semibold text-brand-600' : '' }}">
+                            <option value="">Semua Mapel</option>
+                            @foreach($mapels as $m)
+                                <option value="{{ $m->id }}" {{ request('mapel_id') == $m->id ? 'selected' : '' }}>{{ $m->nama_mapel }}</option>
+                            @endforeach
+                        </select>
+                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-gray-400">
+                            <i class="fas fa-chevron-down text-[10px]"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Cari -->
+                <div>
+                    <label class="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300">Cari Kata Kunci</label>
+                    <div class="relative">
+                        <input type="text" name="search" value="{{ request('search') }}" placeholder="Cari jadwal..."
+                            oninput="clearTimeout(this.delay); this.delay = setTimeout(() => { this.form.submit() }, 500);"
+                            class="w-full rounded-xl border border-gray-200 bg-transparent py-2.5 pl-3.5 pr-9 text-xs outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white {{ request('search') ? 'border-brand-500' : '' }}">
+                        <button type="submit" class="absolute right-0 top-0 h-full px-3 text-gray-400 hover:text-brand-500">
+                            <i class="fas fa-search text-xs"></i>
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
     </div>
 
     <!-- Table Card -->
@@ -265,7 +350,7 @@
     <!-- ========================= MODALS ========================= -->
 
     <!-- Modal Tambah Jadwal -->
-    <x-ui.modal id="modalTambahJadwal" :is-open="false" x-data="{}">
+    <x-ui.modal id="modalTambahJadwal" :is-open="false" class="max-w-2xl sm:max-w-2xl" x-data="{}">
         <div class="p-6">
             <div class="flex items-center justify-between mb-5">
                 <h3 class="text-xl font-bold text-gray-800 dark:text-white/90">Tambah Jadwal Pelajaran</h3>
@@ -274,15 +359,46 @@
             <form action="{{ route('jadwal-pelajaran.store') }}" method="POST">
                 @csrf
                 <div class="space-y-4">
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                            <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Kelas</label>
-                            <select name="kelas_id" id="tambah_kelas_id" required class="w-full rounded-lg border border-gray-200 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
-                                <option value="">-- Pilih Kelas Terlebih Dahulu --</option>
-                                @foreach($kelases as $k)
-                                    <option value="{{ $k->id }}">{{ $k->nama_kelas }}</option>
-                                @endforeach
-                            </select>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
+                        <!-- Multi-Kelas Dropdown Repeater -->
+                        <div x-data="kelasRepeater()" class="space-y-2">
+                            <div class="flex items-center justify-between mb-1.5">
+                                <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    Kelas <span class="text-error-500">*</span>
+                                </label>
+                                <a href="{{ route('kelas.index') }}" target="_blank" class="text-xs text-brand-600 hover:underline dark:text-brand-400 font-medium">
+                                    + Kelola Kelas
+                                </a>
+                            </div>
+
+                            <!-- List Dropdown Kelas -->
+                            <div class="space-y-2">
+                                <template x-for="(item, index) in rows" :key="item.uid">
+                                    <div class="flex items-center gap-2">
+                                        <select name="kelas_ids[]" x-model="item.kelas_id" @change="onKelasChange()" required
+                                            class="w-full rounded-lg border border-gray-200 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                                            <option value="">-- Pilih Kelas --</option>
+                                            @foreach($kelases as $k)
+                                                <option value="{{ $k->id }}">{{ $k->nama_kelas }}</option>
+                                            @endforeach
+                                        </select>
+                                        <button type="button" x-show="rows.length > 1" @click="removeRow(index)"
+                                            class="h-9 w-9 shrink-0 flex items-center justify-center rounded-lg border border-red-200 text-red-500 hover:bg-red-50 hover:text-red-700 dark:border-red-900/50 dark:hover:bg-red-900/20 transition cursor-pointer"
+                                            title="Hapus kelas ini">
+                                            <i class="fas fa-times text-sm"></i>
+                                        </button>
+                                    </div>
+                                </template>
+                            </div>
+
+                            <!-- Tombol Tambah Kelas -->
+                            <div class="pt-0.5">
+                                <button type="button" @click="addRow()"
+                                    class="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-600 hover:text-brand-700 dark:text-brand-400 hover:underline cursor-pointer">
+                                    <i class="fas fa-plus-circle text-xs"></i>
+                                    <span>Tambah Kelas</span>
+                                </button>
+                            </div>
                         </div>
                         <div>
                             <div class="flex items-center justify-between mb-1.5">
@@ -387,7 +503,7 @@
     </x-ui.modal>
 
     <!-- Modal Edit Jadwal -->
-    <x-ui.modal id="modalEditJadwal" :is-open="false">
+    <x-ui.modal id="modalEditJadwal" :is-open="false" class="max-w-2xl sm:max-w-2xl">
         <div class="p-6">
             <div class="flex items-center justify-between mb-5">
                 <h3 class="text-xl font-bold text-gray-800 dark:text-white/90">Edit Jadwal Pelajaran</h3>
@@ -397,15 +513,46 @@
                 @csrf
                 @method('PUT')
                 <div class="space-y-4">
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                            <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Kelas</label>
-                            <select name="kelas_id" id="edit_kelas_id" required class="w-full rounded-lg border border-gray-200 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
-                                <option value="">-- Pilih Kelas --</option>
-                                @foreach($kelases as $k)
-                                    <option value="{{ $k->id }}">{{ $k->nama_kelas }}</option>
-                                @endforeach
-                            </select>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
+                        <!-- Multi-Kelas Dropdown Repeater untuk Edit -->
+                        <div x-data="kelasRepeaterEdit()" class="space-y-2">
+                            <div class="flex items-center justify-between mb-1.5">
+                                <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    Kelas <span class="text-error-500">*</span>
+                                </label>
+                                <a href="{{ route('kelas.index') }}" target="_blank" class="text-xs text-brand-600 hover:underline dark:text-brand-400 font-medium">
+                                    + Kelola Kelas
+                                </a>
+                            </div>
+
+                            <!-- List Dropdown Kelas -->
+                            <div class="space-y-2">
+                                <template x-for="(item, index) in rows" :key="item.uid">
+                                    <div class="flex items-center gap-2">
+                                        <select name="kelas_ids[]" x-model="item.kelas_id" @change="onKelasChange()" required
+                                            class="w-full rounded-lg border border-gray-200 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                                            <option value="">-- Pilih Kelas --</option>
+                                            @foreach($kelases as $k)
+                                                <option value="{{ $k->id }}">{{ $k->nama_kelas }}</option>
+                                            @endforeach
+                                        </select>
+                                        <button type="button" x-show="rows.length > 1" @click="removeRow(index)"
+                                            class="h-9 w-9 shrink-0 flex items-center justify-center rounded-lg border border-red-200 text-red-500 hover:bg-red-50 hover:text-red-700 dark:border-red-900/50 dark:hover:bg-red-900/20 transition cursor-pointer"
+                                            title="Hapus kelas ini">
+                                            <i class="fas fa-times text-sm"></i>
+                                        </button>
+                                    </div>
+                                </template>
+                            </div>
+
+                            <!-- Tombol Tambah Kelas -->
+                            <div class="pt-0.5">
+                                <button type="button" @click="addRow()"
+                                    class="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-600 hover:text-brand-700 dark:text-brand-400 hover:underline cursor-pointer">
+                                    <i class="fas fa-plus-circle text-xs"></i>
+                                    <span>Tambah Kelas</span>
+                                </button>
+                            </div>
                         </div>
                         <div>
                             <div class="flex items-center justify-between mb-1.5">
@@ -550,13 +697,231 @@
         </div>
     </x-ui.modal>
 
+    <!-- Modal Import Jadwal dari Excel -->
+    <x-ui.modal id="modalImportJadwal" :is-open="false" class="max-w-xl sm:max-w-xl">
+        <div class="p-6">
+            <div class="flex items-center justify-between mb-4 pb-3 border-b border-gray-100 dark:border-gray-800">
+                <div class="flex items-center gap-2.5">
+                    <div class="h-9 w-9 rounded-lg bg-success-50 text-success-600 dark:bg-success-500/15 dark:text-success-400 flex items-center justify-center text-lg" style="background-color: #ecfdf3; color: #12b76a;">
+                        <i class="fas fa-file-excel"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-bold text-gray-800 dark:text-white">Import Jadwal dari Excel</h3>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">Unggah file jadwal pelajaran format Excel (.xlsx)</p>
+                    </div>
+                </div>
+                <button type="button" @click="open = false" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 cursor-pointer">
+                    <i class="fas fa-times text-base"></i>
+                </button>
+            </div>
+
+            <!-- Card Unduh Template dengan Dropdown -->
+            <div class="mb-5 rounded-xl border border-success-200 bg-success-50/70 p-4 dark:border-success-500/20 dark:bg-success-500/10" style="border-color: #a6f4c5; background-color: #f6fef9;">
+                <div class="flex items-center gap-2 text-xs font-bold text-success-700 dark:text-success-400 mb-1.5" style="color: #027a48;">
+                    <i class="fas fa-magic"></i>
+                    <span>Download Template Excel</span>
+                </div>
+                <p class="text-xs text-gray-600 dark:text-gray-300 leading-relaxed mb-3">
+                    Unduh template Excel, pastikan Jam Pelajaran, dan Mata Pelajaran sudah di Input.
+                </p>
+                <div>
+                    <a href="{{ route('jadwal-pelajaran.download-template') }}"
+                        class="inline-flex items-center gap-2 rounded-lg bg-success-500 px-4 py-2.5 text-xs font-bold text-white hover:bg-success-600 transition shadow-sm cursor-pointer"
+                        style="background-color: #12b76a; color: #ffffff !important; text-decoration: none;">
+                        <i class="fas fa-download text-sm" style="color: #ffffff;"></i>
+                        <span style="color: #ffffff;">Unduh Template Excel (.xlsx)</span>
+                    </a>
+                </div>
+            </div>
+
+            <form action="{{ route('jadwal-pelajaran.import') }}" method="POST" enctype="multipart/form-data">
+                @csrf
+                <div class="space-y-4">
+                    <!-- File Input -->
+                    <div>
+                        <div class="flex items-center justify-between mb-1.5">
+                            <label class="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                                Pilih File Excel (.xlsx, .xls, .csv) <span class="text-error-500">*</span>
+                            </label>
+                        </div>
+                        <input type="file" name="fileExcel" accept=".xlsx,.xls,.csv" required
+                            class="w-full text-xs text-gray-600 dark:text-gray-300 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100 dark:file:bg-brand-900/30 dark:file:text-brand-300 border border-gray-200 dark:border-gray-800 rounded-lg p-1.5 bg-gray-50/50 dark:bg-gray-900">
+                    </div>
+
+                    <!-- Mode Import -->
+                    <div class="rounded-xl border border-gray-100 bg-gray-50/70 p-3.5 dark:border-gray-800 dark:bg-gray-800/40">
+                        <label class="block mb-2 text-xs font-semibold text-gray-700 dark:text-gray-300">
+                            Opsi Mode Impor:
+                        </label>
+                        <div class="space-y-2">
+                            <label class="flex items-start gap-2.5 cursor-pointer">
+                                <input type="radio" name="mode" value="append" checked class="mt-0.5 text-brand-600 focus:ring-brand-500">
+                                <div>
+                                    <span class="block text-xs font-semibold text-gray-800 dark:text-gray-200">Tambahkan ke Jadwal yang Ada (Append)</span>
+                                    <span class="block text-[11px] text-gray-500 dark:text-gray-400">Jadwal baru akan ditambahkan tanpa menghapus jadwal yang sudah ada.</span>
+                                </div>
+                            </label>
+                            <label class="flex items-start gap-2.5 cursor-pointer">
+                                <input type="radio" name="mode" value="replace" class="mt-0.5 text-error-600 focus:ring-error-500">
+                                <div>
+                                    <span class="block text-xs font-semibold text-error-600 dark:text-error-400">Ganti Seluruh Jadwal (Replace All)</span>
+                                    <span class="block text-[11px] text-gray-500 dark:text-gray-400">Menghapus seluruh jadwal lama sekolah saat ini dan menggantinya dengan isi file Excel.</span>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-6 flex justify-end gap-3 pt-3 border-t border-gray-100 dark:border-gray-800">
+                    <button type="button" @click="open = false" class="rounded-lg border border-gray-200 px-4 py-2 text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-gray-800 text-xs font-medium cursor-pointer">Batal</button>
+                    <button type="submit" class="inline-flex items-center gap-1.5 rounded-lg bg-success-500 px-4 py-2 text-white hover:bg-success-600 text-xs font-semibold transition cursor-pointer"
+                        style="background-color: #12b76a; color: #ffffff !important;">
+                        <i class="fas fa-file-upload"></i> Upload & Proses Import
+                    </button>
+                </div>
+            </form>
+        </div>
+    </x-ui.modal>
+
 @endsection
 
 @push('scripts')
     <script src="{{ asset('vendor/jquery/jquery.min.js') }}"></script>
     <script>
+        // Alpine component untuk repeater dropdown kelas pada modal Tambah
+        window.kelasRepeater = function () {
+            return {
+                rows: [{ uid: Date.now(), kelas_id: '' }],
+                uidCounter: 1,
+
+                addRow: function () {
+                    this.rows.push({ uid: Date.now() + (this.uidCounter++), kelas_id: '' });
+                },
+
+                removeRow: function (index) {
+                    if (this.rows.length > 1) {
+                        this.rows.splice(index, 1);
+                        this.onKelasChange();
+                    }
+                },
+
+                onKelasChange: function () {
+                    var selectedIds = this.rows
+                        .map(function (r) { return r.kelas_id; })
+                        .filter(function (id) { return id !== '' && id !== null && id !== undefined; });
+
+                    if (typeof window.filterMapelByKelasMulti === 'function') {
+                        window.filterMapelByKelasMulti(selectedIds, '#tambah_mapel_id', '#tambah_mapel_info');
+                    }
+                }
+            };
+        };
+
+        // Alpine component untuk repeater dropdown kelas pada modal Edit
+        window.kelasRepeaterEdit = function () {
+            return {
+                rows: [{ uid: Date.now(), kelas_id: '' }],
+                uidCounter: 1,
+
+                init: function () {
+                    var self = this;
+                    window.addEventListener('set-edit-kelas', function (e) {
+                        var detail = e.detail || {};
+                        var kelasIds = detail.kelasIds || [];
+                        if (kelasIds.length === 0) {
+                            self.rows = [{ uid: Date.now() + (self.uidCounter++), kelas_id: '' }];
+                        } else {
+                            self.rows = kelasIds.map(function (id) {
+                                return { uid: Date.now() + (self.uidCounter++), kelas_id: String(id) };
+                            });
+                        }
+
+                        // Filter mapel saat edit dibuka
+                        setTimeout(function () {
+                            self.onKelasChange(detail.preselectedMapelId);
+                        }, 50);
+                    });
+                },
+
+                addRow: function () {
+                    this.rows.push({ uid: Date.now() + (this.uidCounter++), kelas_id: '' });
+                },
+
+                removeRow: function (index) {
+                    if (this.rows.length > 1) {
+                        this.rows.splice(index, 1);
+                        this.onKelasChange();
+                    }
+                },
+
+                onKelasChange: function (preselectedMapelId) {
+                    var selectedIds = this.rows
+                        .map(function (r) { return r.kelas_id; })
+                        .filter(function (id) { return id !== '' && id !== null && id !== undefined; });
+
+                    if (typeof window.filterMapelByKelasMulti === 'function') {
+                        window.filterMapelByKelasMulti(selectedIds, '#edit_mapel_id', '#edit_mapel_info', preselectedMapelId);
+                    }
+                }
+            };
+        };
+
+        // Filter Mapel by Multiple Selected Kelas
+        window.filterMapelByKelasMulti = function (selectedKelasIds, mapelSelectEl, infoEl, preselectedMapelId) {
+            var mapelSelect = $(mapelSelectEl);
+            var currentVal = preselectedMapelId !== undefined ? preselectedMapelId : mapelSelect.val();
+            var availableCount = 0;
+            selectedKelasIds = Array.isArray(selectedKelasIds) ? selectedKelasIds.map(Number) : [];
+
+            mapelSelect.find('option').each(function () {
+                var opt = $(this);
+                var optVal = opt.val();
+                if (!optVal) return; // skip placeholder
+
+                var rawKelasIds = opt.data('kelas-ids');
+                var kelasIds = Array.isArray(rawKelasIds) ? rawKelasIds.map(Number) : [];
+
+                if (selectedKelasIds.length === 0) {
+                    opt.prop('disabled', true).hide();
+                } else if (kelasIds.length === 0) {
+                    // Mapel berlaku umum untuk semua kelas
+                    opt.prop('disabled', false).show();
+                    availableCount++;
+                } else {
+                    // Ada irisan kelas yang dipilih dengan kelas mapel
+                    var hasOverlap = selectedKelasIds.some(function (kId) {
+                        return kelasIds.indexOf(kId) !== -1;
+                    });
+                    if (hasOverlap) {
+                        opt.prop('disabled', false).show();
+                        availableCount++;
+                    } else {
+                        opt.prop('disabled', true).hide();
+                    }
+                }
+            });
+
+            var placeholder = mapelSelect.find('option[value=""]');
+            if (selectedKelasIds.length === 0) {
+                placeholder.text('-- Pilih Kelas Terlebih Dahulu --');
+                if (infoEl) $(infoEl).text('Pilih kelas di sebelah kiri untuk melihat mata pelajaran yang tersedia.');
+            } else if (availableCount === 0) {
+                placeholder.text('-- Tidak ada mapel untuk kelas terpilih --');
+                if (infoEl) $(infoEl).html('<span class="text-warning-600 dark:text-warning-400"><i class="fas fa-exclamation-triangle"></i> Belum ada mapel ter-mapping untuk kelas terpilih. Atur di menu Mata Pelajaran.</span>');
+            } else {
+                placeholder.text('-- Pilih Mata Pelajaran (' + availableCount + ' Tersedia) --');
+                if (infoEl) $(infoEl).text(availableCount + ' mata pelajaran tersedia untuk ' + selectedKelasIds.length + ' kelas terpilih.');
+            }
+
+            if (currentVal && mapelSelect.find('option[value="' + currentVal + '"]:not(:disabled)').length > 0) {
+                mapelSelect.val(currentVal);
+            } else {
+                mapelSelect.val('');
+            }
+        };
+
         $(document).ready(function () {
-            // Function Filter Mapel by Selected Kelas
+            // Function Filter Mapel by Selected Kelas (Single Select untuk Edit)
             function filterMapelByKelas(kelasSelectEl, mapelSelectEl, infoEl, preselectedMapelId) {
                 var selectedKelasId = parseInt($(kelasSelectEl).val());
                 var mapelSelect = $(mapelSelectEl);
@@ -604,17 +969,8 @@
                 }
             }
 
-            // Trigger on Tambah Modal
-            $('#tambah_kelas_id').on('change', function () {
-                filterMapelByKelas('#tambah_kelas_id', '#tambah_mapel_id', '#tambah_mapel_info');
-            });
-            // Initial filter on load
-            filterMapelByKelas('#tambah_kelas_id', '#tambah_mapel_id', '#tambah_mapel_info');
-
-            // Trigger on Edit Modal
-            $('#edit_kelas_id').on('change', function () {
-                filterMapelByKelas('#edit_kelas_id', '#edit_mapel_id', '#edit_mapel_info');
-            });
+            // Inisialisasi awal filter mapel untuk modal tambah (kosong)
+            window.filterMapelByKelasMulti([], '#tambah_mapel_id', '#tambah_mapel_info');
 
             // Filter Sesi Jam Pelajaran berdasarkan Hari
             function filterJamByHari(hariSelector, jamMulaiSelector, jamAkhirSelector, previewSelector, selectedMulaiToRestore, selectedAkhirToRestore) {
@@ -806,8 +1162,14 @@
             // Edit Modal Handler
             $('.btnEditJadwal').on('click', function () {
                 var d = $(this).data();
-                $('#edit_kelas_id').val(d.kelas_id);
-                filterMapelByKelas('#edit_kelas_id', '#edit_mapel_id', '#edit_mapel_info', d.mapel_id);
+
+                // Set kelas terpilih di Alpine multiSelectKelasEdit
+                window.dispatchEvent(new CustomEvent('set-edit-kelas', {
+                    detail: {
+                        kelasIds: d.kelas_id ? [d.kelas_id] : [],
+                        preselectedMapelId: d.mapel_id
+                    }
+                }));
 
                 $('#edit_guru_id').val(d.guru_id);
                 $('#edit_hari').val(d.hari);

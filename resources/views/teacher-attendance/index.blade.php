@@ -32,67 +32,85 @@
 
 {{-- Filter Card --}}
 <div class="mb-6 rounded-2xl border border-gray-200 bg-white shadow-theme-sm dark:border-gray-800 dark:bg-gray-dark">
-    <div class="border-b border-gray-200 px-5 py-4 dark:border-gray-800">
-        <h6 class="font-semibold text-gray-800 dark:text-white/90">Filter Data</h6>
+    <div class="border-b border-gray-200 px-5 py-4 dark:border-gray-800 flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+            <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
+                <i class="fas fa-filter text-xs"></i>
+            </div>
+            <div>
+                <h6 class="font-semibold text-gray-800 dark:text-white/90 text-sm">Filter Kehadiran {{ $labelKaryawan }}</h6>
+            </div>
+        </div>
+        @if(($filterShift ?? '') !== '' || ($filterStatus ?? '') !== '' || ($search ?? '') !== '' || ($dateStr ?? '') !== now()->format('Y-m-d'))
+            <a href="{{ route('absensi-guru.index') }}" 
+               class="inline-flex items-center gap-1.5 text-xs text-error-600 hover:text-error-700 dark:text-error-400 font-medium hover:underline">
+                <i class="fas fa-times"></i> Reset Filter
+            </a>
+        @endif
     </div>
     <div class="p-5">
         <form action="{{ route('absensi-guru.index') }}" method="GET" class="flex flex-col sm:flex-row gap-4 items-end flex-wrap">
             {{-- Tanggal --}}
             <div class="w-full sm:w-auto">
-                <label for="tanggal" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Tanggal</label>
+                <label for="tanggal" class="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300">Tanggal</label>
                 <input type="date" name="tanggal" id="tanggal" value="{{ $dateStr }}"
-                    class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                    class="w-full rounded-xl border border-gray-200 bg-transparent px-3.5 py-2.5 text-xs outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white {{ ($dateStr ?? '') !== now()->format('Y-m-d') ? 'border-brand-500 bg-brand-50/20 font-semibold text-brand-600' : '' }}">
             </div>
             {{-- Filter Shift --}}
             <div class="w-full sm:w-auto min-w-[180px]">
-                <label for="filter_shift" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Shift Kerja</label>
-                <select name="shift_id" id="filter_shift"
-                    class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
-                    <option value="">Semua Shift</option>
-                    <option value="none" {{ ($filterShift ?? '') === 'none' ? 'selected' : '' }}>Tanpa Shift / Belum Ditugaskan</option>
-                    @foreach($shifts as $s)
-                        <option value="{{ $s->id }}" {{ ($filterShift ?? '') == $s->id ? 'selected' : '' }}>
-                            {{ $s->nama_shift }} ({{ $s->formatted_jam_masuk }}-{{ $s->formatted_jam_pulang }})
-                        </option>
-                    @endforeach
-                </select>
+                <label for="filter_shift" class="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300">Shift Kerja</label>
+                <div class="relative">
+                    <select name="shift_id" id="filter_shift"
+                        class="w-full appearance-none rounded-xl border border-gray-200 bg-transparent py-2.5 pl-3.5 pr-8 text-xs outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white cursor-pointer {{ ($filterShift ?? '') !== '' ? 'border-brand-500 bg-brand-50/20 font-semibold text-brand-600' : '' }}">
+                        <option value="">Semua Shift</option>
+                        <option value="none" {{ ($filterShift ?? '') === 'none' ? 'selected' : '' }}>Tanpa Shift / Belum Ditugaskan</option>
+                        @foreach($shifts as $s)
+                            <option value="{{ $s->id }}" {{ ($filterShift ?? '') == $s->id ? 'selected' : '' }}>
+                                {{ $s->nama_shift }} ({{ $s->formatted_jam_masuk }}-{{ $s->formatted_jam_pulang }})
+                            </option>
+                        @endforeach
+                    </select>
+                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-gray-400">
+                        <i class="fas fa-chevron-down text-[10px]"></i>
+                    </div>
+                </div>
             </div>
             {{-- Filter Status --}}
             <div class="w-full sm:w-auto min-w-[160px]">
-                <label for="filter_status" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Status</label>
-                <select name="status" id="filter_status"
-                    class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
-                    <option value="">Semua Status</option>
-                    <option value="Hadir"       {{ ($filterStatus ?? '') == 'Hadir'       ? 'selected' : '' }}>Hadir (Tepat Waktu)</option>
-                    <option value="Terlambat"   {{ ($filterStatus ?? '') == 'Terlambat'   ? 'selected' : '' }}>Terlambat</option>
-                    <option value="Belum Absen" {{ ($filterStatus ?? '') == 'Belum Absen' ? 'selected' : '' }}>Belum Absen</option>
-                    <option value="Izin"        {{ ($filterStatus ?? '') == 'Izin'        ? 'selected' : '' }}>Izin</option>
-                    <option value="Sakit"       {{ ($filterStatus ?? '') == 'Sakit'       ? 'selected' : '' }}>Sakit</option>
-                    <option value="Alpha"       {{ ($filterStatus ?? '') == 'Alpha'       ? 'selected' : '' }}>Alpha / Tidak Hadir</option>
-                </select>
+                <label for="filter_status" class="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300">Status</label>
+                <div class="relative">
+                    <select name="status" id="filter_status"
+                        class="w-full appearance-none rounded-xl border border-gray-200 bg-transparent py-2.5 pl-3.5 pr-8 text-xs outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white cursor-pointer {{ ($filterStatus ?? '') !== '' ? 'border-brand-500 bg-brand-50/20 font-semibold text-brand-600' : '' }}">
+                        <option value="">Semua Status</option>
+                        <option value="Hadir"       {{ ($filterStatus ?? '') == 'Hadir'       ? 'selected' : '' }}>Hadir (Tepat Waktu)</option>
+                        <option value="Terlambat"   {{ ($filterStatus ?? '') == 'Terlambat'   ? 'selected' : '' }}>Terlambat</option>
+                        <option value="Belum Absen" {{ ($filterStatus ?? '') == 'Belum Absen' ? 'selected' : '' }}>Belum Absen</option>
+                        <option value="Izin"        {{ ($filterStatus ?? '') == 'Izin'        ? 'selected' : '' }}>Izin</option>
+                        <option value="Sakit"       {{ ($filterStatus ?? '') == 'Sakit'       ? 'selected' : '' }}>Sakit</option>
+                        <option value="Alpha"       {{ ($filterStatus ?? '') == 'Alpha'       ? 'selected' : '' }}>Alpha / Tidak Hadir</option>
+                    </select>
+                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-gray-400">
+                        <i class="fas fa-chevron-down text-[10px]"></i>
+                    </div>
+                </div>
             </div>
             {{-- Cari nama / NIP --}}
             <div class="w-full sm:w-auto relative min-w-[220px]">
-                <label for="search" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Cari Nama / {{ $labelNIP }}</label>
-                <input type="text" name="search" id="search" value="{{ $search ?? '' }}" placeholder="Ketik nama {{ strtolower($labelKaryawan) }}..."
-                    class="client-search w-full rounded-lg border border-gray-200 bg-transparent py-2 pl-4 pr-10 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
-                <div class="absolute right-3 bottom-2.5 text-gray-400">
-                    <i class="fas fa-search"></i>
+                <label for="search" class="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300">Cari Nama / {{ $labelNIP }}</label>
+                <div class="relative">
+                    <input type="text" name="search" id="search" value="{{ $search ?? '' }}" placeholder="Ketik nama {{ strtolower($labelKaryawan) }}..."
+                        class="client-search w-full rounded-xl border border-gray-200 bg-transparent py-2.5 pl-3.5 pr-8 text-xs outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white {{ ($search ?? '') !== '' ? 'border-brand-500 bg-brand-50/20 font-semibold text-brand-600' : '' }}">
+                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-gray-400">
+                        <i class="fas fa-search text-xs"></i>
+                    </div>
                 </div>
             </div>
-            {{-- Tombol Tampilkan & Reset --}}
-            <div class="w-full sm:w-auto flex items-center gap-2">
+            {{-- Tombol Tampilkan --}}
+            <div class="w-full sm:w-auto">
                 <button type="submit"
-                    class="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-lg bg-brand-500 px-6 py-2 text-center font-medium text-white hover:bg-brand-600 transition shadow-sm">
+                    class="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-brand-500 px-5 py-2.5 text-center text-xs font-medium text-white hover:bg-brand-600 transition shadow-sm cursor-pointer">
                     <i class="fas fa-filter"></i> Tampilkan
                 </button>
-                @if(($filterShift ?? '') !== '' || ($filterStatus ?? '') !== '' || ($search ?? '') !== '' || ($dateStr ?? '') !== now()->format('Y-m-d'))
-                    <a href="{{ route('absensi-guru.index') }}"
-                        class="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-center font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 transition shadow-sm"
-                        title="Reset Filter ke Hari Ini">
-                        <i class="fas fa-undo"></i> Reset
-                    </a>
-                @endif
             </div>
         </form>
     </div>

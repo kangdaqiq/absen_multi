@@ -44,34 +44,52 @@
 
 {{-- Filter Tanggal --}}
 <div class="mb-6 rounded-2xl border border-gray-200 bg-white shadow-theme-sm dark:border-gray-800 dark:bg-gray-dark">
-    <div class="border-b border-gray-200 px-5 py-4 dark:border-gray-800">
-        <h6 class="font-semibold text-gray-800 dark:text-white/90">Filter Tanggal</h6>
+    <div class="border-b border-gray-200 px-5 py-4 dark:border-gray-800 flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+            <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
+                <i class="fas fa-filter text-xs"></i>
+            </div>
+            <div>
+                <h6 class="font-semibold text-gray-800 dark:text-white/90 text-sm">Filter Tanggal Presensi</h6>
+            </div>
+        </div>
+        @if(request('tanggal') && request('tanggal') !== now()->format('Y-m-d'))
+            <a href="{{ route('kegiatan.attendance', $kegiatan->id) }}" 
+               class="inline-flex items-center gap-1.5 text-xs text-error-600 hover:text-error-700 dark:text-error-400 font-medium hover:underline">
+                <i class="fas fa-times"></i> Reset Filter
+            </a>
+        @endif
     </div>
     <div class="p-5">
         <form action="{{ route('kegiatan.attendance', $kegiatan->id) }}" method="GET"
               class="flex flex-col sm:flex-row gap-4 items-end">
             <div class="w-full sm:w-auto">
-                <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Tanggal</label>
+                <label class="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300">Tanggal</label>
                 <input type="date" name="tanggal" value="{{ $tanggal }}"
-                    class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                    class="w-full rounded-xl border border-gray-200 bg-transparent px-3.5 py-2.5 text-xs outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white {{ (request('tanggal') && request('tanggal') !== now()->format('Y-m-d')) ? 'border-brand-500 bg-brand-50/20 font-semibold text-brand-600' : '' }}">
             </div>
             @if($availableDates->isNotEmpty())
             <div class="w-full sm:w-auto min-w-[200px]">
-                <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Atau pilih tanggal tercatat</label>
-                <select name="tanggal" onchange="this.form.submit()"
-                    class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
-                    <option value="">-- Pilih tanggal --</option>
-                    @foreach($availableDates as $d)
-                        <option value="{{ $d }}" {{ $tanggal == $d ? 'selected' : '' }}>
-                            {{ \Carbon\Carbon::parse($d)->translatedFormat('l, d F Y') }}
-                        </option>
-                    @endforeach
-                </select>
+                <label class="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300">Atau pilih tanggal tercatat</label>
+                <div class="relative">
+                    <select name="tanggal" onchange="this.form.submit()"
+                        class="w-full appearance-none rounded-xl border border-gray-200 bg-transparent py-2.5 pl-3.5 pr-8 text-xs outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white cursor-pointer">
+                        <option value="">-- Pilih tanggal --</option>
+                        @foreach($availableDates as $d)
+                            <option value="{{ $d }}" {{ $tanggal == $d ? 'selected' : '' }}>
+                                {{ \Carbon\Carbon::parse($d)->translatedFormat('l, d F Y') }}
+                            </option>
+                        @endforeach
+                    </select>
+                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-gray-400">
+                        <i class="fas fa-chevron-down text-[10px]"></i>
+                    </div>
+                </div>
             </div>
             @endif
             <div>
                 <button type="submit"
-                    class="inline-flex items-center gap-2 rounded-lg bg-brand-500 px-5 py-2 text-sm font-medium text-white hover:bg-brand-600 transition">
+                    class="inline-flex items-center gap-2 rounded-xl bg-brand-500 px-5 py-2.5 text-xs font-medium text-white hover:bg-brand-600 transition shadow-sm cursor-pointer">
                     <i class="fas fa-filter"></i> Tampilkan
                 </button>
             </div>

@@ -137,11 +137,15 @@
                     </h3>
                     <div class="flex flex-wrap items-center gap-1.5 mt-1">
                         <span class="inline-flex rounded-lg bg-blue-50 px-2.5 py-0.5 text-xs font-bold text-blue-700 dark:bg-blue-500/15 dark:text-blue-400">
-                            Kelas {{ $j->kelas?->nama_kelas ?? '-' }}
+                            @if(!empty($j->is_multi_kelas))
+                                Kelas {{ implode(', ', $j->parallel_kelases ?? [$j->kelas?->nama_kelas]) }}
+                            @else
+                                Kelas {{ $j->kelas?->nama_kelas ?? '-' }}
+                            @endif
                         </span>
                         @if(!empty($j->is_multi_kelas))
-                            <span class="inline-flex items-center gap-1 rounded-lg bg-purple-50 px-2 py-0.5 text-[11px] font-bold text-purple-700 dark:bg-purple-500/15 dark:text-purple-300 border border-purple-200 dark:border-purple-500/20" title="Digabung dengan kelas: {{ implode(', ', $j->parallel_kelases ?? []) }}">
-                                <i class="fas fa-layer-group text-[10px]"></i> Gabungan ({{ implode(', ', $j->parallel_kelases ?? []) }})
+                            <span class="inline-flex items-center gap-1 rounded-lg bg-brand-50 px-2 py-0.5 text-[11px] font-bold text-brand-700 dark:bg-brand-500/15 dark:text-brand-300 border border-brand-200 dark:border-brand-500/20" title="Sesi Gabungan {{ $j->parallel_count ?? count($j->parallel_kelases ?? []) }} Kelas">
+                                <i class="fas fa-layer-group text-[10px] text-brand-500" style="color: #4f6bed;"></i> Gabungan ({{ $j->parallel_count ?? count($j->parallel_kelases ?? []) }} Kelas)
                             </span>
                         @endif
                         @if($j->ruangan)
@@ -172,20 +176,20 @@
                     <!-- Stats mini badges jika sudah diabsen -->
                     @if($j->is_attended && $j->absensi_summary)
                         <div class="mt-3 flex flex-wrap gap-1.5 text-[11px] font-semibold">
-                            <span class="px-2 py-0.5 rounded bg-success-50 text-success-700 border border-success-200 dark:bg-success-500/10 dark:text-success-400 dark:border-success-500/20">
+                            <span class="px-2 py-0.5 rounded bg-success-50 text-success-700 border border-success-200 dark:bg-success-500/10 dark:text-success-400 dark:border-success-500/20" style="background-color: #ecfdf3; color: #027a48; border-color: #a6f4c5;">
                                 H: {{ $j->absensi_summary->count_h }}
                             </span>
-                            <span class="px-2 py-0.5 rounded bg-warning-50 text-warning-700 border border-warning-200 dark:bg-warning-500/10 dark:text-warning-400 dark:border-warning-500/20">
+                            <span class="px-2 py-0.5 rounded bg-warning-50 text-warning-700 border border-warning-200 dark:bg-warning-500/10 dark:text-warning-400 dark:border-warning-500/20" style="background-color: #fffaeb; color: #b54708; border-color: #fedf89;">
                                 S: {{ $j->absensi_summary->count_s }}
                             </span>
-                            <span class="px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20">
+                            <span class="px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20" style="background-color: #f0f9ff; color: #026aa2; border-color: #b9e6fe;">
                                 I: {{ $j->absensi_summary->count_i }}
                             </span>
-                            <span class="px-2 py-0.5 rounded bg-error-50 text-error-700 border border-error-200 dark:bg-error-500/10 dark:text-error-400 dark:border-error-500/20">
+                            <span class="px-2 py-0.5 rounded bg-error-50 text-error-700 border border-error-200 dark:bg-error-500/10 dark:text-error-400 dark:border-error-500/20" style="background-color: #fef3f2; color: #b42318; border-color: #fecdca;">
                                 A: {{ $j->absensi_summary->count_a }}
                             </span>
                             @if($j->absensi_summary->count_t > 0)
-                                <span class="px-2 py-0.5 rounded bg-orange-50 text-orange-700 border border-orange-200 dark:bg-orange-500/10 dark:text-orange-400 dark:border-orange-500/20">
+                                <span class="px-2 py-0.5 rounded bg-orange-50 text-orange-700 border border-orange-200 dark:bg-orange-500/10 dark:text-orange-400 dark:border-orange-500/20" style="background-color: #fff6ed; color: #c4320a; border-color: #fddcab;">
                                     T: {{ $j->absensi_summary->count_t }}
                                 </span>
                             @endif
@@ -196,10 +200,11 @@
                 <!-- Action Button -->
                 <div class="mt-5 pt-4 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between">
                     <span class="text-xs text-gray-500 dark:text-gray-400">
-                        {{ $j->kelas?->siswas_count ?? $j->kelas?->siswas()->count() }} Siswa Terdaftar
+                        {{ $j->total_siswa_gabungan ?? ($j->kelas?->siswas_count ?? $j->kelas?->siswas()->count()) }} Siswa Terdaftar
                     </span>
                     <a href="{{ route('absensi-pelajaran.presensi', ['jadwal' => $j->id, 'tanggal' => $tanggal]) }}"
-                        class="inline-flex items-center gap-1.5 rounded-lg {{ $j->is_attended ? 'bg-gray-100 text-gray-800 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-200' : 'bg-brand-500 text-white hover:bg-brand-600' }} px-3.5 py-2 text-xs font-bold transition shadow-sm">
+                        class="inline-flex items-center gap-1.5 rounded-lg {{ $j->is_attended ? 'bg-gray-100 text-gray-800 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-200' : 'bg-brand-500 text-white hover:bg-brand-600' }} px-3.5 py-2 text-xs font-bold transition shadow-sm"
+                        style="{{ !$j->is_attended ? 'background-color: #4f6bed; color: #ffffff;' : '' }}">
                         <i class="fas {{ $j->is_attended ? 'fa-edit' : 'fa-clipboard-check' }}"></i>
                         <span>{{ $j->is_attended ? 'Edit Presensi' : 'Input Presensi Siswa' }}</span>
                     </a>

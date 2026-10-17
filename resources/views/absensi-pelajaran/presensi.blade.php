@@ -233,8 +233,8 @@
                 <p class="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-0.5 truncate">
                     {{ $jadwal->mapel?->nama_mapel ?? 'Mapel' }} &bull; 
                     @if(!empty($isMultiKelas))
-                        <span class="inline-flex items-center gap-1 font-bold text-purple-600 dark:text-purple-400">
-                            <i class="fas fa-layer-group text-xs"></i> Kelas Gabungan: {{ $parallelJadwals->pluck('kelas.nama_kelas')->join(' & ') }}
+                        <span class="inline-flex items-center gap-1 font-bold text-brand-600 dark:text-brand-400">
+                            <i class="fas fa-layer-group text-xs text-brand-500"></i> Kelas Gabungan: {{ $parallelJadwals->pluck('kelas.nama_kelas')->filter()->unique()->join(' & ') }}
                         </span>
                     @else
                         Kelas {{ $jadwal->kelas?->nama_kelas ?? '-' }}
@@ -278,10 +278,10 @@
             <div>
                 <span class="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 block">Kelas</span>
                 @if(!empty($isMultiKelas))
-                    <span class="font-bold text-purple-600 dark:text-purple-400 text-sm sm:text-base block truncate" title="{{ $parallelJadwals->pluck('kelas.nama_kelas')->join(' & ') }}">
-                        {{ $parallelJadwals->pluck('kelas.nama_kelas')->join(' & ') }}
+                    <span class="font-bold text-brand-600 dark:text-brand-400 text-sm sm:text-base block truncate" title="{{ $parallelJadwals->pluck('kelas.nama_kelas')->filter()->unique()->join(' & ') }}">
+                        {{ $parallelJadwals->pluck('kelas.nama_kelas')->filter()->unique()->join(' & ') }}
                     </span>
-                    <span class="text-[10px] font-semibold text-purple-500 block">(Kelas Gabungan)</span>
+                    <span class="text-[10px] font-semibold text-brand-500 block">(Kelas Gabungan)</span>
                 @else
                     <span class="font-bold text-brand-600 dark:text-brand-400 text-sm sm:text-base block truncate">{{ $jadwal->kelas?->nama_kelas ?? '-' }}</span>
                 @endif
@@ -311,28 +311,28 @@
 
     <!-- ========================= MULTI-CLASS / KELAS GABUNGAN BANNER ========================= -->
     @if(!empty($isMultiKelas))
-        <div class="mb-5 sm:mb-6 rounded-2xl border border-purple-200 bg-gradient-to-r from-purple-50/90 via-white to-purple-50/60 p-4 sm:p-5 dark:border-purple-500/20 dark:from-purple-950/20 dark:via-gray-dark dark:to-purple-950/10 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div class="mb-5 sm:mb-6 rounded-2xl border border-brand-200 bg-brand-50/50 p-4 sm:p-5 dark:border-brand-500/20 dark:bg-brand-500/10 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3">
             <div class="flex items-start sm:items-center gap-3">
-                <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-purple-600 text-white font-bold text-lg shadow-xs">
-                    <i class="fas fa-layer-group"></i>
+                <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl font-bold text-lg shadow-sm" style="background-color: #4f6bed; color: #ffffff;">
+                    <i class="fas fa-layer-group text-white text-base"></i>
                 </div>
                 <div>
                     <div class="flex flex-wrap items-center gap-2">
                         <h4 class="font-bold text-sm sm:text-base text-gray-900 dark:text-white">Sesi Mengajar Kelas Gabungan</h4>
-                        <span class="inline-flex rounded-full bg-purple-100 dark:bg-purple-900/40 px-2.5 py-0.5 text-[11px] font-bold text-purple-700 dark:text-purple-300">
+                        <span class="inline-flex rounded-full bg-brand-100 text-brand-700 dark:bg-brand-500/20 dark:text-brand-300 px-2.5 py-0.5 text-[11px] font-bold border border-brand-200 dark:border-brand-500/30">
                             {{ $parallelJadwals->count() }} Kelas Paralel
                         </span>
                     </div>
                     <p class="text-xs text-gray-600 dark:text-gray-300 mt-0.5">
                         Anda mengajar mata pelajaran ini di jam yang sama untuk kelas: 
-                        <strong class="text-purple-700 dark:text-purple-300">{{ $parallelJadwals->pluck('kelas.nama_kelas')->join(' & ') }}</strong>.
+                        <strong class="text-brand-600 dark:text-brand-400 font-bold">{{ $parallelJadwals->pluck('kelas.nama_kelas')->filter()->unique()->join(' & ') }}</strong>.
                         Jurnal KBM otomatis disinkronkan ke seluruh kelas, dan absensi siswa dikelompokkan per kelas di bawah.
                     </p>
                 </div>
             </div>
             <div class="shrink-0 flex items-center gap-2">
-                <span class="inline-flex items-center gap-1.5 rounded-xl border border-purple-200 bg-white dark:border-purple-800 dark:bg-gray-800 px-3 py-1.5 text-xs font-semibold text-purple-700 dark:text-purple-300 shadow-2xs">
-                    <i class="fas fa-sync-alt text-purple-500"></i> Jurnal Otomatis Terhubung
+                <span class="inline-flex items-center gap-1.5 rounded-xl border border-brand-200 bg-white dark:border-gray-800 dark:bg-gray-800 px-3 py-1.5 text-xs font-semibold text-brand-600 dark:text-brand-400 shadow-2xs">
+                    <i class="fas fa-sync-alt text-brand-500"></i> Jurnal Otomatis Terhubung
                 </span>
             </div>
         </div>
@@ -382,14 +382,14 @@
                         <div class="flex items-center gap-2">
                             <h3 class="text-sm sm:text-base font-bold text-gray-800 dark:text-white/90">Jurnal Pembelajaran</h3>
                             @if(!empty($isMultiKelas))
-                                <span class="inline-flex items-center gap-1 rounded-md bg-purple-50 text-purple-700 dark:bg-purple-500/15 dark:text-purple-300 px-2 py-0.5 text-[11px] font-bold border border-purple-200 dark:border-purple-500/20">
-                                    <i class="fas fa-sync-alt text-[10px]"></i> Tersinkron ke {{ $parallelJadwals->count() }} Kelas
+                                <span class="inline-flex items-center gap-1 rounded-md bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300 px-2 py-0.5 text-[11px] font-bold border border-brand-200 dark:border-brand-500/20">
+                                    <i class="fas fa-sync-alt text-[10px] text-brand-500"></i> Tersinkron ke {{ $parallelJadwals->count() }} Kelas
                                 </span>
                             @endif
                         </div>
                         <p class="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400">
                             @if(!empty($isMultiKelas))
-                                Cukup isi sekali, sistem otomatis menyinkronkan materi ke seluruh kelas gabungan: {{ $parallelJadwals->pluck('kelas.nama_kelas')->join(' & ') }}
+                                Cukup isi sekali, sistem otomatis menyinkronkan materi ke seluruh kelas gabungan: {{ $parallelJadwals->pluck('kelas.nama_kelas')->filter()->unique()->join(' & ') }}
                             @else
                                 Catat materi kompetensi dasar dan evaluasi proses sesi ini
                             @endif
@@ -478,30 +478,33 @@
             <!-- Class Tabs Navigation for Multi-Class Session -->
             <div class="px-4 sm:px-5 pt-3 pb-3 border-b border-gray-200 dark:border-gray-800 bg-gray-50/70 dark:bg-gray-800/20">
                 <div class="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar" id="classTabsBar">
+                    <!-- Tab 1: Semua Kelas (DEFAULT ACTIVE) -->
+                    <button type="button"
+                        class="class-tab-btn inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-bold transition-all shadow-2xs bg-brand-500 text-white shadow-brand-500/25 active-tab"
+                        data-filter-kelas="all"
+                        data-jadwal-id="all"
+                        data-kelas-name="Semua Kelas">
+                        <i class="fas fa-users text-xs"></i>
+                        <span>Semua Kelas</span>
+                        <span class="tab-badge ml-1 rounded-full px-2 py-0.5 text-[10px] font-extrabold bg-white/25 text-white">
+                            {{ $globalStats['total'] }} Siswa
+                        </span>
+                    </button>
+
+                    <!-- Tab per Kelas -->
                     @foreach($classesData as $idx => $cd)
                         <button type="button"
-                            class="class-tab-btn inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-bold transition-all shadow-2xs {{ $cd->is_current ? 'bg-brand-500 text-white shadow-brand-500/25 active-tab' : 'bg-white text-gray-700 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700' }}"
+                            class="class-tab-btn inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-bold transition-all shadow-2xs bg-white text-gray-700 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700"
                             data-filter-kelas="{{ $cd->jadwal->id }}"
                             data-jadwal-id="{{ $cd->jadwal->id }}"
                             data-kelas-name="Kelas {{ $cd->kelas?->nama_kelas }}">
                             <i class="fas fa-chalkboard text-xs"></i>
                             <span>Kelas {{ $cd->kelas?->nama_kelas }}</span>
-                            <span class="tab-badge ml-1 rounded-full px-2 py-0.5 text-[10px] font-extrabold {{ $cd->is_current ? 'bg-white/25 text-white' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300' }}">
+                            <span class="tab-badge ml-1 rounded-full px-2 py-0.5 text-[10px] font-extrabold bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300">
                                 {{ $cd->stats['total'] }} Siswa
                             </span>
                         </button>
                     @endforeach
-                    <button type="button"
-                        class="class-tab-btn inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-bold transition-all shadow-2xs bg-white text-gray-700 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700"
-                        data-filter-kelas="all"
-                        data-jadwal-id="all"
-                        data-kelas-name="Semua Kelas">
-                        <i class="fas fa-users text-xs"></i>
-                        <span>Semua Kelas Gabungan</span>
-                        <span class="tab-badge ml-1 rounded-full px-2 py-0.5 text-[10px] font-extrabold bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300">
-                            {{ $globalStats['total'] }} Total
-                        </span>
-                    </button>
                 </div>
             </div>
         @endif
@@ -542,7 +545,7 @@
                                             <div class="flex flex-wrap items-center gap-1.5">
                                                 <p class="font-semibold text-gray-900 dark:text-white text-xs sm:text-sm leading-snug truncate">{{ $s->nama }}</p>
                                                 @if(!empty($isMultiKelas))
-                                                    <span class="inline-flex rounded bg-purple-50 text-purple-700 dark:bg-purple-500/15 dark:text-purple-300 px-1.5 py-0.5 text-[10px] font-bold border border-purple-200 dark:border-purple-500/20 shrink-0">
+                                                    <span class="inline-flex rounded bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300 px-1.5 py-0.5 text-[10px] font-bold border border-brand-200 dark:border-brand-500/20 shrink-0">
                                                         Kelas {{ $s->nama_kelas }}
                                                     </span>
                                                 @endif
@@ -640,8 +643,8 @@
             var jadwalId = {{ $jadwal->id }};
             var tanggal = '{{ $tanggal }}';
             var isMultiKelas = {{ !empty($isMultiKelas) ? 'true' : 'false' }};
-            var activeFilter = isMultiKelas ? '{{ $jadwal->id }}' : 'all';
-            var activeJadwalId = {{ $jadwal->id }};
+            var activeFilter = 'all';
+            var activeJadwalId = 'all';
 
             // Function to update visual card highlight (A = rose, S = amber, I = blue, H = neutral/green)
             function updateRowHighlight() {
@@ -689,7 +692,7 @@
                 activeFilter = targetKelas;
                 if (targetKelas === 'all') {
                     $('.student-row').show();
-                    $('#btnSetSemuaHadirText').text('Setel Hadir Semua Kelas Gabungan');
+                    $('#btnSetSemuaHadirText').text('Setel Semua Hadir');
                 } else {
                     $('.student-row').each(function () {
                         var rKelas = $(this).data('kelas-id');
@@ -826,7 +829,7 @@
                         }
                         recalculateLocalCounters();
                         setLiveStatus('success', 'Semua Hadir Tersimpan');
-                        var btnLabel = isAllParallel ? 'Setel Hadir Semua Kelas Gabungan' : ($('.class-tab-btn.active-tab').data('kelas-name') ? 'Setel Semua Hadir (' + $('.class-tab-btn.active-tab').data('kelas-name') + ')' : 'Setel Semua Hadir');
+                        var btnLabel = isAllParallel ? 'Setel Semua Hadir' : ($('.class-tab-btn.active-tab').data('kelas-name') ? 'Setel Semua Hadir (' + $('.class-tab-btn.active-tab').data('kelas-name') + ')' : 'Setel Semua Hadir');
                         $btn.prop('disabled', false).html('<i class="fas fa-check-double"></i> <span id="btnSetSemuaHadirText">' + btnLabel + '</span>');
                     },
                     error: function () {

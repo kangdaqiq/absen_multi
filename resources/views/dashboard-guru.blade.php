@@ -318,12 +318,12 @@
 
                                 <!-- Status Absen Badge -->
                                 @if($isAttended)
-                                    <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] sm:text-xs font-semibold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20">
-                                        <i class="fas fa-check-circle text-emerald-500"></i> Sudah Diabsen
+                                    <span class="inline-flex items-center gap-1 rounded-full bg-success-50 px-2.5 py-0.5 text-[10px] sm:text-xs font-semibold text-success-700 dark:bg-success-500/15 dark:text-success-400 border border-success-200 dark:border-success-500/20" style="background-color: #ecfdf3; color: #027a48; border-color: #a6f4c5;">
+                                        <i class="fas fa-check-circle" style="color: #12b76a;"></i> Sudah Diabsen
                                     </span>
                                 @else
-                                    <span class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] sm:text-xs font-semibold text-amber-700 dark:bg-amber-500/15 dark:text-amber-400 border border-amber-200 dark:border-amber-500/20">
-                                        <i class="fas fa-exclamation-circle text-amber-500"></i> Belum Diabsen
+                                    <span class="inline-flex items-center gap-1 rounded-full bg-warning-50 px-2.5 py-0.5 text-[10px] sm:text-xs font-semibold text-warning-700 dark:bg-warning-500/15 dark:text-warning-400 border border-warning-200 dark:border-warning-500/20" style="background-color: #fffaeb; color: #b54708; border-color: #fedf89;">
+                                        <i class="fas fa-exclamation-circle" style="color: #f79009;"></i> Belum Diabsen
                                     </span>
                                 @endif
                             </div>
@@ -331,9 +331,20 @@
                             <!-- Meta Kelas, Jam Ke, & Ruangan -->
                             <div class="flex flex-wrap items-center gap-1.5 sm:gap-2 text-xs">
                                 <span class="inline-flex items-center gap-1 sm:gap-1.5 font-bold text-gray-900 dark:text-gray-100 bg-gray-100 dark:bg-gray-800 px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-lg border border-gray-200 dark:border-gray-700 text-[11px] sm:text-xs">
-                                    <i class="fas fa-users text-brand-500"></i> {{ $j->kelas?->nama_kelas ?? '-' }}
-                                    <span class="text-gray-500 font-normal">({{ $totalSiswaKelas }} Siswa)</span>
+                                    <i class="fas fa-users text-brand-500" style="color: #4f6bed;"></i> 
+                                    @if(!empty($j->is_multi_kelas))
+                                        {{ implode(', ', $j->parallel_kelases ?? [$j->kelas?->nama_kelas]) }}
+                                    @else
+                                        {{ $j->kelas?->nama_kelas ?? '-' }}
+                                    @endif
+                                    <span class="text-gray-500 font-normal">({{ $j->total_siswa_gabungan ?? $totalSiswaKelas }} Siswa)</span>
                                 </span>
+
+                                @if(!empty($j->is_multi_kelas))
+                                    <span class="inline-flex items-center gap-1 rounded-lg bg-brand-50 px-2 py-0.5 text-[11px] font-bold text-brand-700 dark:bg-brand-500/15 dark:text-brand-300 border border-brand-200 dark:border-brand-500/20" title="Sesi Gabungan {{ $j->parallel_count ?? count($j->parallel_kelases ?? []) }} Kelas">
+                                        <i class="fas fa-layer-group text-[10px] text-brand-500" style="color: #4f6bed;"></i> Gabungan ({{ $j->parallel_count ?? count($j->parallel_kelases ?? []) }} Kelas)
+                                    </span>
+                                @endif
 
                                 @if($j->jam_ke)
                                     <span class="inline-flex items-center font-mono font-bold text-brand-700 dark:text-brand-300 bg-brand-50 dark:bg-brand-500/15 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg border border-brand-200 dark:border-brand-500/20 text-[11px] sm:text-xs">
@@ -352,31 +363,31 @@
                             <div class="flex flex-wrap items-center gap-1 sm:gap-1.5 text-xs pt-0.5">
                                 @if($isAttended)
                                     <span class="text-gray-500 mr-0.5 text-[11px] sm:text-xs font-semibold">Kehadiran:</span>
-                                    <span class="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400 font-bold border border-emerald-200 dark:border-emerald-500/20 text-[11px]" title="Hadir">
+                                    <span class="px-2 py-0.5 rounded-md bg-success-50 text-success-700 dark:bg-success-500/15 dark:text-success-400 font-bold border border-success-200 dark:border-success-500/20 text-[11px]" style="background-color: #ecfdf3; color: #027a48; border-color: #a6f4c5;" title="Hadir">
                                         {{ $abs->count_h ?? 0 }} Hadir
                                     </span>
                                     @if(($abs->count_s ?? 0) > 0)
-                                        <span class="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400 font-bold border border-blue-200 dark:border-blue-500/20 text-[11px]" title="Sakit">
+                                        <span class="px-2 py-0.5 rounded-md bg-blue-light-50 text-blue-light-700 dark:bg-blue-light-500/15 dark:text-blue-light-400 font-bold border border-blue-light-200 dark:border-blue-light-500/20 text-[11px]" style="background-color: #f0f9ff; color: #026aa2; border-color: #b9e6fe;" title="Sakit">
                                             {{ $abs->count_s }} Sakit
                                         </span>
                                     @endif
                                     @if(($abs->count_i ?? 0) > 0)
-                                        <span class="px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400 font-bold border border-amber-200 dark:border-amber-500/20 text-[11px]" title="Izin">
+                                        <span class="px-2 py-0.5 rounded-md bg-warning-50 text-warning-700 dark:bg-warning-500/15 dark:text-warning-400 font-bold border border-warning-200 dark:border-warning-500/20 text-[11px]" style="background-color: #fffaeb; color: #b54708; border-color: #fedf89;" title="Izin">
                                             {{ $abs->count_i }} Izin
                                         </span>
                                     @endif
                                     @if(($abs->count_a ?? 0) > 0)
-                                        <span class="px-2 py-0.5 rounded-md bg-rose-50 text-rose-700 dark:bg-rose-500/15 dark:text-rose-400 font-bold border border-rose-200 dark:border-rose-500/20 text-[11px]" title="Alpa">
+                                        <span class="px-2 py-0.5 rounded-md bg-error-50 text-error-700 dark:bg-error-500/15 dark:text-error-400 font-bold border border-error-200 dark:border-error-500/20 text-[11px]" style="background-color: #fef3f2; color: #b42318; border-color: #fecdca;" title="Alpa">
                                             {{ $abs->count_a }} Alpa
                                         </span>
                                     @endif
                                     @if(($abs->count_t ?? 0) > 0)
-                                        <span class="px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 dark:bg-purple-500/15 dark:text-purple-400 font-bold border border-purple-200 dark:border-purple-500/20 text-[11px]" title="Terlambat">
+                                        <span class="px-2 py-0.5 rounded-md bg-orange-50 text-orange-700 dark:bg-orange-500/15 dark:text-orange-400 font-bold border border-orange-200 dark:border-orange-500/20 text-[11px]" style="background-color: #fff6ed; color: #c4320a; border-color: #fddcab;" title="Terlambat">
                                             {{ $abs->count_t }} Telat
                                         </span>
                                     @endif
                                 @else
-                                    <span class="text-[11px] sm:text-xs text-amber-600 dark:text-amber-400 font-medium">
+                                    <span class="text-[11px] sm:text-xs text-warning-600 dark:text-warning-400 font-medium" style="color: #dc6803;">
                                         <i class="fas fa-exclamation-circle mr-1"></i> Presensi siswa belum diinput
                                     </span>
                                 @endif
@@ -390,14 +401,14 @@
                         <div class="w-full sm:w-64 lg:w-56 xl:w-72 p-2.5 sm:p-3 rounded-xl border border-gray-200 bg-gray-50/80 dark:border-gray-800 dark:bg-gray-900/40 text-xs">
                             <div class="flex items-center justify-between mb-1">
                                 <span class="font-bold text-gray-800 dark:text-gray-200 flex items-center gap-1.5 text-[11px] sm:text-xs">
-                                    <i class="fas fa-book-open text-brand-500"></i> Jurnal KBM:
+                                    <i class="fas fa-book-open text-brand-500" style="color: #4f6bed;"></i> Jurnal KBM:
                                 </span>
                                 @if($isJurnalFilled)
-                                    <span class="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                                    <span class="text-[10px] font-bold text-success-600 dark:text-success-400 flex items-center gap-1" style="color: #039855;">
                                         <i class="fas fa-check"></i> Terisi
                                     </span>
                                 @else
-                                    <span class="text-[10px] font-bold text-amber-600 dark:text-amber-400">
+                                    <span class="text-[10px] font-bold text-warning-600 dark:text-warning-400" style="color: #dc6803;">
                                         Kosong
                                     </span>
                                 @endif
@@ -411,17 +422,20 @@
                         <div class="grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-col xl:flex-row items-stretch gap-2 w-full sm:w-auto">
                             <!-- Tombol 1: Input / Edit Presensi & Jurnal Terpadu -->
                             <a href="{{ route('absensi-pelajaran.presensi', ['jadwal' => $j->id, 'tanggal' => $tanggal]) }}"
-                                class="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold text-white transition shadow-sm text-center {{ $isAttended ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-brand-500 hover:bg-brand-600' }}">
+                                class="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold text-white transition shadow-sm text-center {{ $isAttended ? 'bg-brand-500 hover:bg-brand-600' : 'bg-brand-500 hover:bg-brand-600' }}"
+                                style="background-color: #4f6bed; color: #ffffff;"
+                                onmouseover="this.style.backgroundColor='#3d57d6'"
+                                onmouseout="this.style.backgroundColor='#4f6bed'">
                                 <i class="fas fa-{{ $isAttended ? 'edit' : 'clipboard-check' }}"></i>
                                 <span>{{ $isAttended ? 'Update Absen & Jurnal' : 'Input Absen & Jurnal' }}</span>
                             </a>
 
                             <!-- Tombol 2: Quick Jurnal Pop-up -->
                             <button type="button"
-                                @click="openJurnalModal('{{ $j->id }}', '{{ addslashes($j->mapel?->nama_mapel ?? '') }}', '{{ addslashes($j->kelas?->nama_kelas ?? '') }}', '{{ addslashes($j->jurnal_today?->materi ?? '') }}', '{{ addslashes($j->jurnal_today?->catatan ?? '') }}')"
+                                @click="openJurnalModal('{{ $j->id }}', '{{ addslashes($j->mapel?->nama_mapel ?? '') }}', '{{ addslashes(!empty($j->is_multi_kelas) ? implode(', ', $j->parallel_kelases ?? [$j->kelas?->nama_kelas]) : ($j->kelas?->nama_kelas ?? '')) }}', '{{ addslashes($j->jurnal_today?->materi ?? '') }}', '{{ addslashes($j->jurnal_today?->catatan ?? '') }}')"
                                 class="inline-flex items-center justify-center gap-1.5 rounded-xl border border-gray-300 bg-white px-3.5 py-2.5 text-xs font-bold text-gray-700 hover:bg-brand-50 hover:text-brand-600 hover:border-brand-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 transition shadow-2xs text-center"
                                 title="Input Materi & Catatan Jurnal Saja">
-                                <i class="fas fa-edit text-brand-500"></i>
+                                <i class="fas fa-edit text-brand-500" style="color: #4f6bed;"></i>
                                 <span>Jurnal Cepat</span>
                             </button>
                         </div>

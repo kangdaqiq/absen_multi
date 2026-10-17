@@ -53,7 +53,13 @@ class AbsensiPelajaranController extends Controller
         $filterHari = $request->query('hari', $namaHari);
 
         $query = JadwalPelajaran::where('school_id', $schoolId)
-            ->with(['guru', 'kelas', 'mapel'])
+            ->with([
+                'guru',
+                'kelas' => function ($q) {
+                    $q->withCount('siswas');
+                },
+                'mapel'
+            ])
             ->where('hari', $filterHari);
 
         // Jika bukan admin/waka dan merupakan guru, filter hanya jadwal guru tersebut
@@ -99,30 +105,97 @@ class AbsensiPelajaranController extends Controller
         foreach ($jadwals as $jadwal) {
             $jadwal->absensi_summary = $absensiCounts->get($jadwal->id);
             $jadwal->is_attended = !empty($jadwal->absensi_summary) && $jadwal->absensi_summary->total_absen > 0;
+            $jadwal->jurnal_today = $jurnals->get($jadwal->id);
+        }
 
-            // Multi-kelas parallel check: guru yang sama, mapel sama, hari & jam sama
-            $parallel = $jadwals->filter(function ($item) use ($jadwal) {
-                return $item->guru_id === $jadwal->guru_id
-                    && $item->mapel_id === $jadwal->mapel_id
-                    && $item->hari === $jadwal->hari
-                    && $item->jam_mulai === $jadwal->jam_mulai
-                    && $item->jam_selesai === $jadwal->jam_selesai;
-            });
-            $jadwal->is_multi_kelas = $parallel->count() > 1;
-            $jadwal->parallel_kelases = $parallel->pluck('kelas.nama_kelas')->filter()->values()->all();
-            $jadwal->parallel_count = $parallel->count();
+        // Jika tidak memfilter kelas tertentu, satukan sesi multi-kelas paralel menjadi 1 kartu
+        if (!$request->filled('kelas_id')) {
+            $groupedJadwals = collect();
+            $processedIds = [];
 
-            // Jurnal hari ini (ambil dari jadwal ini atau sister jadwal jika multi-kelas)
-            $jurnalToday = $jurnals->get($jadwal->id);
-            if (!$jurnalToday && $jadwal->is_multi_kelas) {
-                foreach ($parallel as $pItem) {
-                    if ($jurnals->has($pItem->id)) {
-                        $jurnalToday = $jurnals->get($pItem->id);
-                        break;
+            foreach ($jadwals as $jadwal) {
+                if (in_array($jadwal->id, $processedIds)) {
+                    continue;
+                }
+
+                $parallels = $jadwals->filter(function ($item) use ($jadwal) {
+                    return $item->guru_id === $jadwal->guru_id
+                        && $item->mapel_id === $jadwal->mapel_id
+                        && $item->hari === $jadwal->hari
+                        && substr($item->jam_mulai, 0, 5) === substr($jadwal->jam_mulai, 0, 5)
+                        && substr($item->jam_selesai, 0, 5) === substr($jadwal->jam_selesai, 0, 5);
+                });
+
+                foreach ($parallels as $p) {
+                    $processedIds[] = $p->id;
+                }
+
+                if ($parallels->count() > 1) {
+                    $primary = clone $jadwal;
+                    $primary->is_multi_kelas = true;
+                    $primary->parallel_count = $parallels->count();
+                    $primary->parallel_ids = $parallels->pluck('id')->all();
+
+                    $allKelases = $parallels->map(fn($p) => $p->kelas?->nama_kelas)->filter()->values();
+                    $uniqueKelases = $allKelases->unique()->values()->all();
+                    $primary->parallel_kelases = $uniqueKelases;
+
+                    // Akumulasi total siswa gabungan
+                    $totalSiswa = 0;
+                    foreach ($parallels as $p) {
+                        $totalSiswa += ($p->kelas?->siswas ? $p->kelas->siswas->count() : ($p->kelas?->siswas_count ?? 0));
                     }
+                    $primary->total_siswa_gabungan = $totalSiswa;
+
+                    // Akumulasi absensi gabungan
+                    $mergedAbs = (object)[
+                        'total_absen' => 0,
+                        'count_h' => 0,
+                        'count_s' => 0,
+                        'count_i' => 0,
+                        'count_a' => 0,
+                        'count_t' => 0,
+                        'count_d' => 0,
+                    ];
+                    $hasAttended = false;
+                    foreach ($parallels as $p) {
+                        if ($p->absensi_summary) {
+                            $mergedAbs->total_absen += $p->absensi_summary->total_absen ?? 0;
+                            $mergedAbs->count_h += $p->absensi_summary->count_h ?? 0;
+                            $mergedAbs->count_s += $p->absensi_summary->count_s ?? 0;
+                            $mergedAbs->count_i += $p->absensi_summary->count_i ?? 0;
+                            $mergedAbs->count_a += $p->absensi_summary->count_a ?? 0;
+                            $mergedAbs->count_t += $p->absensi_summary->count_t ?? 0;
+                            $mergedAbs->count_d += $p->absensi_summary->count_d ?? 0;
+                        }
+                        if ($p->is_attended) {
+                            $hasAttended = true;
+                        }
+                    }
+                    $primary->absensi_summary = $mergedAbs;
+                    $primary->is_attended = $hasAttended || ($mergedAbs->total_absen > 0);
+
+                    // Jurnal KBM
+                    $filledJurnal = null;
+                    foreach ($parallels as $p) {
+                        if (!empty($p->jurnal_today) && !empty($p->jurnal_today->materi)) {
+                            $filledJurnal = $p->jurnal_today;
+                            break;
+                        }
+                    }
+                    $primary->jurnal_today = $filledJurnal ?: $primary->jurnal_today;
+
+                    $groupedJadwals->push($primary);
+                } else {
+                    $jadwal->is_multi_kelas = false;
+                    $jadwal->parallel_count = 1;
+                    $jadwal->parallel_kelases = [$jadwal->kelas?->nama_kelas];
+                    $jadwal->total_siswa_gabungan = $jadwal->kelas?->siswas ? $jadwal->kelas->siswas->count() : ($jadwal->kelas?->siswas_count ?? 0);
+                    $groupedJadwals->push($jadwal);
                 }
             }
-            $jadwal->jurnal_today = $jurnalToday;
+
+            $jadwals = $groupedJadwals;
         }
 
         $kelases = Kelas::where('school_id', $schoolId)->orderBy('nama_kelas')->get();

@@ -1285,5 +1285,161 @@ Mengambil daftar master sesi jam pelajaran yang aktif (seperti master shift), se
 }
 ```
 
+---
+
+### 8.8 Jadwal Pelajaran Hari Ini & Status Presensi Mapel untuk Siswa (`GET /api/mobile/student/jadwal-pelajaran/hari-ini`)
+Digunakan oleh aplikasi **Siswa (atau Orang Tua)** untuk melihat daftar mata pelajaran hari ini (berdasarkan kelas siswa), jam pelajaran, guru pengajar, materi KBM dari guru, serta **status kehadiran presensi siswa pada setiap jam pelajaran/mapel**.
+
+> **Tips:** Endpoint polymorphic `GET /api/mobile/jadwal-pelajaran/hari-ini` secara otomatis mengenali peran akun. Jika user yang login adalah siswa, endpoint tersebut otomatis mengembalikan respon siswa di bawah ini.
+
+- **URL**: `/api/mobile/student/jadwal-pelajaran/hari-ini` *(alias: `/api/mobile/siswa/jadwal-pelajaran/hari-ini` atau `/api/mobile/jadwal-pelajaran/hari-ini`)*
+- **Method**: `GET`
+- **Auth**: Bearer Token
+- **Query Params**:
+  - `tanggal` *(opsional, format `YYYY-MM-DD`, default: hari ini)*
+  - `student_id` *(opsional, untuk guru/wali kelas yang ingin mengecek siswa tertentu)*
+- **Response Success (200 OK)**:
+```json
+{
+  "success": true,
+  "data": {
+    "tanggal": "2026-10-17",
+    "hari": "Sabtu",
+    "student": {
+      "id": 15,
+      "nama": "Ahmad Rizky Pratama",
+      "nis": "1001",
+      "foto_url": "http://domain.com/storage/siswa/1001.jpg",
+      "kelas_id": 3,
+      "kelas_nama": "XII RPL 1"
+    },
+    "summary": {
+      "total": 4,
+      "sudah_absen": 2,
+      "h": 2,
+      "s": 0,
+      "i": 0,
+      "a": 0,
+      "t": 0,
+      "d": 0,
+      "belum_absen": 2
+    },
+    "pelajaran": [
+      {
+        "id": 12,
+        "jadwal_pelajaran_id": 12,
+        "hari": "Sabtu",
+        "jam_ke": "1-2",
+        "jam_mulai": "07:15",
+        "jam_selesai": "08:35",
+        "jam_format": "07:15 - 08:35",
+        "ruangan": "Lab Komputer 1",
+        "mapel": {
+          "id": 5,
+          "nama": "Pemrograman Web"
+        },
+        "guru": {
+          "id": 8,
+          "nama": "Budi Santoso, S.Pd",
+          "nip": "198501012010011002",
+          "foto_url": "http://domain.com/storage/guru/budi.jpg"
+        },
+        "presensi": {
+          "is_attended": true,
+          "status": "H",
+          "status_label": "Hadir",
+          "keterangan": "",
+          "guru_pengabsen": "Budi Santoso, S.Pd",
+          "waktu_absen": "2026-10-17 07:30:00"
+        },
+        "jurnal": {
+          "id": 4,
+          "materi": "Implementasi Responsive Layout dengan CSS Grid",
+          "catatan": "Siswa mengerjakan modul latihan praktikum 2"
+        }
+      },
+      {
+        "id": 13,
+        "jadwal_pelajaran_id": 13,
+        "hari": "Sabtu",
+        "jam_ke": "3-4",
+        "jam_mulai": "08:35",
+        "jam_selesai": "09:55",
+        "jam_format": "08:35 - 09:55",
+        "ruangan": "Ruang Teori 12",
+        "mapel": {
+          "id": 2,
+          "nama": "Bahasa Indonesia"
+        },
+        "guru": {
+          "id": 11,
+          "nama": "Siti Nurhaliza, M.Pd",
+          "nip": "199003122015022001",
+          "foto_url": null
+        },
+        "presensi": {
+          "is_attended": false,
+          "status": null,
+          "status_label": "Belum Presensi",
+          "keterangan": "",
+          "guru_pengabsen": null,
+          "waktu_absen": null
+        },
+        "jurnal": null
+      }
+    ]
+  }
+}
+```
+
+*Keterangan Nilai `status`:*
+- `H`: Hadir
+- `S`: Sakit
+- `I`: Izin
+- `A`: Alpa
+- `T`: Terlambat
+- `D`: Dispen (Dispensasi)
+- `null`: Belum ada presensi yang diinput guru untuk sesi mapel ini.
+
+---
+
+### 8.9 Jadwal Pelajaran Mingguan untuk Siswa (`GET /api/mobile/student/jadwal-pelajaran/mingguan`)
+Mengambil jadwal pelajaran lengkap selama satu minggu untuk kelas siswa, dikelompokkan berdasarkan hari (Senin s/d Minggu).
+
+- **URL**: `/api/mobile/student/jadwal-pelajaran/mingguan` *(alias: `/api/mobile/siswa/jadwal-pelajaran/mingguan` atau `/api/mobile/jadwal-pelajaran/mingguan`)*
+- **Method**: `GET`
+- **Auth**: Bearer Token
+- **Response Success (200 OK)**:
+```json
+{
+  "success": true,
+  "data": {
+    "student": {
+      "id": 15,
+      "nama": "Ahmad Rizky Pratama",
+      "nis": "1001",
+      "kelas_id": 3,
+      "kelas_nama": "XII RPL 1"
+    },
+    "jadwals": {
+      "Senin": [
+        {
+          "id": 1,
+          "hari": "Senin",
+          "jam_ke": "1-2",
+          "jam_mulai": "07:15",
+          "jam_selesai": "08:35",
+          "jam_format": "07:15 - 08:35",
+          "ruangan": "Lab 1",
+          "mapel": { "id": 5, "nama": "Pemrograman Web" },
+          "guru": { "id": 8, "nama": "Budi Santoso, S.Pd", "nip": "198501012010011002", "foto_url": "..." }
+        }
+      ],
+      "Selasa": [ ... ]
+    }
+  }
+}
+```
+
 
 

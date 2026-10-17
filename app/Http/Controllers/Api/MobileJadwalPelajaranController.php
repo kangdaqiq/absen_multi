@@ -23,6 +23,10 @@ class MobileJadwalPelajaranController extends Controller
         $guru = $user->guru;
 
         if (!$guru) {
+            if ($user->student || in_array($user->role, ['student', 'siswa']) || $request->filled('student_id')) {
+                return $this->getStudentHariIni($request);
+            }
+
             return response()->json([
                 'success' => false,
                 'message' => 'Akun Anda tidak terhubung dengan data guru pengajar.'
@@ -139,6 +143,10 @@ class MobileJadwalPelajaranController extends Controller
         $guru = $user->guru;
 
         if (!$guru) {
+            if ($user->student || in_array($user->role, ['student', 'siswa']) || $request->filled('student_id')) {
+                return $this->getStudentMingguan($request);
+            }
+
             return response()->json([
                 'success' => false,
                 'message' => 'Akun Anda tidak terhubung dengan data guru pengajar.'
@@ -481,5 +489,250 @@ class MobileJadwalPelajaranController extends Controller
             'success' => true,
             'data'    => $jamPelajarans
         ]);
+    }
+
+    /**
+     * Dapatkan jadwal pelajaran siswa untuk hari ini (atau tanggal tertentu)
+     * beserta status presensi siswa di setiap mata pelajaran.
+     */
+    public function getStudentHariIni(Request $request)
+    {
+        $user = $request->user();
+        $student = $this->resolveStudent($request, $user);
+
+        if (!$student) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Data profil siswa tidak ditemukan untuk akun ini.'
+            ], 404);
+        }
+
+        if (!$student->kelas_id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Siswa belum terdaftar pada kelas manapun.'
+            ], 400);
+        }
+
+        $schoolId = $student->school_id ?: ($user->school_id ?? 0);
+        $schoolTz = \App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'timezone')->value('setting_value') ?: config('app.timezone', 'Asia/Jakarta');
+
+        $rawTanggal = $request->query('tanggal', Carbon::now($schoolTz)->format('Y-m-d'));
+        try {
+            $parsedDate = Carbon::parse($rawTanggal);
+            $tanggal = $parsedDate->format('Y-m-d');
+        } catch (\Exception $e) {
+            $parsedDate = Carbon::now($schoolTz);
+            $tanggal = $parsedDate->format('Y-m-d');
+        }
+
+        $hariIndonesia = [
+            1 => 'Senin',
+            2 => 'Selasa',
+            3 => 'Rabu',
+            4 => 'Kamis',
+            5 => 'Jumat',
+            6 => 'Sabtu',
+            7 => 'Minggu',
+        ];
+        $namaHari = $hariIndonesia[$parsedDate->dayOfWeekIso] ?? 'Senin';
+
+        // Ambil jadwal pelajaran kelas siswa di hari tersebut
+        $jadwals = JadwalPelajaran::where('school_id', $schoolId)
+            ->where('kelas_id', $student->kelas_id)
+            ->where('hari', $namaHari)
+            ->with(['guru', 'mapel'])
+            ->orderBy('jam_mulai')
+            ->get();
+
+        $jadwalIds = $jadwals->pluck('id');
+
+        // Ambil Jurnal KBM yang sudah diisi oleh guru
+        $jurnals = JurnalPelajaran::where('school_id', $schoolId)
+            ->whereIn('jadwal_pelajaran_id', $jadwalIds)
+            ->where('tanggal', $tanggal)
+            ->get()
+            ->keyBy('jadwal_pelajaran_id');
+
+        // Ambil catatan presensi siswa tersebut di setiap jadwal
+        $absensis = AbsensiPelajaran::where('school_id', $schoolId)
+            ->whereIn('jadwal_pelajaran_id', $jadwalIds)
+            ->where('student_id', $student->id)
+            ->where('tanggal', $tanggal)
+            ->with('guru')
+            ->get()
+            ->keyBy('jadwal_pelajaran_id');
+
+        $statCounts = [
+            'total'       => $jadwals->count(),
+            'sudah_absen' => 0,
+            'h'           => 0,
+            's'           => 0,
+            'i'           => 0,
+            'a'           => 0,
+            't'           => 0,
+            'd'           => 0,
+            'belum_absen' => 0,
+        ];
+
+        $list = $jadwals->map(function ($j) use ($jurnals, $absensis, &$statCounts) {
+            $jurnal = $jurnals->get($j->id);
+            $absen = $absensis->get($j->id);
+
+            if ($absen) {
+                $statCounts['sudah_absen']++;
+                $st = strtolower($absen->status);
+                if (isset($statCounts[$st])) {
+                    $statCounts[$st]++;
+                }
+            } else {
+                $statCounts['belum_absen']++;
+            }
+
+            return [
+                'id'                  => $j->id,
+                'jadwal_pelajaran_id' => $j->id,
+                'hari'                => $j->hari,
+                'jam_ke'              => $j->jam_ke ?? '-',
+                'jam_mulai'           => substr($j->jam_mulai, 0, 5),
+                'jam_selesai'         => substr($j->jam_selesai, 0, 5),
+                'jam_format'          => $j->jam_format,
+                'ruangan'             => $j->ruangan ?? '-',
+                'mapel'               => [
+                    'id'   => $j->mapel_id,
+                    'nama' => $j->mapel?->nama_mapel ?? '-',
+                ],
+                'guru'                => [
+                    'id'       => $j->guru_id,
+                    'nama'     => $j->guru?->nama ?? '-',
+                    'nip'      => $j->guru?->nip ?? '-',
+                    'foto_url' => $j->guru?->foto_url ?? null,
+                ],
+                'presensi'            => [
+                    'is_attended'    => !empty($absen),
+                    'status'         => $absen?->status ?? null,
+                    'status_label'   => $absen ? $absen->status_label : 'Belum Presensi',
+                    'keterangan'     => $absen?->keterangan ?? '',
+                    'guru_pengabsen' => $absen?->guru?->nama ?? null,
+                    'waktu_absen'    => $absen?->created_at ? $absen->created_at->format('Y-m-d H:i:s') : null,
+                ],
+                'jurnal'              => $jurnal ? [
+                    'id'      => $jurnal->id,
+                    'materi'  => $jurnal->materi,
+                    'catatan' => $jurnal->catatan,
+                ] : null,
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'data'    => [
+                'tanggal'   => $tanggal,
+                'hari'      => $namaHari,
+                'student'   => [
+                    'id'         => $student->id,
+                    'nama'       => $student->nama,
+                    'nis'        => $student->nis,
+                    'foto_url'   => $student->foto_url,
+                    'kelas_id'   => $student->kelas_id,
+                    'kelas_nama' => $student->kelas ? ($student->kelas->nama_kelas ?? $student->kelas->nama) : null,
+                ],
+                'summary'   => $statCounts,
+                'pelajaran' => $list,
+            ]
+        ]);
+    }
+
+    /**
+     * Dapatkan seluruh jadwal pelajaran mingguan kelas siswa
+     */
+    public function getStudentMingguan(Request $request)
+    {
+        $user = $request->user();
+        $student = $this->resolveStudent($request, $user);
+
+        if (!$student) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Data profil siswa tidak ditemukan untuk akun ini.'
+            ], 404);
+        }
+
+        if (!$student->kelas_id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Siswa belum terdaftar pada kelas manapun.'
+            ], 400);
+        }
+
+        $schoolId = $student->school_id ?: ($user->school_id ?? 0);
+
+        $jadwals = JadwalPelajaran::where('school_id', $schoolId)
+            ->where('kelas_id', $student->kelas_id)
+            ->with(['guru', 'mapel'])
+            ->orderByRaw("FIELD(hari, 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu')")
+            ->orderBy('jam_mulai')
+            ->get();
+
+        $grouped = $jadwals->groupBy('hari')->map(function ($items, $day) {
+            return $items->map(function ($j) {
+                return [
+                    'id'          => $j->id,
+                    'hari'        => $j->hari,
+                    'jam_ke'      => $j->jam_ke ?? '-',
+                    'jam_mulai'   => substr($j->jam_mulai, 0, 5),
+                    'jam_selesai' => substr($j->jam_selesai, 0, 5),
+                    'jam_format'  => $j->jam_format,
+                    'ruangan'     => $j->ruangan ?? '-',
+                    'mapel'       => [
+                        'id'   => $j->mapel_id,
+                        'nama' => $j->mapel?->nama_mapel ?? '-',
+                    ],
+                    'guru'        => [
+                        'id'       => $j->guru_id,
+                        'nama'     => $j->guru?->nama ?? '-',
+                        'nip'      => $j->guru?->nip ?? '-',
+                        'foto_url' => $j->guru?->foto_url ?? null,
+                    ],
+                ];
+            });
+        });
+
+        return response()->json([
+            'success' => true,
+            'data'    => [
+                'student' => [
+                    'id'         => $student->id,
+                    'nama'       => $student->nama,
+                    'nis'        => $student->nis,
+                    'kelas_id'   => $student->kelas_id,
+                    'kelas_nama' => $student->kelas ? ($student->kelas->nama_kelas ?? $student->kelas->nama) : null,
+                ],
+                'jadwals' => $grouped,
+            ]
+        ]);
+    }
+
+    /**
+     * Helper resolve Siswa instance
+     */
+    protected function resolveStudent(Request $request, $user)
+    {
+        if ($request->filled('student_id')) {
+            return Siswa::with(['kelas', 'school'])->find($request->student_id);
+        }
+
+        if ($user && $user->student) {
+            return $user->student->loadMissing(['kelas', 'school']);
+        }
+
+        if ($user) {
+            return Siswa::with(['kelas', 'school'])
+                ->where('user_id', $user->id)
+                ->orWhere('nis', str_replace('siswa_', '', $user->username))
+                ->first();
+        }
+
+        return null;
     }
 }

@@ -231,7 +231,14 @@
                     Presensi Siswa & Jurnal Pembelajaran
                 </h2>
                 <p class="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-0.5 truncate">
-                    {{ $jadwal->mapel?->nama_mapel ?? 'Mapel' }} &bull; Kelas {{ $jadwal->kelas?->nama_kelas ?? '-' }}
+                    {{ $jadwal->mapel?->nama_mapel ?? 'Mapel' }} &bull; 
+                    @if(!empty($isMultiKelas))
+                        <span class="inline-flex items-center gap-1 font-bold text-purple-600 dark:text-purple-400">
+                            <i class="fas fa-layer-group text-xs"></i> Kelas Gabungan: {{ $parallelJadwals->pluck('kelas.nama_kelas')->join(' & ') }}
+                        </span>
+                    @else
+                        Kelas {{ $jadwal->kelas?->nama_kelas ?? '-' }}
+                    @endif
                 </p>
             </div>
         </div>
@@ -270,7 +277,14 @@
             </div>
             <div>
                 <span class="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 block">Kelas</span>
-                <span class="font-bold text-brand-600 dark:text-brand-400 text-sm sm:text-base block truncate">{{ $jadwal->kelas?->nama_kelas ?? '-' }}</span>
+                @if(!empty($isMultiKelas))
+                    <span class="font-bold text-purple-600 dark:text-purple-400 text-sm sm:text-base block truncate" title="{{ $parallelJadwals->pluck('kelas.nama_kelas')->join(' & ') }}">
+                        {{ $parallelJadwals->pluck('kelas.nama_kelas')->join(' & ') }}
+                    </span>
+                    <span class="text-[10px] font-semibold text-purple-500 block">(Kelas Gabungan)</span>
+                @else
+                    <span class="font-bold text-brand-600 dark:text-brand-400 text-sm sm:text-base block truncate">{{ $jadwal->kelas?->nama_kelas ?? '-' }}</span>
+                @endif
             </div>
             <div>
                 <span class="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 block">Hari & Sesi</span>
@@ -294,6 +308,35 @@
             </div>
         </div>
     </div>
+
+    <!-- ========================= MULTI-CLASS / KELAS GABUNGAN BANNER ========================= -->
+    @if(!empty($isMultiKelas))
+        <div class="mb-5 sm:mb-6 rounded-2xl border border-purple-200 bg-gradient-to-r from-purple-50/90 via-white to-purple-50/60 p-4 sm:p-5 dark:border-purple-500/20 dark:from-purple-950/20 dark:via-gray-dark dark:to-purple-950/10 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div class="flex items-start sm:items-center gap-3">
+                <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-purple-600 text-white font-bold text-lg shadow-xs">
+                    <i class="fas fa-layer-group"></i>
+                </div>
+                <div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <h4 class="font-bold text-sm sm:text-base text-gray-900 dark:text-white">Sesi Mengajar Kelas Gabungan</h4>
+                        <span class="inline-flex rounded-full bg-purple-100 dark:bg-purple-900/40 px-2.5 py-0.5 text-[11px] font-bold text-purple-700 dark:text-purple-300">
+                            {{ $parallelJadwals->count() }} Kelas Paralel
+                        </span>
+                    </div>
+                    <p class="text-xs text-gray-600 dark:text-gray-300 mt-0.5">
+                        Anda mengajar mata pelajaran ini di jam yang sama untuk kelas: 
+                        <strong class="text-purple-700 dark:text-purple-300">{{ $parallelJadwals->pluck('kelas.nama_kelas')->join(' & ') }}</strong>.
+                        Jurnal KBM otomatis disinkronkan ke seluruh kelas, dan absensi siswa dikelompokkan per kelas di bawah.
+                    </p>
+                </div>
+            </div>
+            <div class="shrink-0 flex items-center gap-2">
+                <span class="inline-flex items-center gap-1.5 rounded-xl border border-purple-200 bg-white dark:border-purple-800 dark:bg-gray-800 px-3 py-1.5 text-xs font-semibold text-purple-700 dark:text-purple-300 shadow-2xs">
+                    <i class="fas fa-sync-alt text-purple-500"></i> Jurnal Otomatis Terhubung
+                </span>
+            </div>
+        </div>
+    @endif
 
     <!-- ========================= LIVE COUNTERS RIBBON (4 STATUS: H, I, S, A) ========================= -->
     <div class="mb-5 sm:mb-6 grid grid-cols-2 sm:grid-cols-5 gap-2.5 sm:gap-3">
@@ -336,8 +379,21 @@
                         <i class="fas fa-book-open"></i>
                     </div>
                     <div>
-                        <h3 class="text-sm sm:text-base font-bold text-gray-800 dark:text-white/90">Jurnal Pembelajaran</h3>
-                        <p class="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400">Catat materi kompetensi dasar dan evaluasi proses sesi ini</p>
+                        <div class="flex items-center gap-2">
+                            <h3 class="text-sm sm:text-base font-bold text-gray-800 dark:text-white/90">Jurnal Pembelajaran</h3>
+                            @if(!empty($isMultiKelas))
+                                <span class="inline-flex items-center gap-1 rounded-md bg-purple-50 text-purple-700 dark:bg-purple-500/15 dark:text-purple-300 px-2 py-0.5 text-[11px] font-bold border border-purple-200 dark:border-purple-500/20">
+                                    <i class="fas fa-sync-alt text-[10px]"></i> Tersinkron ke {{ $parallelJadwals->count() }} Kelas
+                                </span>
+                            @endif
+                        </div>
+                        <p class="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400">
+                            @if(!empty($isMultiKelas))
+                                Cukup isi sekali, sistem otomatis menyinkronkan materi ke seluruh kelas gabungan: {{ $parallelJadwals->pluck('kelas.nama_kelas')->join(' & ') }}
+                            @else
+                                Catat materi kompetensi dasar dan evaluasi proses sesi ini
+                            @endif
+                        </p>
                     </div>
                 </div>
 
@@ -413,11 +469,42 @@
             <div class="flex items-center gap-2 w-full sm:w-auto">
                 <button type="button" id="btnSetSemuaHadir"
                     class="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 rounded-xl bg-success-500 hover:bg-success-600 px-4 py-2 text-xs font-bold text-white transition shadow-sm">
-                    <i class="fas fa-check-double"></i> <span>Setel Semua Hadir</span>
+                    <i class="fas fa-check-double"></i> <span id="btnSetSemuaHadirText">Setel Semua Hadir</span>
                 </button>
             </div>
         </div>
 
+        @if(!empty($isMultiKelas))
+            <!-- Class Tabs Navigation for Multi-Class Session -->
+            <div class="px-4 sm:px-5 pt-3 pb-3 border-b border-gray-200 dark:border-gray-800 bg-gray-50/70 dark:bg-gray-800/20">
+                <div class="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar" id="classTabsBar">
+                    @foreach($classesData as $idx => $cd)
+                        <button type="button"
+                            class="class-tab-btn inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-bold transition-all shadow-2xs {{ $cd->is_current ? 'bg-brand-500 text-white shadow-brand-500/25 active-tab' : 'bg-white text-gray-700 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700' }}"
+                            data-filter-kelas="{{ $cd->jadwal->id }}"
+                            data-jadwal-id="{{ $cd->jadwal->id }}"
+                            data-kelas-name="Kelas {{ $cd->kelas?->nama_kelas }}">
+                            <i class="fas fa-chalkboard text-xs"></i>
+                            <span>Kelas {{ $cd->kelas?->nama_kelas }}</span>
+                            <span class="tab-badge ml-1 rounded-full px-2 py-0.5 text-[10px] font-extrabold {{ $cd->is_current ? 'bg-white/25 text-white' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300' }}">
+                                {{ $cd->stats['total'] }} Siswa
+                            </span>
+                        </button>
+                    @endforeach
+                    <button type="button"
+                        class="class-tab-btn inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-bold transition-all shadow-2xs bg-white text-gray-700 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700"
+                        data-filter-kelas="all"
+                        data-jadwal-id="all"
+                        data-kelas-name="Semua Kelas">
+                        <i class="fas fa-users text-xs"></i>
+                        <span>Semua Kelas Gabungan</span>
+                        <span class="tab-badge ml-1 rounded-full px-2 py-0.5 text-[10px] font-extrabold bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300">
+                            {{ $globalStats['total'] }} Total
+                        </span>
+                    </button>
+                </div>
+            </div>
+        @endif
 
         <div class="max-w-full overflow-x-auto">
             <table class="w-full table-auto presensi-table">
@@ -434,9 +521,12 @@
                         @php
                             $currStatus = $s->presensi_status ?? 'A'; // DEFAULT ALPHA
                         @endphp
-                        <tr class="hover:bg-gray-50/70 dark:hover:bg-gray-800/40 transition-colors student-row row-status-{{ $currStatus }}" data-student-id="{{ $s->id }}">
+                        <tr class="hover:bg-gray-50/70 dark:hover:bg-gray-800/40 transition-colors student-row row-status-{{ $currStatus }}"
+                            data-student-id="{{ $s->id }}"
+                            data-jadwal-id="{{ $s->jadwal_id ?? $jadwal->id }}"
+                            data-kelas-id="{{ $s->jadwal_id ?? $jadwal->id }}">
                             <td class="px-4 py-3 text-center text-xs text-gray-500 dark:text-gray-400 td-no">
-                                {{ $idx + 1 }}
+                                <span class="student-idx">{{ $idx + 1 }}</span>
                             </td>
                             <td class="px-4 py-3 td-student">
                                 <div class="flex items-center justify-between gap-3">
@@ -449,13 +539,20 @@
                                             </div>
                                         @endif
                                         <div class="min-w-0">
-                                            <p class="font-semibold text-gray-900 dark:text-white text-xs sm:text-sm leading-snug truncate">{{ $s->nama }}</p>
+                                            <div class="flex flex-wrap items-center gap-1.5">
+                                                <p class="font-semibold text-gray-900 dark:text-white text-xs sm:text-sm leading-snug truncate">{{ $s->nama }}</p>
+                                                @if(!empty($isMultiKelas))
+                                                    <span class="inline-flex rounded bg-purple-50 text-purple-700 dark:bg-purple-500/15 dark:text-purple-300 px-1.5 py-0.5 text-[10px] font-bold border border-purple-200 dark:border-purple-500/20 shrink-0">
+                                                        Kelas {{ $s->nama_kelas }}
+                                                    </span>
+                                                @endif
+                                            </div>
                                             <span class="text-[11px] text-gray-400 font-mono">NIS: {{ $s->nis }}</span>
                                         </div>
                                     </div>
                                     <!-- Mobile Student Number Badge -->
                                     <span class="md:hidden inline-flex items-center justify-center h-6 w-6 rounded-full bg-gray-100 dark:bg-gray-800 text-[10px] font-bold text-gray-600 dark:text-gray-300 font-mono shrink-0">
-                                        #{{ $idx + 1 }}
+                                        #<span class="student-idx-mobile">{{ $idx + 1 }}</span>
                                     </span>
                                 </div>
                             </td>
@@ -542,10 +639,13 @@
 
             var jadwalId = {{ $jadwal->id }};
             var tanggal = '{{ $tanggal }}';
+            var isMultiKelas = {{ !empty($isMultiKelas) ? 'true' : 'false' }};
+            var activeFilter = isMultiKelas ? '{{ $jadwal->id }}' : 'all';
+            var activeJadwalId = {{ $jadwal->id }};
 
             // Function to update visual card highlight (A = rose, S = amber, I = blue, H = neutral/green)
             function updateRowHighlight() {
-                $('.student-row').each(function () {
+                $('.student-row:visible').each(function () {
                     var status = $(this).find('.radio-status:checked').val();
                     $(this).removeClass('row-status-H row-status-I row-status-S row-status-A');
                     if (status) {
@@ -554,16 +654,18 @@
                 });
             }
 
-            // Function to recalculate local counters
+            // Function to recalculate local counters based on VISIBLE rows
             function recalculateLocalCounters() {
-                var counts = { H: 0, I: 0, S: 0, A: 0 };
-                $('.radio-status:checked').each(function () {
-                    var val = $(this).val();
+                var counts = { H: 0, I: 0, S: 0, A: 0, total: 0 };
+                $('.student-row:visible').each(function () {
+                    counts.total++;
+                    var val = $(this).find('.radio-status:checked').val();
                     if (counts.hasOwnProperty(val)) {
                         counts[val]++;
                     }
                 });
 
+                $('#counter_total').text(counts.total);
                 $('#counter_H').text(counts.H);
                 $('#counter_I').text(counts.I);
                 $('#counter_S').text(counts.S);
@@ -572,8 +674,65 @@
                 updateRowHighlight();
             }
 
-            // Inisialisasi awal saat halaman dibuka
-            recalculateLocalCounters();
+            // Function to renumber index numbers for visible rows
+            function renumberVisibleRows() {
+                var idx = 1;
+                $('.student-row:visible').each(function () {
+                    $(this).find('.student-idx').text(idx);
+                    $(this).find('.student-idx-mobile').text(idx);
+                    idx++;
+                });
+            }
+
+            // Function to filter students by class
+            function filterStudentsByClass(targetKelas) {
+                activeFilter = targetKelas;
+                if (targetKelas === 'all') {
+                    $('.student-row').show();
+                    $('#btnSetSemuaHadirText').text('Setel Hadir Semua Kelas Gabungan');
+                } else {
+                    $('.student-row').each(function () {
+                        var rKelas = $(this).data('kelas-id');
+                        if (String(rKelas) === String(targetKelas)) {
+                            $(this).show();
+                        } else {
+                            $(this).hide();
+                        }
+                    });
+                    var $activeBtn = $('.class-tab-btn[data-filter-kelas="' + targetKelas + '"]');
+                    var kName = $activeBtn.data('kelas-name') || 'Kelas Ini';
+                    $('#btnSetSemuaHadirText').text('Setel Semua Hadir (' + kName + ')');
+                }
+                renumberVisibleRows();
+                recalculateLocalCounters();
+            }
+
+            // If multi-class session, initialize tab filter
+            if (isMultiKelas) {
+                filterStudentsByClass(activeFilter);
+            } else {
+                recalculateLocalCounters();
+            }
+
+            // Handle Tab Click
+            $(document).on('click', '.class-tab-btn', function () {
+                var target = $(this).data('filter-kelas');
+                var jId = $(this).data('jadwal-id');
+                activeJadwalId = (jId === 'all') ? jadwalId : jId;
+
+                // Toggle active styling
+                $('.class-tab-btn').removeClass('bg-brand-500 text-white shadow-brand-500/25 active-tab')
+                    .addClass('bg-white text-gray-700 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700');
+                $('.class-tab-btn .tab-badge').removeClass('bg-white/25 text-white')
+                    .addClass('bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300');
+
+                $(this).removeClass('bg-white text-gray-700 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700')
+                    .addClass('bg-brand-500 text-white shadow-brand-500/25 active-tab');
+                $(this).find('.tab-badge').removeClass('bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300')
+                    .addClass('bg-white/25 text-white');
+
+                filterStudentsByClass(target);
+            });
 
             // Function to set live indicator UI
             function setLiveStatus(state, msg) {
@@ -594,14 +753,15 @@
             }
 
             // AJAX: Save Single Student Attendance
-            function saveStudentAttendance(studentId, status, keterangan) {
+            function saveStudentAttendance(studentId, status, keterangan, studentJadwalId) {
                 setLiveStatus('saving', 'Menyimpan...');
+                var targetJadwal = studentJadwalId || (activeFilter !== 'all' ? activeJadwalId : jadwalId);
 
                 $.ajax({
                     url: '{{ route("absensi-pelajaran.update-single") }}',
                     type: 'POST',
                     data: {
-                        jadwal_pelajaran_id: jadwalId,
+                        jadwal_pelajaran_id: targetJadwal,
                         student_id: studentId,
                         tanggal: tanggal,
                         status: status,
@@ -609,17 +769,7 @@
                     },
                     success: function (res) {
                         setLiveStatus('success', 'Tersimpan Otomatis');
-                        if (res.stats) {
-                            $('#counter_H').text(res.stats.H);
-                            $('#counter_I').text(res.stats.I);
-                            $('#counter_S').text(res.stats.S);
-                            $('#counter_A').text(res.stats.A);
-
-                            $('#counter_mobile_H').text(res.stats.H);
-                            $('#counter_mobile_I').text(res.stats.I);
-                            $('#counter_mobile_S').text(res.stats.S);
-                            $('#counter_mobile_A').text(res.stats.A);
-                        }
+                        recalculateLocalCounters();
                     },
                     error: function (xhr) {
                         setLiveStatus('error', 'Gagal tersimpan');
@@ -632,10 +782,11 @@
                 var studentId = $(this).data('student-id');
                 var status = $(this).val();
                 var $row = $(this).closest('.student-row');
+                var studentJadwalId = $row.data('jadwal-id') || jadwalId;
                 var keterangan = $row.find('.input-keterangan').val();
 
                 recalculateLocalCounters();
-                saveStudentAttendance(studentId, status, keterangan);
+                saveStudentAttendance(studentId, status, keterangan, studentJadwalId);
             });
 
             // 2. Listen to notes input change or blur -> LIVE ACTION SAVE!
@@ -643,9 +794,10 @@
                 var studentId = $(this).data('student-id');
                 var keterangan = $(this).val();
                 var $row = $(this).closest('.student-row');
+                var studentJadwalId = $row.data('jadwal-id') || jadwalId;
                 var status = $row.find('.radio-status:checked').val() || 'A';
 
-                saveStudentAttendance(studentId, status, keterangan);
+                saveStudentAttendance(studentId, status, keterangan, studentJadwalId);
             });
 
             // 3. Fast 1-Click "Set Semua Hadir" -> LIVE ACTION SAVE ALL!
@@ -654,28 +806,37 @@
                 $btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Memproses...');
                 setLiveStatus('saving', 'Menyetel semua hadir...');
 
+                var isAllParallel = (activeFilter === 'all');
+                var targetJadwal = isAllParallel ? jadwalId : activeJadwalId;
+
                 $.ajax({
                     url: '{{ route("absensi-pelajaran.set-all") }}',
                     type: 'POST',
                     data: {
-                        jadwal_pelajaran_id: jadwalId,
+                        jadwal_pelajaran_id: targetJadwal,
+                        all_parallel: isAllParallel ? 1 : 0,
                         tanggal: tanggal,
                         status: 'H'
                     },
                     success: function (res) {
-                        $('.radio-status[value="H"]').prop('checked', true);
+                        if (isAllParallel) {
+                            $('.student-row .radio-status[value="H"]').prop('checked', true);
+                        } else {
+                            $('.student-row:visible .radio-status[value="H"]').prop('checked', true);
+                        }
                         recalculateLocalCounters();
                         setLiveStatus('success', 'Semua Hadir Tersimpan');
-                        $btn.prop('disabled', false).html('<i class="fas fa-check-double"></i> <span>Setel Semua Hadir</span>');
+                        var btnLabel = isAllParallel ? 'Setel Hadir Semua Kelas Gabungan' : ($('.class-tab-btn.active-tab').data('kelas-name') ? 'Setel Semua Hadir (' + $('.class-tab-btn.active-tab').data('kelas-name') + ')' : 'Setel Semua Hadir');
+                        $btn.prop('disabled', false).html('<i class="fas fa-check-double"></i> <span id="btnSetSemuaHadirText">' + btnLabel + '</span>');
                     },
                     error: function () {
                         setLiveStatus('error', 'Gagal setel semua hadir');
-                        $btn.prop('disabled', false).html('<i class="fas fa-check-double"></i> <span>Setel Semua Hadir</span>');
+                        $btn.prop('disabled', false).html('<i class="fas fa-check-double"></i> <span id="btnSetSemuaHadirText">Setel Semua Hadir</span>');
                     }
                 });
             });
 
-            // 4. Form Jurnal KBM Submit Handler (Independent Save)
+            // 4. Form Jurnal KBM Submit Handler (Independent Save with Automatic Parallel Sync)
             $('#formJurnal').on('submit', function (e) {
                 e.preventDefault();
                 var $form = $(this);
@@ -697,9 +858,9 @@
                         $status.html('<span class="text-emerald-600 font-bold"><i class="fas fa-check-circle"></i> ' + (res.message || 'Jurnal berhasil disimpan!') + '</span>');
 
                         setTimeout(function () {
-                            $btnTop.html('<i class="fas fa-save"></i> <span>Simpan Jurnal </span>');
+                            $btnTop.html('<i class="fas fa-save"></i> <span>Simpan Jurnal</span>');
                             $btnBottom.html('<i class="fas fa-save"></i> <span>Simpan Jurnal</span>');
-                        }, 2500);
+                        }, 3000);
                     },
                     error: function (xhr) {
                         var err = 'Gagal menyimpan jurnal.';
@@ -707,8 +868,8 @@
                             err = xhr.responseJSON.message;
                         }
                         $status.html('<span class="text-rose-600 font-bold"><i class="fas fa-exclamation-circle"></i> ' + err + '</span>');
-                        $btnTop.prop('disabled', false).html('<i class="fas fa-save"></i> <span>Simpan Jurnal </span>');
-                        $btnBottom.prop('disabled', false).html('<i class="fas fa-save"></i> <span>Simpan Jurnal </span>');
+                        $btnTop.prop('disabled', false).html('<i class="fas fa-save"></i> <span>Simpan Jurnal</span>');
+                        $btnBottom.prop('disabled', false).html('<i class="fas fa-save"></i> <span>Simpan Jurnal</span>');
                     }
                 });
             });

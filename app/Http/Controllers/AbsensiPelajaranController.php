@@ -97,9 +97,32 @@ class AbsensiPelajaranController extends Controller
             ->keyBy('jadwal_pelajaran_id');
 
         foreach ($jadwals as $jadwal) {
-            $jadwal->jurnal_today = $jurnals->get($jadwal->id);
             $jadwal->absensi_summary = $absensiCounts->get($jadwal->id);
             $jadwal->is_attended = !empty($jadwal->absensi_summary) && $jadwal->absensi_summary->total_absen > 0;
+
+            // Multi-kelas parallel check: guru yang sama, mapel sama, hari & jam sama
+            $parallel = $jadwals->filter(function ($item) use ($jadwal) {
+                return $item->guru_id === $jadwal->guru_id
+                    && $item->mapel_id === $jadwal->mapel_id
+                    && $item->hari === $jadwal->hari
+                    && $item->jam_mulai === $jadwal->jam_mulai
+                    && $item->jam_selesai === $jadwal->jam_selesai;
+            });
+            $jadwal->is_multi_kelas = $parallel->count() > 1;
+            $jadwal->parallel_kelases = $parallel->pluck('kelas.nama_kelas')->filter()->values()->all();
+            $jadwal->parallel_count = $parallel->count();
+
+            // Jurnal hari ini (ambil dari jadwal ini atau sister jadwal jika multi-kelas)
+            $jurnalToday = $jurnals->get($jadwal->id);
+            if (!$jurnalToday && $jadwal->is_multi_kelas) {
+                foreach ($parallel as $pItem) {
+                    if ($jurnals->has($pItem->id)) {
+                        $jurnalToday = $jurnals->get($pItem->id);
+                        break;
+                    }
+                }
+            }
+            $jadwal->jurnal_today = $jurnalToday;
         }
 
         $kelases = Kelas::where('school_id', $schoolId)->orderBy('nama_kelas')->get();
@@ -123,6 +146,7 @@ class AbsensiPelajaranController extends Controller
 
     /**
      * Halaman Formulir Input Presensi Siswa & Jurnal KBM
+     * Mendukung Sesi Multi-Kelas (Guru & Mapel sama di jam yang sama pada 2+ kelas)
      */
     public function presensi($jadwalId, Request $request)
     {
@@ -149,68 +173,114 @@ class AbsensiPelajaranController extends Controller
             $tanggal = $parsedDate->format('Y-m-d');
         }
 
-        // Ambil Jurnal KBM jika sudah ada
-        $jurnal = JurnalPelajaran::where('jadwal_pelajaran_id', $jadwal->id)
-            ->where('tanggal', $tanggal)
-            ->first();
-
-        // Ambil Siswa di kelas tersebut
-        $students = Siswa::where('school_id', $schoolId)
-            ->where('kelas_id', $jadwal->kelas_id)
-            ->orderBy('nama')
+        // Cari semua jadwal paralel (multi-kelas gabungan di jam, hari, mapel, & guru yang sama)
+        $parallelJadwals = JadwalPelajaran::where('school_id', $schoolId)
+            ->where('guru_id', $jadwal->guru_id)
+            ->where('mapel_id', $jadwal->mapel_id)
+            ->where('hari', $jadwal->hari)
+            ->where('jam_mulai', $jadwal->jam_mulai)
+            ->where('jam_selesai', $jadwal->jam_selesai)
+            ->with(['guru', 'kelas', 'mapel'])
+            ->orderBy('id')
             ->get();
 
-        // Ambil data presensi yang sudah tersimpan
-        $existingAttendance = AbsensiPelajaran::where('jadwal_pelajaran_id', $jadwal->id)
+        $isMultiKelas = $parallelJadwals->count() > 1;
+
+        // Ambil Jurnal KBM jika sudah ada di salah satu jadwal paralel ini
+        $jurnal = JurnalPelajaran::whereIn('jadwal_pelajaran_id', $parallelJadwals->pluck('id'))
             ->where('tanggal', $tanggal)
-            ->get()
-            ->keyBy('student_id');
+            ->latest('updated_at')
+            ->first();
 
         $operatorGuruId = $isGuru ? $guruId : $jadwal->guru_id;
-
-        // Auto-seed default Alpha (A) jika siswa belum memiliki record di database
-        $toInsert = [];
         $now = now();
-        foreach ($students as $student) {
-            if (!$existingAttendance->has($student->id)) {
-                $toInsert[] = [
-                    'school_id'           => $schoolId,
-                    'jadwal_pelajaran_id' => $jadwal->id,
-                    'jurnal_pelajaran_id' => $jurnal?->id,
-                    'student_id'          => $student->id,
-                    'guru_id'             => $operatorGuruId,
-                    'tanggal'             => $tanggal,
-                    'status'              => 'A', // DEFAULT ALPHA
-                    'keterangan'          => null,
-                    'created_at'          => $now,
-                    'updated_at'          => $now,
-                ];
-            }
-        }
-        if (!empty($toInsert)) {
-            AbsensiPelajaran::insert($toInsert);
-            $existingAttendance = AbsensiPelajaran::where('jadwal_pelajaran_id', $jadwal->id)
+
+        $classesData = [];
+        $allStudents = collect();
+        $globalStats = [
+            'total' => 0,
+            'H'     => 0,
+            'I'     => 0,
+            'S'     => 0,
+            'A'     => 0,
+        ];
+
+        foreach ($parallelJadwals as $pj) {
+            $classStudents = Siswa::where('school_id', $schoolId)
+                ->where('kelas_id', $pj->kelas_id)
+                ->orderBy('nama')
+                ->get();
+
+            $existingAttendance = AbsensiPelajaran::where('jadwal_pelajaran_id', $pj->id)
                 ->where('tanggal', $tanggal)
                 ->get()
                 ->keyBy('student_id');
+
+            // Auto-seed default Alpha (A) jika siswa belum memiliki record di database
+            $toInsert = [];
+            foreach ($classStudents as $student) {
+                if (!$existingAttendance->has($student->id)) {
+                    $toInsert[] = [
+                        'school_id'           => $schoolId,
+                        'jadwal_pelajaran_id' => $pj->id,
+                        'jurnal_pelajaran_id' => $jurnal?->id,
+                        'student_id'          => $student->id,
+                        'guru_id'             => $operatorGuruId,
+                        'tanggal'             => $tanggal,
+                        'status'              => 'A', // DEFAULT ALPHA
+                        'keterangan'          => null,
+                        'created_at'          => $now,
+                        'updated_at'          => $now,
+                    ];
+                }
+            }
+
+            if (!empty($toInsert)) {
+                AbsensiPelajaran::insert($toInsert);
+                $existingAttendance = AbsensiPelajaran::where('jadwal_pelajaran_id', $pj->id)
+                    ->where('tanggal', $tanggal)
+                    ->get()
+                    ->keyBy('student_id');
+            }
+
+            // Pasangkan status ke masing-masing siswa
+            foreach ($classStudents as $student) {
+                $record = $existingAttendance->get($student->id);
+                $student->presensi_status = $record?->status ?? 'A';
+                $student->presensi_keterangan = $record?->keterangan ?? '';
+                $student->presensi_id = $record?->id;
+                $student->jadwal_id = $pj->id;
+                $student->nama_kelas = $pj->kelas?->nama_kelas ?? '-';
+            }
+
+            $classStats = [
+                'total' => $classStudents->count(),
+                'H'     => $classStudents->where('presensi_status', 'H')->count(),
+                'I'     => $classStudents->where('presensi_status', 'I')->count(),
+                'S'     => $classStudents->where('presensi_status', 'S')->count(),
+                'A'     => $classStudents->where('presensi_status', 'A')->count(),
+            ];
+
+            $globalStats['total'] += $classStats['total'];
+            $globalStats['H']     += $classStats['H'];
+            $globalStats['I']     += $classStats['I'];
+            $globalStats['S']     += $classStats['S'];
+            $globalStats['A']     += $classStats['A'];
+
+            $classesData[] = (object) [
+                'jadwal'     => $pj,
+                'kelas'      => $pj->kelas,
+                'students'   => $classStudents,
+                'stats'      => $classStats,
+                'is_current' => ($pj->id === $jadwal->id),
+            ];
+
+            $allStudents = $allStudents->concat($classStudents);
         }
 
-        // Pasangkan status ke masing-masing siswa (default: 'A')
-        foreach ($students as $student) {
-            $record = $existingAttendance->get($student->id);
-            $student->presensi_status = $record?->status ?? 'A';
-            $student->presensi_keterangan = $record?->keterangan ?? '';
-            $student->presensi_id = $record?->id;
-        }
-
-        // Hitung rekap saat ini (Hanya Hadir, Izin, Sakit, Alpha)
-        $stats = [
-            'total' => $students->count(),
-            'H' => $students->where('presensi_status', 'H')->count(),
-            'I' => $students->where('presensi_status', 'I')->count(),
-            'S' => $students->where('presensi_status', 'S')->count(),
-            'A' => $students->where('presensi_status', 'A')->count(),
-        ];
+        // Kompatibilitas variabel
+        $students = $isMultiKelas ? $allStudents : ($classesData[0]->students ?? collect());
+        $stats = $isMultiKelas ? $globalStats : ($classesData[0]->stats ?? $globalStats);
 
         return view('absensi-pelajaran.presensi', compact(
             'jadwal',
@@ -218,7 +288,11 @@ class AbsensiPelajaranController extends Controller
             'jurnal',
             'students',
             'stats',
-            'isAdminOrWaka'
+            'isAdminOrWaka',
+            'isMultiKelas',
+            'parallelJadwals',
+            'classesData',
+            'globalStats'
         ));
     }
 
@@ -253,37 +327,64 @@ class AbsensiPelajaranController extends Controller
         $tanggal = Carbon::parse($request->tanggal)->format('Y-m-d');
         $operatorGuruId = $isGuru ? $guruId : $jadwal->guru_id;
 
-        $jurnal = JurnalPelajaran::updateOrCreate(
-            [
-                'jadwal_pelajaran_id' => $jadwal->id,
-                'tanggal'             => $tanggal,
-            ],
-            [
-                'school_id'    => $schoolId,
-                'guru_id'      => $operatorGuruId,
-                'jam_ke'       => $jadwal->jam_ke,
-                'materi'       => trim($request->materi),
-                'catatan'      => $request->catatan ? trim($request->catatan) : null,
-                'jam_mulai'    => $jadwal->jam_mulai,
-                'jam_selesai'  => $jadwal->jam_selesai,
-            ]
-        );
+        // Cari semua jadwal paralel (multi-kelas gabungan di jam, hari, mapel, & guru yang sama)
+        $parallelJadwals = JadwalPelajaran::where('school_id', $schoolId)
+            ->where('guru_id', $jadwal->guru_id)
+            ->where('mapel_id', $jadwal->mapel_id)
+            ->where('hari', $jadwal->hari)
+            ->where('jam_mulai', $jadwal->jam_mulai)
+            ->where('jam_selesai', $jadwal->jam_selesai)
+            ->with('kelas')
+            ->get();
 
-        // Sambungkan jurnal_id ke absensi yang sudah ada pada tanggal ini
-        AbsensiPelajaran::where('jadwal_pelajaran_id', $jadwal->id)
-            ->where('tanggal', $tanggal)
-            ->whereNull('jurnal_pelajaran_id')
-            ->update(['jurnal_pelajaran_id' => $jurnal->id]);
+        $savedJurnal = null;
+        foreach ($parallelJadwals as $pj) {
+            $j = JurnalPelajaran::updateOrCreate(
+                [
+                    'jadwal_pelajaran_id' => $pj->id,
+                    'tanggal'             => $tanggal,
+                ],
+                [
+                    'school_id'    => $schoolId,
+                    'guru_id'      => $operatorGuruId,
+                    'jam_ke'       => $pj->jam_ke,
+                    'materi'       => trim($request->materi),
+                    'catatan'      => $request->catatan ? trim($request->catatan) : null,
+                    'jam_mulai'    => $pj->jam_mulai,
+                    'jam_selesai'  => $pj->jam_selesai,
+                ]
+            );
+
+            // Sambungkan jurnal_id ke absensi yang sudah ada pada tanggal ini
+            AbsensiPelajaran::where('jadwal_pelajaran_id', $pj->id)
+                ->where('tanggal', $tanggal)
+                ->whereNull('jurnal_pelajaran_id')
+                ->update(['jurnal_pelajaran_id' => $j->id]);
+
+            if ($pj->id === $jadwal->id) {
+                $savedJurnal = $j;
+            }
+        }
+        if (!$savedJurnal) {
+            $savedJurnal = $j ?? null;
+        }
+
+        $isMulti = $parallelJadwals->count() > 1;
+        $classNames = $parallelJadwals->pluck('kelas.nama_kelas')->filter()->join(', ');
+        $msg = $isMulti
+            ? "Jurnal KBM berhasil disimpan dan disinkronkan ke {$parallelJadwals->count()} kelas ({$classNames})!"
+            : 'Jurnal KBM berhasil disimpan!';
 
         if ($request->ajax() || $request->wantsJson()) {
             return response()->json([
                 'success' => true,
-                'message' => 'Jurnal KBM berhasil disimpan!',
-                'jurnal'  => $jurnal
+                'message' => $msg,
+                'jurnal'  => $savedJurnal,
+                'is_multi'=> $isMulti,
             ]);
         }
 
-        return redirect()->back()->with('success', 'Jurnal KBM berhasil disimpan!');
+        return redirect()->back()->with('success', $msg);
     }
 
     /**
@@ -312,48 +413,63 @@ class AbsensiPelajaranController extends Controller
             'attendance.*'   => 'nullable|in:H,I,S,A',
             'keterangan'     => 'nullable|array',
             'keterangan.*'   => 'nullable|string|max:255',
+            'student_jadwal' => 'nullable|array',
         ]);
 
         $tanggal = Carbon::parse($request->tanggal)->format('Y-m-d');
         $operatorGuruId = $isGuru ? $guruId : $jadwal->guru_id;
 
         DB::transaction(function () use ($request, $jadwal, $schoolId, $tanggal, $operatorGuruId) {
-            // 1. Simpan / Perbarui Jurnal Pelajaran (jika materi diisi)
-            $jurnal = null;
+            // 1. Simpan / Perbarui Jurnal Pelajaran (disinkronkan ke seluruh jadwal paralel jika multi-kelas)
+            $parallelJadwals = JadwalPelajaran::where('school_id', $schoolId)
+                ->where('guru_id', $jadwal->guru_id)
+                ->where('mapel_id', $jadwal->mapel_id)
+                ->where('hari', $jadwal->hari)
+                ->where('jam_mulai', $jadwal->jam_mulai)
+                ->where('jam_selesai', $jadwal->jam_selesai)
+                ->get();
+
+            $jurnalsByJadwal = [];
             if ($request->filled('materi')) {
-                $jurnal = JurnalPelajaran::updateOrCreate(
-                    [
-                        'jadwal_pelajaran_id' => $jadwal->id,
-                        'tanggal'             => $tanggal,
-                    ],
-                    [
-                        'school_id'    => $schoolId,
-                        'guru_id'      => $operatorGuruId,
-                        'jam_ke'       => $jadwal->jam_ke,
-                        'materi'       => trim($request->materi),
-                        'catatan'      => $request->catatan ? trim($request->catatan) : null,
-                        'jam_mulai'    => $jadwal->jam_mulai,
-                        'jam_selesai'  => $jadwal->jam_selesai,
-                    ]
-                );
+                foreach ($parallelJadwals as $pj) {
+                    $j = JurnalPelajaran::updateOrCreate(
+                        [
+                            'jadwal_pelajaran_id' => $pj->id,
+                            'tanggal'             => $tanggal,
+                        ],
+                        [
+                            'school_id'    => $schoolId,
+                            'guru_id'      => $operatorGuruId,
+                            'jam_ke'       => $pj->jam_ke,
+                            'materi'       => trim($request->materi),
+                            'catatan'      => $request->catatan ? trim($request->catatan) : null,
+                            'jam_mulai'    => $pj->jam_mulai,
+                            'jam_selesai'  => $pj->jam_selesai,
+                        ]
+                    );
+                    $jurnalsByJadwal[$pj->id] = $j;
+                }
             }
 
             // 2. Simpan / Perbarui Absensi Siswa
             $attendances = $request->input('attendance', []);
             $keterangans = $request->input('keterangan', []);
+            $studentJadwals = $request->input('student_jadwal', []);
 
             foreach ($attendances as $studentId => $status) {
                 $ket = $keterangans[$studentId] ?? null;
+                $targetJadwalId = $studentJadwals[$studentId] ?? $jadwal->id;
+                $targetJurnalId = $jurnalsByJadwal[$targetJadwalId]?->id ?? null;
 
                 AbsensiPelajaran::updateOrCreate(
                     [
-                        'jadwal_pelajaran_id' => $jadwal->id,
+                        'jadwal_pelajaran_id' => $targetJadwalId,
                         'student_id'          => $studentId,
                         'tanggal'             => $tanggal,
                     ],
                     [
                         'school_id'           => $schoolId,
-                        'jurnal_pelajaran_id' => $jurnal?->id,
+                        'jurnal_pelajaran_id' => $targetJurnalId,
                         'guru_id'             => $operatorGuruId,
                         'status'              => $status,
                         'keterangan'          => !empty($ket) ? trim($ket) : null,
@@ -370,7 +486,7 @@ class AbsensiPelajaranController extends Controller
         }
 
         return redirect()->route('absensi-pelajaran.index', ['tanggal' => $tanggal])
-            ->with('success', 'Presensi dan Jurnal KBM kelas ' . ($jadwal->kelas->nama_kelas ?? '') . ' berhasil disimpan!');
+            ->with('success', 'Presensi dan Jurnal KBM berhasil disimpan!');
     }
 
     /**
@@ -432,16 +548,17 @@ class AbsensiPelajaranController extends Controller
             'success' => true,
             'message' => 'Presensi siswa berhasil diperbarui.',
             'data'    => [
-                'id'          => $absensi->id,
-                'status'      => $absensi->status,
-                'status_label'=> $absensi->status_label,
+                'id'                  => $absensi->id,
+                'jadwal_pelajaran_id' => $jadwal->id,
+                'status'              => $absensi->status,
+                'status_label'        => $absensi->status_label,
             ],
             'stats'   => $stats,
         ]);
     }
 
     /**
-     * AJAX Live Action: Setel Semua Hadir
+     * AJAX Live Action: Setel Semua Hadir (Mendukung kelas spesifik atau seluruh kelas gabungan)
      */
     public function setAllHadir(Request $request)
     {
@@ -455,6 +572,7 @@ class AbsensiPelajaranController extends Controller
             'jadwal_pelajaran_id' => 'required|exists:jadwal_pelajaran,id',
             'tanggal'             => 'required|date',
             'status'              => 'nullable|in:H,I,S,A',
+            'all_parallel'        => 'nullable|boolean',
         ]);
 
         $status = $request->input('status', 'H');
@@ -466,38 +584,56 @@ class AbsensiPelajaranController extends Controller
 
         $tanggal = Carbon::parse($request->tanggal)->format('Y-m-d');
         $operatorGuruId = $isGuru ? $guruId : $jadwal->guru_id;
-        $jurnal = JurnalPelajaran::where('jadwal_pelajaran_id', $jadwal->id)->where('tanggal', $tanggal)->first();
 
-        $students = Siswa::where('school_id', $schoolId)->where('kelas_id', $jadwal->kelas_id)->get();
+        $targetJadwals = collect([$jadwal]);
+        if ($request->boolean('all_parallel')) {
+            $targetJadwals = JadwalPelajaran::where('school_id', $schoolId)
+                ->where('guru_id', $jadwal->guru_id)
+                ->where('mapel_id', $jadwal->mapel_id)
+                ->where('hari', $jadwal->hari)
+                ->where('jam_mulai', $jadwal->jam_mulai)
+                ->where('jam_selesai', $jadwal->jam_selesai)
+                ->get();
+        }
 
-        foreach ($students as $student) {
-            AbsensiPelajaran::updateOrCreate(
-                [
-                    'jadwal_pelajaran_id' => $jadwal->id,
-                    'student_id'          => $student->id,
-                    'tanggal'             => $tanggal,
-                ],
-                [
-                    'school_id'           => $schoolId,
-                    'jurnal_pelajaran_id' => $jurnal?->id,
-                    'guru_id'             => $operatorGuruId,
-                    'status'              => $status,
-                ]
-            );
+        $targetJadwalIds = $targetJadwals->pluck('id');
+        $targetKelasIds = $targetJadwals->pluck('kelas_id');
+
+        foreach ($targetJadwals as $tJadwal) {
+            $jurnal = JurnalPelajaran::where('jadwal_pelajaran_id', $tJadwal->id)->where('tanggal', $tanggal)->first();
+            $students = Siswa::where('school_id', $schoolId)->where('kelas_id', $tJadwal->kelas_id)->get();
+
+            foreach ($students as $student) {
+                AbsensiPelajaran::updateOrCreate(
+                    [
+                        'jadwal_pelajaran_id' => $tJadwal->id,
+                        'student_id'          => $student->id,
+                        'tanggal'             => $tanggal,
+                    ],
+                    [
+                        'school_id'           => $schoolId,
+                        'jurnal_pelajaran_id' => $jurnal?->id,
+                        'guru_id'             => $operatorGuruId,
+                        'status'              => $status,
+                    ]
+                );
+            }
         }
 
         $stats = [
-            'total' => $students->count(),
-            'H'     => AbsensiPelajaran::where('jadwal_pelajaran_id', $jadwal->id)->where('tanggal', $tanggal)->where('status', 'H')->count(),
-            'I'     => AbsensiPelajaran::where('jadwal_pelajaran_id', $jadwal->id)->where('tanggal', $tanggal)->where('status', 'I')->count(),
-            'S'     => AbsensiPelajaran::where('jadwal_pelajaran_id', $jadwal->id)->where('tanggal', $tanggal)->where('status', 'S')->count(),
-            'A'     => AbsensiPelajaran::where('jadwal_pelajaran_id', $jadwal->id)->where('tanggal', $tanggal)->where('status', 'A')->count(),
+            'total' => Siswa::where('school_id', $schoolId)->whereIn('kelas_id', $targetKelasIds)->count(),
+            'H'     => AbsensiPelajaran::whereIn('jadwal_pelajaran_id', $targetJadwalIds)->where('tanggal', $tanggal)->where('status', 'H')->count(),
+            'I'     => AbsensiPelajaran::whereIn('jadwal_pelajaran_id', $targetJadwalIds)->where('tanggal', $tanggal)->where('status', 'I')->count(),
+            'S'     => AbsensiPelajaran::whereIn('jadwal_pelajaran_id', $targetJadwalIds)->where('tanggal', $tanggal)->where('status', 'S')->count(),
+            'A'     => AbsensiPelajaran::whereIn('jadwal_pelajaran_id', $targetJadwalIds)->where('tanggal', $tanggal)->where('status', 'A')->count(),
         ];
 
         return response()->json([
-            'success' => true,
-            'message' => 'Semua siswa berhasil disetel ' . ($status === 'H' ? 'Hadir' : $status) . '.',
-            'stats'   => $stats,
+            'success'      => true,
+            'message'      => 'Semua siswa berhasil disetel ' . ($status === 'H' ? 'Hadir' : $status) . '.',
+            'stats'        => $stats,
+            'all_parallel' => $request->boolean('all_parallel'),
+            'jadwal_id'    => $jadwal->id,
         ]);
     }
 

@@ -73,9 +73,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/mobile/change-password', [MobileAttendanceController::class, 'changePassword']);
     Route::post('/mobile/ganti-password', [MobileAttendanceController::class, 'changePassword']);
 
-    // --- Fitur Jadwal Pembelajaran & Absensi Siswa Per Jam Pelajaran (Apps Guru) ---
+    // --- Fitur Jadwal Pembelajaran & Absensi Siswa Per Jam Pelajaran (Apps Guru & Siswa) ---
     Route::get('/mobile/jadwal-pelajaran/hari-ini', [App\Http\Controllers\Api\MobileJadwalPelajaranController::class, 'getHariIni']);
     Route::get('/mobile/jadwal-pelajaran/mingguan', [App\Http\Controllers\Api\MobileJadwalPelajaranController::class, 'getMingguan']);
+    Route::get('/mobile/student/jadwal-pelajaran/hari-ini', [App\Http\Controllers\Api\MobileJadwalPelajaranController::class, 'getStudentHariIni']);
+    Route::get('/mobile/student/jadwal-pelajaran/mingguan', [App\Http\Controllers\Api\MobileJadwalPelajaranController::class, 'getStudentMingguan']);
+    Route::get('/mobile/siswa/jadwal-pelajaran/hari-ini', [App\Http\Controllers\Api\MobileJadwalPelajaranController::class, 'getStudentHariIni']);
+    Route::get('/mobile/siswa/jadwal-pelajaran/mingguan', [App\Http\Controllers\Api\MobileJadwalPelajaranController::class, 'getStudentMingguan']);
     Route::get('/mobile/jadwal-pelajaran/{id}/presensi', [App\Http\Controllers\Api\MobileJadwalPelajaranController::class, 'getPresensiDetail']);
     Route::post('/mobile/jadwal-pelajaran/{id}/presensi', [App\Http\Controllers\Api\MobileJadwalPelajaranController::class, 'submitPresensi']);
     Route::post('/mobile/jadwal-pelajaran/{id}/presensi-single', [App\Http\Controllers\Api\MobileJadwalPelajaranController::class, 'updateSinglePresensi']);

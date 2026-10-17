@@ -135,10 +135,15 @@
                     <h3 class="text-lg font-bold text-gray-800 dark:text-white/90 flex items-center gap-2">
                         <span>{{ $j->mapel?->nama_mapel ?? 'Mata Pelajaran' }}</span>
                     </h3>
-                    <div class="flex items-center gap-2 mt-1">
+                    <div class="flex flex-wrap items-center gap-1.5 mt-1">
                         <span class="inline-flex rounded-lg bg-blue-50 px-2.5 py-0.5 text-xs font-bold text-blue-700 dark:bg-blue-500/15 dark:text-blue-400">
                             Kelas {{ $j->kelas?->nama_kelas ?? '-' }}
                         </span>
+                        @if(!empty($j->is_multi_kelas))
+                            <span class="inline-flex items-center gap-1 rounded-lg bg-purple-50 px-2 py-0.5 text-[11px] font-bold text-purple-700 dark:bg-purple-500/15 dark:text-purple-300 border border-purple-200 dark:border-purple-500/20" title="Digabung dengan kelas: {{ implode(', ', $j->parallel_kelases ?? []) }}">
+                                <i class="fas fa-layer-group text-[10px]"></i> Gabungan ({{ implode(', ', $j->parallel_kelases ?? []) }})
+                            </span>
+                        @endif
                         @if($j->ruangan)
                             <span class="text-xs text-gray-500 dark:text-gray-400">
                                 <i class="fas fa-map-marker-alt text-gray-400 mr-1"></i>{{ $j->ruangan }}

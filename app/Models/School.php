@@ -46,6 +46,54 @@ class School extends Model
         'telegram_enabled'     => 'boolean',
     ];
 
+    protected $appends = [
+        'logo_url',
+    ];
+
+    /**
+     * Accessor for full logo URL.
+     */
+    public function getLogoUrlAttribute(): ?string
+    {
+        $logo = $this->logo;
+
+        if (empty($logo)) {
+            $logo = Setting::where('school_id', $this->id)->where('setting_key', 'logo_filename')->value('setting_value');
+        }
+
+        if (empty($logo)) {
+            $logo = Setting::where('school_id', 0)->where('setting_key', 'logo_filename')->value('setting_value');
+        }
+
+        if (empty($logo)) {
+            return asset('images/logo/logo.svg');
+        }
+
+        if (\Illuminate\Support\Str::startsWith($logo, ['http://', 'https://'])) {
+            return $logo;
+        }
+
+        $cleanPath = ltrim(str_replace(['\\', '/'], '/', $logo), '/');
+
+        if (file_exists(public_path('storage/' . $cleanPath))) {
+            return asset('storage/' . $cleanPath);
+        }
+
+        if (file_exists(public_path($cleanPath))) {
+            return asset($cleanPath);
+        }
+
+        if (\Illuminate\Support\Str::startsWith($cleanPath, ['schools/', 'settings/'])) {
+            return asset('storage/' . $cleanPath);
+        }
+
+        if (file_exists(public_path('images/logo/' . $cleanPath))) {
+            return asset('images/logo/' . $cleanPath);
+        }
+
+        return asset('storage/' . $cleanPath);
+    }
+
     /**
      * Get all users for this school
      */

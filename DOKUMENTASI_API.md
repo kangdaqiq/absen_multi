@@ -21,41 +21,108 @@ Digunakan untuk autentikasi awal pegawai, guru, wali kelas, maupun **siswa**.
 ```json
 {
   "email": "1001", 
-  "password": "password123"
+  "password": "password123",
+  "fcm_token": "fcm_device_token_opsional"
 }
 ```
-*Keterangan:* Field `email` dapat diisi dengan **Email**, **Username**, maupun **NIS / NISN** siswa.
+*Keterangan:* 
+- Field `email` dapat diisi dengan **Email**, **Username**, maupun **NIS / NISN** siswa.
+- Field `fcm_token` (opsional): Jika disertakan saat login, sistem akan otomatis mendaftarkan token ke user aktif dan **menghapus token tersebut dari akun user/siswa sebelumnya** pada perangkat tersebut guna mencegah notifikasi terkirim dobel.
 
-- **Response Success (200 OK)**:
+- **Response Success (200 OK) — Contoh Login Guru / Pegawai**:
 ```json
 {
   "success": true,
   "message": "Login berhasil",
   "token": "1|abcdef1234567890sanctumtoken",
   "user": {
-    "id": 5,
-    "full_name": "Ahmad Rizky",
-    "username": "ahmad",
-    "email": "ahmad@gmail.com",
-    "role": "siswa",
+    "id": 2,
+    "full_name": "Budi Santoso, S.Pd",
+    "username": "budisantoso",
+    "email": "budi@sekolah.sch.id",
+    "role": "teacher",
+    "nip": "198507152010011012",
     "school_id": 1,
-    "student": {
-      "id": 15,
-      "nama": "Ahmad Rizky",
-      "nis": "1001"
+    "is_wali_kelas": true,
+    "kelas_id": 3,
+    "kelas_name": "XII RPL 1",
+    "wali_kelases": [
+      {
+        "id": 3,
+        "nama": "XII RPL 1",
+        "nama_kelas": "XII RPL 1",
+        "peran": "Wali Kelas 1",
+        "is_utama": true
+      }
+    ],
+    "guru": {
+      "id": 10,
+      "nama": "Budi Santoso, S.Pd",
+      "nip": "198507152010011012",
+      "tgl_lahir": "1985-07-15",
+      "no_wa": "081234567890",
+      "foto_url": "http://absen.jagattech.my.id/storage/guru/budi.jpg",
+      "is_wali_kelas": true,
+      "kelas_id": 3,
+      "kelas_name": "XII RPL 1",
+      "wali_kelases": [
+        {
+          "id": 3,
+          "nama": "XII RPL 1",
+          "nama_kelas": "XII RPL 1",
+          "peran": "Wali Kelas 1",
+          "is_utama": true
+        }
+      ]
     }
   },
   "school": {
     "id": 1,
-    "nama": "SMK Negeri 1 Jagat",
     "name": "SMK Negeri 1 Jagat",
     "domain": "smkn1jagat.sch.id",
+    "logo_url": "http://absen.jagattech.my.id/storage/schools/logos/logo.png",
     "latitude": -6.175392,
     "longitude": 106.827153,
-    "lat": -6.175392,
-    "long": 106.827153,
     "radius": 100,
-    "geofence_radius": 100,
+    "geofence_enabled": true
+  }
+}
+```
+
+- **Response Success (200 OK) — Contoh Login Siswa**:
+```json
+{
+  "success": true,
+  "message": "Login siswa berhasil",
+  "token": "2|fedcba0987654321sanctumtoken",
+  "user": {
+    "id": 5,
+    "full_name": "Ahmad Rizky",
+    "username": "1001",
+    "email": "1001@siswa.local",
+    "role": "student",
+    "nis": "1001",
+    "school_id": 1,
+    "student": {
+      "id": 15,
+      "nama": "Ahmad Rizky",
+      "nis": "1001",
+      "no_wa": "081234567890",
+      "wa_ortu": "081987654321",
+      "foto_url": "http://absen.jagattech.my.id/storage/siswa/1001.jpg",
+      "tgl_lahir": "2008-05-15",
+      "kelas_id": 3,
+      "kelas_name": "XII RPL 1"
+    }
+  },
+  "school": {
+    "id": 1,
+    "name": "SMK Negeri 1 Jagat",
+    "domain": "smkn1jagat.sch.id",
+    "logo_url": "http://absen.jagattech.my.id/storage/schools/logos/logo.png",
+    "latitude": -6.175392,
+    "longitude": 106.827153,
+    "radius": 100,
     "geofence_enabled": true
   }
 }
@@ -65,14 +132,14 @@ Digunakan untuk autentikasi awal pegawai, guru, wali kelas, maupun **siswa**.
 ```json
 {
   "success": false,
-  "message": "Email/Username/NIS atau password salah."
+  "message": "NISN/Email atau Password/Tanggal Lahir salah."
 }
 ```
 
 ---
 
 ### 1.2 Profil User (`GET /api/mobile/user`)
-Mengambil data detail profil pengguna yang sedang login.
+Mengambil data detail profil pengguna yang sedang login (baik Guru maupun Siswa).
 
 - **URL**: `/api/mobile/user`
 - **Method**: `GET`
@@ -82,12 +149,34 @@ Mengambil data detail profil pengguna yang sedang login.
 {
   "success": true,
   "data": {
-    "id": 5,
-    "full_name": "Ahmad Rizky",
-    "username": "ahmad",
-    "email": "ahmad@gmail.com",
-    "role": "siswa",
-    "school_id": 1
+    "id": 2,
+    "full_name": "Budi Santoso, S.Pd",
+    "username": "budisantoso",
+    "email": "budi@sekolah.sch.id",
+    "role": "teacher",
+    "nip": "198507152010011012",
+    "nis": null,
+    "school_id": 1,
+    "guru": {
+      "id": 10,
+      "nama": "Budi Santoso, S.Pd",
+      "nip": "198507152010011012",
+      "foto_url": "http://absen.jagattech.my.id/storage/guru/budi.jpg",
+      "is_wali_kelas": true,
+      "kelas_id": 3,
+      "kelas_name": "XII RPL 1"
+    },
+    "student": null,
+    "school": {
+      "id": 1,
+      "name": "SMK Negeri 1 Jagat",
+      "domain": "smkn1jagat.sch.id",
+      "logo_url": "http://absen.jagattech.my.id/storage/schools/logos/logo.png",
+      "latitude": -6.175392,
+      "longitude": 106.827153,
+      "radius": 100,
+      "geofence_enabled": true
+    }
   }
 }
 ```
@@ -113,6 +202,7 @@ Memperbarui FCM Device Registration Token untuk push notification.
   "message": "FCM Token berhasil diperbarui"
 }
 ```
+*Catatan:* Jika token FCM yang dikirimkan sebelumnya masih tersimpan di user atau siswa lain (misal berganti akun di perangkat yang sama), token pada akun lama tersebut akan otomatis dihapus (`null`) agar notifikasi tidak terkirim ganda.
 
 ---
 
@@ -153,12 +243,80 @@ Mengubah kata sandi akun pengguna yang sedang login (berlaku untuk Guru, Pegawai
 {
   "success": false,
   "message": "Password baru minimal terdiri dari 6 karakter."
+```
+
+---
+
+### 1.5 Update Profil & Kontak Siswa (`POST /api/mobile/student/profile`)
+Endpoint terpadu untuk memperbarui **Tanggal Lahir**, **Email Siswa**, **Nomor WhatsApp Siswa**, serta **Nomor WhatsApp Orang Tua/Wali**.
+- **Siswa**: Dapat langsung mengupdate datanya sendiri tanpa mengirim `student_id`.
+- **Guru / Wali Kelas / Admin**: Dapat mengupdate data siswa tertentu dengan menyertakan parameter `student_id`.
+
+- **URL**: `/api/mobile/student/profile` *(Alias: `/api/mobile/student/contact`, `/api/mobile/student/update-profile`, `/api/mobile/student/update-contact`, `/api/mobile/update-profile`, `/api/mobile/update-contact`)*
+- **Method**: `POST`
+- **Auth**: Bearer Token
+- **Body Request (JSON / Form-Data)**:
+```json
+{
+  "student_id": 15,
+  "tgl_lahir": "2008-05-15",
+  "email": "ahmad.rizky@gmail.com",
+  "no_wa": "081234567890",
+  "wa_ortu": "081987654321"
+}
+```
+*Catatan Parameter:*
+- `student_id` (opsional): ID siswa. Wajib disertakan jika diakses oleh akun guru/wali kelas/admin. Siswa yang login tidak perlu mengirim parameter ini.
+- `tgl_lahir` (opsional): Tanggal lahir siswa (format `YYYY-MM-DD`, `DD-MM-YYYY`, atau `DD/MM/YYYY`). Mendukung alias key `tanggal_lahir`, `birth_date`.
+- `email` (opsional): Alamat email siswa baru. Sistem memvalidasi keunikan email di database.
+- `no_wa` (opsional): Nomor WhatsApp siswa (format `08xxx` atau `628xxx`). Mendukung alias key `nomor_wa`, `phone`, `wa_siswa`.
+- `wa_ortu` (opsional): Nomor WhatsApp orang tua/wali siswa (format `08xxx` atau `628xxx`). Mendukung alias key `nomor_wa_ortu`, `no_wa_ortu`, `wa_orang_tua`.
+- Minimal salah satu field (`tgl_lahir`, `email`, `no_wa`, atau `wa_ortu`) harus dikirimkan.
+
+- **Response Success (200 OK)**:
+```json
+{
+  "success": true,
+  "message": "Data profil siswa berhasil diperbarui.",
+  "data": {
+    "student_id": 15,
+    "nama": "Ahmad Rizky",
+    "nis": "1001",
+    "tgl_lahir": "2008-05-15",
+    "email": "ahmad.rizky@gmail.com",
+    "no_wa": "081234567890",
+    "wa_ortu": "081987654321"
+  }
+}
+```
+
+- **Response Error (422 Unprocessable Entity - Email Sudah Terdaftar)**:
+```json
+{
+  "success": false,
+  "message": "Email sudah digunakan oleh akun lain. Silakan gunakan email lain."
+}
+```
+
+- **Response Error (422 Unprocessable Entity - Format Tanggal / WA Tidak Valid)**:
+```json
+{
+  "success": false,
+  "message": "Format tanggal lahir tidak valid (gunakan format YYYY-MM-DD, contoh: 2008-05-15)."
+}
+```
+
+- **Response Error (403 Forbidden - Akses Ditolak)**:
+```json
+{
+  "success": false,
+  "message": "Akses ditolak: Anda hanya dapat mengubah profil Anda sendiri."
 }
 ```
 
 ---
 
-### 1.5 Logout (`POST /api/mobile/logout`)
+### 1.6 Logout (`POST /api/mobile/logout`)
 Menghapus/revokasi token Sanctum aktif.
 
 - **URL**: `/api/mobile/logout`

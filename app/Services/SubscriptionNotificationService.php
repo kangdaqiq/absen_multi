@@ -286,7 +286,7 @@ class SubscriptionNotificationService
 
         $message = "✅ *PEMBAYARAN PERPANJANGAN BERHASIL* ✅\n\n" .
             "Yth. Pengelola / Admin *{$school->name}*,\n\n" .
-            "Alhamdulillah, pembayaran perpanjangan langganan sistem absensi sekolah Anda telah *berhasil diverifikasi* dan seluruh layanan aktif kembali secara otomatis.\n\n" .
+            "Pembayaran perpanjangan langganan sistem absensi sekolah Anda telah *berhasil diverifikasi* dan seluruh layanan aktif kembali.\n\n" .
             "📋 *Rincian Pembayaran:*\n" .
             "• No. Invoice: `{$subscription->invoice_number}`\n" .
             "• Paket: *{$packageName}* ({$billingCycleText})\n" .

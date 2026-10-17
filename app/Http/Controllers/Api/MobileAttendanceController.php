@@ -67,18 +67,23 @@ class MobileAttendanceController extends Controller
 
             $guruPayload = null;
             if ($user->guru) {
-                $guruPayload = array_merge($user->guru->toArray(), [
+                $guruPayload = [
+                    'id' => $user->guru->id,
+                    'nama' => $user->guru->nama,
+                    'nip' => $user->guru->nip,
+                    'tgl_lahir' => $user->guru->tgl_lahir,
+                    'no_wa' => $user->guru->no_wa,
+                    'foto_url' => $user->guru->foto_url,
                     'is_wali_kelas' => $isWaliKelas,
                     'kelas_id' => $kelasWali?->id,
                     'kelas_name' => $kelasWali ? ($kelasWali->nama_kelas ?? $kelasWali->nama) : null,
                     'wali_kelases' => $waliKelases,
-                ]);
+                ];
             }
 
-            // Save FCM token if provided
+            // Save FCM token if provided & detach from previous accounts
             if ($request->filled('fcm_token')) {
-                $user->fcm_token = $request->fcm_token;
-                $user->save();
+                $this->assignFcmToken($request->fcm_token, $user);
             }
 
             ApiLog::create([
@@ -103,22 +108,14 @@ class MobileAttendanceController extends Controller
                     'username' => $user->username,
                     'email' => $user->email,
                     'role' => $user->role,
+                    'nip' => $user->guru?->nip,
                     'school_id' => $user->school_id,
                     'is_wali_kelas' => $isWaliKelas,
-                    'wali_kelas' => $isWaliKelas,
-                    'kelas_name' => $kelasWali ? ($kelasWali->nama_kelas ?? $kelasWali->nama) : null,
                     'kelas_id' => $kelasWali?->id,
-                    'kelas' => $kelasWali ? [
-                        'id' => $kelasWali->id,
-                        'nama' => $kelasWali->nama_kelas ?? $kelasWali->nama,
-                        'nama_kelas' => $kelasWali->nama_kelas ?? $kelasWali->nama,
-                    ] : null,
+                    'kelas_name' => $kelasWali ? ($kelasWali->nama_kelas ?? $kelasWali->nama) : null,
                     'wali_kelases' => $waliKelases,
                     'guru' => $guruPayload,
-                    'student' => $user->student
                 ],
-                'is_wali_kelas' => $isWaliKelas,
-                'wali_kelases' => $waliKelases,
                 'school' => $this->formatSchoolResponse($user->school, $user->school_id)
             ]);
         }
@@ -191,14 +188,9 @@ class MobileAttendanceController extends Controller
                         }
                     }
 
-                    // Save FCM token if provided
+                    // Save FCM token if provided & detach from previous accounts
                     if ($request->filled('fcm_token')) {
-                        $user->fcm_token = $request->fcm_token;
-                        $user->save();
-                        if (\Illuminate\Support\Facades\Schema::hasColumn('siswa', 'fcm_token')) {
-                            $siswa->fcm_token = $request->fcm_token;
-                            $siswa->save();
-                        }
+                        $this->assignFcmToken($request->fcm_token, $user, $siswa);
                     }
 
                     $token = $user->createToken('android-app-siswa')->plainTextToken;
@@ -225,27 +217,20 @@ class MobileAttendanceController extends Controller
                             'username' => $siswa->nis,
                             'email' => $user->email,
                             'role' => 'student',
+                            'nis' => $siswa->nis,
                             'school_id' => $siswa->school_id,
-                            'is_wali_kelas' => false,
-                            'wali_kelas' => false,
-                            'guru' => null,
                             'student' => [
                                 'id' => $siswa->id,
                                 'nama' => $siswa->nama,
                                 'nis' => $siswa->nis,
-                                'foto' => $siswa->foto,
-                                'foto_url' => $siswa->foto_url,
+                                'no_wa' => $siswa->no_wa,
+                                'wa_ortu' => $siswa->wa_ortu,
                                 'tgl_lahir' => $siswa->tgl_lahir ? Carbon::parse($siswa->tgl_lahir)->format('Y-m-d') : null,
+                                'foto_url' => $siswa->foto_url,
                                 'kelas_id' => $siswa->kelas_id,
                                 'kelas_name' => $siswa->kelas ? ($siswa->kelas->nama_kelas ?? $siswa->kelas->nama) : null,
-                                'kelas' => $siswa->kelas ? [
-                                    'id' => $siswa->kelas->id,
-                                    'nama' => $siswa->kelas->nama_kelas ?? $siswa->kelas->nama,
-                                    'nama_kelas' => $siswa->kelas->nama_kelas ?? $siswa->kelas->nama,
-                                ] : null,
                             ]
                         ],
-                        'is_wali_kelas' => false,
                         'school' => $this->formatSchoolResponse($siswa->school, $siswa->school_id)
                     ]);
                 }
@@ -285,12 +270,21 @@ class MobileAttendanceController extends Controller
         }
 
         $studentData = null;
-        if ($user->student) {
-            $s = $user->student;
+        $s = $user->student ?? Siswa::where('user_id', $user->id)->first();
+        if (!$s && in_array($user->role, ['student', 'siswa'])) {
+            $cleanNis = str_replace('siswa_', '', $user->username);
+            $s = Siswa::where('nis', $cleanNis)
+                ->when($user->school_id, fn($q) => $q->where('school_id', $user->school_id))
+                ->first() ?? Siswa::where('nis', $cleanNis)->first();
+        }
+
+        if ($s) {
             $studentData = [
                 'id' => $s->id,
                 'nama' => $s->nama,
                 'nis' => $s->nis,
+                'no_wa' => $s->no_wa,
+                'wa_ortu' => $s->wa_ortu,
                 'foto' => $s->foto,
                 'foto_url' => $s->foto_url,
                 'tgl_lahir' => $s->tgl_lahir ? Carbon::parse($s->tgl_lahir)->format('Y-m-d') : null,
@@ -343,6 +337,8 @@ class MobileAttendanceController extends Controller
                 'username' => $user->username,
                 'email' => $user->email,
                 'role' => $user->role,
+                'nip' => $user->guru?->nip,
+                'nis' => $user->student?->nis,
                 'school_id' => $user->school_id,
                 'guru' => $guruData,
                 'student' => $studentData,
@@ -456,11 +452,9 @@ class MobileAttendanceController extends Controller
                     'is_checked_in' => !empty($absen?->jam_masuk),
                     'is_checked_out' => !empty($absen?->jam_pulang),
                     'is_wali_kelas' => $isWaliKelas,
-                    'wali_kelas' => $isWaliKelas,
                     'kelas_name' => $kelasWali ? ($kelasWali->nama_kelas ?? $kelasWali->nama) : null,
                     'kelas_id' => $kelasWali?->id,
                     'wali_kelases' => $waliKelases,
-                    'is_mobile_attendance_enabled' => $isMobileAttendanceEnabled,
                     'geofence_enabled' => $isMobileAttendanceEnabled,
                 ]
             ]);
@@ -480,10 +474,8 @@ class MobileAttendanceController extends Controller
                 'is_checked_in' => false,
                 'is_checked_out' => false,
                 'is_wali_kelas' => $isWaliKelas,
-                'wali_kelas' => $isWaliKelas,
                 'kelas_name' => null,
                 'kelas_id' => null,
-                'is_mobile_attendance_enabled' => $isMobileAttendanceEnabled,
                 'geofence_enabled' => $isMobileAttendanceEnabled,
             ]
         ]);
@@ -511,7 +503,7 @@ class MobileAttendanceController extends Controller
     }
 
     /**
-     * Format data sekolah beserta koordinat lokasi latitude dan longitude untuk respon mobile.
+     * Format data sekolah beserta koordinat lokasi latitude, longitude, dan logo untuk respon mobile.
      */
     private function formatSchoolResponse($school, ?int $schoolId = null): ?array
     {
@@ -520,6 +512,10 @@ class MobileAttendanceController extends Controller
         }
 
         $id = $school?->id ?? $schoolId;
+
+        if (!$school instanceof \App\Models\School && $id > 0) {
+            $school = \App\Models\School::find($id);
+        }
 
         $schoolLat = Setting::where('school_id', $id)->where('setting_key', 'school_latitude')->value('setting_value');
         if ($schoolLat === null && $id > 0) {
@@ -541,22 +537,35 @@ class MobileAttendanceController extends Controller
         $lat = $schoolLat !== null ? (float) $schoolLat : null;
         $long = $schoolLng !== null ? (float) $schoolLng : null;
 
-        $baseData = $school ? (is_array($school) ? $school : $school->toArray()) : [];
+        $logoUrl = null;
+        if ($school instanceof \App\Models\School) {
+            $logoUrl = $school->logo_url;
+        } else {
+            $logoFilename = Setting::where('school_id', $id)->where('setting_key', 'logo_filename')->value('setting_value')
+                ?? Setting::where('school_id', 0)->where('setting_key', 'logo_filename')->value('setting_value');
 
-        return array_merge($baseData, [
+            if ($logoFilename) {
+                if (\Illuminate\Support\Str::startsWith($logoFilename, ['http://', 'https://'])) {
+                    $logoUrl = $logoFilename;
+                } else {
+                    $cleanLogo = ltrim(str_replace(['\\', '/'], '/', $logoFilename), '/');
+                    $logoUrl = asset('storage/' . $cleanLogo);
+                }
+            } else {
+                $logoUrl = asset('images/logo/logo.svg');
+            }
+        }
+
+        return [
             'id' => $id,
-            'nama' => $school?->name ?? $school?->nama ?? 'Sekolah',
-            'name' => $school?->name ?? $school?->nama ?? 'Sekolah',
+            'name' => $school?->name ?? 'Sekolah',
             'domain' => $school?->domain ?? null,
+            'logo_url' => $logoUrl,
             'latitude' => $lat,
             'longitude' => $long,
-            'lat' => $lat,
-            'long' => $long,
-            'lng' => $long,
             'radius' => $radius,
-            'geofence_radius' => $radius,
             'geofence_enabled' => $isGeoEnabled,
-        ]);
+        ];
     }
 
     /**
@@ -2047,20 +2056,7 @@ class MobileAttendanceController extends Controller
 
         $user = $request->user();
         if ($user) {
-            $user->fcm_token = $request->fcm_token;
-            $user->save();
-
-            if ($user->student) {
-                $user->student->fcm_token = $request->fcm_token;
-                $user->student->save();
-            } elseif (in_array($user->role, ['student', 'siswa'])) {
-                $cleanNis = str_replace('siswa_', '', $user->username);
-                $siswa = Siswa::where('user_id', $user->id)->orWhere('nis', $cleanNis)->first();
-                if ($siswa) {
-                    $siswa->fcm_token = $request->fcm_token;
-                    $siswa->save();
-                }
-            }
+            $this->assignFcmToken($request->fcm_token, $user);
         }
 
         return response()->json([
@@ -3185,10 +3181,328 @@ class MobileAttendanceController extends Controller
         ]);
     }
 
+    /**
+     * Endpoint Update Data Profil & Kontak Siswa (POST /api/mobile/student/profile atau /contact)
+     * Dapat digunakan oleh Siswa sendiri (mengubah profil pribadinya)
+     * atau oleh Guru / Wali Kelas / Admin (dengan menyertakan parameter student_id).
+     *
+     * Menggabungkan update Tanggal Lahir, Nomor WA Siswa, Nomor WA Ortu, dan Email dalam 1 endpoint.
+     *
+     * Parameter (minimal salah satu):
+     * - student_id (opsional jika siswa sendiri, wajib jika diakses guru/staf)
+     * - tgl_lahir (opsional, string tanggal lahir format: YYYY-MM-DD, DD-MM-YYYY, DD/MM/YYYY)
+     * - email (opsional, string valid email)
+     * - no_wa (opsional, string nomor WA siswa, misal: 08123456789 atau 628123456789)
+     * - wa_ortu (opsional, string nomor WA orang tua, misal: 08123456789 atau 628123456789)
+     */
+    public function updateStudentContact(Request $request)
+    {
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated'], 401);
+        }
+
+        $studentId = $request->input('student_id');
+        $siswa = null;
+        $isStaff = in_array($user->role, ['guru', 'teacher', 'wali_kelas', 'admin', 'super_admin']) || !empty($user->guru);
+
+        if ($studentId) {
+            $siswa = Siswa::find($studentId);
+            if (!$siswa) {
+                return response()->json(['success' => false, 'message' => 'Data siswa tidak ditemukan.'], 404);
+            }
+
+            // Validasi hak akses sekolah
+            if ($user->school_id && $siswa->school_id && $user->school_id != $siswa->school_id && !$user->isSuperAdmin()) {
+                return response()->json(['success' => false, 'message' => 'Akses ditolak: Siswa berada di sekolah yang berbeda.'], 403);
+            }
+
+            // Jika bukan staf/guru, pastikan hanya dapat mengedit profil dirinya sendiri
+            if (!$isStaff && $siswa->user_id !== $user->id) {
+                $cleanNis = str_replace('siswa_', '', $user->username);
+                if ($siswa->nis !== $cleanNis) {
+                    return response()->json(['success' => false, 'message' => 'Akses ditolak: Anda hanya dapat mengubah profil Anda sendiri.'], 403);
+                }
+            }
+        } else {
+            // Ambil dari profil login user siswa
+            $siswa = $user->student ?? Siswa::where('user_id', $user->id)->first();
+            if (!$siswa && in_array($user->role, ['student', 'siswa'])) {
+                $cleanNis = str_replace('siswa_', '', $user->username);
+                $siswa = Siswa::where('nis', $cleanNis)
+                    ->when($user->school_id, fn($q) => $q->where('school_id', $user->school_id))
+                    ->first() ?? Siswa::where('nis', $cleanNis)->first();
+            }
+
+            if (!$siswa) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Data siswa tidak ditemukan atau sertakan student_id jika diakses oleh akun dewan guru/admin.'
+                ], 422);
+            }
+        }
+
+        // Cari user account yang terhubung ke siswa ini
+        $studentUser = $siswa->user ?? ($siswa->user_id ? User::find($siswa->user_id) : null);
+        if (!$studentUser) {
+            $studentUser = User::where('school_id', $siswa->school_id)
+                ->where('role', 'student')
+                ->where(function ($q) use ($siswa) {
+                    $q->where('username', 'siswa_' . $siswa->nis)
+                      ->orWhere('username', $siswa->nis);
+                })->first();
+        }
+
+        // Deteksi input yang dikirimkan (mendukung alias key)
+        $hasEmail = $request->has('email') || $request->has('email_siswa');
+        $hasNoWa = $request->has('no_wa') || $request->has('nomor_wa') || $request->has('phone') || $request->has('wa_siswa') || $request->has('wa');
+        $hasWaOrtu = $request->has('wa_ortu') || $request->has('nomor_wa_ortu') || $request->has('no_wa_ortu') || $request->has('wa_orang_tua');
+        $hasTglLahir = $request->has('tgl_lahir') || $request->has('tanggal_lahir') || $request->has('birth_date');
+
+        if (!$hasEmail && !$hasNoWa && !$hasWaOrtu && !$hasTglLahir) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Tidak ada data yang dikirim untuk diperbarui. Sertakan minimal salah satu dari: tgl_lahir, no_wa, wa_ortu, atau email.'
+            ], 422);
+        }
+
+        $emailInput = trim((string) $request->input('email', $request->input('email_siswa', '')));
+        $rawNoWa = $request->input('no_wa', $request->input('nomor_wa', $request->input('phone', $request->input('wa_siswa', $request->input('wa')))));
+        $rawWaOrtu = $request->input('wa_ortu', $request->input('nomor_wa_ortu', $request->input('no_wa_ortu', $request->input('wa_orang_tua'))));
+        $rawTglLahir = $request->input('tgl_lahir', $request->input('tanggal_lahir', $request->input('birth_date')));
+
+        // 1. Validasi Email jika dikirim
+        if ($hasEmail) {
+            if ($emailInput === '') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Email tidak boleh dikosongkan.'
+                ], 422);
+            }
+
+            if (!filter_var($emailInput, FILTER_VALIDATE_EMAIL)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Format email tidak valid.'
+                ], 422);
+            }
+
+            // Pastikan email unik di tabel users kecuali untuk user siswa ini
+            $emailTaken = User::where('email', $emailInput)
+                ->when($studentUser, function ($q) use ($studentUser) {
+                    $q->where('id', '!=', $studentUser->id);
+                })
+                ->exists();
+
+            if ($emailTaken) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Email sudah digunakan oleh akun lain. Silakan gunakan email lain.'
+                ], 422);
+            }
+        }
+
+        // 2. Validasi Nomor WA Siswa jika dikirim
+        $cleanNoWa = null;
+        if ($hasNoWa) {
+            $rawStr = trim((string) $rawNoWa);
+            if ($rawStr !== '') {
+                if (!preg_match('/^(\+?62|08|628)[0-9\-\s]{7,18}$/', $rawStr)) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Format nomor WhatsApp siswa tidak valid. Gunakan awalan 08 atau 62 (contoh: 08123456789).'
+                    ], 422);
+                }
+                $cleanNoWa = preg_replace('/[^0-9]/', '', $rawStr);
+                if (strlen($cleanNoWa) < 9 || strlen($cleanNoWa) > 16) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Nomor WhatsApp siswa harus terdiri dari 9 hingga 16 digit angka.'
+                    ], 422);
+                }
+            }
+        }
+
+        // 3. Validasi Nomor WA Orang Tua jika dikirim
+        $cleanWaOrtu = null;
+        if ($hasWaOrtu) {
+            $rawOrtuStr = trim((string) $rawWaOrtu);
+            if ($rawOrtuStr !== '') {
+                if (!preg_match('/^(\+?62|08|628)[0-9\-\s]{7,18}$/', $rawOrtuStr)) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Format nomor WhatsApp orang tua tidak valid. Gunakan awalan 08 atau 62 (contoh: 08123456789).'
+                    ], 422);
+                }
+                $cleanWaOrtu = preg_replace('/[^0-9]/', '', $rawOrtuStr);
+                if (strlen($cleanWaOrtu) < 9 || strlen($cleanWaOrtu) > 16) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Nomor WhatsApp orang tua harus terdiri dari 9 hingga 16 digit angka.'
+                    ], 422);
+                }
+            }
+        }
+
+        // 4. Validasi Tanggal Lahir jika dikirim
+        $cleanTglLahir = null;
+        if ($hasTglLahir) {
+            $rawDateStr = trim((string) $rawTglLahir);
+            if ($rawDateStr !== '') {
+                try {
+                    $parsedDate = Carbon::parse($rawDateStr);
+                    if ($parsedDate->isFuture()) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'Tanggal lahir tidak boleh di masa depan.'
+                        ], 422);
+                    }
+                    $cleanTglLahir = $parsedDate->format('Y-m-d');
+                } catch (\Exception $e) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Format tanggal lahir tidak valid (gunakan format YYYY-MM-DD, contoh: 2008-05-15).'
+                    ], 422);
+                }
+            }
+        }
+
+        // 5. Update Email pada Akun User Siswa
+        if ($hasEmail) {
+            if ($studentUser) {
+                $studentUser->email = $emailInput;
+                $studentUser->save();
+            } else {
+                $defaultPass = $cleanTglLahir ?? ($siswa->tgl_lahir ? Carbon::parse($siswa->tgl_lahir)->format('dmY') : $siswa->nis);
+                $studentUser = User::create([
+                    'full_name' => $siswa->nama,
+                    'username' => 'siswa_' . $siswa->nis,
+                    'email' => $emailInput,
+                    'password_hash' => Hash::make($defaultPass),
+                    'role' => 'student',
+                    'school_id' => $siswa->school_id,
+                ]);
+                $siswa->user_id = $studentUser->id;
+            }
+        }
+
+        // 6. Update Data pada Tabel Siswa
+        if ($hasTglLahir) {
+            $siswa->tgl_lahir = $cleanTglLahir;
+        }
+
+        if ($hasNoWa) {
+            $siswa->no_wa = $cleanNoWa;
+        }
+
+        if ($hasWaOrtu) {
+            $siswa->wa_ortu = $cleanWaOrtu;
+        }
+
+        if ($studentUser && \Illuminate\Support\Facades\Schema::hasColumn('siswa', 'user_id')) {
+            if ($siswa->user_id !== $studentUser->id) {
+                $siswa->user_id = $studentUser->id;
+            }
+        }
+
+        $siswa->save();
+
+        ApiLog::create([
+            'school_id' => $siswa->school_id,
+            'api_key' => 'MOBILE_APP',
+            'action' => 'mobile_update_student_profile',
+            'uid' => $user->username ?? $user->email,
+            'success' => true,
+            'message' => "Update profil siswa berhasil: {$siswa->nama} (NIS: {$siswa->nis})",
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent() ?? 'Android Mobile App',
+            'created_at' => now(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Data profil siswa berhasil diperbarui.',
+            'data' => [
+                'student_id' => $siswa->id,
+                'nama' => $siswa->nama,
+                'nis' => $siswa->nis,
+                'tgl_lahir' => $siswa->tgl_lahir ? Carbon::parse($siswa->tgl_lahir)->format('Y-m-d') : null,
+                'email' => $studentUser?->email,
+                'no_wa' => $siswa->no_wa,
+                'wa_ortu' => $siswa->wa_ortu,
+            ]
+        ]);
+    }
+
+    /**
+     * Daftarkan token FCM ke user & siswa aktif, serta hapus token tersebut
+     * dari akun user/siswa lain sebelumnya untuk menghindari notifikasi ganda ke perangkat yang sama.
+     */
+    protected function assignFcmToken(string $fcmToken, User $user, ?Siswa $siswa = null): void
+    {
+        $fcmToken = trim($fcmToken);
+        if ($fcmToken === '') {
+            return;
+        }
+
+        $targetSiswaId = $siswa?->id ?? $user->student?->id;
+        if (!$targetSiswaId && in_array($user->role, ['student', 'siswa'])) {
+            $cleanNis = str_replace('siswa_', '', $user->username);
+            $foundSiswa = Siswa::where('user_id', $user->id)
+                ->orWhere('nis', $cleanNis)
+                ->first();
+            $targetSiswaId = $foundSiswa?->id;
+            if (!$siswa) {
+                $siswa = $foundSiswa;
+            }
+        }
+
+        // 1. Hapus token FCM yang sama dari seluruh akun user lain sebelumnya
+        User::where('fcm_token', $fcmToken)
+            ->where('id', '!=', $user->id)
+            ->update(['fcm_token' => null]);
+
+        // 2. Hapus token FCM yang sama dari seluruh data siswa lain sebelumnya
+        if (\Illuminate\Support\Facades\Schema::hasColumn('siswa', 'fcm_token')) {
+            Siswa::where('fcm_token', $fcmToken)
+                ->when($targetSiswaId, function ($q) use ($targetSiswaId) {
+                    $q->where('id', '!=', $targetSiswaId);
+                })
+                ->update(['fcm_token' => null]);
+        }
+
+        // 3. Simpan token ke user aktif saat ini
+        $user->fcm_token = $fcmToken;
+        $user->save();
+
+        // 4. Simpan token ke siswa aktif saat ini (jika ada)
+        if ($siswa && \Illuminate\Support\Facades\Schema::hasColumn('siswa', 'fcm_token')) {
+            $siswa->fcm_token = $fcmToken;
+            $siswa->save();
+        }
+    }
+
     public function logout(Request $request)
     {
-        if ($request->user() && $request->user()->currentAccessToken()) {
-            $request->user()->currentAccessToken()->delete();
+        $user = $request->user();
+        if ($user) {
+            $currentToken = $user->fcm_token;
+            $user->fcm_token = null;
+            $user->save();
+
+            if ($currentToken) {
+                if (\Illuminate\Support\Facades\Schema::hasColumn('siswa', 'fcm_token')) {
+                    Siswa::where('fcm_token', $currentToken)->update(['fcm_token' => null]);
+                }
+            }
+            if ($user->student && \Illuminate\Support\Facades\Schema::hasColumn('siswa', 'fcm_token')) {
+                $user->student->fcm_token = null;
+                $user->student->save();
+            }
+
+            if ($user->currentAccessToken()) {
+                $user->currentAccessToken()->delete();
+            }
         }
         return response()->json(['success' => true, 'message' => 'Logout berhasil']);
     }

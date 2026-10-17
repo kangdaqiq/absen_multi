@@ -260,15 +260,16 @@ Mengubah kata sandi akun pengguna yang sedang login (berlaku untuk Guru, Pegawai
 
 ---
 
-### 1.5 Update Profil & Kontak Siswa (`POST /api/mobile/student/profile`)
-Endpoint terpadu untuk memperbarui **Tanggal Lahir**, **Email Siswa**, **Nomor WhatsApp Siswa**, serta **Nomor WhatsApp Orang Tua/Wali**.
-- **Siswa**: Dapat langsung mengupdate datanya sendiri tanpa mengirim `student_id`.
-- **Guru / Wali Kelas / Admin**: Dapat mengupdate data siswa tertentu dengan menyertakan parameter `student_id`.
+### 1.5 Update Profil Pengguna (Siswa & Guru) (`POST /api/mobile/update-profile`)
+Endpoint terpadu untuk memperbarui **Tanggal Lahir**, **Email**, serta **Nomor WhatsApp**:
+- **Siswa**: Dapat langsung mengupdate datanya sendiri (`tgl_lahir`, `email`, `no_wa`, `wa_ortu`) tanpa mengirim `student_id`.
+- **Guru / Pegawai**: Dapat mengupdate data profilnya sendiri (`tgl_lahir`, `email`, `no_wa`) tanpa mengirim `student_id`.
+- **Guru / Wali Kelas / Admin (Edit Siswa)**: Dapat mengupdate profil siswa tertentu dengan menyertakan parameter `student_id`.
 
-- **URL**: `/api/mobile/student/profile` *(Alias: `/api/mobile/student/contact`, `/api/mobile/student/update-profile`, `/api/mobile/student/update-contact`, `/api/mobile/update-profile`, `/api/mobile/update-contact`)*
+- **URL**: `/api/mobile/update-profile` *(Alias: `/api/mobile/student/profile`, `/api/mobile/teacher/profile`, `/api/mobile/guru/profile`, `/api/mobile/student/contact`, `/api/mobile/update-contact`)*
 - **Method**: `POST`
 - **Auth**: Bearer Token
-- **Body Request (JSON / Form-Data)**:
+- **Body Request (JSON / Form-Data) — Contoh Update Siswa**:
 ```json
 {
   "student_id": 15,
@@ -278,15 +279,25 @@ Endpoint terpadu untuk memperbarui **Tanggal Lahir**, **Email Siswa**, **Nomor W
   "wa_ortu": "081987654321"
 }
 ```
+
+- **Body Request (JSON / Form-Data) — Contoh Update Guru / Pegawai**:
+```json
+{
+  "tgl_lahir": "1985-07-15",
+  "email": "budi.santoso@gmail.com",
+  "no_wa": "081234567890"
+}
+```
+
 *Catatan Parameter:*
-- `student_id` (opsional): ID siswa. Wajib disertakan jika diakses oleh akun guru/wali kelas/admin. Siswa yang login tidak perlu mengirim parameter ini.
-- `tgl_lahir` (opsional): Tanggal lahir siswa (format `YYYY-MM-DD`, `DD-MM-YYYY`, atau `DD/MM/YYYY`). Mendukung alias key `tanggal_lahir`, `birth_date`.
-- `email` (opsional): Alamat email siswa baru. Sistem memvalidasi keunikan email di database.
-- `no_wa` (opsional): Nomor WhatsApp siswa (format `08xxx` atau `628xxx`). Mendukung alias key `nomor_wa`, `phone`, `wa_siswa`.
-- `wa_ortu` (opsional): Nomor WhatsApp orang tua/wali siswa (format `08xxx` atau `628xxx`). Mendukung alias key `nomor_wa_ortu`, `no_wa_ortu`, `wa_orang_tua`.
+- `student_id` (opsional): ID siswa. Wajib disertakan hanya jika akun guru/admin ingin mengedit siswa tertentu.
+- `tgl_lahir` (opsional): Format `YYYY-MM-DD`, `DD-MM-YYYY`, atau `DD/MM/YYYY`. (Mendukung alias: `tanggal_lahir`, `birth_date`).
+- `email` (opsional): Alamat email baru (divalidasi keunikannya di database).
+- `no_wa` (opsional): Nomor WhatsApp (`08xxx` / `628xxx`). (Mendukung alias: `nomor_wa`, `phone`, `wa_siswa`, `wa_guru`).
+- `wa_ortu` (opsional): Nomor WhatsApp orang tua (khusus data siswa). (Mendukung alias: `nomor_wa_ortu`, `no_wa_ortu`, `wa_orang_tua`).
 - Minimal salah satu field (`tgl_lahir`, `email`, `no_wa`, atau `wa_ortu`) harus dikirimkan.
 
-- **Response Success (200 OK)**:
+- **Response Success (200 OK) — Response Siswa**:
 ```json
 {
   "success": true,
@@ -299,6 +310,22 @@ Endpoint terpadu untuk memperbarui **Tanggal Lahir**, **Email Siswa**, **Nomor W
     "email": "ahmad.rizky@gmail.com",
     "no_wa": "081234567890",
     "wa_ortu": "081987654321"
+  }
+}
+```
+
+- **Response Success (200 OK) — Response Guru**:
+```json
+{
+  "success": true,
+  "message": "Data profil guru berhasil diperbarui.",
+  "data": {
+    "guru_id": 10,
+    "nama": "Budi Santoso, S.Pd",
+    "nip": "198507152010011012",
+    "tgl_lahir": "1985-07-15",
+    "email": "budi.santoso@gmail.com",
+    "no_wa": "081234567890"
   }
 }
 ```

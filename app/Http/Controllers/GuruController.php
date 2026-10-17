@@ -97,6 +97,7 @@ class GuruController extends Controller
         if (empty($data['telegram_chat_id'])) {
             $data['telegram_chat_id'] = null;
         }
+        $data['tgl_lahir'] = !empty($data['tgl_lahir']) ? \Carbon\Carbon::parse($data['tgl_lahir'])->format('Y-m-d') : null;
         $data['default_shift_id'] = $request->filled('default_shift_id') ? $request->default_shift_id : null;
         $data['uid_rfid'] = !empty($data['uid_rfid']) ? strtoupper(trim($data['uid_rfid'])) : null;
 
@@ -165,6 +166,7 @@ class GuruController extends Controller
         } elseif (empty($data['telegram_chat_id'])) {
             $data['telegram_chat_id'] = null;
         }
+        $data['tgl_lahir'] = !empty($data['tgl_lahir']) ? \Carbon\Carbon::parse($data['tgl_lahir'])->format('Y-m-d') : null;
         $data['default_shift_id'] = $request->filled('default_shift_id') ? $request->default_shift_id : null;
         $data['uid_rfid'] = !empty($data['uid_rfid']) ? strtoupper(trim($data['uid_rfid'])) : null;
 
@@ -700,7 +702,36 @@ class GuruController extends Controller
                 if ($nip === '') {
                     $nip = null;
                 }
-                $wa = isset($row[2]) ? trim((string)$row[2]) : null;
+
+                $colC = isset($row[2]) ? trim((string)$row[2]) : '';
+                $colD = isset($row[3]) ? trim((string)$row[3]) : '';
+
+                $tglLahir = null;
+                $wa = null;
+
+                if ($colD !== '') {
+                    // Format 4 Kolom: A=Nama, B=NIP, C=Tgl Lahir, D=No WA
+                    if ($colC !== '') {
+                        try {
+                            $tglLahir = \Carbon\Carbon::parse($colC)->format('Y-m-d');
+                        } catch (\Exception $e) {
+                            $tglLahir = null;
+                        }
+                    }
+                    $wa = $colD;
+                } else {
+                    // Format 3 Kolom: jika Col C adalah No WA
+                    $cleanDigits = preg_replace('/[^0-9]/', '', $colC);
+                    if (str_starts_with($cleanDigits, '08') || str_starts_with($cleanDigits, '628') || strlen($cleanDigits) >= 9) {
+                        $wa = $colC;
+                    } else {
+                        try {
+                            $tglLahir = \Carbon\Carbon::parse($colC)->format('Y-m-d');
+                        } catch (\Exception $e) {
+                            $tglLahir = null;
+                        }
+                    }
+                }
 
                 if ($nama === '') {
                     $failures[] = [
@@ -719,7 +750,7 @@ class GuruController extends Controller
                         'row' => $excelRowIndex,
                         'nama' => $nama,
                         'nip' => $nip ?: '-',
-                        'reason' => 'Nomor WhatsApp guru (Kolom C) kosong.'
+                        'reason' => 'Nomor WhatsApp guru kosong atau format tidak sesuai.'
                     ];
                     continue;
                 }
@@ -773,6 +804,7 @@ class GuruController extends Controller
                     Guru::create([
                         'nama'      => $nama,
                         'nip'       => $nip,
+                        'tgl_lahir' => $tglLahir,
                         'no_wa'     => $normalizedWa,
                         'school_id' => $schoolId,
                     ]);
@@ -835,12 +867,14 @@ class GuruController extends Controller
         // Header
         $sheet->setCellValue('A1', 'Nama Lengkap');
         $sheet->setCellValue('B1', 'NIP (Opsional)');
-        $sheet->setCellValue('C1', 'No WhatsApp (08xxx)');
+        $sheet->setCellValue('C1', 'Tanggal Lahir (YYYY-MM-DD)');
+        $sheet->setCellValue('D1', 'No WhatsApp (08xxx)');
 
         // Example
         $sheet->setCellValue('A2', 'Budi Santoso, S.Pd');
         $sheet->setCellValue('B2', '198001012005011001');
-        $sheet->setCellValue('C2', '081234567890');
+        $sheet->setCellValue('C2', '1985-07-15');
+        $sheet->setCellValue('D2', '081234567890');
 
         $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
 

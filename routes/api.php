@@ -59,6 +59,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/mobile/student/update-profile', [MobileAttendanceController::class, 'updateStudentContact']);
     Route::post('/mobile/update-contact', [MobileAttendanceController::class, 'updateStudentContact']);
     Route::post('/mobile/update-profile', [MobileAttendanceController::class, 'updateStudentContact']);
+    Route::post('/mobile/teacher/contact', [MobileAttendanceController::class, 'updateStudentContact']);
+    Route::post('/mobile/teacher/profile', [MobileAttendanceController::class, 'updateStudentContact']);
+    Route::post('/mobile/guru/contact', [MobileAttendanceController::class, 'updateStudentContact']);
+    Route::post('/mobile/guru/profile', [MobileAttendanceController::class, 'updateStudentContact']);
     Route::post('/mobile/student/photo', [MobileAttendanceController::class, 'uploadStudentPhoto']);
     Route::post('/mobile/student/upload-photo', [MobileAttendanceController::class, 'uploadStudentPhoto']);
     Route::post('/mobile/student/scan-face', [MobileAttendanceController::class, 'scanFaceStudent']);

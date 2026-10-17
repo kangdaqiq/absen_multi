@@ -3239,6 +3239,12 @@ class MobileAttendanceController extends Controller
                 }
             }
         } else {
+            // Jika login sebagai Guru / Pegawai dan tidak menyertakan student_id,
+            // maka perbarui data profil akun Guru tersebut sendiri!
+            if ($user->guru || in_array($user->role, ['guru', 'teacher', 'wali_kelas'])) {
+                return $this->updateGuruProfile($request, $user);
+            }
+
             // Ambil dari profil login user siswa
             $siswa = $user->student ?? Siswa::where('user_id', $user->id)->first();
             if (!$siswa && in_array($user->role, ['student', 'siswa'])) {
@@ -3444,6 +3450,134 @@ class MobileAttendanceController extends Controller
                 'email' => $studentUser?->email,
                 'no_wa' => $siswa->no_wa,
                 'wa_ortu' => $siswa->wa_ortu,
+            ]
+        ]);
+    }
+
+    /**
+     * Helper update profil akun Guru (Tanggal Lahir, No WA, Email)
+     */
+    protected function updateGuruProfile(Request $request, User $user)
+    {
+        $guru = $user->guru ?? Guru::where('user_id', $user->id)->first();
+        if (!$guru && in_array($user->role, ['guru', 'teacher', 'wali_kelas'])) {
+            $guru = Guru::where('school_id', $user->school_id)
+                ->where(function ($q) use ($user) {
+                    $q->where('nama', $user->full_name)
+                      ->orWhere('nip', $user->username);
+                })->first();
+        }
+
+        if (!$guru) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Data guru tidak ditemukan untuk akun ini.'
+            ], 404);
+        }
+
+        $hasEmail = $request->has('email') || $request->has('email_guru');
+        $hasNoWa = $request->has('no_wa') || $request->has('nomor_wa') || $request->has('phone') || $request->has('wa_guru') || $request->has('wa');
+        $hasTglLahir = $request->has('tgl_lahir') || $request->has('tanggal_lahir') || $request->has('birth_date');
+
+        if (!$hasEmail && !$hasNoWa && !$hasTglLahir) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Tidak ada data yang dikirim untuk diperbarui. Sertakan minimal salah satu dari: tgl_lahir, no_wa, atau email.'
+            ], 422);
+        }
+
+        $emailInput = trim((string) $request->input('email', $request->input('email_guru', '')));
+        $rawNoWa = $request->input('no_wa', $request->input('nomor_wa', $request->input('phone', $request->input('wa_guru', $request->input('wa')))));
+        $rawTglLahir = $request->input('tgl_lahir', $request->input('tanggal_lahir', $request->input('birth_date')));
+
+        // 1. Validasi Email
+        if ($hasEmail) {
+            if ($emailInput === '') {
+                return response()->json(['success' => false, 'message' => 'Email tidak boleh dikosongkan.'], 422);
+            }
+            if (!filter_var($emailInput, FILTER_VALIDATE_EMAIL)) {
+                return response()->json(['success' => false, 'message' => 'Format email tidak valid.'], 422);
+            }
+            $emailTaken = User::where('email', $emailInput)->where('id', '!=', $user->id)->exists();
+            if ($emailTaken) {
+                return response()->json(['success' => false, 'message' => 'Email sudah digunakan oleh akun lain. Silakan gunakan email lain.'], 422);
+            }
+        }
+
+        // 2. Validasi Nomor WA
+        $cleanNoWa = null;
+        if ($hasNoWa) {
+            $rawStr = trim((string) $rawNoWa);
+            if ($rawStr !== '') {
+                if (!preg_match('/^(\+?62|08|628)[0-9\-\s]{7,18}$/', $rawStr)) {
+                    return response()->json(['success' => false, 'message' => 'Format nomor WhatsApp tidak valid. Gunakan awalan 08 atau 62 (contoh: 08123456789).'], 422);
+                }
+                $cleanNoWa = preg_replace('/[^0-9]/', '', $rawStr);
+                if (strlen($cleanNoWa) < 9 || strlen($cleanNoWa) > 16) {
+                    return response()->json(['success' => false, 'message' => 'Nomor WhatsApp harus terdiri dari 9 hingga 16 digit angka.'], 422);
+                }
+            }
+        }
+
+        // 3. Validasi Tanggal Lahir
+        $cleanTglLahir = null;
+        if ($hasTglLahir) {
+            $rawDateStr = trim((string) $rawTglLahir);
+            if ($rawDateStr !== '') {
+                try {
+                    $parsedDate = Carbon::parse($rawDateStr);
+                    if ($parsedDate->isFuture()) {
+                        return response()->json(['success' => false, 'message' => 'Tanggal lahir tidak boleh di masa depan.'], 422);
+                    }
+                    $cleanTglLahir = $parsedDate->format('Y-m-d');
+                } catch (\Exception $e) {
+                    return response()->json(['success' => false, 'message' => 'Format tanggal lahir tidak valid (gunakan format YYYY-MM-DD, contoh: 1985-07-15).'], 422);
+                }
+            }
+        }
+
+        // 4. Update Email di User
+        if ($hasEmail) {
+            $user->email = $emailInput;
+            $user->save();
+        }
+
+        // 5. Update di Tabel Guru
+        if ($hasTglLahir) {
+            $guru->tgl_lahir = $cleanTglLahir;
+        }
+        if ($hasNoWa) {
+            $guru->no_wa = $cleanNoWa;
+        }
+        if (\Illuminate\Support\Facades\Schema::hasColumn('guru', 'user_id')) {
+            if ($guru->user_id !== $user->id) {
+                $guru->user_id = $user->id;
+            }
+        }
+        $guru->save();
+
+        ApiLog::create([
+            'school_id' => $user->school_id,
+            'api_key' => 'MOBILE_APP',
+            'action' => 'mobile_update_guru_profile',
+            'uid' => $user->username ?? $user->email,
+            'success' => true,
+            'message' => "Update profil guru berhasil: {$guru->nama} (NIP: {$guru->nip})",
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent() ?? 'Android Mobile App',
+            'created_at' => now(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Data profil guru berhasil diperbarui.',
+            'data' => [
+                'guru_id' => $guru->id,
+                'nama' => $guru->nama,
+                'nip' => $guru->nip,
+                'tgl_lahir' => $guru->tgl_lahir ? Carbon::parse($guru->tgl_lahir)->format('Y-m-d') : null,
+                'email' => $user->email,
+                'no_wa' => $guru->no_wa,
             ]
         ]);
     }

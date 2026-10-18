@@ -32,6 +32,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'stream') {
     // Daftar perintah yang diizinkan untuk keamanan
     $validCommands = [
         'update'  => 'update',
+        'license' => 'license',
         'status'  => 'status',
         'restart' => 'restart web',
         'backup'  => 'backup',
@@ -390,6 +391,17 @@ $phpVer = PHP_VERSION;
             box-shadow: 0 8px 25px rgba(6, 182, 212, 0.58) !important;
         }
 
+        .btn-license {
+            background: linear-gradient(135deg, #059669 0%, #10b981 100%) !important;
+            border: 1px solid rgba(16, 185, 129, 0.6) !important;
+            box-shadow: 0 6px 18px rgba(16, 185, 129, 0.42) !important;
+            color: #ffffff !important;
+        }
+        .btn-license:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(16, 185, 129, 0.58) !important;
+        }
+
         .btn-status {
             background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%) !important;
             border: 1px solid rgba(124, 58, 237, 0.6) !important;
@@ -583,6 +595,9 @@ $phpVer = PHP_VERSION;
             <button id="btnUpdate" class="btn-action btn-update" onclick="runCommand('update')">
                 <span>🔄 Update Sistem Lengkap</span>
             </button>
+            <button id="btnLicense" class="btn-action btn-license" onclick="runCommand('license')">
+                <span>🔑 Perbaiki Lisensi & Izin</span>
+            </button>
             <button id="btnStatus" class="btn-action btn-status" onclick="runCommand('status')">
                 <span>📊 Cek Status Layanan</span>
             </button>
@@ -631,6 +646,10 @@ function runCommand(cmdKey) {
     }
 
     if (cmdKey === 'update' && !confirm('Jalankan update sistem sekarang? Proses ini akan menarik Git terbaru, update dependensi, migrasi DB, dan restart bot.')) {
+        return;
+    }
+
+    if (cmdKey === 'license' && !confirm('Jalankan perbaikan lisensi (rehash), pemulihan hak akses file storage, dan validasi ulang lisensi?')) {
         return;
     }
 

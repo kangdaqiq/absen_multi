@@ -224,23 +224,36 @@ class LicenseService
         return storage_path('app/' . self::CACHE_FILE);
     }
 
+    private function cacheSalt(): string
+    {
+        // Menggunakan APP_KEY agar konsisten antara PHP CLI (Cron/Terminal) dan Web Server (PHP-FPM)
+        return self::CACHE_SALT . (config('app.key') ?: gethostname());
+    }
+
     private function readCache(): ?array
     {
         $path = $this->cachePath();
         if (!file_exists($path)) return null;
 
-        $raw  = file_get_contents($path);
+        $raw  = @file_get_contents($path);
+        if ($raw === false) return null;
+
         $data = json_decode($raw, true);
         if (!is_array($data)) return null;
 
         // [SECURITY] Verifikasi HMAC signature — cegah manipulasi cache manual
         $signature = $data['_sig'] ?? null;
         unset($data['_sig']);
-        $expected = hash_hmac('sha256', json_encode($data), self::CACHE_SALT . gethostname());
+
+        $expected = hash_hmac('sha256', json_encode($data), $this->cacheSalt());
         if (!hash_equals($expected, (string) $signature)) {
-            Log::warning('[LicenseService] Cache signature tidak valid — cache dihapus.');
-            @unlink($path);
-            return null;
+            // Fallback: periksa dengan salt legacy (gethostname) jika cache lama masih ada
+            $legacyExpected = hash_hmac('sha256', json_encode($data), self::CACHE_SALT . gethostname());
+            if (!hash_equals($legacyExpected, (string) $signature)) {
+                Log::warning('[LicenseService] Cache signature tidak valid — cache dihapus.');
+                @unlink($path);
+                return null;
+            }
         }
 
         return $data;
@@ -255,8 +268,19 @@ class LicenseService
         ];
 
         // [SECURITY] Tambahkan HMAC signature untuk anti-tamper
-        $data['_sig'] = hash_hmac('sha256', json_encode($data), self::CACHE_SALT . gethostname());
-        file_put_contents($this->cachePath(), json_encode($data, JSON_PRETTY_PRINT));
+        $data['_sig'] = hash_hmac('sha256', json_encode($data), $this->cacheSalt());
+
+        try {
+            $path = $this->cachePath();
+            $dir  = dirname($path);
+            if (!is_dir($dir)) {
+                @mkdir($dir, 0775, true);
+            }
+            file_put_contents($path, json_encode($data, JSON_PRETTY_PRINT));
+            @chmod($path, 0666);
+        } catch (\Throwable $e) {
+            Log::error('[LicenseService] Gagal menulis license cache: ' . $e->getMessage());
+        }
     }
 
     // ── Integrity Check ────────────────────────────────────────────────────

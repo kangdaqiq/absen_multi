@@ -34,7 +34,8 @@ class CheckLicense
 
         // Bypass: license pages, login, logout, API endpoints, and developer simulator
         if ($request->routeIs('license.*')
-            || $request->routeIs('login')
+            || $request->routeIs('login*')
+            || $request->is('login')
             || $request->routeIs('logout')
             || $request->routeIs('simulator.*')
             || $request->is('api/*')

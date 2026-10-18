@@ -417,12 +417,12 @@
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                         <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Nama Sesi <span class="text-error-500">*</span></label>
-                        <input type="text" name="nama_jam" id="tambah_nama_jam" required placeholder="Contoh: Jam Ke-1 atau Jam 1-2"
+                        <input type="text" name="nama_jam" id="tambah_nama_jam" required placeholder="Contoh: Reguler, Kelas 1, Khusus"
                             class="w-full rounded-lg border border-gray-200 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
                     </div>
                     <div>
-                        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Jam Ke (Sesi)</label>
-                        <input type="text" name="jam_ke" placeholder="Contoh: 1 atau 1-2"
+                        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Jam Ke</label>
+                        <input type="text" name="jam_ke" placeholder="Contoh: 1 atau 2"
                             class="w-full rounded-lg border border-gray-200 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
                     </div>
                 </div>

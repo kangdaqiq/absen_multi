@@ -83,40 +83,108 @@ class MobileJadwalPelajaranController extends Controller
             ->get()
             ->keyBy('jadwal_pelajaran_id');
 
-        $formatted = $jadwals->map(function ($j) use ($jurnals, $absensiCounts) {
-            $jurnal = $jurnals->get($j->id);
-            $counts = $absensiCounts->get($j->id);
-            $isAttended = !empty($counts) && $counts->total_absen > 0;
+        $formatted = collect();
+        $processedIds = [];
 
-            return [
-                'id'           => $j->id,
-                'hari'         => $j->hari,
-                'jam_ke'       => $j->jam_ke ?? '-',
-                'jam_mulai'    => substr($j->jam_mulai, 0, 5),
-                'jam_selesai'  => substr($j->jam_selesai, 0, 5),
-                'jam_format'   => $j->jam_format,
-                'ruangan'      => $j->ruangan ?? '-',
-                'kelas_id'     => $j->kelas_id,
-                'kelas_nama'   => $j->kelas?->nama_kelas ?? '-',
-                'mapel_id'     => $j->mapel_id,
-                'mapel_nama'   => $j->mapel?->nama_mapel ?? '-',
-                'is_attended'  => $isAttended,
-                'jurnal'       => $jurnal ? [
+        foreach ($jadwals as $j) {
+            if (in_array($j->id, $processedIds)) {
+                continue;
+            }
+
+            // Cari jadwal paralel (sesi multi-kelas gabungan)
+            $parallels = $jadwals->filter(function ($item) use ($j) {
+                if ($item->mapel_id != $j->mapel_id) {
+                    return false;
+                }
+                $time1 = substr(trim($item->jam_mulai ?? ''), 0, 5) . '-' . substr(trim($item->jam_selesai ?? ''), 0, 5);
+                $time2 = substr(trim($j->jam_mulai ?? ''), 0, 5) . '-' . substr(trim($j->jam_selesai ?? ''), 0, 5);
+                if ($time1 !== '-' && $time1 === $time2) {
+                    return true;
+                }
+                if (!empty($item->jam_pelajaran_id) && $item->jam_pelajaran_id == $j->jam_pelajaran_id) {
+                    return true;
+                }
+                if (!empty($item->jam_ke) && str_replace(' ', '', strtolower($item->jam_ke)) === str_replace(' ', '', strtolower($j->jam_ke))) {
+                    return true;
+                }
+                return false;
+            });
+
+            foreach ($parallels as $p) {
+                $processedIds[] = $p->id;
+            }
+
+            $isMulti = $parallels->count() > 1;
+            $parallelIds = $parallels->pluck('id')->all();
+            $parallelKelasNames = $parallels->map(fn($p) => $p->kelas?->nama_kelas)->filter()->unique()->values()->all();
+
+            // Ambil jurnal KBM jika ada yang terisi di antara jadwal paralel
+            $jurnal = null;
+            foreach ($parallels as $p) {
+                if ($jurnals->has($p->id)) {
+                    $jurnal = $jurnals->get($p->id);
+                    break;
+                }
+            }
+
+            // Akumulasi statistik kehadiran dari seluruh kelas paralel
+            $stats = [
+                'total' => 0,
+                'h'     => 0,
+                's'     => 0,
+                'i'     => 0,
+                'a'     => 0,
+                't'     => 0,
+                'd'     => 0,
+            ];
+            $isAttended = false;
+
+            foreach ($parallels as $p) {
+                $counts = $absensiCounts->get($p->id);
+                if ($counts) {
+                    $stats['total'] += (int)$counts->total_absen;
+                    $stats['h']     += (int)$counts->count_h;
+                    $stats['s']     += (int)$counts->count_s;
+                    $stats['i']     += (int)$counts->count_i;
+                    $stats['a']     += (int)$counts->count_a;
+                    $stats['t']     += (int)$counts->count_t;
+                    $stats['d']     += (int)$counts->count_d;
+                    if ($counts->total_absen > 0) {
+                        $isAttended = true;
+                    }
+                }
+            }
+
+            $formatted->push([
+                'id'               => $j->id,
+                'hari'             => $j->hari,
+                'jam_ke'           => $j->jam_ke ?? '-',
+                'jam_mulai'        => substr($j->jam_mulai, 0, 5),
+                'jam_selesai'      => substr($j->jam_selesai, 0, 5),
+                'jam_format'       => $j->jam_format,
+                'ruangan'          => $j->ruangan ?? '-',
+                'kelas_id'         => $j->kelas_id,
+                'kelas_nama'       => $isMulti ? implode(', ', $parallelKelasNames) : ($j->kelas?->nama_kelas ?? '-'),
+                'is_multi_kelas'   => $isMulti,
+                'parallel_count'   => $parallels->count(),
+                'parallel_kelases' => $parallelKelasNames,
+                'parallel_ids'     => $parallelIds,
+                'parallel_classes' => $parallels->map(fn($p) => [
+                    'jadwal_id'  => $p->id,
+                    'kelas_id'   => $p->kelas_id,
+                    'kelas_nama' => $p->kelas?->nama_kelas ?? '-',
+                ])->values()->all(),
+                'mapel_id'         => $j->mapel_id,
+                'mapel_nama'       => $j->mapel?->nama_mapel ?? '-',
+                'is_attended'      => $isAttended,
+                'jurnal'           => $jurnal ? [
                     'id'      => $jurnal->id,
                     'materi'  => $jurnal->materi,
                     'catatan' => $jurnal->catatan,
                 ] : null,
-                'stats'        => [
-                    'total' => (int)($counts?->total_absen ?? 0),
-                    'h'     => (int)($counts?->count_h ?? 0),
-                    's'     => (int)($counts?->count_s ?? 0),
-                    'i'     => (int)($counts?->count_i ?? 0),
-                    'a'     => (int)($counts?->count_a ?? 0),
-                    't'     => (int)($counts?->count_t ?? 0),
-                    'd'     => (int)($counts?->count_d ?? 0),
-                ]
-            ];
-        });
+                'stats'            => $stats,
+            ]);
+        }
 
         return response()->json([
             'success' => true,
@@ -161,21 +229,64 @@ class MobileJadwalPelajaranController extends Controller
             ->get();
 
         $grouped = $jadwals->groupBy('hari')->map(function ($items, $day) {
-            return $items->map(function ($j) {
-                return [
-                    'id'          => $j->id,
-                    'hari'        => $j->hari,
-                    'jam_ke'      => $j->jam_ke ?? '-',
-                    'jam_mulai'   => substr($j->jam_mulai, 0, 5),
-                    'jam_selesai' => substr($j->jam_selesai, 0, 5),
-                    'jam_format'  => $j->jam_format,
-                    'ruangan'     => $j->ruangan ?? '-',
-                    'kelas_id'    => $j->kelas_id,
-                    'kelas_nama'  => $j->kelas?->nama_kelas ?? '-',
-                    'mapel_id'    => $j->mapel_id,
-                    'mapel_nama'  => $j->mapel?->nama_mapel ?? '-',
-                ];
-            });
+            $processedIds = [];
+            $dayList = collect();
+
+            foreach ($items as $j) {
+                if (in_array($j->id, $processedIds)) {
+                    continue;
+                }
+
+                $parallels = $items->filter(function ($item) use ($j) {
+                    if ($item->mapel_id != $j->mapel_id) {
+                        return false;
+                    }
+                    $time1 = substr(trim($item->jam_mulai ?? ''), 0, 5) . '-' . substr(trim($item->jam_selesai ?? ''), 0, 5);
+                    $time2 = substr(trim($j->jam_mulai ?? ''), 0, 5) . '-' . substr(trim($j->jam_selesai ?? ''), 0, 5);
+                    if ($time1 !== '-' && $time1 === $time2) {
+                        return true;
+                    }
+                    if (!empty($item->jam_pelajaran_id) && $item->jam_pelajaran_id == $j->jam_pelajaran_id) {
+                        return true;
+                    }
+                    if (!empty($item->jam_ke) && str_replace(' ', '', strtolower($item->jam_ke)) === str_replace(' ', '', strtolower($j->jam_ke))) {
+                        return true;
+                    }
+                    return false;
+                });
+
+                foreach ($parallels as $p) {
+                    $processedIds[] = $p->id;
+                }
+
+                $isMulti = $parallels->count() > 1;
+                $parallelKelasNames = $parallels->map(fn($p) => $p->kelas?->nama_kelas)->filter()->unique()->values()->all();
+
+                $dayList->push([
+                    'id'               => $j->id,
+                    'hari'             => $j->hari,
+                    'jam_ke'           => $j->jam_ke ?? '-',
+                    'jam_mulai'        => substr($j->jam_mulai, 0, 5),
+                    'jam_selesai'      => substr($j->jam_selesai, 0, 5),
+                    'jam_format'       => $j->jam_format,
+                    'ruangan'          => $j->ruangan ?? '-',
+                    'kelas_id'         => $j->kelas_id,
+                    'kelas_nama'       => $isMulti ? implode(', ', $parallelKelasNames) : ($j->kelas?->nama_kelas ?? '-'),
+                    'is_multi_kelas'   => $isMulti,
+                    'parallel_count'   => $parallels->count(),
+                    'parallel_kelases' => $parallelKelasNames,
+                    'parallel_ids'     => $parallelIds,
+                    'parallel_classes' => $parallels->map(fn($p) => [
+                        'jadwal_id'  => $p->id,
+                        'kelas_id'   => $p->kelas_id,
+                        'kelas_nama' => $p->kelas?->nama_kelas ?? '-',
+                    ])->values()->all(),
+                    'mapel_id'         => $j->mapel_id,
+                    'mapel_nama'       => $j->mapel?->nama_mapel ?? '-',
+                ]);
+            }
+
+            return $dayList;
         });
 
         return response()->json([
@@ -185,7 +296,36 @@ class MobileJadwalPelajaranController extends Controller
     }
 
     /**
+     * Helper dapatkan semua jadwal paralel (multi-kelas)
+     */
+    protected function getParallelJadwals($jadwal, $schoolId)
+    {
+        $allDay = JadwalPelajaran::where('school_id', $schoolId)
+            ->where('guru_id', $jadwal->guru_id)
+            ->where('mapel_id', $jadwal->mapel_id)
+            ->where('hari', $jadwal->hari)
+            ->with(['kelas'])
+            ->get();
+
+        return $allDay->filter(function ($item) use ($jadwal) {
+            $time1 = substr(trim($item->jam_mulai ?? ''), 0, 5) . '-' . substr(trim($item->jam_selesai ?? ''), 0, 5);
+            $time2 = substr(trim($jadwal->jam_mulai ?? ''), 0, 5) . '-' . substr(trim($jadwal->jam_selesai ?? ''), 0, 5);
+            if ($time1 !== '-' && $time1 === $time2) {
+                return true;
+            }
+            if (!empty($item->jam_pelajaran_id) && $item->jam_pelajaran_id == $jadwal->jam_pelajaran_id) {
+                return true;
+            }
+            if (!empty($item->jam_ke) && str_replace(' ', '', strtolower($item->jam_ke)) === str_replace(' ', '', strtolower($jadwal->jam_ke))) {
+                return true;
+            }
+            return false;
+        });
+    }
+
+    /**
      * Dapatkan detail jadwal, jurnal, dan daftar siswa dengan status kehadiran
+     * Mendukung Sesi Multi-Kelas (memuat siswa dari seluruh kelas gabungan)
      */
     public function getPresensiDetail($jadwalId, Request $request)
     {
@@ -211,19 +351,28 @@ class MobileJadwalPelajaranController extends Controller
             $tanggal = Carbon::today()->format('Y-m-d');
         }
 
-        // Ambil Jurnal
-        $jurnal = JurnalPelajaran::where('jadwal_pelajaran_id', $jadwal->id)
+        // Cek apakah jadwal ini memiliki sesi paralel (multi-kelas gabungan)
+        $parallels = $this->getParallelJadwals($jadwal, $schoolId);
+        $isMultiKelas = $parallels->count() > 1;
+        $parallelIds = $parallels->pluck('id')->all();
+        $parallelKelasIds = $parallels->pluck('kelas_id')->filter()->unique()->values()->all();
+        $parallelKelasNames = $parallels->map(fn($p) => $p->kelas?->nama_kelas)->filter()->unique()->values()->all();
+
+        // Ambil Jurnal (cari dari jadwal ini atau sister jadwal jika multi-kelas)
+        $jurnal = JurnalPelajaran::whereIn('jadwal_pelajaran_id', $parallelIds)
             ->where('tanggal', $tanggal)
             ->first();
 
-        // Ambil Siswa
+        // Ambil Seluruh Siswa (dari semua kelas gabungan jika multi-kelas)
         $students = Siswa::where('school_id', $schoolId)
-            ->where('kelas_id', $jadwal->kelas_id)
+            ->whereIn('kelas_id', $parallelKelasIds)
+            ->with(['kelas'])
+            ->orderBy('kelas_id')
             ->orderBy('nama')
             ->get();
 
-        // Ambil data presensi tersimpan
-        $attendanceMap = AbsensiPelajaran::where('jadwal_pelajaran_id', $jadwal->id)
+        // Ambil data presensi tersimpan dari seluruh jadwal paralel
+        $attendanceMap = AbsensiPelajaran::whereIn('jadwal_pelajaran_id', $parallelIds)
             ->where('tanggal', $tanggal)
             ->get()
             ->keyBy('student_id');
@@ -231,14 +380,16 @@ class MobileJadwalPelajaranController extends Controller
         $studentList = $students->map(function ($s) use ($attendanceMap) {
             $record = $attendanceMap->get($s->id);
             return [
-                'id'         => $s->id,
-                'nama'       => $s->nama,
-                'nis'        => $s->nis,
-                'foto'       => $s->foto_url ?? null,
-                'status'     => $record?->status ?? 'H', // Default Hadir
-                'status_label' => $record?->status_label ?? 'Hadir',
-                'keterangan' => $record?->keterangan ?? '',
-                'is_saved'   => !empty($record),
+                'id'           => $s->id,
+                'nama'         => $s->nama,
+                'nis'          => $s->nis,
+                'foto'         => $s->foto_url ?? null,
+                'kelas_id'     => $s->kelas_id,
+                'kelas_nama'   => $s->kelas?->nama_kelas ?? '-',
+                'status'       => $record?->status ?? 'A', // Default Alpa
+                'status_label' => $record ? ($record->status_label ?? 'Hadir') : 'Alpa',
+                'keterangan'   => $record?->keterangan ?? '',
+                'is_saved'     => !empty($record),
             ];
         });
 
@@ -256,22 +407,30 @@ class MobileJadwalPelajaranController extends Controller
             'success' => true,
             'data'    => [
                 'jadwal' => [
-                    'id'          => $jadwal->id,
-                    'hari'        => $jadwal->hari,
-                    'jam_ke'      => $jadwal->jam_ke ?? '-',
-                    'jam_mulai'   => substr($jadwal->jam_mulai, 0, 5),
-                    'jam_selesai' => substr($jadwal->jam_selesai, 0, 5),
-                    'jam_format'  => $jadwal->jam_format,
-                    'ruangan'     => $jadwal->ruangan ?? '-',
-                    'kelas'       => [
+                    'id'               => $jadwal->id,
+                    'hari'             => $jadwal->hari,
+                    'jam_ke'           => $jadwal->jam_ke ?? '-',
+                    'jam_mulai'        => substr($jadwal->jam_mulai, 0, 5),
+                    'jam_selesai'      => substr($jadwal->jam_selesai, 0, 5),
+                    'jam_format'       => $jadwal->jam_format,
+                    'ruangan'          => $jadwal->ruangan ?? '-',
+                    'kelas'            => [
                         'id'   => $jadwal->kelas?->id,
-                        'nama' => $jadwal->kelas?->nama_kelas,
+                        'nama' => $isMultiKelas ? implode(', ', $parallelKelasNames) : ($jadwal->kelas?->nama_kelas ?? '-'),
                     ],
-                    'mapel'       => [
+                    'is_multi_kelas'   => $isMultiKelas,
+                    'parallel_count'   => $parallels->count(),
+                    'parallel_kelases' => $parallelKelasNames,
+                    'parallel_classes' => $parallels->map(fn($p) => [
+                        'jadwal_id'  => $p->id,
+                        'kelas_id'   => $p->kelas_id,
+                        'kelas_nama' => $p->kelas?->nama_kelas ?? '-',
+                    ])->values()->all(),
+                    'mapel'            => [
                         'id'   => $jadwal->mapel?->id,
                         'nama' => $jadwal->mapel?->nama_mapel,
                     ],
-                    'guru'        => [
+                    'guru'             => [
                         'id'   => $jadwal->guru?->id,
                         'nama' => $jadwal->guru?->nama,
                     ]
@@ -290,6 +449,7 @@ class MobileJadwalPelajaranController extends Controller
 
     /**
      * Simpan / Perbarui Presensi Batch dan Jurnal KBM dari Apps
+     * Otomatis menyinkronkan Jurnal KBM ke seluruh kelas paralel jika multi-kelas
      */
     public function submitPresensi($jadwalId, Request $request)
     {
@@ -319,35 +479,51 @@ class MobileJadwalPelajaranController extends Controller
         $tanggal = Carbon::parse($request->tanggal)->format('Y-m-d');
         $operatorGuruId = $guru?->id ?? $jadwal->guru_id;
 
-        DB::transaction(function () use ($request, $jadwal, $schoolId, $tanggal, $operatorGuruId) {
-            // 1. Jurnal KBM
-            $jurnal = JurnalPelajaran::updateOrCreate(
-                [
-                    'jadwal_pelajaran_id' => $jadwal->id,
-                    'tanggal'             => $tanggal,
-                ],
-                [
-                    'school_id'    => $schoolId,
-                    'guru_id'      => $operatorGuruId,
-                    'jam_ke'       => $jadwal->jam_ke,
-                    'materi'       => trim($request->materi),
-                    'catatan'      => $request->catatan ? trim($request->catatan) : null,
-                    'jam_mulai'    => $jadwal->jam_mulai,
-                    'jam_selesai'  => $jadwal->jam_selesai,
-                ]
-            );
+        // Dapatkan semua jadwal paralel (jika multi-kelas)
+        $parallels = $this->getParallelJadwals($jadwal, $schoolId);
 
-            // 2. Presensi Siswa
+        DB::transaction(function () use ($request, $jadwal, $parallels, $schoolId, $tanggal, $operatorGuruId) {
+            // 1. Sinkronkan Jurnal KBM ke semua jadwal paralel
+            $jurnalMap = [];
+            foreach ($parallels as $pJadwal) {
+                $jurnal = JurnalPelajaran::updateOrCreate(
+                    [
+                        'jadwal_pelajaran_id' => $pJadwal->id,
+                        'tanggal'             => $tanggal,
+                    ],
+                    [
+                        'school_id'    => $schoolId,
+                        'guru_id'      => $operatorGuruId,
+                        'jam_ke'       => $pJadwal->jam_ke,
+                        'materi'       => trim($request->materi),
+                        'catatan'      => $request->catatan ? trim($request->catatan) : null,
+                        'jam_mulai'    => $pJadwal->jam_mulai,
+                        'jam_selesai'  => $pJadwal->jam_selesai,
+                    ]
+                );
+                $jurnalMap[$pJadwal->id] = $jurnal->id;
+            }
+
+            // 2. Presensi Siswa: petakan masing-masing siswa ke jadwal kelas asalnya
+            $kelasToJadwalMap = $parallels->pluck('id', 'kelas_id')->all();
+            $studentIds = collect($request->input('attendances', []))->pluck('student_id')->filter()->all();
+            $studentKelasMap = Siswa::whereIn('id', $studentIds)->pluck('kelas_id', 'id')->all();
+
             foreach ($request->input('attendances', []) as $item) {
+                $sId = $item['student_id'];
+                $sKelasId = $studentKelasMap[$sId] ?? $jadwal->kelas_id;
+                $targetJadwalId = $kelasToJadwalMap[$sKelasId] ?? $jadwal->id;
+                $targetJurnalId = $jurnalMap[$targetJadwalId] ?? ($jurnalMap[$jadwal->id] ?? null);
+
                 AbsensiPelajaran::updateOrCreate(
                     [
-                        'jadwal_pelajaran_id' => $jadwal->id,
-                        'student_id'          => $item['student_id'],
+                        'jadwal_pelajaran_id' => $targetJadwalId,
+                        'student_id'          => $sId,
                         'tanggal'             => $tanggal,
                     ],
                     [
                         'school_id'           => $schoolId,
-                        'jurnal_pelajaran_id' => $jurnal->id,
+                        'jurnal_pelajaran_id' => $targetJurnalId,
                         'guru_id'             => $operatorGuruId,
                         'status'              => $item['status'],
                         'keterangan'          => !empty($item['keterangan']) ? trim($item['keterangan']) : null,
@@ -390,13 +566,31 @@ class MobileJadwalPelajaranController extends Controller
         $tanggal = Carbon::parse($request->tanggal)->format('Y-m-d');
         $operatorGuruId = $guru?->id ?? $jadwal->guru_id;
 
-        $jurnal = JurnalPelajaran::where('jadwal_pelajaran_id', $jadwal->id)
+        // Cari jadwal target yang sesuai dengan kelas siswa jika sesi multi-kelas
+        $student = Siswa::find($request->student_id);
+        $targetJadwalId = $jadwal->id;
+
+        if ($student && $student->kelas_id !== $jadwal->kelas_id) {
+            $parallels = $this->getParallelJadwals($jadwal, $schoolId);
+            $matched = $parallels->firstWhere('kelas_id', $student->kelas_id);
+            if ($matched) {
+                $targetJadwalId = $matched->id;
+            }
+        }
+
+        $jurnal = JurnalPelajaran::where('jadwal_pelajaran_id', $targetJadwalId)
             ->where('tanggal', $tanggal)
             ->first();
 
+        if (!$jurnal) {
+            $jurnal = JurnalPelajaran::where('jadwal_pelajaran_id', $jadwal->id)
+                ->where('tanggal', $tanggal)
+                ->first();
+        }
+
         $absensi = AbsensiPelajaran::updateOrCreate(
             [
-                'jadwal_pelajaran_id' => $jadwal->id,
+                'jadwal_pelajaran_id' => $targetJadwalId,
                 'student_id'          => $request->student_id,
                 'tanggal'             => $tanggal,
             ],
@@ -598,16 +792,29 @@ class MobileJadwalPelajaranController extends Controller
                 'jam_selesai'         => substr($j->jam_selesai, 0, 5),
                 'jam_format'          => $j->jam_format,
                 'ruangan'             => $j->ruangan ?? '-',
+                'kelas_id'            => $student->kelas_id,
+                'kelas_nama'          => $student->kelas ? ($student->kelas->nama_kelas ?? $student->kelas->nama) : ($j->kelas?->nama_kelas ?? '-'),
+                'mapel_id'            => $j->mapel_id,
+                'mapel_nama'          => $j->mapel?->nama_mapel ?? '-',
+                'nama_mapel'          => $j->mapel?->nama_mapel ?? '-',
                 'mapel'               => [
                     'id'   => $j->mapel_id,
                     'nama' => $j->mapel?->nama_mapel ?? '-',
                 ],
+                'guru_id'             => $j->guru_id,
+                'guru_nama'           => $j->guru?->nama ?? '-',
+                'nama_guru'           => $j->guru?->nama ?? '-',
                 'guru'                => [
                     'id'       => $j->guru_id,
                     'nama'     => $j->guru?->nama ?? '-',
                     'nip'      => $j->guru?->nip ?? '-',
                     'foto_url' => $j->guru?->foto_url ?? null,
                 ],
+                'is_attended'         => !empty($absen),
+                'status'              => $absen?->status ?? null,
+                'status_label'        => $absen ? $absen->status_label : 'Belum Presensi',
+                'status_kehadiran'    => $absen ? $absen->status_label : 'Belum Presensi',
+                'keterangan'          => $absen?->keterangan ?? '',
                 'presensi'            => [
                     'is_attended'    => !empty($absen),
                     'status'         => $absen?->status ?? null,
@@ -639,6 +846,7 @@ class MobileJadwalPelajaranController extends Controller
                 ],
                 'summary'   => $statCounts,
                 'pelajaran' => $list,
+                'jadwals'   => $list,
             ]
         ]);
     }
@@ -674,8 +882,8 @@ class MobileJadwalPelajaranController extends Controller
             ->orderBy('jam_mulai')
             ->get();
 
-        $grouped = $jadwals->groupBy('hari')->map(function ($items, $day) {
-            return $items->map(function ($j) {
+        $grouped = $jadwals->groupBy('hari')->map(function ($items, $day) use ($student) {
+            return $items->map(function ($j) use ($student) {
                 return [
                     'id'          => $j->id,
                     'hari'        => $j->hari,
@@ -684,10 +892,18 @@ class MobileJadwalPelajaranController extends Controller
                     'jam_selesai' => substr($j->jam_selesai, 0, 5),
                     'jam_format'  => $j->jam_format,
                     'ruangan'     => $j->ruangan ?? '-',
+                    'kelas_id'    => $student->kelas_id,
+                    'kelas_nama'  => $student->kelas ? ($student->kelas->nama_kelas ?? $student->kelas->nama) : ($j->kelas?->nama_kelas ?? '-'),
+                    'mapel_id'    => $j->mapel_id,
+                    'mapel_nama'  => $j->mapel?->nama_mapel ?? '-',
+                    'nama_mapel'  => $j->mapel?->nama_mapel ?? '-',
                     'mapel'       => [
                         'id'   => $j->mapel_id,
                         'nama' => $j->mapel?->nama_mapel ?? '-',
                     ],
+                    'guru_id'     => $j->guru_id,
+                    'guru_nama'   => $j->guru?->nama ?? '-',
+                    'nama_guru'   => $j->guru?->nama ?? '-',
                     'guru'        => [
                         'id'       => $j->guru_id,
                         'nama'     => $j->guru?->nama ?? '-',

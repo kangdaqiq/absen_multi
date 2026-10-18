@@ -1020,6 +1020,7 @@ Modul ini digunakan oleh Guru Pengajar pada aplikasi mobile untuk melihat jadwal
 
 ### 8.1 Jadwal Mengajar Hari Ini (`GET /api/mobile/jadwal-pelajaran/hari-ini`)
 Mengambil seluruh jadwal mengajar guru yang sedang login untuk hari ini (atau tanggal tertentu).
+> **Fitur Kelas Gabungan (Multi-Kelas):** Jika guru mengajar jam dan mata pelajaran yang sama pada 2 atau lebih kelas paralel, sistem otomatis menggabungkannya menjadi 1 item sesi mengajar dengan akumulasi data statistik dan daftar kelas gabungan.
 
 - **URL**: `/api/mobile/jadwal-pelajaran/hari-ini`
 - **Method**: `GET`
@@ -1048,19 +1049,23 @@ Mengambil seluruh jadwal mengajar guru yang sedang login untuk hari ini (atau ta
         "jam_format": "07:15 - 08:35",
         "ruangan": "Lab Komputer 1",
         "kelas_id": 3,
-        "kelas_nama": "X-RPL 1",
+        "kelas_nama": "X-RPL 1, X-RPL 2",
+        "is_multi_kelas": true,
+        "parallel_count": 2,
+        "parallel_kelases": ["X-RPL 1", "X-RPL 2"],
+        "parallel_ids": [12, 13],
         "mapel_id": 5,
         "mapel_nama": "Pemrograman Web",
         "is_attended": true,
         "jurnal": {
           "id": 4,
           "materi": "Pengenalan HTML5 dan Semantic Tags",
-          "catatan": "Siswa mengerjakan latihan halaman 20"
+          "catatan": "Siswa mengerjakan latihan modul 1"
         },
         "stats": {
-          "total": 32,
-          "h": 29,
-          "s": 1,
+          "total": 64,
+          "h": 60,
+          "s": 2,
           "i": 1,
           "a": 1,
           "t": 0,
@@ -1075,7 +1080,7 @@ Mengambil seluruh jadwal mengajar guru yang sedang login untuk hari ini (atau ta
 ---
 
 ### 8.2 Jadwal Mengajar Mingguan (`GET /api/mobile/jadwal-pelajaran/mingguan`)
-Mengambil seluruh jadwal mengajar guru selama satu minggu, dikelompokkan per hari.
+Mengambil seluruh jadwal mengajar guru selama satu minggu, dikelompokkan per hari. Mendukung sesi kelas gabungan (`is_multi_kelas: true`).
 
 - **URL**: `/api/mobile/jadwal-pelajaran/mingguan`
 - **Method**: `GET`
@@ -1094,7 +1099,8 @@ Mengambil seluruh jadwal mengajar guru selama satu minggu, dikelompokkan per har
 ---
 
 ### 8.3 Detail Presensi & Daftar Siswa Kelas (`GET /api/mobile/jadwal-pelajaran/{id}/presensi`)
-Mengambil info jadwal, data jurnal KBM, dan daftar seluruh siswa di kelas tersebut beserta status absensi saat ini.
+Mengambil info jadwal, data jurnal KBM, dan daftar seluruh siswa beserta status absensi saat ini.
+> **Dukungan Multi-Kelas:** Jika jadwal merupakan sesi paralel/kelas gabungan, daftar `students` otomatis memuat seluruh siswa dari semua kelas gabungan tersebut (disertai `kelas_id` dan `kelas_nama` pada tiap siswa), dan data `parallel_classes` disediakan untuk memfasilitasi tab atau filter per kelas di mobile app.
 
 - **URL**: `/api/mobile/jadwal-pelajaran/{id}/presensi`
 - **Method**: `GET`
@@ -1114,7 +1120,14 @@ Mengambil info jadwal, data jurnal KBM, dan daftar seluruh siswa di kelas terseb
       "jam_selesai": "08:35",
       "jam_format": "07:15 - 08:35",
       "ruangan": "Lab Komputer 1",
-      "kelas": { "id": 3, "nama": "X-RPL 1" },
+      "kelas": { "id": 3, "nama": "X-RPL 1, X-RPL 2" },
+      "is_multi_kelas": true,
+      "parallel_count": 2,
+      "parallel_kelases": ["X-RPL 1", "X-RPL 2"],
+      "parallel_classes": [
+        { "jadwal_id": 12, "kelas_id": 3, "kelas_nama": "X-RPL 1" },
+        { "jadwal_id": 13, "kelas_id": 4, "kelas_nama": "X-RPL 2" }
+      ],
       "mapel": { "id": 5, "nama": "Pemrograman Web" },
       "guru": { "id": 8, "nama": "Budi Santoso, S.Pd" }
     },
@@ -1125,10 +1138,10 @@ Mengambil info jadwal, data jurnal KBM, dan daftar seluruh siswa di kelas terseb
       "catatan": "Latihan modul 1"
     },
     "summary": {
-      "total": 32,
-      "h": 30,
-      "s": 1,
-      "i": 0,
+      "total": 64,
+      "h": 60,
+      "s": 2,
+      "i": 1,
       "a": 1,
       "t": 0,
       "d": 0
@@ -1139,6 +1152,20 @@ Mengambil info jadwal, data jurnal KBM, dan daftar seluruh siswa di kelas terseb
         "nama": "Ahmad Rizky",
         "nis": "1001",
         "foto": "http://domain.com/storage/siswa/1001.jpg",
+        "kelas_id": 3,
+        "kelas_nama": "X-RPL 1",
+        "status": "H",
+        "status_label": "Hadir",
+        "keterangan": "",
+        "is_saved": true
+      },
+      {
+        "id": 45,
+        "nama": "Budi Pratama",
+        "nis": "2001",
+        "foto": "http://domain.com/storage/siswa/2001.jpg",
+        "kelas_id": 4,
+        "kelas_nama": "X-RPL 2",
         "status": "H",
         "status_label": "Hadir",
         "keterangan": "",
@@ -1153,6 +1180,7 @@ Mengambil info jadwal, data jurnal KBM, dan daftar seluruh siswa di kelas terseb
 
 ### 8.4 Simpan Presensi Batch & Jurnal KBM (`POST /api/mobile/jadwal-pelajaran/{id}/presensi`)
 Menyimpan materi jurnal KBM dan seluruh daftar kehadiran siswa dalam satu request secara serentak.
+> **Auto-Sync Multi-Kelas:** Jika jadwal merupakan sesi paralel/gabungan, materi & catatan Jurnal KBM **otomatis disinkronkan ke seluruh jadwal kelas paralel**, dan kehadiran siswa otomatis disimpan ke masing-masing jadwal kelas asalnya.
 
 - **URL**: `/api/mobile/jadwal-pelajaran/{id}/presensi`
 - **Method**: `POST`
@@ -1170,14 +1198,9 @@ Menyimpan materi jurnal KBM dan seluruh daftar kehadiran siswa dalam satu reques
       "keterangan": ""
     },
     {
-      "student_id": 16,
+      "student_id": 45,
       "status": "S",
       "keterangan": "Surat dokter menyusul"
-    },
-    {
-      "student_id": 17,
-      "status": "A",
-      "keterangan": "Tidak ada keterangan"
     }
   ]
 }
@@ -1290,7 +1313,7 @@ Mengambil daftar master sesi jam pelajaran yang aktif (seperti master shift), se
 ### 8.8 Jadwal Pelajaran Hari Ini & Status Presensi Mapel untuk Siswa (`GET /api/mobile/student/jadwal-pelajaran/hari-ini`)
 Digunakan oleh aplikasi **Siswa (atau Orang Tua)** untuk melihat daftar mata pelajaran hari ini (berdasarkan kelas siswa), jam pelajaran, guru pengajar, materi KBM dari guru, serta **status kehadiran presensi siswa pada setiap jam pelajaran/mapel**.
 
-> **Tips:** Endpoint polymorphic `GET /api/mobile/jadwal-pelajaran/hari-ini` secara otomatis mengenali peran akun. Jika user yang login adalah siswa, endpoint tersebut otomatis mengembalikan respon siswa di bawah ini.
+> **Tips:** Endpoint polymorphic `GET /api/mobile/jadwal-pelajaran/hari-ini` secara otomatis mengenali peran akun. Jika user yang login adalah siswa, endpoint tersebut otomatis mengembalikan respon siswa di bawah ini. Respon menyediakan list pada properti `pelajaran` sekaligus alias `jadwals` beserta atribut flat (`mapel_nama`, `guru_nama`, `status`, `status_label`, `is_attended`) untuk memastikan kompatibilitas penuh dengan aplikasi mobile.
 
 - **URL**: `/api/mobile/student/jadwal-pelajaran/hari-ini` *(alias: `/api/mobile/siswa/jadwal-pelajaran/hari-ini` atau `/api/mobile/jadwal-pelajaran/hari-ini`)*
 - **Method**: `GET`

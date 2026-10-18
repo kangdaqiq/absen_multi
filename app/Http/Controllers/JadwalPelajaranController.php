@@ -118,6 +118,12 @@ class JadwalPelajaranController extends Controller
             ? JamPelajaran::find($request->jam_pelajaran_id_akhir)
             : null;
 
+        if ($jpAkhir && strcasecmp(trim($jpAkhir->nama_jam ?? ''), trim($jpAwal->nama_jam ?? '')) !== 0) {
+            return redirect()->back()
+                ->withInput()
+                ->with('error', 'Jam selesai harus berada dalam nama sesi yang sama dengan jam mulai (' . ($jpAwal->nama_jam ?: 'Sesi') . ').');
+        }
+
         $jamMulai = Carbon::parse($jpAwal->jam_mulai)->format('H:i');
         $jamSelesai = $jpAkhir
             ? Carbon::parse($jpAkhir->jam_selesai)->format('H:i')
@@ -192,6 +198,12 @@ class JadwalPelajaranController extends Controller
         $jpAkhir = !empty($request->jam_pelajaran_id_akhir) && $request->jam_pelajaran_id_akhir != $jpAwal->id
             ? JamPelajaran::find($request->jam_pelajaran_id_akhir)
             : null;
+
+        if ($jpAkhir && strcasecmp(trim($jpAkhir->nama_jam ?? ''), trim($jpAwal->nama_jam ?? '')) !== 0) {
+            return redirect()->back()
+                ->withInput()
+                ->with('error', 'Jam selesai harus berada dalam nama sesi yang sama dengan jam mulai (' . ($jpAwal->nama_jam ?: 'Sesi') . ').');
+        }
 
         $jamMulai = Carbon::parse($jpAwal->jam_mulai)->format('H:i');
         $jamSelesai = $jpAkhir
@@ -712,6 +724,14 @@ class JadwalPelajaranController extends Controller
                 $jpAkhir = null;
                 if (!empty($jamAkhirRaw) && (string)$jamAkhirRaw !== (string)$jamMulaiRaw) {
                     $jpAkhir = $this->resolveJamPelajaranRecord($jamAkhirRaw, $hari, $allJamPelajaran);
+                    if ($jpAkhir && strcasecmp(trim($jpAkhir->nama_jam ?? ''), trim($jpAwal->nama_jam ?? '')) !== 0) {
+                        $failures[] = [
+                            'row'    => $excelRowIndex,
+                            'info'   => "Jam: '{$jamMulaiRaw}' s/d '{$jamAkhirRaw}'",
+                            'reason' => "Sesi jam selesai ('{$jpAkhir->nama_jam}') harus berada dalam nama sesi yang sama dengan jam mulai ('{$jpAwal->nama_jam}').",
+                        ];
+                        continue;
+                    }
                 }
 
                 $jamMulai = Carbon::parse($jpAwal->jam_mulai)->format('H:i');

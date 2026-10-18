@@ -1043,7 +1043,7 @@
                 var startJamKe = selectedMulaiOpt.data('jam-ke') || selectedMulaiOpt.data('nama');
                 var startMulai = selectedMulaiOpt.data('mulai') || '';
                 var startSelesai = selectedMulaiOpt.data('selesai') || '';
-                var startNama = selectedMulaiOpt.data('nama') || '';
+                var startNama = (selectedMulaiOpt.data('nama') ? String(selectedMulaiOpt.data('nama')) : '').trim();
 
                 var currentAkhirVal = selectedAkhirToRestore !== undefined ? selectedAkhirToRestore : jamAkhirSelect.val();
                 var availableAkhirCount = 0;
@@ -1052,12 +1052,13 @@
                     var opt = $(this);
                     var val = opt.val();
                     if (!val) {
-                        opt.text('-- 1 Jam Pelajaran (' + startNama + ': ' + startMulai + ' - ' + startSelesai + ') --');
+                        opt.text('-- 1 Jam Pelajaran (' + (startNama || 'Sesi') + ': ' + startMulai + ' - ' + startSelesai + ') --');
                         return;
                     }
 
                     var optHari = opt.data('hari') ? String(opt.data('hari')).trim() : '';
                     var optUrutan = parseInt(opt.data('urutan')) || 0;
+                    var optNama = (opt.data('nama') ? String(opt.data('nama')) : '').trim();
 
                     // Cek kesesuaian hari
                     var isDayMatch = false;
@@ -1070,10 +1071,29 @@
                         }
                     }
 
-                    // Hanya tampilkan sesi jam SETELAH sesi mulai (urutan > startUrutan)
-                    if (isDayMatch && optUrutan > startUrutan) {
-                        var gapCount = optUrutan - startUrutan + 1;
-                        var optNama = opt.data('nama') || '';
+                    // Cek kesesuaian sesi (WAJIB SESI YANG SAMA DENGAN JAM MULAI)
+                    var isSessionMatch = false;
+                    if (startNama && optNama) {
+                        isSessionMatch = (optNama.toLowerCase() === startNama.toLowerCase());
+                    } else if (!startNama && !optNama) {
+                        isSessionMatch = true;
+                    }
+
+                    // Cek urutan jam (harus setelah jam mulai)
+                    var isOrderMatch = (optUrutan > startUrutan);
+                    if (optUrutan === startUrutan && opt.data('mulai') && startMulai) {
+                        isOrderMatch = (opt.data('mulai') > startMulai);
+                    }
+
+                    // Hanya tampilkan jika hari cocok, nama sesi sama persis, dan urutan setelah jam mulai
+                    if (isDayMatch && isSessionMatch && isOrderMatch) {
+                        var numJamAwal = parseInt(selectedMulaiOpt.data('jam-ke'));
+                        var numJamAkhir = parseInt(opt.data('jam-ke'));
+                        var gapCount = (!isNaN(numJamAwal) && !isNaN(numJamAkhir) && numJamAkhir >= numJamAwal)
+                            ? (numJamAkhir - numJamAwal + 1)
+                            : (optUrutan > startUrutan ? (optUrutan - startUrutan + 1) : 2);
+                        if (gapCount < 2) gapCount = 2;
+
                         var optJamKe = opt.data('jam-ke') ? ' [Jam ke ' + opt.data('jam-ke') + ']' : '';
                         var optSelesai = opt.data('selesai') || '';
                         opt.text('Sampai ' + optNama + optJamKe + ' (Selesai ' + optSelesai + ') • ' + gapCount + ' Jam Pelajaran');
@@ -1123,7 +1143,13 @@
                     var endLabel = endNama + endJamKe;
                     var endSelesai = akhirOpt.data('selesai') || '';
                     var endUrutan = parseInt(akhirOpt.data('urutan')) || 0;
-                    var totalJam = (endUrutan > startUrutan) ? (endUrutan - startUrutan + 1) : 2;
+
+                    var numJamAwal = parseInt(mulaiOpt.data('jam-ke'));
+                    var numJamAkhir = parseInt(akhirOpt.data('jam-ke'));
+                    var totalJam = (!isNaN(numJamAwal) && !isNaN(numJamAkhir) && numJamAkhir >= numJamAwal)
+                        ? (numJamAkhir - numJamAwal + 1)
+                        : ((endUrutan > startUrutan) ? (endUrutan - startUrutan + 1) : 2);
+                    if (totalJam < 2) totalJam = 2;
 
                     previewBox.removeClass('hidden');
                     previewBox.find('.preview-text').html('<strong> ' + totalJam + ' Jam Pelajaran:</strong> ' + startLabel + ' s/d ' + endLabel + ' <span class="ml-1 text-gray-500 font-normal">(' + startMulai + ' - ' + endSelesai + ')</span>');
@@ -1177,8 +1203,11 @@
                 // Cari id akhir jika belum tersimpan secara eksplisit (misal data lama)
                 var idAkhir = d.jam_pelajaran_id_akhir;
                 if (!idAkhir && d.jam_selesai) {
+                    var mulaiOpt = $('#edit_jam_pelajaran_id option[value="' + d.jam_pelajaran_id + '"]');
+                    var startNamaEdit = (mulaiOpt.data('nama') || '').toString().trim().toLowerCase();
                     var matchAkhir = $('#edit_jam_pelajaran_id_akhir option').filter(function() {
-                        return $(this).data('selesai') === d.jam_selesai;
+                        var optNama = ($(this).data('nama') || '').toString().trim().toLowerCase();
+                        return $(this).data('selesai') === d.jam_selesai && (startNamaEdit === '' || optNama === startNamaEdit);
                     });
                     if (matchAkhir.length > 0 && matchAkhir.val() != d.jam_pelajaran_id) {
                         idAkhir = matchAkhir.val();

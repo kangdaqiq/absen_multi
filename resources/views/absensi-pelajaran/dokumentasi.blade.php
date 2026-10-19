@@ -285,7 +285,7 @@
                     @foreach($group->jurnals as $jurnal)
                         @php
                             $docs = $jurnal->filtered_docs ?? $jurnal->dokumentasi_list;
-                            $jadwal = $jurnal->jadwalPelajaran;
+                            $jadwal = $jurnal->jadwal ?? $jurnal->jadwalPelajaran;
                         @endphp
                         <div class="p-4 sm:p-5 hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition">
                             <!-- Header Sesi KBM -->

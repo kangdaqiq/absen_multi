@@ -823,8 +823,8 @@ class AbsensiPelajaranController extends Controller
             ->where('jurnal_pelajaran.dokumentasi', '!=', '')
             ->with([
                 'guru',
-                'jadwalPelajaran.kelas',
-                'jadwalPelajaran.mapel',
+                'jadwal.kelas',
+                'jadwal.mapel',
             ]);
 
         if (!empty($startDate) && !empty($endDate)) {
@@ -838,11 +838,11 @@ class AbsensiPelajaranController extends Controller
         }
 
         if (!empty($kelasId)) {
-            $query->whereHas('jadwalPelajaran', fn($q) => $q->where('kelas_id', $kelasId));
+            $query->whereHas('jadwal', fn($q) => $q->where('kelas_id', $kelasId));
         }
 
         if (!empty($mapelId)) {
-            $query->whereHas('jadwalPelajaran', fn($q) => $q->where('mapel_id', $mapelId));
+            $query->whereHas('jadwal', fn($q) => $q->where('mapel_id', $mapelId));
         }
 
         if (!empty($search)) {
@@ -850,8 +850,8 @@ class AbsensiPelajaranController extends Controller
                 $q->where('materi', 'like', "%{$search}%")
                   ->orWhere('catatan', 'like', "%{$search}%")
                   ->orWhereHas('guru', fn($g) => $g->where('nama', 'like', "%{$search}%"))
-                  ->orWhereHas('jadwalPelajaran.mapel', fn($m) => $m->where('nama_mapel', 'like', "%{$search}%"))
-                  ->orWhereHas('jadwalPelajaran.kelas', fn($k) => $k->where('nama_kelas', 'like', "%{$search}%"));
+                  ->orWhereHas('jadwal.mapel', fn($m) => $m->where('nama_mapel', 'like', "%{$search}%"))
+                  ->orWhereHas('jadwal.kelas', fn($k) => $k->where('nama_kelas', 'like', "%{$search}%"));
             });
         }
 

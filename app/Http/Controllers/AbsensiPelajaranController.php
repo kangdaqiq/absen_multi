@@ -802,6 +802,33 @@ class AbsensiPelajaranController extends Controller
         $guruId = $user->guru?->id;
         $role = $user->role;
         $isAdminOrWaka = in_array($role, ['admin', 'super_admin', 'waka_kurikulum']);
+        $school = $user?->school;
+
+        $isDokKbmEnabled = ($user && $user->role === 'super_admin')
+            ? true
+            : app(\App\Services\LicenseService::class)->isDokKbmFeatureEnabled($school);
+
+        if (!$isDokKbmEnabled) {
+            $groupedByGuru = collect();
+            $stats = [
+                'total_gurus'    => 0,
+                'total_sessions' => 0,
+                'total_files'    => 0,
+                'total_images'   => 0,
+                'total_videos'   => 0,
+            ];
+            $search = '';
+
+            return view('absensi-pelajaran.dokumentasi', compact(
+                'groupedByGuru',
+                'stats',
+                'search',
+                'isAdminOrWaka',
+                'isGuru',
+                'isDokKbmEnabled',
+                'school'
+            ));
+        }
 
         $search = trim($request->query('q', ''));
 
@@ -865,7 +892,9 @@ class AbsensiPelajaranController extends Controller
             'stats',
             'search',
             'isAdminOrWaka',
-            'isGuru'
+            'isGuru',
+            'isDokKbmEnabled',
+            'school'
         ));
     }
 
@@ -880,6 +909,7 @@ class AbsensiPelajaranController extends Controller
         $guruId = $user->guru?->id;
         $role = $user->role;
         $isAdminOrWaka = in_array($role, ['admin', 'super_admin', 'waka_kurikulum']);
+        $school = $user?->school;
 
         // Pastikan guru satu sekolah
         if ($guru->school_id !== $schoolId) {
@@ -889,6 +919,46 @@ class AbsensiPelajaranController extends Controller
         // Jika bukan admin/waka dan akun guru yang berbeda, tolak akses
         if (!$isAdminOrWaka && $isGuru && $guru->id !== $guruId) {
             abort(403, 'Akses ditolak.');
+        }
+
+        $isDokKbmEnabled = ($user && $user->role === 'super_admin')
+            ? true
+            : app(\App\Services\LicenseService::class)->isDokKbmFeatureEnabled($school);
+
+        if (!$isDokKbmEnabled) {
+            $filteredJurnals = collect();
+            $allDocs = collect();
+            $teacherStats = [
+                'total_sessions' => 0,
+                'total_files'    => 0,
+                'total_images'   => 0,
+                'total_videos'   => 0,
+            ];
+            $startDate = null;
+            $endDate = null;
+            $kelasId = null;
+            $mapelId = null;
+            $mediaType = 'all';
+            $search = '';
+            $kelases = collect();
+            $mapels = collect();
+
+            return view('absensi-pelajaran.dokumentasi-guru', compact(
+                'guru',
+                'filteredJurnals',
+                'allDocs',
+                'teacherStats',
+                'startDate',
+                'endDate',
+                'kelasId',
+                'mapelId',
+                'mediaType',
+                'search',
+                'kelases',
+                'mapels',
+                'isDokKbmEnabled',
+                'school'
+            ));
         }
 
         $startDate = $request->query('start_date');
@@ -997,7 +1067,9 @@ class AbsensiPelajaranController extends Controller
             'mediaType',
             'search',
             'kelases',
-            'mapels'
+            'mapels',
+            'isDokKbmEnabled',
+            'school'
         ));
     }
 }

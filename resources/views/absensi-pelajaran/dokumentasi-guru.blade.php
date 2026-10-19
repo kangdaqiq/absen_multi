@@ -3,7 +3,18 @@
 @section('title', 'Galeri Dokumentasi KBM - ' . $guru->nama)
 
 @section('content')
-<div x-data="dokumentasiGaleri()" class="space-y-6">
+<div class="relative w-full min-h-[550px]">
+@if(isset($isDokKbmEnabled) && !$isDokKbmEnabled)
+    <x-feature-locked-overlay
+        title="Fitur Dokumentasi KBM Terkunci"
+        featureName="Dokumentasi Pembelajaran (KBM)"
+        description="Fitur Dokumentasi Pembelajaran (KBM) belum diaktifkan atau dinonaktifkan untuk sekolah ini. Hubungi SuperAdmin untuk mengaktifkan modul dokumentasi KBM."
+        :school="$school ?? null"
+        icon="fas fa-photo-video"
+    />
+@endif
+
+<div x-data="dokumentasiGaleri()" class="space-y-6 w-full" @if(isset($isDokKbmEnabled) && !$isDokKbmEnabled) style="filter: blur(8px); pointer-events: none; user-select: none; opacity: 0.55;" @endif>
     <!-- Header Title & Teacher Profile Card -->
     <div class="rounded-2xl border border-gray-200 bg-white p-5 sm:p-6 shadow-theme-xs dark:border-gray-800 dark:bg-gray-dark">
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -376,6 +387,7 @@
             </div>
         </div>
     </div>
+</div>
 </div>
 
 @push('scripts')

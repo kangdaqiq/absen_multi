@@ -461,6 +461,9 @@ class LicenseService
     {
         if ($this->isSelfHosted()) {
             $license = $this->validate();
+            if (isset($license['is_active']) && !$license['is_active']) {
+                return false;
+            }
             return isset($license['dok_kbm_enabled']) ? (bool) $license['dok_kbm_enabled'] : false;
         }
 
@@ -470,6 +473,9 @@ class LicenseService
         }
 
         if ($school) {
+            if (isset($school->is_active) && !$school->is_active) {
+                return false;
+            }
             return (bool) ($school->dok_kbm_enabled ?? false);
         }
 

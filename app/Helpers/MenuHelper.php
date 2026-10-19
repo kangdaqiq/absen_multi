@@ -22,6 +22,7 @@ class MenuHelper
         $isGuru = in_array($role, ['teacher', 'guru', 'wali_kelas']) || ($user->guru && !in_array($role, ['admin', 'super_admin']));
 
         if ($isGuru) {
+            $isDokKbmLocked = !app(\App\Services\LicenseService::class)->isDokKbmFeatureEnabled($school);
             $kehadiranItems = [
                 [
                     'icon' => 'calendar',
@@ -37,6 +38,7 @@ class MenuHelper
                     'icon' => 'charts',
                     'name' => 'Dokumentasi KBM',
                     'path' => route('absensi-pelajaran.dokumentasi', [], false),
+                    'locked' => $isDokKbmLocked,
                 ],
             ];
 
@@ -205,10 +207,15 @@ class MenuHelper
 
             $rekapSubItems = [];
             if (!$isOffice && !$isPesantren) {
+                $isDokKbmLocked = !app(\App\Services\LicenseService::class)->isDokKbmFeatureEnabled($school);
                 $rekapSubItems[] = ['name' => 'Rekap Siswa', 'path' => route('rekap.index', [], false)];
                 $rekapSubItems[] = ['name' => 'Rekap Kelas', 'path' => route('rekap-kelas.index', [], false)];
                 $rekapSubItems[] = ['name' => 'Rekap Absensi Mapel', 'path' => route('absensi-pelajaran.rekap', [], false)];
-                $rekapSubItems[] = ['name' => 'Dokumentasi KBM', 'path' => route('absensi-pelajaran.dokumentasi', [], false)];
+                $rekapSubItems[] = [
+                    'name' => 'Dokumentasi KBM',
+                    'path' => route('absensi-pelajaran.dokumentasi', [], false),
+                    'locked' => $isDokKbmLocked,
+                ];
             }
 
             // Rekap Guru / Karyawan untuk Admin & Waka Kurikulum

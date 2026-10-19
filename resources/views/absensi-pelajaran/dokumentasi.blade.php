@@ -3,7 +3,18 @@
 @section('title', 'Dokumentasi Pembelajaran (KBM)')
 
 @section('content')
-<div class="space-y-6">
+<div class="relative w-full min-h-[550px]">
+@if(isset($isDokKbmEnabled) && !$isDokKbmEnabled)
+    <x-feature-locked-overlay
+        title="Fitur Dokumentasi KBM Terkunci"
+        featureName="Dokumentasi Pembelajaran (KBM)"
+        description="Fitur Dokumentasi Pembelajaran (KBM) belum diaktifkan atau dinonaktifkan untuk sekolah ini. Hubungi SuperAdmin untuk mengaktifkan modul dokumentasi KBM."
+        :school="$school ?? null"
+        icon="fas fa-photo-video"
+    />
+@endif
+
+<div class="space-y-6 w-full" @if(isset($isDokKbmEnabled) && !$isDokKbmEnabled) style="filter: blur(8px); pointer-events: none; user-select: none; opacity: 0.55;" @endif>
     <!-- Header Title & Action Buttons -->
     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -257,5 +268,6 @@
             </table>
         </div>
     </div>
+</div>
 </div>
 @endsection

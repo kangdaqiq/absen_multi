@@ -71,7 +71,11 @@ class JurnalPelajaran extends Model
         foreach ($raw as $item) {
             if (is_string($item)) {
                 $ext = strtolower(pathinfo(parse_url($item, PHP_URL_PATH) ?? '', PATHINFO_EXTENSION));
-                $isVideo = in_array($ext, ['mp4', 'mov', 'avi', 'mkv', 'webm', '3gp']) || str_contains(strtolower($item), 'video');
+                $rawName = basename(parse_url($item, PHP_URL_PATH) ?? '');
+                $isVideo = in_array($ext, ['mp4', 'mov', 'avi', 'mkv', 'webm', '3gp'])
+                    || str_contains(strtolower($item), 'video')
+                    || str_contains(strtolower($item), 'vid')
+                    || str_contains(strtolower($rawName), 'vid');
 
                 // Auto-generate URL thumbnail dari Go storage server
                 $thumbnailUrl = null;
@@ -84,7 +88,6 @@ class JurnalPelajaran extends Model
                     $thumbnailUrl = $item;
                 }
 
-                $rawName = basename(parse_url($item, PHP_URL_PATH) ?? '');
                 if (empty($rawName) || in_array(strtolower($rawName), ['view', 'download', 'file', 'thumbnail'])) {
                     $rawName = $isVideo ? 'Video Pembelajaran' : 'Foto Kegiatan';
                 }
@@ -103,11 +106,16 @@ class JurnalPelajaran extends Model
                 $url = $item['view_url'] ?? ($item['url'] ?? ($item['download_url'] ?? ''));
                 $mime = strtolower($item['mime_type'] ?? '');
                 $ext = strtolower($item['extension'] ?? pathinfo(parse_url($url, PHP_URL_PATH) ?? '', PATHINFO_EXTENSION));
+                $rawName = $item['original_name'] ?? ($item['name'] ?? basename(parse_url($url, PHP_URL_PATH) ?? ''));
+
                 $isVideo = (!empty($item['is_video']))
                     || (($item['type'] ?? '') === 'video')
                     || str_starts_with($mime, 'video/')
                     || in_array($ext, ['mp4', 'mov', 'avi', 'mkv', 'webm', '3gp'])
-                    || str_contains(strtolower($url), 'video');
+                    || str_contains(strtolower($url), 'video')
+                    || str_contains(strtolower($url), 'vid')
+                    || str_contains(strtolower($rawName), 'video')
+                    || str_contains(strtolower($rawName), 'vid');
 
                 // Dapatkan thumbnail_url dari payload atau generate otomatis dari Go storage server
                 $thumbnailUrl = $item['thumbnail_url'] ?? ($item['thumb_url'] ?? null);
@@ -124,7 +132,6 @@ class JurnalPelajaran extends Model
                     }
                 }
 
-                $rawName = $item['original_name'] ?? ($item['name'] ?? basename(parse_url($url, PHP_URL_PATH) ?? ''));
                 if (empty($rawName) || in_array(strtolower($rawName), ['view', 'download', 'file', 'thumbnail'])) {
                     $rawName = $isVideo ? 'Video Pembelajaran' : 'Foto Kegiatan';
                 }

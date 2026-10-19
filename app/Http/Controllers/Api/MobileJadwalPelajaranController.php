@@ -553,7 +553,9 @@ class MobileJadwalPelajaranController extends Controller
                             $itemUrl = trim($item);
                             if (empty($itemUrl)) continue;
                             $ext = strtolower(pathinfo(parse_url($itemUrl, PHP_URL_PATH) ?? '', PATHINFO_EXTENSION));
-                            $isVid = in_array($ext, ['mp4', 'mov', 'webm', '3gp', 'mkv']) || str_contains(strtolower($itemUrl), 'video');
+                            $isVid = in_array($ext, ['mp4', 'mov', 'webm', '3gp', 'mkv', 'avi'])
+                                || str_contains(strtolower($itemUrl), 'video')
+                                || str_contains(strtolower($itemUrl), 'vid');
                             $thumb = preg_replace('#/api/v1/files/([^/]+)/view#', '/api/v1/files/$1/thumbnail', $itemUrl);
 
                             $dokumentasiPayload[] = [
@@ -572,14 +574,22 @@ class MobileJadwalPelajaranController extends Controller
                             $type = strtolower($item['type'] ?? '');
                             $mime = strtolower($item['mime_type'] ?? '');
                             $ext = strtolower(pathinfo(parse_url($itemUrl, PHP_URL_PATH) ?? '', PATHINFO_EXTENSION));
-                            $isVid = ($type === 'video') || str_starts_with($mime, 'video/') || in_array($ext, ['mp4', 'mov', 'webm', '3gp', 'mkv']) || (!empty($item['is_video']));
+                            $rawName = $item['name'] ?? ($item['original_name'] ?? basename(parse_url($itemUrl, PHP_URL_PATH) ?? ''));
+
+                            $isVid = ($type === 'video')
+                                || str_starts_with($mime, 'video/')
+                                || in_array($ext, ['mp4', 'mov', 'webm', '3gp', 'mkv', 'avi'])
+                                || (!empty($item['is_video']))
+                                || str_contains(strtolower($itemUrl), 'video')
+                                || str_contains(strtolower($itemUrl), 'vid')
+                                || str_contains(strtolower($rawName), 'video')
+                                || str_contains(strtolower($rawName), 'vid');
 
                             $thumb = $item['thumbnail_url'] ?? ($item['thumb_url'] ?? null);
                             if (empty($thumb) && str_contains($itemUrl, '/api/v1/files/')) {
                                 $thumb = preg_replace('#/api/v1/files/([^/]+)/view#', '/api/v1/files/$1/thumbnail', $itemUrl);
                             }
 
-                            $rawName = $item['name'] ?? ($item['original_name'] ?? basename(parse_url($itemUrl, PHP_URL_PATH) ?? ''));
                             if (empty($rawName) || in_array(strtolower($rawName), ['view', 'download', 'file', 'thumbnail'])) {
                                 $rawName = $isVid ? 'Video Pembelajaran' : 'Foto Kegiatan';
                             }
@@ -608,7 +618,10 @@ class MobileJadwalPelajaranController extends Controller
                 $rawUrl = trim($request->input('foto_dokumentasi'));
                 $ext = strtolower(pathinfo(parse_url($rawUrl, PHP_URL_PATH) ?? '', PATHINFO_EXTENSION));
                 $typeInput = strtolower($request->input('foto_dokumentasi_type', $request->input('type', '')));
-                $isVid = ($typeInput === 'video') || in_array($ext, ['mp4', 'mov', 'webm', '3gp', 'mkv']) || str_contains(strtolower($rawUrl), 'video');
+                $isVid = ($typeInput === 'video')
+                    || in_array($ext, ['mp4', 'mov', 'webm', '3gp', 'mkv', 'avi'])
+                    || str_contains(strtolower($rawUrl), 'video')
+                    || str_contains(strtolower($rawUrl), 'vid');
 
                 $thumbUrl = $request->input('thumbnail_url');
                 if (empty($thumbUrl) && str_contains($rawUrl, '/api/v1/files/')) {

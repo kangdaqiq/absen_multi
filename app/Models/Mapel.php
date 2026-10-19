@@ -23,6 +23,11 @@ class Mapel extends Model
         return $this->hasMany(JadwalPelajaran::class, 'mapel_id');
     }
 
+    public function jadwalPelajaran()
+    {
+        return $this->hasMany(JadwalPelajaran::class, 'mapel_id');
+    }
+
     public function kelases()
     {
         return $this->belongsToMany(Kelas::class, 'kelas_mapel', 'mapel_id', 'kelas_id');

@@ -981,22 +981,9 @@ class AbsensiPelajaranController extends Controller
             'total_videos'   => $allDocs->where('is_video', true)->count(),
         ];
 
-        // Filter Options (Kelas & Mapel yang diajar guru ini)
-        $kelases = Kelas::where('school_id', $schoolId)
-            ->whereHas('jadwalPelajaran', fn($q) => $q->where('guru_id', $guru->id))
-            ->orderBy('nama_kelas')
-            ->get();
-        if ($kelases->isEmpty()) {
-            $kelases = Kelas::where('school_id', $schoolId)->orderBy('nama_kelas')->get();
-        }
-
-        $mapels = Mapel::where('school_id', $schoolId)
-            ->whereHas('jadwalPelajaran', fn($q) => $q->where('guru_id', $guru->id))
-            ->orderBy('nama_mapel')
-            ->get();
-        if ($mapels->isEmpty()) {
-            $mapels = Mapel::where('school_id', $schoolId)->orderBy('nama_mapel')->get();
-        }
+        // Filter Options (Kelas & Mapel)
+        $kelases = Kelas::where('school_id', $schoolId)->orderBy('nama_kelas')->get();
+        $mapels = Mapel::where('school_id', $schoolId)->orderBy('nama_mapel')->get();
 
         return view('absensi-pelajaran.dokumentasi-guru', compact(
             'guru',

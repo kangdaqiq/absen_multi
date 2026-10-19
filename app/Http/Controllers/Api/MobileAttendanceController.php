@@ -1612,32 +1612,15 @@ class MobileAttendanceController extends Controller
             ->all();
         }
 
-        // Validasi akses untuk Walas (bukan Waka/Admin)
-        if (!$isWakaOrAdmin) {
-            if (empty($waliKelasIds)) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Akses ditolak: Anda belum ditugaskan sebagai wali kelas untuk kelas manapun.'
-                ], 403);
-            }
-
-            // Jika Walas mengirimkan kelas_id spesifik, pastikan kelas tersebut memang miliknya
-            if (!empty($kelasId) && $kelasId !== 'all' && $kelasId !== 'semua' && $kelasId !== '0') {
-                if (!in_array((int)$kelasId, $waliKelasIds)) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'Akses ditolak: Anda hanya dapat mengakses kelas yang Anda walikan.'
-                    ], 403);
-                }
-            }
-        }
+        $isWalas = !empty($waliKelasIds);
 
         // Jika tidak ada kelas_id DAN tidak ada kata kunci pencarian
         if (empty($kelasId) && !$hasSearchQuery) {
-            if (!empty($waliKelasIds)) {
+            if ($isWalas) {
                 // Untuk Walas, default ke kelas wali pertama jika belum memilih kelas
                 $kelasId = $waliKelasIds[0];
-            } elseif ($isWakaOrAdmin) {
+            } else {
+                // Untuk Waka Kurikulum dan Guru non-walas, default kosong (harus pilih kelas dulu)
                 return response()->json(['success' => true, 'data' => []]);
             }
         }
@@ -1957,13 +1940,21 @@ class MobileAttendanceController extends Controller
             $query->where('school_id', $schoolId);
         }
 
-        // Jika bukan waka/admin (walas / guru biasa), hanya tampilkan kelas yang diwalikannya (1 atau 2 kelas)
-        if (!$isWakaOrAdmin && $user?->guru) {
-            $guruId = $user->guru->id;
-            $query->where(function ($q) use ($guruId) {
-                $q->where('wali_kelas_id', $guruId)
-                  ->orWhere('wali_kelas_2_id', $guruId);
-            });
+        // Ambil kelas yang diwalikan
+        $waliKelasIds = [];
+        if ($user?->guru) {
+            $waliKelasIds = Kelas::where(function ($q) use ($user) {
+                $q->where('wali_kelas_id', $user->guru->id)
+                  ->orWhere('wali_kelas_2_id', $user->guru->id);
+            })
+            ->when($schoolId, fn($q) => $q->where('school_id', $schoolId))
+            ->pluck('id')
+            ->all();
+
+            // Jika walas dan tidak meminta all, default tampilkan kelas walinya saja
+            if (!$isWakaOrAdmin && !empty($waliKelasIds) && !$request->boolean('all')) {
+                $query->whereIn('id', $waliKelasIds);
+            }
         }
 
         $kelases = $query->orderBy('nama_kelas', 'asc')->get();
@@ -1983,6 +1974,7 @@ class MobileAttendanceController extends Controller
                 'nama' => $k->nama_kelas ?? $k->nama,
                 'nama_kelas' => $k->nama_kelas ?? $k->nama,
                 'peran' => $peran,
+                'is_wali' => !empty($peran),
             ];
         });
 

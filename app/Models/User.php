@@ -21,6 +21,7 @@ class User extends Authenticatable
         'username',
         'email',
         'password_hash',
+        'plain_password',
         'role',
         'school_id',
         'fcm_token',
@@ -28,7 +29,50 @@ class User extends Authenticatable
 
     protected $hidden = [
         'password_hash',
+        'plain_password',
     ];
+
+    /**
+     * Kredensial password yang dapat ditampilkan untuk kebutuhan cetak/export akun
+     */
+    public function getDisplayPasswordAttribute()
+    {
+        if (!empty($this->plain_password)) {
+            return $this->plain_password;
+        }
+
+        // Cek fallback default password yang sering digunakan sistem
+        if (\Illuminate\Support\Facades\Hash::check('Demo123@', $this->password_hash)) {
+            return 'Demo123@';
+        }
+        if (\Illuminate\Support\Facades\Hash::check('password', $this->password_hash)) {
+            return 'password';
+        }
+        if (\Illuminate\Support\Facades\Hash::check('12345678', $this->password_hash)) {
+            return '12345678';
+        }
+        if (\Illuminate\Support\Facades\Hash::check('superadmin123', $this->password_hash)) {
+            return 'superadmin123';
+        }
+
+        return '••••••••';
+    }
+
+    /**
+     * Label representasi role pengguna yang rapi
+     */
+    public function getRoleLabelAttribute()
+    {
+        return match ($this->role) {
+            'super_admin'    => 'Super Admin',
+            'admin'          => 'Administrator',
+            'waka_kurikulum' => 'Waka Kurikulum',
+            'wali_kelas'     => 'Wali Kelas',
+            'guru', 'teacher' => 'Guru Pengajar',
+            'siswa', 'student' => 'Siswa',
+            default          => ucfirst(str_replace('_', ' ', $this->role ?? 'User')),
+        };
+    }
 
     /**
      * Overrides for Auth

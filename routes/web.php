@@ -352,6 +352,7 @@ Route::middleware('auth')->group(function () {
         Route::delete('/backups/{filename}', [App\Http\Controllers\BackupController::class, 'delete'])->name('backups.delete');
 
         // Users
+        Route::get('/users/export-pdf', [App\Http\Controllers\UserController::class, 'exportPdf'])->name('users.export-pdf');
         Route::post('/users/generate-guru', [App\Http\Controllers\UserController::class, 'generateGuruAccounts'])->name('users.generate-guru');
         Route::delete('/users/bulk-destroy', [App\Http\Controllers\UserController::class, 'bulkDestroy'])->name('users.bulk-destroy');
         Route::resource('users', App\Http\Controllers\UserController::class)->except(['show']);

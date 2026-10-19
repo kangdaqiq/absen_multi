@@ -5,9 +5,11 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\User;
 use App\Models\Guru;
+use App\Models\Setting;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class UserController extends Controller
 {
@@ -89,6 +91,7 @@ class UserController extends Controller
             'username' => $request->username,
             'email' => $request->email,
             'password_hash' => Hash::make($request->password),
+            'plain_password' => $request->password,
             'role' => $request->role,
         ];
 
@@ -103,6 +106,70 @@ class UserController extends Controller
         }
 
         return redirect()->route('users.index')->with('success', 'User berhasil ditambahkan.');
+    }
+
+    /**
+     * Export daftar akun pengguna ke PDF (Nama, Username, Password, Role)
+     */
+    public function exportPdf(Request $request)
+    {
+        $allowedRoles = ['admin', 'super_admin', 'wali_kelas', 'waka_kurikulum', 'guru', 'teacher'];
+        $query = User::with('guru')->whereIn('role', $allowedRoles)->orderBy('role')->orderBy('full_name');
+
+        $user = auth()->user();
+        $schoolId = $user?->school_id;
+        $isSuperAdmin = $user?->isSuperAdmin();
+
+        if ($user && !$isSuperAdmin && $schoolId) {
+            $query->where('school_id', $schoolId)
+                  ->whereIn('role', ['admin', 'wali_kelas', 'waka_kurikulum', 'guru', 'teacher']);
+        }
+
+        // Filter role jika diminta
+        if ($request->filled('role')) {
+            if ($request->role === 'guru') {
+                $query->whereIn('role', ['guru', 'teacher']);
+            } else {
+                $query->where('role', $request->role);
+            }
+        }
+
+        // Filter kata kunci pencarian jika diminta
+        if ($request->filled('search')) {
+            $s = trim($request->search);
+            $query->where(function($q) use ($s) {
+                $q->where('full_name', 'like', "%{$s}%")
+                  ->orWhere('username', 'like', "%{$s}%")
+                  ->orWhere('email', 'like', "%{$s}%");
+            });
+        }
+
+        $users = $query->get();
+
+        $school = $user?->school;
+        $schoolName = Setting::getVal('nama_sekolah', null, $schoolId) ?? ($school?->name ?? 'Sistem Absensi Jagat');
+        $schoolAddress = Setting::getVal('alamat_sekolah', null, $schoolId) ?? ($school?->address ?? '');
+        $kopSurat = Setting::getVal('kop_surat', null, $schoolId);
+
+        $activeRole = $request->query('role');
+        $roleTitle = match ($activeRole) {
+            'guru' => 'Guru Pengajar',
+            'wali_kelas' => 'Wali Kelas',
+            'waka_kurikulum' => 'Waka Kurikulum',
+            'admin' => 'Administrator',
+            default => 'Semua Pengguna'
+        };
+
+        $pdf = Pdf::loadView('users.pdf', compact('users', 'schoolName', 'schoolAddress', 'kopSurat', 'activeRole', 'roleTitle', 'school'));
+        $pdf->setPaper('a4', 'portrait');
+
+        $filename = 'daftar-akun-' . Str::slug($roleTitle) . '-' . date('Ymd-His') . '.pdf';
+
+        if ($request->boolean('stream')) {
+            return $pdf->stream($filename);
+        }
+
+        return $pdf->download($filename);
     }
 
     public function edit(User $user)
@@ -133,6 +200,7 @@ class UserController extends Controller
 
         if ($request->filled('password')) {
             $user->password_hash = Hash::make($request->password);
+            $user->plain_password = $request->password;
         }
 
         $user->save();
@@ -272,6 +340,7 @@ class UserController extends Controller
             if ($guru->user_id && $existingUser = User::find($guru->user_id)) {
                 if ($resetExisting) {
                     $existingUser->password_hash = Hash::make($plainPassword);
+                    $existingUser->plain_password = $plainPassword;
                     // Pastikan rolenya minimal guru jika sebelumnya bukan admin
                     if (!in_array($existingUser->role, ['admin', 'super_admin', 'wali_kelas', 'waka_kurikulum'])) {
                         $existingUser->role = 'guru';
@@ -302,11 +371,11 @@ class UserController extends Controller
             }
 
             // Buat email unik
-            $baseEmail = $username . '@sekolah.id';
+            $baseEmail = $username . '@guru.jagattech.my.id';
             $email = $baseEmail;
             $emailSuffix = 1;
             while (User::where('email', $email)->exists()) {
-                $email = $username . $emailSuffix . '@sekolah.id';
+                $email = $username . $emailSuffix . '@guru.jagattech.my.id';
                 $emailSuffix++;
             }
 
@@ -316,6 +385,7 @@ class UserController extends Controller
                 'username' => $username,
                 'email' => $email,
                 'password_hash' => Hash::make($plainPassword),
+                'plain_password' => $plainPassword,
                 'role' => 'guru',
                 'school_id' => $guru->school_id ?: $schoolId,
             ]);

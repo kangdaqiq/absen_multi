@@ -156,7 +156,7 @@
             </div>
             <div class="bg-white dark:bg-gray-800 p-2 rounded-lg border border-gray-200 dark:border-gray-700">
               <span class="text-gray-500 dark:text-gray-400 block text-[10px]">Siswa</span>
-              <span class="font-mono font-bold text-gray-800 dark:text-white select-all">demosiswa</span>
+              <span class="font-mono font-bold text-gray-800 dark:text-white select-all">demosiswa@jagattech.my.id</span>
             </div>
           </div>
         </div>

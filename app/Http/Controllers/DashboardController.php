@@ -276,14 +276,6 @@ class DashboardController extends Controller
     public function downloadAndroidApp(Request $request)
     {
         $user = auth()->user();
-        $school = $user?->school;
-
-        // Validasi: Kunci download jika fitur Face ID dinonaktifkan
-        $isFaceEnabled = app(\App\Services\LicenseService::class)->isFaceFeatureEnabled($school);
-        if (!$isFaceEnabled) {
-            return redirect()->route('dashboard')->with('error', 'Download aplikasi Jagat Absen dikunci karena fitur Face ID sekolah sedang dinonaktifkan.');
-        }
-
         $schoolId = $user?->school_id ?? 0;
 
         $customUrl = \App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'android_apk_url')->value('setting_value')

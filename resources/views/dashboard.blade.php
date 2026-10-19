@@ -9,7 +9,7 @@
   $isFaceEnabled = $isFaceEnabled ?? app(\App\Services\LicenseService::class)->isFaceFeatureEnabled(auth()->user()?->school);
 @endphp
 
-<div x-data="{ showAndroidModal: false, copied: false, faceEnabled: {{ $isFaceEnabled ? 'true' : 'false' }} }">
+<div x-data="{ showAndroidModal: false, copied: false }">
   <x-page-header 
     title="Dashboard" 
     subtitle="Ringkasan statistik kehadiran siswa & guru real-time" 
@@ -23,12 +23,10 @@
       <div class="flex items-start gap-4">
         <div class="relative flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-2xl bg-white border border-gray-200/80 p-2.5 shadow-theme-xs dark:border-gray-700 dark:bg-white">
           <img src="{{ asset('images/logo/logo-icon.svg') }}" alt="Logo Jagat Absen" class="h-9 w-9 object-contain" />
-          @if($isFaceEnabled)
-            <span class="absolute -top-1 -right-1 flex h-3.5 w-3.5">
-              <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-success-500 opacity-75"></span>
-              <span class="relative inline-flex h-3.5 w-3.5 rounded-full bg-success-500 ring-2 ring-white dark:ring-gray-900"></span>
-            </span>
-          @endif
+          <span class="absolute -top-1 -right-1 flex h-3.5 w-3.5">
+            <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-success-500 opacity-75"></span>
+            <span class="relative inline-flex h-3.5 w-3.5 rounded-full bg-success-500 ring-2 ring-white dark:ring-gray-900"></span>
+          </span>
         </div>
 
         <div>
@@ -54,39 +52,16 @@
       </div>
 
       <div class="flex flex-wrap items-center gap-2.5 sm:flex-nowrap lg:flex-shrink-0">
-        @if($isFaceEnabled)
-          <button @click="showAndroidModal = true" type="button"
-            class="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-theme-xs hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700 transition">
-            <i class="fas fa-qrcode text-brand-500"></i>
-            <span>Scan QR</span>
-          </button>
-
-          <a href="{{ route('download.android-app') }}"
-            class="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 rounded-xl bg-brand-500 px-5 py-2.5 text-sm font-semibold text-white shadow-theme-xs hover:bg-brand-600 transition"
-            style="background-color: #4f6bed; color: #ffffff;">
-            <i class="fas fa-download"></i>
-            <span>Download File APK</span>
-          </a>
-        @else
-          <button type="button" disabled
-            class="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-gray-100 px-4 py-2.5 text-sm font-semibold text-gray-400 cursor-not-allowed dark:border-gray-800 dark:bg-gray-800 dark:text-gray-500"
-            title="Scan QR dikunci: Fitur Face ID nonaktif">
-            <i class="fas fa-lock text-xs"></i>
-            <span>Scan QR</span>
-          </button>
-
-          <button type="button" disabled
-            class="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 rounded-xl bg-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-400 cursor-not-allowed dark:bg-gray-800 dark:text-gray-500 shadow-theme-xs"
-            title="Download APK dikunci: Fitur Face ID nonaktif">
-            <i class="fas fa-lock text-xs"></i>
-            <span>Download File APK</span>
-          </button>
-        @endif
+        <button @click="showAndroidModal = true" type="button"
+          class="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 rounded-xl bg-brand-500 px-5 py-2.5 text-sm font-semibold text-white shadow-theme-xs hover:bg-brand-600 transition"
+          style="background-color: #4f6bed; color: #ffffff;">
+          <i class="fas fa-download"></i>
+          <span>Download File APK</span>
+        </button>
       </div>
     </div>
   </div>
 
-  @if($isFaceEnabled)
   <!-- Modal Shortcut & QR Code Download Android -->
   <div x-show="showAndroidModal"
        x-transition:enter="transition ease-out duration-200"
@@ -128,23 +103,23 @@
       </div>
 
       <!-- Modal Body -->
-      <div class="py-5 text-center">
+      <div class="py-4 text-center">
         <!-- QR Code Container -->
-        <div class="mx-auto inline-block rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800/50">
+        <div class="mx-auto inline-block rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50 p-3.5 dark:border-gray-700 dark:bg-gray-800/50">
           <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=4&data={{ urlencode(route('public.download.android')) }}"
                alt="QR Code Download Android App Jagat Absen"
-               class="mx-auto h-48 w-48 rounded-xl bg-white p-2 shadow-sm" />
-          <p class="mt-2 text-[11px] font-semibold text-brand-500 dark:text-brand-400">
+               class="mx-auto h-40 w-40 rounded-xl bg-white p-2 shadow-sm" />
+          <p class="mt-1.5 text-[11px] font-semibold text-brand-500 dark:text-brand-400">
             <i class="fas fa-camera mr-1"></i> Scan dengan Kamera / Google Lens HP
           </p>
         </div>
 
-        <p class="mt-4 text-xs text-gray-600 dark:text-gray-300">
+        <p class="mt-3 text-xs text-gray-600 dark:text-gray-300">
           Arahkan smartphone Android Anda ke QR Code di atas untuk mengunduh aplikasi.
         </p>
 
         <!-- Direct Actions -->
-        <div class="mt-5 flex flex-col sm:flex-row gap-2.5">
+        <div class="mt-4 flex flex-col sm:flex-row gap-2.5">
           <a href="{{ route('download.android-app') }}"
             class="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-brand-500 px-4 py-2.5 text-sm font-semibold text-white shadow-theme-xs hover:bg-brand-600 transition"
             style="background-color: #4f6bed; color: #ffffff;">
@@ -160,15 +135,42 @@
           </button>
         </div>
 
-        <!-- Panduan Instalasi -->
-        <div class="mt-5 rounded-xl bg-gray-50 p-3.5 text-left text-xs text-gray-600 dark:bg-gray-800/60 dark:text-gray-300">
-          <p class="font-bold text-gray-800 dark:text-white/90 mb-1 flex items-center gap-1.5">
-            <i class="fas fa-info-circle text-brand-500"></i> Panduan Instalasi Singkat:
+        <!-- Catatan Akun Demo (Tulisan Ringkas) -->
+        <div class="mt-4 rounded-xl bg-amber-500/10 border border-amber-500/20 p-3.5 text-left text-xs">
+          <p class="font-bold text-gray-800 dark:text-white mb-2 flex items-center justify-between">
+            <span class="flex items-center gap-1.5">
+              <i class="fas fa-id-badge text-amber-500"></i> Akun Demo Uji Coba:
+            </span>
+            <span class="text-[11px] font-normal text-gray-500">Password: <strong class="font-mono text-gray-800 dark:text-white">Demo123@</strong></span>
           </p>
-          <ol class="list-decimal list-inside space-y-1 text-[11px] text-gray-500 dark:text-gray-400">
-            <li>Setelah download selesai, buka file <strong>Jagat-Absen.apk</strong> di smartphone.</li>
-            <li>Jika muncul peringatan keamanan, pilih <em>"Tetap Install"</em> / Izinkan instalasi dari sumber ini.</li>
-            <li>Buka aplikasi, izinkan izin Kamera & Lokasi GPS, lalu login dengan akun Anda.</li>
+          <div class="grid grid-cols-2 gap-2 text-[11px]">
+            <div class="bg-white dark:bg-gray-800 p-2 rounded-lg border border-gray-200 dark:border-gray-700">
+              <span class="text-gray-500 dark:text-gray-400 block text-[10px]">Waka Kurikulum</span>
+              <span class="font-mono font-bold text-gray-800 dark:text-white select-all">demowakur</span>
+            </div>
+            <div class="bg-white dark:bg-gray-800 p-2 rounded-lg border border-gray-200 dark:border-gray-700">
+              <span class="text-gray-500 dark:text-gray-400 block text-[10px]">Wali Kelas</span>
+              <span class="font-mono font-bold text-gray-800 dark:text-white select-all">demowalas</span>
+            </div>
+            <div class="bg-white dark:bg-gray-800 p-2 rounded-lg border border-gray-200 dark:border-gray-700">
+              <span class="text-gray-500 dark:text-gray-400 block text-[10px]">Guru Pengajar</span>
+              <span class="font-mono font-bold text-gray-800 dark:text-white select-all">demoguru</span>
+            </div>
+            <div class="bg-white dark:bg-gray-800 p-2 rounded-lg border border-gray-200 dark:border-gray-700">
+              <span class="text-gray-500 dark:text-gray-400 block text-[10px]">Siswa</span>
+              <span class="font-mono font-bold text-gray-800 dark:text-white select-all">demosiswa</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Panduan Instalasi Singkat -->
+        <div class="mt-4 rounded-xl bg-gray-50 p-3 text-left text-xs text-gray-600 dark:bg-gray-800/60 dark:text-gray-300">
+          <p class="font-bold text-gray-800 dark:text-white/90 mb-1 flex items-center gap-1.5">
+            <i class="fas fa-info-circle text-brand-500"></i> Panduan Instalasi:
+          </p>
+          <ol class="list-decimal list-inside space-y-0.5 text-[11px] text-gray-500 dark:text-gray-400">
+            <li>Buka file <strong>Jagat-Absen.apk</strong> lalu pilih <em>"Tetap Install"</em> jika ada peringatan.</li>
+            <li>Buka aplikasi, izinkan akses Kamera & GPS, lalu login dengan akun di atas.</li>
           </ol>
         </div>
       </div>
@@ -181,7 +183,6 @@
       </div>
     </div>
   </div>
-  @endif
 
 <!-- Metrics Cards -->
 <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-6 xl:grid-cols-4 2xl:gap-7.5">

@@ -139,7 +139,7 @@ async def compare_face(
             similarity = float(np.dot(master_embedding, checkin_embedding) / (norm_master * norm_checkin))
 
         # Threshold kemiripan 75% (0.75) sesuai standar cetak biru
-        THRESHOLD = float(os.getenv("FACE_THRESHOLD", "0.75"))
+        THRESHOLD = float(os.getenv("FACE_THRESHOLD", "0.65"))
         is_match = bool(similarity >= THRESHOLD)
 
         return {

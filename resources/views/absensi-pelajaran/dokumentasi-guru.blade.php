@@ -62,32 +62,49 @@
     <!-- Filter & Pencarian Bar Galeri -->
     <div class="rounded-2xl border border-gray-200 bg-white p-4 sm:p-5 shadow-theme-xs dark:border-gray-800 dark:bg-gray-dark">
         <form method="GET" action="{{ route('absensi-pelajaran.dokumentasi.guru', $guru->id) }}" class="space-y-4">
-            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5">
                 <!-- 1. Dari Tanggal -->
                 <div>
-                    <label class="block text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1">
-                        Dari Tanggal
+                    <label class="block text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5 flex items-center gap-1.5">
+                        <i class="fas fa-calendar-day text-brand-500 text-[10px]"></i>
+                        <span>Dari Tanggal</span>
                     </label>
-                    <input type="date" name="start_date" value="{{ $startDate }}"
-                        class="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-3 py-2 text-xs text-gray-800 focus:border-brand-500 focus:bg-white focus:outline-hidden dark:border-gray-800 dark:bg-gray-800 dark:text-white transition">
+                    <div class="relative">
+                        <input type="text" id="filter_start_date" name="start_date" value="{{ $startDate }}"
+                            placeholder="Pilih tanggal..."
+                            class="w-full rounded-xl border border-gray-200 bg-gray-50/50 pl-3 pr-9 py-2 text-xs text-gray-800 focus:border-brand-500 focus:bg-white focus:outline-none dark:border-gray-800 dark:bg-gray-800 dark:text-white transition cursor-pointer"
+                            autocomplete="off">
+                        <span class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                            <i class="fas fa-calendar-alt text-xs"></i>
+                        </span>
+                    </div>
                 </div>
 
                 <!-- 2. Sampai Tanggal -->
                 <div>
-                    <label class="block text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1">
-                        Sampai Tanggal
+                    <label class="block text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5 flex items-center gap-1.5">
+                        <i class="fas fa-calendar-check text-brand-500 text-[10px]"></i>
+                        <span>Sampai Tanggal</span>
                     </label>
-                    <input type="date" name="end_date" value="{{ $endDate }}"
-                        class="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-3 py-2 text-xs text-gray-800 focus:border-brand-500 focus:bg-white focus:outline-hidden dark:border-gray-800 dark:bg-gray-800 dark:text-white transition">
+                    <div class="relative">
+                        <input type="text" id="filter_end_date" name="end_date" value="{{ $endDate }}"
+                            placeholder="Pilih tanggal..."
+                            class="w-full rounded-xl border border-gray-200 bg-gray-50/50 pl-3 pr-9 py-2 text-xs text-gray-800 focus:border-brand-500 focus:bg-white focus:outline-none dark:border-gray-800 dark:bg-gray-800 dark:text-white transition cursor-pointer"
+                            autocomplete="off">
+                        <span class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                            <i class="fas fa-calendar-alt text-xs"></i>
+                        </span>
+                    </div>
                 </div>
 
                 <!-- 3. Filter Kelas -->
                 <div>
-                    <label class="block text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1">
-                        Kelas
+                    <label class="block text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5 flex items-center gap-1.5">
+                        <i class="fas fa-school text-brand-500 text-[10px]"></i>
+                        <span>Kelas</span>
                     </label>
                     <select name="kelas_id"
-                        class="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-3 py-2 text-xs text-gray-800 focus:border-brand-500 focus:bg-white focus:outline-hidden dark:border-gray-800 dark:bg-gray-800 dark:text-white transition">
+                        class="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-3 py-2 text-xs text-gray-800 focus:border-brand-500 focus:bg-white focus:outline-none dark:border-gray-800 dark:bg-gray-800 dark:text-white transition cursor-pointer">
                         <option value="">-- Semua Kelas --</option>
                         @foreach($kelases as $k)
                             <option value="{{ $k->id }}" {{ (string)$kelasId === (string)$k->id ? 'selected' : '' }}>
@@ -99,11 +116,12 @@
 
                 <!-- 4. Filter Mapel -->
                 <div>
-                    <label class="block text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1">
-                        Mata Pelajaran
+                    <label class="block text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5 flex items-center gap-1.5">
+                        <i class="fas fa-book-open text-brand-500 text-[10px]"></i>
+                        <span>Mata Pelajaran</span>
                     </label>
                     <select name="mapel_id"
-                        class="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-3 py-2 text-xs text-gray-800 focus:border-brand-500 focus:bg-white focus:outline-hidden dark:border-gray-800 dark:bg-gray-800 dark:text-white transition">
+                        class="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-3 py-2 text-xs text-gray-800 focus:border-brand-500 focus:bg-white focus:outline-none dark:border-gray-800 dark:bg-gray-800 dark:text-white transition cursor-pointer">
                         <option value="">-- Semua Mapel --</option>
                         @foreach($mapels as $m)
                             <option value="{{ $m->id }}" {{ (string)$mapelId === (string)$m->id ? 'selected' : '' }}>
@@ -115,11 +133,12 @@
 
                 <!-- 5. Tipe Media -->
                 <div>
-                    <label class="block text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1">
-                        Tipe Media
+                    <label class="block text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5 flex items-center gap-1.5">
+                        <i class="fas fa-photo-video text-brand-500 text-[10px]"></i>
+                        <span>Tipe Media</span>
                     </label>
                     <select name="media_type"
-                        class="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-3 py-2 text-xs text-gray-800 focus:border-brand-500 focus:bg-white focus:outline-hidden dark:border-gray-800 dark:bg-gray-800 dark:text-white transition">
+                        class="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-3 py-2 text-xs text-gray-800 focus:border-brand-500 focus:bg-white focus:outline-none dark:border-gray-800 dark:bg-gray-800 dark:text-white transition cursor-pointer">
                         <option value="all" {{ $mediaType === 'all' ? 'selected' : '' }}>Semua (Foto & Video)</option>
                         <option value="image" {{ $mediaType === 'image' ? 'selected' : '' }}>Hanya Foto ({{ $teacherStats['total_images'] }})</option>
                         <option value="video" {{ $mediaType === 'video' ? 'selected' : '' }}>Hanya Video ({{ $teacherStats['total_videos'] }})</option>
@@ -127,13 +146,14 @@
                 </div>
             </div>
 
-            <div class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-1 border-t border-gray-100 dark:border-gray-800">
+            <!-- Baris Bawah: Pencarian Materi & Tombol Action -->
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 pt-3 border-t border-gray-100 dark:border-gray-800">
                 <!-- Search Keyword -->
-                <div class="relative w-full sm:w-80">
+                <div class="relative w-full md:w-96">
                     <input type="text" name="q" value="{{ $search }}"
                         placeholder="Cari materi pembelajaran atau catatan..."
-                        class="w-full rounded-xl border border-gray-200 bg-gray-50/50 py-2 pl-9 pr-8 text-xs text-gray-800 focus:border-brand-500 focus:bg-white focus:outline-hidden dark:border-gray-800 dark:bg-gray-800 dark:text-white transition">
-                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                        class="w-full rounded-xl border border-gray-200 bg-gray-50/50 py-2 pl-9 pr-8 text-xs text-gray-800 focus:border-brand-500 focus:bg-white focus:outline-none dark:border-gray-800 dark:bg-gray-800 dark:text-white transition">
+                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
                         <i class="fas fa-search text-xs"></i>
                     </span>
                     @if(!empty($search))
@@ -144,16 +164,17 @@
                 </div>
 
                 <!-- Tombol Action -->
-                <div class="flex items-center gap-2 self-end sm:self-auto">
+                <div class="flex items-center gap-2 self-end md:self-auto shrink-0">
                     @if(!empty($startDate) || !empty($endDate) || !empty($kelasId) || !empty($mapelId) || $mediaType !== 'all' || !empty($search))
                         <a href="{{ route('absensi-pelajaran.dokumentasi.guru', $guru->id) }}"
-                           class="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 px-3.5 py-2 text-xs font-medium text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 transition">
-                            <i class="fas fa-undo"></i> Reset Filter
+                           class="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3.5 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 transition shadow-xs">
+                            <i class="fas fa-undo text-[10px]"></i>
+                            <span>Reset Filter</span>
                         </a>
                     @endif
                     <button type="submit"
-                        class="inline-flex items-center gap-2 rounded-xl bg-brand-500 hover:bg-brand-600 px-4 py-2 text-xs font-semibold text-white transition shadow-sm">
-                        <i class="fas fa-filter"></i>
+                        class="inline-flex items-center gap-2 rounded-xl bg-brand-500 hover:bg-brand-600 px-4 py-2 text-xs font-semibold text-white transition shadow-sm cursor-pointer">
+                        <i class="fas fa-filter text-[10px]"></i>
                         <span>Terapkan Filter</span>
                     </button>
                 </div>
@@ -168,43 +189,49 @@
                 <div class="group relative rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-dark shadow-theme-xs hover:shadow-md transition flex flex-col justify-between">
                     <div>
                         @if($doc['is_video'])
-                            <!-- Video Thumbnail Card with Play Overlay -->
-                            <div class="aspect-square w-full bg-gray-900 flex items-center justify-center relative cursor-pointer overflow-hidden"
+                            <!-- Video Thumbnail Card with Centered Play Button & Corner Badge -->
+                            <div class="aspect-square w-full bg-gray-900 flex items-center justify-center relative cursor-pointer overflow-hidden group/thumb"
                                  @click="openVideoModal('{{ $doc['view_url'] }}', '{{ addslashes($doc['name']) }}', '{{ $doc['thumbnail_url'] ?? '' }}')">
                                 @if(!empty($doc['thumbnail_url']))
                                     <img src="{{ $doc['thumbnail_url'] }}"
                                          alt="{{ $doc['name'] }}"
                                          loading="lazy"
-                                         class="w-full h-full object-cover opacity-85 group-hover:opacity-100 group-hover:scale-105 transition duration-300"
+                                         class="w-full h-full object-cover opacity-85 group-hover/thumb:opacity-100 group-hover/thumb:scale-105 transition duration-300"
                                          onerror="this.style.display='none'; if(this.nextElementSibling){ this.nextElementSibling.style.display='block'; }">
-                                    <video src="{{ $doc['view_url'] }}#t=0.5" preload="metadata" style="display: none;" class="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition duration-300"></video>
+                                    <video src="{{ $doc['view_url'] }}#t=0.5" preload="metadata" style="display: none;" class="w-full h-full object-cover opacity-80 group-hover/thumb:opacity-100 transition duration-300"></video>
                                 @else
-                                    <video src="{{ $doc['view_url'] }}#t=0.5" preload="metadata" class="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition duration-300"></video>
+                                    <video src="{{ $doc['view_url'] }}#t=0.5" preload="metadata" class="w-full h-full object-cover opacity-80 group-hover/thumb:opacity-100 transition duration-300"></video>
                                 @endif
 
-                                <!-- Play Icon Overlay -->
-                                <div class="absolute inset-0 bg-black/30 flex items-center justify-center group-hover:bg-black/15 transition">
-                                    <div class="flex h-11 w-11 items-center justify-center rounded-full bg-brand-500 text-white shadow-lg group-hover:scale-110 transition duration-300">
+                                <!-- Play Icon Overlay (Hanya Icon Play di Tengah) -->
+                                <div class="absolute inset-0 bg-black/25 flex items-center justify-center group-hover/thumb:bg-black/15 transition">
+                                    <div class="flex h-12 w-12 items-center justify-center rounded-full bg-brand-500/95 text-white shadow-xl group-hover/thumb:scale-110 transition duration-300">
                                         <i class="fas fa-play text-sm ml-0.5"></i>
                                     </div>
                                 </div>
-                                <span class="absolute top-2 left-2 px-2 py-0.5 rounded-md text-[9px] font-bold bg-amber-500 text-white flex items-center gap-1 shadow">
-                                    <i class="fas fa-video"></i> VIDEO
+
+                                <!-- Badge VIDEO Terkunci Permanen di Pojok Kiri Atas -->
+                                <span style="position: absolute; top: 8px; left: 8px; z-index: 20;"
+                                      class="px-2 py-0.5 rounded-md text-[9px] font-bold bg-amber-500 text-white flex items-center gap-1 shadow-md">
+                                    <i class="fas fa-video text-[9px]"></i> VIDEO
                                 </span>
                             </div>
                         @else
-                            <!-- Photo Card with Lightbox Trigger -->
-                            <div class="aspect-square w-full overflow-hidden bg-gray-100 dark:bg-gray-900 relative cursor-pointer group"
+                            <!-- Photo Card with Corner Badge & Centered Hover Zoom -->
+                            <div class="aspect-square w-full overflow-hidden bg-gray-100 dark:bg-gray-900 relative cursor-pointer group/thumb"
                                  @click="openPhotoModal('{{ $doc['view_url'] }}', '{{ addslashes($doc['name']) }}')">
                                 <img src="{{ $doc['thumbnail_url'] ?? $doc['view_url'] }}" alt="{{ $doc['name'] }}" loading="lazy"
-                                     class="w-full h-full object-cover group-hover:scale-105 transition duration-300">
-                                <div class="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition flex items-center justify-center opacity-0 group-hover:opacity-100">
-                                    <div class="flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-gray-800 shadow">
+                                     class="w-full h-full object-cover group-hover/thumb:scale-105 transition duration-300">
+                                <div class="absolute inset-0 bg-black/0 group-hover/thumb:bg-black/20 transition flex items-center justify-center opacity-0 group-hover/thumb:opacity-100">
+                                    <div class="flex h-10 w-10 items-center justify-center rounded-full bg-white/95 text-gray-800 shadow-lg">
                                         <i class="fas fa-search-plus text-xs"></i>
                                     </div>
                                 </div>
-                                <span class="absolute top-2 left-2 px-2 py-0.5 rounded-md text-[9px] font-bold bg-blue-600 text-white flex items-center gap-1 shadow">
-                                    <i class="fas fa-image"></i> FOTO
+
+                                <!-- Badge FOTO Terkunci Permanen di Pojok Kiri Atas -->
+                                <span style="position: absolute; top: 8px; left: 8px; z-index: 20;"
+                                      class="px-2 py-0.5 rounded-md text-[9px] font-bold bg-blue-600 text-white flex items-center gap-1 shadow-md">
+                                    <i class="fas fa-image text-[9px]"></i> FOTO
                                 </span>
                             </div>
                         @endif
@@ -287,21 +314,26 @@
          @keydown.escape.window="photoModalOpen = false">
         <div class="relative max-w-4xl w-full flex flex-col items-center"
              @click.away="photoModalOpen = false">
-            <button @click="photoModalOpen = false"
-                    class="absolute -top-10 right-0 text-white/80 hover:text-white text-lg p-2 transition">
-                <i class="fas fa-times"></i> Tutup (ESC)
-            </button>
-            <div class="w-full flex justify-between items-center text-white/90 mb-2 px-1 text-xs sm:text-sm">
-                <span class="truncate font-medium flex items-center gap-2">
-                    <i class="fas fa-image text-brand-400"></i>
-                    <span x-text="activeMediaName"></span>
-                </span>
-                <a :href="activeMediaUrl" target="_blank" download class="inline-flex items-center gap-1.5 text-brand-400 hover:text-brand-300 font-bold ml-3">
-                    <i class="fas fa-download"></i> Unduh Foto
-                </a>
+            <!-- Modal Header Bar -->
+            <div class="w-full flex items-center justify-between text-white mb-2.5 px-2">
+                <div class="flex items-center gap-2 truncate mr-3">
+                    <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-600 text-white shrink-0">FOTO</span>
+                    <span class="truncate font-medium text-xs sm:text-sm text-gray-200" x-text="activeMediaName"></span>
+                </div>
+                <div class="flex items-center gap-2 shrink-0">
+                    <a :href="activeMediaUrl" target="_blank" download class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold transition shadow">
+                        <i class="fas fa-download text-[11px]"></i>
+                        <span>Unduh Foto</span>
+                    </a>
+                    <button type="button" @click="photoModalOpen = false" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 text-white text-xs font-semibold transition cursor-pointer">
+                        <i class="fas fa-times text-[11px]"></i>
+                        <span>Tutup (ESC)</span>
+                    </button>
+                </div>
             </div>
-            <div class="max-h-[80vh] overflow-hidden rounded-2xl shadow-2xl border border-white/10 bg-black flex items-center justify-center">
-                <img :src="activeMediaUrl" :alt="activeMediaName" class="max-h-[80vh] w-auto max-w-full object-contain">
+            <!-- Media Preview Container -->
+            <div class="max-h-[80vh] overflow-hidden rounded-2xl shadow-2xl border border-white/10 bg-black flex items-center justify-center p-1">
+                <img :src="activeMediaUrl" :alt="activeMediaName" class="max-h-[78vh] w-auto max-w-full object-contain rounded-xl">
             </div>
         </div>
     </div>
@@ -318,22 +350,27 @@
          @keydown.escape.window="closeVideoModal()">
         <div class="relative max-w-4xl w-full flex flex-col items-center"
              @click.away="closeVideoModal()">
-            <button @click="closeVideoModal()"
-                    class="absolute -top-10 right-0 text-white/80 hover:text-white text-lg p-2 transition">
-                <i class="fas fa-times"></i> Tutup (ESC)
-            </button>
-            <div class="w-full flex justify-between items-center text-white/90 mb-2 px-1 text-xs sm:text-sm">
-                <span class="truncate font-medium flex items-center gap-2">
-                    <i class="fas fa-video text-amber-400"></i>
-                    <span x-text="activeMediaName"></span>
-                </span>
-                <a :href="activeMediaUrl" target="_blank" download class="inline-flex items-center gap-1.5 text-brand-400 hover:text-brand-300 font-bold ml-3">
-                    <i class="fas fa-download"></i> Unduh Video
-                </a>
+            <!-- Modal Header Bar -->
+            <div class="w-full flex items-center justify-between text-white mb-2.5 px-2">
+                <div class="flex items-center gap-2 truncate mr-3">
+                    <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500 text-white shrink-0">VIDEO</span>
+                    <span class="truncate font-medium text-xs sm:text-sm text-gray-200" x-text="activeMediaName"></span>
+                </div>
+                <div class="flex items-center gap-2 shrink-0">
+                    <a :href="activeMediaUrl" target="_blank" download class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold transition shadow">
+                        <i class="fas fa-download text-[11px]"></i>
+                        <span>Unduh Video</span>
+                    </a>
+                    <button type="button" @click="closeVideoModal()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 text-white text-xs font-semibold transition cursor-pointer">
+                        <i class="fas fa-times text-[11px]"></i>
+                        <span>Tutup (ESC)</span>
+                    </button>
+                </div>
             </div>
-            <div class="w-full bg-black rounded-2xl overflow-hidden shadow-2xl border border-white/10 aspect-video flex items-center justify-center">
-                <video id="modalVideoPlayer" controls autoplay preload="auto" :poster="activeMediaPoster" class="w-full h-full object-contain">
-                    <source :src="activeMediaUrl" type="video/mp4">
+            <!-- Video Player Container (mendukung potret ponsel & landscape) -->
+            <div class="w-full bg-black/95 rounded-2xl overflow-hidden shadow-2xl border border-white/10 flex items-center justify-center p-1 sm:p-2">
+                <video id="modalVideoPlayer" controls autoplay playsinline preload="auto" :poster="activeMediaPoster"
+                       class="max-h-[75vh] w-auto max-w-full rounded-xl object-contain mx-auto">
                     Browser Anda tidak mendukung tag video.
                 </video>
             </div>
@@ -343,6 +380,24 @@
 
 @push('scripts')
 <script>
+function initDokumentasiFlatpickr() {
+    const config = {
+        dateFormat: "Y-m-d",
+        altInput: true,
+        altFormat: "d M Y",
+        altInputClass: "w-full rounded-xl border border-gray-200 bg-gray-50/50 pl-3 pr-9 py-2 text-xs text-gray-800 focus:border-brand-500 focus:bg-white focus:outline-none dark:border-gray-800 dark:bg-gray-800 dark:text-white transition cursor-pointer",
+        allowInput: false,
+    };
+    if (window.flatpickr) {
+        window.flatpickr("#filter_start_date", config);
+        window.flatpickr("#filter_end_date", config);
+    } else {
+        setTimeout(initDokumentasiFlatpickr, 100);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', initDokumentasiFlatpickr);
+
 function dokumentasiGaleri() {
     return {
         photoModalOpen: false,
@@ -350,6 +405,12 @@ function dokumentasiGaleri() {
         activeMediaUrl: '',
         activeMediaPoster: '',
         activeMediaName: '',
+
+        init() {
+            this.$nextTick(() => {
+                initDokumentasiFlatpickr();
+            });
+        },
 
         openPhotoModal(url, name) {
             this.activeMediaUrl = url;

@@ -115,8 +115,8 @@
     <!-- Panel Daftar Guru Pengunggah Dokumentasi -->
     <div class="rounded-2xl border border-gray-200 bg-white shadow-theme-xs dark:border-gray-800 dark:bg-gray-dark">
         <!-- Header Tabel & Search Bar -->
-        <div class="p-4 sm:p-5 border-b border-gray-100 dark:border-gray-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div>
+        <div class="p-4 sm:p-5 border-b border-gray-100 dark:border-gray-800 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div class="shrink-0">
                 <h3 class="text-base sm:text-lg font-bold text-gray-800 dark:text-white/90 flex items-center gap-2">
                     <i class="fas fa-users-class text-brand-500"></i>
                     <span>Daftar Guru & Rekap Berkas KBM</span>
@@ -127,12 +127,12 @@
             </div>
 
             <!-- Form Pencarian Cepat Nama Guru / NIP -->
-            <form method="GET" action="{{ route('absensi-pelajaran.dokumentasi') }}" class="w-full sm:w-72">
+            <form method="GET" action="{{ route('absensi-pelajaran.dokumentasi') }}" class="w-full md:w-80 shrink-0" style="max-width: 320px;">
                 <div class="relative">
                     <input type="text" name="q" value="{{ $search }}"
                         placeholder="Cari nama guru atau NIP..."
-                        class="w-full rounded-xl border border-gray-200 bg-gray-50/50 py-2 pl-9 pr-8 text-xs text-gray-800 focus:border-brand-500 focus:bg-white focus:outline-hidden dark:border-gray-800 dark:bg-gray-800 dark:text-white dark:focus:bg-gray-dark transition">
-                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                        class="w-full rounded-xl border border-gray-200 bg-gray-50/50 py-2 pl-9 pr-8 text-xs text-gray-800 focus:border-brand-500 focus:bg-white focus:outline-none dark:border-gray-800 dark:bg-gray-800 dark:text-white transition">
+                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
                         <i class="fas fa-search text-xs"></i>
                     </span>
                     @if(!empty($search))

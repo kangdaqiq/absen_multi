@@ -537,18 +537,89 @@ class MobileJadwalPelajaranController extends Controller
         $hasDokumentasiInput = false;
 
         if ($isDokKbmAllowed) {
-            // Cek apakah ada input foto_dokumentasi dari mobile ATAU payload dokumentasi
-            if ($request->filled('foto_dokumentasi')) {
+            // 1. Prioritaskan payload array 'dokumentasi' jika dikirim dari Android
+            if ($request->has('dokumentasi') && !empty($request->input('dokumentasi'))) {
+                $hasDokumentasiInput = true;
+                $rawDok = $request->input('dokumentasi');
+                if (is_string($rawDok)) {
+                    $decoded = json_decode($rawDok, true);
+                    $rawDok = is_array($decoded) ? $decoded : [];
+                }
+
+                if (is_array($rawDok) && !empty($rawDok)) {
+                    $dokumentasiPayload = [];
+                    foreach ($rawDok as $item) {
+                        if (is_string($item)) {
+                            $itemUrl = trim($item);
+                            if (empty($itemUrl)) continue;
+                            $ext = strtolower(pathinfo(parse_url($itemUrl, PHP_URL_PATH) ?? '', PATHINFO_EXTENSION));
+                            $isVid = in_array($ext, ['mp4', 'mov', 'webm', '3gp', 'mkv']) || str_contains(strtolower($itemUrl), 'video');
+                            $thumb = preg_replace('#/api/v1/files/([^/]+)/view#', '/api/v1/files/$1/thumbnail', $itemUrl);
+
+                            $dokumentasiPayload[] = [
+                                'url'           => $itemUrl,
+                                'view_url'      => $itemUrl,
+                                'download_url'  => $itemUrl,
+                                'thumbnail_url' => ($thumb !== $itemUrl) ? $thumb : null,
+                                'type'          => $isVid ? 'video' : 'image',
+                                'is_video'      => $isVid,
+                                'is_image'      => !$isVid,
+                                'name'          => $isVid ? 'Video Pembelajaran' : 'Foto Kegiatan',
+                            ];
+                        } elseif (is_array($item)) {
+                            $itemUrl = $item['url'] ?? ($item['view_url'] ?? ($item['download_url'] ?? ''));
+                            if (empty($itemUrl)) continue;
+                            $type = strtolower($item['type'] ?? '');
+                            $mime = strtolower($item['mime_type'] ?? '');
+                            $ext = strtolower(pathinfo(parse_url($itemUrl, PHP_URL_PATH) ?? '', PATHINFO_EXTENSION));
+                            $isVid = ($type === 'video') || str_starts_with($mime, 'video/') || in_array($ext, ['mp4', 'mov', 'webm', '3gp', 'mkv']) || (!empty($item['is_video']));
+
+                            $thumb = $item['thumbnail_url'] ?? ($item['thumb_url'] ?? null);
+                            if (empty($thumb) && str_contains($itemUrl, '/api/v1/files/')) {
+                                $thumb = preg_replace('#/api/v1/files/([^/]+)/view#', '/api/v1/files/$1/thumbnail', $itemUrl);
+                            }
+
+                            $rawName = $item['name'] ?? ($item['original_name'] ?? basename(parse_url($itemUrl, PHP_URL_PATH) ?? ''));
+                            if (empty($rawName) || in_array(strtolower($rawName), ['view', 'download', 'file', 'thumbnail'])) {
+                                $rawName = $isVid ? 'Video Pembelajaran' : 'Foto Kegiatan';
+                            }
+
+                            $dokumentasiPayload[] = [
+                                'id'            => $item['id'] ?? null,
+                                'url'           => $itemUrl,
+                                'view_url'      => $itemUrl,
+                                'download_url'  => $item['download_url'] ?? $itemUrl,
+                                'thumbnail_url' => $thumb,
+                                'type'          => $isVid ? 'video' : 'image',
+                                'is_video'      => $isVid,
+                                'is_image'      => !$isVid,
+                                'name'          => $rawName,
+                                'size'          => $item['size'] ?? null,
+                                'mime_type'     => $item['mime_type'] ?? null,
+                            ];
+                        }
+                    }
+                }
+            }
+
+            // 2. Fallback untuk input tunggal foto_dokumentasi jika array dokumentasi tidak ada / kosong
+            if (empty($dokumentasiPayload) && $request->filled('foto_dokumentasi')) {
                 $hasDokumentasiInput = true;
                 $rawUrl = trim($request->input('foto_dokumentasi'));
                 $ext = strtolower(pathinfo(parse_url($rawUrl, PHP_URL_PATH) ?? '', PATHINFO_EXTENSION));
-                $isVid = in_array($ext, ['mp4', 'mov', 'webm', '3gp', 'mkv']) || str_contains(strtolower($rawUrl), 'video');
+                $typeInput = strtolower($request->input('foto_dokumentasi_type', $request->input('type', '')));
+                $isVid = ($typeInput === 'video') || in_array($ext, ['mp4', 'mov', 'webm', '3gp', 'mkv']) || str_contains(strtolower($rawUrl), 'video');
 
                 $thumbUrl = $request->input('thumbnail_url');
                 if (empty($thumbUrl) && str_contains($rawUrl, '/api/v1/files/')) {
                     $thumbUrl = preg_replace('#/api/v1/files/([^/]+)/view#', '/api/v1/files/$1/thumbnail', $rawUrl);
                 }
-                
+
+                $rawName = basename(parse_url($rawUrl, PHP_URL_PATH) ?? '');
+                if (empty($rawName) || in_array(strtolower($rawName), ['view', 'download', 'file', 'thumbnail'])) {
+                    $rawName = $isVid ? 'Video Pembelajaran' : 'Foto Kegiatan';
+                }
+
                 $dokumentasiPayload = [
                     [
                         'url'           => $rawUrl,
@@ -558,20 +629,9 @@ class MobileJadwalPelajaranController extends Controller
                         'type'          => $isVid ? 'video' : 'image',
                         'is_video'      => $isVid,
                         'is_image'      => !$isVid,
-                        'name'          => basename(parse_url($rawUrl, PHP_URL_PATH) ?? ($isVid ? 'video.mp4' : 'foto.jpg')),
+                        'name'          => $rawName,
                     ]
                 ];
-            } elseif ($request->has('dokumentasi')) {
-                $hasDokumentasiInput = true;
-                $rawDok = $request->input('dokumentasi');
-                if (is_string($rawDok)) {
-                    $decoded = json_decode($rawDok, true);
-                    $dokumentasiPayload = is_array($decoded) ? $decoded : [];
-                } elseif (is_array($rawDok)) {
-                    $dokumentasiPayload = $rawDok;
-                } else {
-                    $dokumentasiPayload = [];
-                }
             }
 
             // Jika ada file multipart langsung di request ini, upload ke storage server

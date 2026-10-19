@@ -53,11 +53,25 @@ class JurnalPelajaran extends Model
             return [];
         }
 
+        $storageKey = config('services.storage_server.key') ?: '812194c6c53ee6557e088b897f5ec08abafb49a8fa5e656f5acf75f70a93145f';
+
+        // Helper untuk menyertakan api_key pada URL storage server agar browser tidak terkena 401 Unauthorized
+        $attachApiKey = function (?string $url) use ($storageKey): ?string {
+            if (empty($url) || empty($storageKey)) {
+                return $url;
+            }
+            if (str_contains($url, '/api/v1/files/') && !str_contains($url, 'api_key=')) {
+                $separator = str_contains($url, '?') ? '&' : '?';
+                return $url . $separator . 'api_key=' . urlencode($storageKey);
+            }
+            return $url;
+        };
+
         $list = [];
         foreach ($raw as $item) {
             if (is_string($item)) {
                 $ext = strtolower(pathinfo(parse_url($item, PHP_URL_PATH) ?? '', PATHINFO_EXTENSION));
-                $isVideo = in_array($ext, ['mp4', 'mov', 'avi', 'mkv', 'webm', '3gp']);
+                $isVideo = in_array($ext, ['mp4', 'mov', 'avi', 'mkv', 'webm', '3gp']) || str_contains(strtolower($item), 'video');
 
                 // Auto-generate URL thumbnail dari Go storage server
                 $thumbnailUrl = null;
@@ -70,13 +84,18 @@ class JurnalPelajaran extends Model
                     $thumbnailUrl = $item;
                 }
 
+                $rawName = basename(parse_url($item, PHP_URL_PATH) ?? '');
+                if (empty($rawName) || in_array(strtolower($rawName), ['view', 'download', 'file', 'thumbnail'])) {
+                    $rawName = $isVideo ? 'Video Pembelajaran' : 'Foto Kegiatan';
+                }
+
                 $list[] = [
-                    'url'           => $item,
-                    'view_url'      => $item,
-                    'download_url'  => $item,
-                    'thumbnail_url' => $thumbnailUrl,
+                    'url'           => $attachApiKey($item),
+                    'view_url'      => $attachApiKey($item),
+                    'download_url'  => $attachApiKey($item),
+                    'thumbnail_url' => $attachApiKey($thumbnailUrl),
                     'type'          => $isVideo ? 'video' : 'image',
-                    'name'          => basename(parse_url($item, PHP_URL_PATH) ?? 'file'),
+                    'name'          => $rawName,
                     'is_video'      => $isVideo,
                     'is_image'      => !$isVideo,
                 ];
@@ -84,7 +103,11 @@ class JurnalPelajaran extends Model
                 $url = $item['view_url'] ?? ($item['url'] ?? ($item['download_url'] ?? ''));
                 $mime = strtolower($item['mime_type'] ?? '');
                 $ext = strtolower($item['extension'] ?? pathinfo(parse_url($url, PHP_URL_PATH) ?? '', PATHINFO_EXTENSION));
-                $isVideo = str_starts_with($mime, 'video/') || in_array($ext, ['mp4', 'mov', 'avi', 'mkv', 'webm', '3gp']) || (($item['type'] ?? '') === 'video');
+                $isVideo = (!empty($item['is_video']))
+                    || (($item['type'] ?? '') === 'video')
+                    || str_starts_with($mime, 'video/')
+                    || in_array($ext, ['mp4', 'mov', 'avi', 'mkv', 'webm', '3gp'])
+                    || str_contains(strtolower($url), 'video');
 
                 // Dapatkan thumbnail_url dari payload atau generate otomatis dari Go storage server
                 $thumbnailUrl = $item['thumbnail_url'] ?? ($item['thumb_url'] ?? null);
@@ -101,14 +124,19 @@ class JurnalPelajaran extends Model
                     }
                 }
 
+                $rawName = $item['original_name'] ?? ($item['name'] ?? basename(parse_url($url, PHP_URL_PATH) ?? ''));
+                if (empty($rawName) || in_array(strtolower($rawName), ['view', 'download', 'file', 'thumbnail'])) {
+                    $rawName = $isVideo ? 'Video Pembelajaran' : 'Foto Kegiatan';
+                }
+
                 $list[] = [
                     'id'            => $item['id'] ?? null,
-                    'url'           => $url,
-                    'view_url'      => $url,
-                    'download_url'  => $item['download_url'] ?? $url,
-                    'thumbnail_url' => $thumbnailUrl,
+                    'url'           => $attachApiKey($url),
+                    'view_url'      => $attachApiKey($url),
+                    'download_url'  => $attachApiKey($item['download_url'] ?? $url),
+                    'thumbnail_url' => $attachApiKey($thumbnailUrl),
                     'type'          => $isVideo ? 'video' : 'image',
-                    'name'          => $item['original_name'] ?? ($item['name'] ?? basename(parse_url($url, PHP_URL_PATH) ?? 'file')),
+                    'name'          => $rawName,
                     'size'          => $item['size'] ?? null,
                     'human_size'    => $item['human_size'] ?? null,
                     'mime_type'     => $item['mime_type'] ?? null,

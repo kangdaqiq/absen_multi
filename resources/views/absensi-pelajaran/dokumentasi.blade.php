@@ -378,7 +378,7 @@
                                             <!-- Photo Thumbnail Card -->
                                             <div class="aspect-square w-full overflow-hidden bg-gray-100 dark:bg-gray-900 relative cursor-pointer group"
                                                  @click="openPhotoModal('{{ $doc['view_url'] }}', '{{ addslashes($doc['name']) }}')">
-                                                <img src="{{ $doc['view_url'] }}" alt="{{ $doc['name'] }}" loading="lazy"
+                                                <img src="{{ $doc['thumbnail_url'] ?? $doc['view_url'] }}" alt="{{ $doc['name'] }}" loading="lazy"
                                                      class="w-full h-full object-cover group-hover:scale-105 transition duration-300">
                                                 <div class="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition flex items-center justify-center opacity-0 group-hover:opacity-100">
                                                     <div class="flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-gray-800 shadow">

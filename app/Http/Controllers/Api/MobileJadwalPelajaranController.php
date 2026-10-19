@@ -10,6 +10,8 @@ use App\Models\Siswa;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class MobileJadwalPelajaranController extends Controller
 {
@@ -186,13 +188,21 @@ class MobileJadwalPelajaranController extends Controller
                 'mapel_nama'       => $j->mapel?->nama_mapel ?? '-',
                 'is_attended'      => $isAttended,
                 'jurnal'           => $jurnal ? [
-                    'id'      => $jurnal->id,
-                    'materi'  => $jurnal->materi,
-                    'catatan' => $jurnal->catatan,
+                    'id'               => $jurnal->id,
+                    'materi'           => $jurnal->materi,
+                    'catatan'          => $jurnal->catatan,
+                    'foto_dokumentasi' => $jurnal->dokumentasi_list[0]['view_url'] ?? null,
+                    'dokumentasi'      => $jurnal->dokumentasi_list,
+                    'has_dokumentasi'  => $jurnal->has_dokumentasi,
                 ] : null,
                 'stats'            => $stats,
             ]);
         }
+
+        $licenseService = app(\App\Services\LicenseService::class);
+        $school = $user->school ?? ($guru ? $guru->school : null);
+        $dokKbmEnabled = $licenseService->isDokKbmFeatureEnabled($school);
+        $storageCfg = config('services.storage_server', []);
 
         return response()->json([
             'success' => true,
@@ -203,6 +213,12 @@ class MobileJadwalPelajaranController extends Controller
                     'id'   => $guru->id,
                     'nama' => $guru->nama,
                     'nip'  => $guru->nip,
+                ],
+                'dok_kbm'   => [
+                    'enabled'     => $dokKbmEnabled,
+                    'storage_url' => $storageCfg['url'] ?? 'https://storage.jagattech.my.id',
+                    'api_key'     => $dokKbmEnabled ? ($storageCfg['key'] ?? '') : '',
+                    'folder'      => $storageCfg['folder'] ?? 'kbm_docs',
                 ],
                 'jadwals'   => $formatted,
             ]
@@ -459,10 +475,19 @@ class MobileJadwalPelajaranController extends Controller
                 ],
                 'tanggal'  => $tanggal,
                 'jurnal'   => $jurnal ? [
-                    'id'      => $jurnal->id,
-                    'materi'  => $jurnal->materi,
-                    'catatan' => $jurnal->catatan,
+                    'id'               => $jurnal->id,
+                    'materi'           => $jurnal->materi,
+                    'catatan'          => $jurnal->catatan,
+                    'foto_dokumentasi' => $jurnal->dokumentasi_list[0]['view_url'] ?? null,
+                    'dokumentasi'      => $jurnal->dokumentasi_list,
+                    'has_dokumentasi'  => $jurnal->has_dokumentasi,
                 ] : null,
+                'dok_kbm'  => [
+                    'enabled'     => app(\App\Services\LicenseService::class)->isDokKbmFeatureEnabled($jadwal->school ?? $user->school),
+                    'storage_url' => config('services.storage_server.url'),
+                    'api_key'     => app(\App\Services\LicenseService::class)->isDokKbmFeatureEnabled($jadwal->school ?? $user->school) ? config('services.storage_server.key') : '',
+                    'folder'      => config('services.storage_server.folder'),
+                ],
                 'summary'  => $stats,
                 'students' => $studentList,
             ]
@@ -489,10 +514,12 @@ class MobileJadwalPelajaranController extends Controller
         }
 
         $request->validate([
-            'tanggal'        => 'required|date',
-            'materi'         => 'required|string|max:1000',
-            'catatan'        => 'nullable|string|max:1000',
-            'attendances'    => 'required|array',
+            'tanggal'          => 'required|date',
+            'materi'           => 'required|string|max:1000',
+            'catatan'          => 'nullable|string|max:1000',
+            'foto_dokumentasi' => 'nullable|string|max:1000',
+            'dokumentasi'      => 'nullable',
+            'attendances'      => 'required|array',
             'attendances.*.student_id' => 'required|exists:siswa,id',
             'attendances.*.status'     => 'required|in:H,S,I,A,T,D',
             'attendances.*.keterangan' => 'nullable|string|max:255',
@@ -504,24 +531,117 @@ class MobileJadwalPelajaranController extends Controller
         // Dapatkan semua jadwal paralel (jika multi-kelas)
         $parallels = $this->getParallelJadwals($jadwal, $schoolId);
 
-        DB::transaction(function () use ($request, $jadwal, $parallels, $schoolId, $tanggal, $operatorGuruId) {
+        // Periksa apakah fitur Dok KBM aktif untuk sekolah ini
+        $isDokKbmAllowed = app(\App\Services\LicenseService::class)->isDokKbmFeatureEnabled($jadwal->school ?? $user->school);
+        $dokumentasiPayload = null;
+        $hasDokumentasiInput = false;
+
+        if ($isDokKbmAllowed) {
+            // Cek apakah ada input foto_dokumentasi dari mobile ATAU payload dokumentasi
+            if ($request->filled('foto_dokumentasi')) {
+                $hasDokumentasiInput = true;
+                $rawUrl = trim($request->input('foto_dokumentasi'));
+                $ext = strtolower(pathinfo(parse_url($rawUrl, PHP_URL_PATH) ?? '', PATHINFO_EXTENSION));
+                $isVid = in_array($ext, ['mp4', 'mov', 'webm', '3gp', 'mkv']) || str_contains(strtolower($rawUrl), 'video');
+                
+                $dokumentasiPayload = [
+                    [
+                        'url'          => $rawUrl,
+                        'view_url'     => $rawUrl,
+                        'download_url' => $rawUrl,
+                        'type'         => $isVid ? 'video' : 'image',
+                        'is_video'     => $isVid,
+                        'is_image'     => !$isVid,
+                        'name'         => basename(parse_url($rawUrl, PHP_URL_PATH) ?? ($isVid ? 'video.mp4' : 'foto.jpg')),
+                    ]
+                ];
+            } elseif ($request->has('dokumentasi')) {
+                $hasDokumentasiInput = true;
+                $rawDok = $request->input('dokumentasi');
+                if (is_string($rawDok)) {
+                    $decoded = json_decode($rawDok, true);
+                    $dokumentasiPayload = is_array($decoded) ? $decoded : [];
+                } elseif (is_array($rawDok)) {
+                    $dokumentasiPayload = $rawDok;
+                } else {
+                    $dokumentasiPayload = [];
+                }
+            }
+
+            // Jika ada file multipart langsung di request ini, upload ke storage server
+            if ($request->hasFile('dokumentasi_files') || $request->hasFile('files') || $request->hasFile('file')) {
+                $hasDokumentasiInput = true;
+                $dokumentasiPayload = is_array($dokumentasiPayload) ? $dokumentasiPayload : [];
+                $uploadedFiles = [];
+                if ($request->hasFile('dokumentasi_files')) {
+                    $val = $request->file('dokumentasi_files');
+                    $uploadedFiles = is_array($val) ? $val : [$val];
+                } elseif ($request->hasFile('files')) {
+                    $val = $request->file('files');
+                    $uploadedFiles = is_array($val) ? $val : [$val];
+                } elseif ($request->hasFile('file')) {
+                    $uploadedFiles = [$request->file('file')];
+                }
+
+                $storageUrl = rtrim(config('services.storage_server.url'), '/');
+                $storageKey = config('services.storage_server.key');
+                $storageFolder = config('services.storage_server.folder') ?? 'kbm_docs';
+
+                foreach ($uploadedFiles as $uploadedFile) {
+                    try {
+                        $res = Http::timeout(60)
+                            ->withHeaders(['X-API-Key' => $storageKey])
+                            ->attach('file', file_get_contents($uploadedFile->getRealPath()), $uploadedFile->getClientOriginalName())
+                            ->post($storageUrl . '/api/v1/files/upload', [
+                                'folder' => $storageFolder,
+                                'name'   => $uploadedFile->getClientOriginalName(),
+                            ]);
+
+                        if ($res->successful()) {
+                            $resData = $res->json('data') ?? [];
+                            $isVid = str_starts_with($uploadedFile->getMimeType() ?? '', 'video/');
+                            $dokumentasiPayload[] = [
+                                'id'           => $resData['id'] ?? null,
+                                'url'          => $resData['view_url'] ?? '',
+                                'view_url'     => $resData['view_url'] ?? '',
+                                'download_url' => $resData['download_url'] ?? '',
+                                'type'         => $isVid ? 'video' : 'image',
+                                'name'         => $uploadedFile->getClientOriginalName(),
+                                'size'         => $uploadedFile->getSize(),
+                                'mime_type'    => $uploadedFile->getMimeType(),
+                            ];
+                        }
+                    } catch (\Exception $e) {
+                        Log::error('[DokKbm] Direct file upload failed: ' . $e->getMessage());
+                    }
+                }
+            }
+        }
+
+        DB::transaction(function () use ($request, $jadwal, $parallels, $schoolId, $tanggal, $operatorGuruId, $hasDokumentasiInput, $dokumentasiPayload) {
             // 1. Sinkronkan Jurnal KBM ke semua jadwal paralel
             $jurnalMap = [];
             foreach ($parallels as $pJadwal) {
+                $jurnalData = [
+                    'school_id'    => $schoolId,
+                    'guru_id'      => $operatorGuruId,
+                    'jam_ke'       => $pJadwal->jam_ke,
+                    'materi'       => trim($request->materi),
+                    'catatan'      => $request->catatan ? trim($request->catatan) : null,
+                    'jam_mulai'    => $pJadwal->jam_mulai,
+                    'jam_selesai'  => $pJadwal->jam_selesai,
+                ];
+
+                if ($hasDokumentasiInput) {
+                    $jurnalData['dokumentasi'] = $dokumentasiPayload;
+                }
+
                 $jurnal = JurnalPelajaran::updateOrCreate(
                     [
                         'jadwal_pelajaran_id' => $pJadwal->id,
                         'tanggal'             => $tanggal,
                     ],
-                    [
-                        'school_id'    => $schoolId,
-                        'guru_id'      => $operatorGuruId,
-                        'jam_ke'       => $pJadwal->jam_ke,
-                        'materi'       => trim($request->materi),
-                        'catatan'      => $request->catatan ? trim($request->catatan) : null,
-                        'jam_mulai'    => $pJadwal->jam_mulai,
-                        'jam_selesai'  => $pJadwal->jam_selesai,
-                    ]
+                    $jurnalData
                 );
                 $jurnalMap[$pJadwal->id] = $jurnal->id;
             }
@@ -989,4 +1109,113 @@ class MobileJadwalPelajaranController extends Controller
 
         return null;
     }
+
+    /**
+     * Upload dokumentasi foto/video KBM langsung via backend ke storage server
+     * POST /api/mobile/jadwal-pelajaran/upload-dokumentasi
+     */
+    public function uploadDokumentasi(Request $request)
+    {
+        $user = $request->user();
+        $schoolId = $user->school_id ?? ($user->guru ? $user->guru->school_id : null);
+        $school = $user->school ?? \App\Models\School::find($schoolId);
+
+        $licenseService = app(\App\Services\LicenseService::class);
+        if (!$licenseService->isDokKbmFeatureEnabled($school)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Fitur Dokumentasi KBM dinonaktifkan untuk sekolah Anda. Hubungi Super Administrator.'
+            ], 403);
+        }
+
+        $request->validate([
+            'file' => 'required|file|max:102400|mimes:jpg,jpeg,png,webp,mp4,mov,avi,mkv,3gp,webm',
+        ]);
+
+        $file = $request->file('file');
+        $storageUrl = rtrim(config('services.storage_server.url'), '/');
+        $storageKey = config('services.storage_server.key');
+        $storageFolder = config('services.storage_server.folder') ?? 'kbm_docs';
+
+        try {
+            $response = Http::timeout(120)
+                ->withHeaders([
+                    'X-API-Key' => $storageKey,
+                ])
+                ->attach('file', file_get_contents($file->getRealPath()), $file->getClientOriginalName())
+                ->post($storageUrl . '/api/v1/files/upload', [
+                    'folder' => $storageFolder,
+                    'name'   => $file->getClientOriginalName(),
+                ]);
+
+            if (!$response->successful()) {
+                Log::error('[DokKbm] Storage server response error: ' . $response->body());
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Gagal mengupload berkas ke server penyimpanan (' . $response->status() . ').'
+                ], 502);
+            }
+
+            $storageData = $response->json('data') ?? [];
+            $mime = $file->getMimeType() ?? '';
+            $isVideo = str_starts_with($mime, 'video/');
+
+            $docItem = [
+                'id'           => $storageData['id'] ?? null,
+                'url'          => $storageData['view_url'] ?? '',
+                'view_url'     => $storageData['view_url'] ?? '',
+                'download_url' => $storageData['download_url'] ?? '',
+                'type'         => $isVideo ? 'video' : 'image',
+                'name'         => $file->getClientOriginalName(),
+                'size'         => $file->getSize(),
+                'mime_type'    => $mime,
+            ];
+
+            // Jika jadwal_pelajaran_id & tanggal disertakan, langsung lampirkan ke jurnal KBM
+            if ($request->filled('jadwal_pelajaran_id') && $request->filled('tanggal')) {
+                $jDate = Carbon::parse($request->tanggal)->format('Y-m-d');
+                $jadwal = JadwalPelajaran::where('school_id', $schoolId)->find($request->jadwal_pelajaran_id);
+                if ($jadwal) {
+                    $parallels = $this->getParallelJadwals($jadwal, $schoolId);
+                    foreach ($parallels as $pJadwal) {
+                        $jurnal = JurnalPelajaran::firstOrCreate(
+                            [
+                                'jadwal_pelajaran_id' => $pJadwal->id,
+                                'tanggal'             => $jDate,
+                            ],
+                            [
+                                'school_id'   => $schoolId,
+                                'guru_id'     => $user->guru?->id ?? $jadwal->guru_id,
+                                'jam_ke'      => $pJadwal->jam_ke,
+                                'materi'      => 'KBM ' . ($pJadwal->mapel?->nama_mapel ?? ''),
+                                'jam_mulai'   => $pJadwal->jam_mulai,
+                                'jam_selesai' => $pJadwal->jam_selesai,
+                            ]
+                        );
+
+                        $currDok = $jurnal->dokumentasi ?? [];
+                        if (is_string($currDok)) {
+                            $currDok = json_decode($currDok, true) ?? [];
+                        }
+                        $currDok[] = $docItem;
+                        $jurnal->dokumentasi = $currDok;
+                        $jurnal->save();
+                    }
+                }
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Dokumentasi berhasil diupload.',
+                'data'    => $docItem,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('[DokKbm] Upload exception: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan saat upload berkas: ' . $e->getMessage()
+            ], 500);
+        }
+    }
 }
+

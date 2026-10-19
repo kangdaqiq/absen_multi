@@ -122,6 +122,15 @@
 
                 <label class="flex items-center cursor-pointer">
                     <div class="relative">
+                        <input type="checkbox" name="dok_kbm_enabled" value="1" class="sr-only custom-toggle" {{ old('dok_kbm_enabled', false) ? 'checked' : '' }} />
+                        <div class="w-11 h-6 bg-gray-300 rounded-full dark:bg-gray-700 transition-colors duration-300 track"></div>
+                        <div class="absolute top-0.5 left-0.5 h-5 w-5 bg-white rounded-full transition-transform duration-300 shadow thumb"></div>
+                    </div>
+                    <span class="ml-3 font-medium text-black dark:text-white">Fitur Dokumentasi KBM</span>
+                </label>
+
+                <label class="flex items-center cursor-pointer">
+                    <div class="relative">
                         <input type="checkbox" name="is_active" value="1" class="sr-only custom-toggle" {{ old('is_active', true) ? 'checked' : '' }} />
                         <div class="w-11 h-6 bg-gray-300 rounded-full dark:bg-gray-700 transition-colors duration-300 track"></div>
                         <div class="absolute top-0.5 left-0.5 h-5 w-5 bg-white rounded-full transition-transform duration-300 shadow thumb"></div>

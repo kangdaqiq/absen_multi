@@ -64,4 +64,10 @@ return [
         'threshold' => env('FACE_SIMILARITY_THRESHOLD', 0.75),
     ],
 
+    'storage_server' => [
+        'url'    => env('STORAGE_SERVER_URL', 'https://storage.jagattech.my.id'),
+        'key'    => env('STORAGE_SERVER_KEY', 'android-storage-secret-key'),
+        'folder' => env('STORAGE_SERVER_KBM_FOLDER', 'kbm_docs'),
+    ],
+
 ];

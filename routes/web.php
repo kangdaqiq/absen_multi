@@ -81,6 +81,7 @@ Route::middleware(['auth', 'self_hosted_guard'])->prefix('super-admin')->name('s
         Route::patch('schools/{school}/toggle-bot', [App\Http\Controllers\SuperAdmin\SchoolController::class, 'toggleBot'])->name('schools.toggle-bot');
         Route::patch('schools/{school}/toggle-photo', [App\Http\Controllers\SuperAdmin\SchoolController::class, 'togglePhoto'])->name('schools.toggle-photo');
         Route::patch('schools/{school}/toggle-face', [App\Http\Controllers\SuperAdmin\SchoolController::class, 'toggleFace'])->name('schools.toggle-face');
+        Route::patch('schools/{school}/toggle-dok-kbm', [App\Http\Controllers\SuperAdmin\SchoolController::class, 'toggleDokKbm'])->name('schools.toggle-dok-kbm');
         Route::post('schools/{school}/send-invoice-wa', function (\App\Models\School $school, \App\Services\SubscriptionNotificationService $service) {
             $res = $service->sendRenewalInvoiceWhatsApp($school);
             return back()->with($res['success'] ? 'success' : 'error', $res['message']);
@@ -109,6 +110,7 @@ Route::middleware(['auth', 'self_hosted_guard'])->prefix('super-admin')->name('s
         Route::patch('licenses/{license}/regenerate', [App\Http\Controllers\SuperAdmin\LicenseController::class, 'regenerate'])->name('licenses.regenerate');
         Route::patch('licenses/{license}/toggle-photo', [App\Http\Controllers\SuperAdmin\LicenseController::class, 'togglePhoto'])->name('licenses.toggle-photo');
         Route::patch('licenses/{license}/toggle-face', [App\Http\Controllers\SuperAdmin\LicenseController::class, 'toggleFace'])->name('licenses.toggle-face');
+        Route::patch('licenses/{license}/toggle-dok-kbm', [App\Http\Controllers\SuperAdmin\LicenseController::class, 'toggleDokKbm'])->name('licenses.toggle-dok-kbm');
         Route::get('licenses/{license}/download-backup', [App\Http\Controllers\SuperAdmin\LicenseController::class, 'downloadBackup'])->name('licenses.download-backup');
         Route::resource('licenses', App\Http\Controllers\SuperAdmin\LicenseController::class)->only(['index', 'store', 'update', 'destroy']);
 

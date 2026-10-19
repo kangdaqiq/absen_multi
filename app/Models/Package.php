@@ -18,6 +18,7 @@ class Package extends Model
         'bot_enabled',
         'photo_enabled',
         'face_enabled',
+        'dok_kbm_enabled',
         'is_active',
     ];
 
@@ -28,6 +29,7 @@ class Package extends Model
         'bot_enabled' => 'boolean',
         'photo_enabled' => 'boolean',
         'face_enabled' => 'boolean',
+        'dok_kbm_enabled' => 'boolean',
         'is_active' => 'boolean',
     ];
 

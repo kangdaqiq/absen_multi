@@ -19,6 +19,7 @@ class License extends Model
         'is_active',
         'photo_enabled',
         'face_enabled',
+        'dok_kbm_enabled',
         'allowed_hostname',
         'notes',
         'last_ping_at',
@@ -28,10 +29,11 @@ class License extends Model
     ];
 
     protected $casts = [
-        'is_active'      => 'boolean',
-        'photo_enabled'  => 'boolean',
-        'face_enabled'   => 'boolean',
-        'expired_at'    => 'date',
+        'is_active'        => 'boolean',
+        'photo_enabled'    => 'boolean',
+        'face_enabled'     => 'boolean',
+        'dok_kbm_enabled'  => 'boolean',
+        'expired_at'      => 'date',
         'last_ping_at'   => 'datetime',
         'last_backup_at' => 'datetime',
         'backup_size'    => 'integer',

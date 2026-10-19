@@ -147,6 +147,7 @@ class LicenseService
                     'max_bot_users'        => $data['max_bot_users'] ?? 0,
                     'photo_enabled'        => $data['photo_enabled'] ?? true,
                     'face_enabled'         => $data['face_enabled'] ?? true,
+                    'dok_kbm_enabled'      => $data['dok_kbm_enabled'] ?? false,
                     'history_quota_months' => $data['history_quota_months'] ?? null,
                     'message'              => 'Lisensi telah expired pada ' . $expiredAt->format('d M Y') . '. Hubungi provider untuk perpanjangan.',
                     'grace_remaining_days' => 0,
@@ -164,6 +165,7 @@ class LicenseService
                 'max_bot_users'        => $data['max_bot_users'] ?? 0,
                 'photo_enabled'        => $data['photo_enabled'] ?? true,
                 'face_enabled'         => $data['face_enabled'] ?? true,
+                'dok_kbm_enabled'      => $data['dok_kbm_enabled'] ?? false,
                 'history_quota_months' => $data['history_quota_months'] ?? null,
                 'message'              => 'Lisensi aktif.',
                 'grace_remaining_days' => 0,
@@ -187,6 +189,7 @@ class LicenseService
             'max_bot_users'        => 0,   // 0 = unlimited
             'photo_enabled'        => true,
             'face_enabled'         => true,
+            'dok_kbm_enabled'      => true,
             'history_quota_months' => null,
             'message'              => $message,
             'grace_remaining_days' => 0,
@@ -211,6 +214,7 @@ class LicenseService
             'max_bot_users'        => 0,
             'photo_enabled'        => false,
             'face_enabled'         => false,
+            'dok_kbm_enabled'      => false,
             'history_quota_months' => null,
             'message'              => $message,
             'grace_remaining_days' => 0,
@@ -446,6 +450,30 @@ class LicenseService
         }
 
         return true;
+    }
+
+    /**
+     * Periksa apakah fitur upload foto/video dokumentasi KBM aktif.
+     * - Pada mode self_hosted: diperiksa dari status lisensi (dok_kbm_enabled).
+     * - Pada mode hosted (SaaS / Super Admin): diperiksa dari pengaturan sekolah (school->dok_kbm_enabled).
+     */
+    public function isDokKbmFeatureEnabled(?\App\Models\School $school = null): bool
+    {
+        if ($this->isSelfHosted()) {
+            $license = $this->validate();
+            return isset($license['dok_kbm_enabled']) ? (bool) $license['dok_kbm_enabled'] : false;
+        }
+
+        if (!$school) {
+            $user = auth()->user();
+            $school = $user?->school;
+        }
+
+        if ($school) {
+            return (bool) ($school->dok_kbm_enabled ?? false);
+        }
+
+        return false;
     }
 }
 

@@ -322,6 +322,18 @@
                             <span class="text-sm font-medium text-black dark:text-white">Aktifkan Fitur Scanner Face ID (Wajah)</span>
                         </label>
 
+                        <label for="dok_kbm_enabled" class="flex cursor-pointer select-none items-center">
+                            <div class="relative">
+                                <input type="checkbox" id="dok_kbm_enabled" name="dok_kbm_enabled" value="1" {{ old('dok_kbm_enabled', $school->dok_kbm_enabled ?? false) ? 'checked' : '' }} class="sr-only" />
+                                <div id="dok_kbm_enabled_box" class="box mr-4 flex h-5 w-5 items-center justify-center rounded border border-stroke dark:border-strokedark bg-white dark:bg-boxdark">
+                                    <span class="opacity-0">
+                                        <i class="fas fa-check text-xs text-brand-500"></i>
+                                    </span>
+                                </div>
+                            </div>
+                            <span class="text-sm font-medium text-black dark:text-white">Aktifkan Fitur Dokumentasi KBM (Foto/Video)</span>
+                        </label>
+
                         {{-- Toggle Bot WA — hanya superadmin, admin sekolah tidak bisa melihat/mengubah ini --}}
                         <div class="rounded-md border border-stroke dark:border-strokedark p-4 bg-gray-2/40 dark:bg-meta-4/40">
                             <div class="flex items-center justify-between">

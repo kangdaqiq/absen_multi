@@ -71,6 +71,7 @@ class SchoolController extends Controller
         $validated['is_active']           = $request->has('is_active');
         $validated['photo_enabled']       = $request->has('photo_enabled');
         $validated['face_enabled']        = $request->has('face_enabled');
+        $validated['dok_kbm_enabled']     = $request->has('dok_kbm_enabled');
         $validated['wa_enabled']          = $request->has('wa_enabled');
         $validated['bot_enabled']         = true; // Default aktif saat buat sekolah baru
         $validated['bot_user_limit']      = $request->bot_user_limit ?: 0;
@@ -96,6 +97,9 @@ class SchoolController extends Controller
                 }
                 if (isset($package->face_enabled)) {
                     $validated['face_enabled'] = (bool) $package->face_enabled;
+                }
+                if (isset($package->dok_kbm_enabled)) {
+                    $validated['dok_kbm_enabled'] = (bool) $package->dok_kbm_enabled;
                 }
                 $validated['expired_at'] = $billingCycle === 'yearly' ? now()->addYear() : now()->addMonth();
             }
@@ -217,6 +221,7 @@ class SchoolController extends Controller
         $validated['is_active']           = $request->has('is_active');
         $validated['photo_enabled']       = $request->has('photo_enabled');
         $validated['face_enabled']        = $request->has('face_enabled');
+        $validated['dok_kbm_enabled']     = $request->has('dok_kbm_enabled');
         $validated['wa_enabled']          = $request->has('wa_enabled');
         // bot_enabled TIDAK diubah dari form edit biasa — dikontrol lewat toggleBot() khusus superadmin
         $validated['bot_user_limit']       = $request->bot_user_limit ?: 0;
@@ -245,6 +250,9 @@ class SchoolController extends Controller
                     }
                     if (isset($package->face_enabled)) {
                         $validated['face_enabled'] = (bool) $package->face_enabled;
+                    }
+                    if (isset($package->dok_kbm_enabled)) {
+                        $validated['dok_kbm_enabled'] = (bool) $package->dok_kbm_enabled;
                     }
                     // For update, we don't automatically change bot_enabled to prevent accidentally turning it back on if manually disabled by admin
                     // But if it's a completely new package, we might want to respect the package. Let's respect the package but only if turning ON.
@@ -415,6 +423,23 @@ class SchoolController extends Controller
             'success'      => true,
             'face_enabled' => $school->face_enabled,
             'message'      => "Fitur Scanner Face ID untuk {$school->name} berhasil di{$status}kan.",
+        ]);
+    }
+
+    /**
+     * Toggle dok_kbm_enabled for a school (AJAX, superadmin only)
+     */
+    public function toggleDokKbm(School $school)
+    {
+        $school->dok_kbm_enabled = !$school->dok_kbm_enabled;
+        $school->save();
+
+        $status = $school->dok_kbm_enabled ? 'aktif' : 'nonaktif';
+
+        return response()->json([
+            'success'         => true,
+            'dok_kbm_enabled' => $school->dok_kbm_enabled,
+            'message'         => "Fitur Dokumentasi KBM untuk {$school->name} berhasil di{$status}kan.",
         ]);
     }
 

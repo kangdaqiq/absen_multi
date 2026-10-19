@@ -33,6 +33,7 @@ class PackageController extends Controller
             'bot_enabled' => 'nullable|boolean',
             'photo_enabled' => 'nullable|boolean',
             'face_enabled' => 'nullable|boolean',
+            'dok_kbm_enabled' => 'nullable|boolean',
             'is_active' => 'nullable|boolean',
         ]);
 
@@ -40,6 +41,7 @@ class PackageController extends Controller
         $validated['bot_enabled'] = $request->has('bot_enabled');
         $validated['photo_enabled'] = $request->has('photo_enabled');
         $validated['face_enabled'] = $request->has('face_enabled');
+        $validated['dok_kbm_enabled'] = $request->has('dok_kbm_enabled');
         $validated['is_active'] = $request->has('is_active');
         
         // Convert null strings to actual null for limits (0 means unlimited in DB logic, but null is safer for empty)
@@ -73,6 +75,7 @@ class PackageController extends Controller
             'bot_enabled' => 'nullable|boolean',
             'photo_enabled' => 'nullable|boolean',
             'face_enabled' => 'nullable|boolean',
+            'dok_kbm_enabled' => 'nullable|boolean',
             'is_active' => 'nullable|boolean',
         ]);
 
@@ -80,6 +83,7 @@ class PackageController extends Controller
         $validated['bot_enabled'] = $request->has('bot_enabled');
         $validated['photo_enabled'] = $request->has('photo_enabled');
         $validated['face_enabled'] = $request->has('face_enabled');
+        $validated['dok_kbm_enabled'] = $request->has('dok_kbm_enabled');
         $validated['is_active'] = $request->has('is_active');
 
         $validated['student_limit'] = $validated['student_limit'] ?? 0;

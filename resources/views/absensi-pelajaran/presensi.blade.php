@@ -432,6 +432,39 @@
                 </div>
             </div>
 
+            @if($jurnal && $jurnal->has_dokumentasi)
+                <div class="mt-4 pt-3.5 border-t border-gray-100 dark:border-gray-800">
+                    <label class="mb-2.5 block text-xs sm:text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center justify-between">
+                        <span class="flex items-center gap-2">
+                            <i class="fas fa-photo-video text-brand-500"></i>
+                            <span>Dokumentasi Kegiatan Belajar ({{ count($jurnal->dokumentasi_list) }} berkas)</span>
+                        </span>
+                        <span class="text-[11px] text-gray-400 font-normal">Tersimpan di Cloud Storage</span>
+                    </label>
+                    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                        @foreach($jurnal->dokumentasi_list as $dok)
+                            <div class="group relative rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 shadow-xs hover:shadow-md transition">
+                                @if($dok['is_video'])
+                                    <div class="aspect-video w-full bg-black flex items-center justify-center relative">
+                                        <video src="{{ $dok['view_url'] }}" controls preload="metadata" class="w-full h-full object-cover"></video>
+                                    </div>
+                                @else
+                                    <a href="{{ $dok['view_url'] }}" target="_blank" class="block aspect-square w-full overflow-hidden bg-gray-100 dark:bg-gray-900">
+                                        <img src="{{ $dok['view_url'] }}" alt="{{ $dok['name'] }}" loading="lazy" class="w-full h-full object-cover group-hover:scale-105 transition duration-300">
+                                    </a>
+                                @endif
+                                <div class="p-2 text-[10px] text-gray-600 dark:text-gray-400 flex items-center justify-between gap-1 border-t border-gray-100 dark:border-gray-700/60">
+                                    <span class="truncate" title="{{ $dok['name'] }}">{{ $dok['name'] }}</span>
+                                    <a href="{{ $dok['download_url'] }}" target="_blank" download class="text-brand-500 hover:text-brand-600 ml-1 shrink-0" title="Unduh Berkas">
+                                        <i class="fas fa-download"></i>
+                                    </a>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
+
             <!-- Bottom action row jurnal -->
             <div class="mt-3.5 pt-3 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between gap-3">
                 <div id="jurnalSaveStatus" class="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1.5">

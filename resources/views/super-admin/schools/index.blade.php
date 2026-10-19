@@ -33,6 +33,7 @@
                     <th class="py-4 px-4 text-center border-b border-stroke dark:border-strokedark">Bot WA</th>
                     <th class="py-4 px-4 text-center border-b border-stroke dark:border-strokedark">Foto Siswa</th>
                     <th class="py-4 px-4 text-center border-b border-stroke dark:border-strokedark">Scanner Wajah</th>
+                    <th class="py-4 px-4 text-center border-b border-stroke dark:border-strokedark">Dok KBM</th>
                     <th class="py-4 px-4 border-b border-stroke dark:border-strokedark">Aksi</th>
                 </tr>
             </thead>
@@ -149,6 +150,25 @@
                             </label>
                             <p class="text-xs mt-1 {{ ($school->face_enabled ?? true) ? 'text-brand-500 font-medium' : 'text-gray-400 dark:text-gray-500' }}">
                                 {{ ($school->face_enabled ?? true) ? 'Aktif' : 'Mati' }}
+                            </p>
+                        </td>
+                        {{-- Toggle Dok KBM --}}
+                        <td class="border-b border-[#eee] py-5 px-4 dark:border-strokedark align-top text-center">
+                            <label class="inline-flex items-center cursor-pointer" title="{{ ($school->dok_kbm_enabled ?? false) ? 'Klik untuk nonaktifkan fitur Dokumentasi KBM' : 'Klik untuk aktifkan fitur Dokumentasi KBM' }}">
+                                <input
+                                    type="checkbox"
+                                    class="sr-only dok-kbm-toggle"
+                                    data-school-id="{{ $school->id }}"
+                                    data-school-name="{{ $school->name }}"
+                                    data-url="{{ route('super-admin.schools.toggle-dok-kbm', $school) }}"
+                                    {{ ($school->dok_kbm_enabled ?? false) ? 'checked' : '' }}
+                                />
+                                <div class="dok-kbm-toggle-track relative w-11 h-6 rounded-full transition-colors duration-300 {{ ($school->dok_kbm_enabled ?? false) ? 'bg-brand-500' : 'bg-gray-300 dark:bg-meta-4' }}">
+                                    <div class="dok-kbm-toggle-thumb absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-300" style="{{ ($school->dok_kbm_enabled ?? false) ? 'transform: translateX(20px);' : '' }}"></div>
+                                </div>
+                            </label>
+                            <p class="text-xs mt-1 {{ ($school->dok_kbm_enabled ?? false) ? 'text-brand-500 font-medium' : 'text-gray-400 dark:text-gray-500' }}">
+                                {{ ($school->dok_kbm_enabled ?? false) ? 'Aktif' : 'Mati' }}
                             </p>
                         </td>
                         <td class="border-b border-[#eee] py-5 px-4 dark:border-strokedark align-top">
@@ -370,6 +390,60 @@
                         } else {
                             this.checked = !isChecked;
                             showToast('Gagal mengubah status fitur scanner face id.', 'error');
+                        }
+                    })
+                    .catch(() => {
+                        this.checked = !isChecked;
+                        showToast('Terjadi kesalahan jaringan.', 'error');
+                    })
+                    .finally(() => {
+                        this.disabled = false;
+                    });
+                });
+            });
+
+            // ── Toggle Dok KBM ───────────────────────────────────────────────
+            document.querySelectorAll('.dok-kbm-toggle').forEach(input => {
+                input.addEventListener('change', function () {
+                    const url = this.dataset.url;
+                    const isChecked = this.checked;
+                    const track = this.closest('label').querySelector('.dok-kbm-toggle-track');
+                    const thumb = this.closest('label').querySelector('.dok-kbm-toggle-thumb');
+                    const statusText = this.closest('td').querySelector('p');
+
+                    this.disabled = true;
+
+                    fetch(url, {
+                        method: 'PATCH',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': csrfToken,
+                            'Accept': 'application/json',
+                        },
+                    })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.success) {
+                            const active = data.dok_kbm_enabled;
+
+                            if (active) {
+                                track.classList.remove('bg-gray-300', 'dark:bg-meta-4');
+                                track.classList.add('bg-brand-500');
+                                thumb.style.transform = 'translateX(20px)';
+                                statusText.textContent = 'Aktif';
+                                statusText.className = 'text-xs mt-1 text-brand-500 font-medium';
+                            } else {
+                                track.classList.remove('bg-brand-500');
+                                track.classList.add('bg-gray-300', 'dark:bg-meta-4');
+                                thumb.style.transform = 'translateX(0)';
+                                statusText.textContent = 'Mati';
+                                statusText.className = 'text-xs mt-1 text-gray-400 dark:text-gray-500';
+                            }
+
+                            showToast(data.message, active ? 'success' : 'warning');
+                        } else {
+                            this.checked = !isChecked;
+                            showToast('Gagal mengubah status fitur dokumentasi KBM.', 'error');
                         }
                     })
                     .catch(() => {

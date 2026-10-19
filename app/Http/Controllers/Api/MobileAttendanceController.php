@@ -570,6 +570,10 @@ class MobileAttendanceController extends Controller
             }
         }
 
+        $licenseService = app(\App\Services\LicenseService::class);
+        $dokKbmEnabled = $licenseService->isDokKbmFeatureEnabled($school instanceof \App\Models\School ? $school : null);
+        $storageCfg = config('services.storage_server', []);
+
         return [
             'id' => $id,
             'name' => $school?->name ?? 'Sekolah',
@@ -579,6 +583,13 @@ class MobileAttendanceController extends Controller
             'longitude' => $long,
             'radius' => $radius,
             'geofence_enabled' => $isGeoEnabled,
+            'dok_kbm_enabled' => $dokKbmEnabled,
+            'storage_server' => [
+                'enabled' => $dokKbmEnabled,
+                'url' => $storageCfg['url'] ?? 'https://storage.jagattech.my.id',
+                'api_key' => $dokKbmEnabled ? ($storageCfg['key'] ?? '') : '',
+                'folder' => $storageCfg['folder'] ?? 'kbm_docs',
+            ],
         ];
     }
 

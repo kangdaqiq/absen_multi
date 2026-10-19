@@ -21,12 +21,8 @@
   <div class="mb-6 rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-sm dark:border-gray-800 dark:bg-gray-dark md:p-6">
     <div class="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
       <div class="flex items-start gap-4">
-        <div class="relative flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-2xl bg-white border border-gray-200/80 p-2.5 shadow-theme-xs dark:border-gray-700 dark:bg-white">
+        <div class="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-2xl bg-white border border-gray-200/80 p-2.5 shadow-theme-xs dark:border-gray-700 dark:bg-white">
           <img src="{{ asset('images/logo/logo-icon.svg') }}" alt="Logo Jagat Absen" class="h-9 w-9 object-contain" />
-          <span class="absolute -top-1 -right-1 flex h-3.5 w-3.5">
-            <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-success-500 opacity-75"></span>
-            <span class="relative inline-flex h-3.5 w-3.5 rounded-full bg-success-500 ring-2 ring-white dark:ring-gray-900"></span>
-          </span>
         </div>
 
         <div>
@@ -41,12 +37,14 @@
           </div>
 
           <p class="mt-1 text-xs sm:text-sm text-gray-600 dark:text-gray-400 max-w-2xl leading-relaxed">
-            Aplikasi resmi Android untuk <strong>Guru, Wali Kelas, Wali Murid, dan Siswa</strong>: Absensi biometrik <strong>Face ID Recognition</strong>, radius <strong>Geofence</strong> GPS sekolah, rekapitulasi kelas wali kelas, dan notifikasi kehadiran real-time.
+            Aplikasi presensi mobile terintegrasi untuk Guru, Wali Kelas, dan Siswa. Mendukung absensi biometrik Face ID, validasi radius GPS sekolah, absensi kegiatan belajar mengajar (per jam pelajaran), pengisian jurnal pembelajaran, serta rekapitulasi kehadiran real-time.
           </p>
           <div class="mt-2.5 flex flex-wrap items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
             <span class="inline-flex items-center gap-1.5"><i class="fas fa-check-circle text-success-500"></i> Face Recognition</span>
-            <span class="inline-flex items-center gap-1.5"><i class="fas fa-check-circle text-success-500"></i> Geofence GPS Validated</span>
-            <span class="inline-flex items-center gap-1.5"><i class="fas fa-check-circle text-success-500"></i> Notifikasi Pop-up</span>
+            <span class="inline-flex items-center gap-1.5"><i class="fas fa-check-circle text-success-500"></i> Geofence GPS</span>
+            <span class="inline-flex items-center gap-1.5"><i class="fas fa-check-circle text-success-500"></i> Absensi KBM</span>
+            <span class="inline-flex items-center gap-1.5"><i class="fas fa-check-circle text-success-500"></i> Jurnal Pembelajaran</span>
+            <span class="inline-flex items-center gap-1.5"><i class="fas fa-check-circle text-success-500"></i> Notifikasi Real-time</span>
           </div>
         </div>
       </div>

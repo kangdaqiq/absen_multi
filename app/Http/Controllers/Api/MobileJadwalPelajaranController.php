@@ -155,14 +155,22 @@ class MobileJadwalPelajaranController extends Controller
                 }
             }
 
+            $breakInfo = $j->jeda_istirahat_info;
+
             $formatted->push([
-                'id'               => $j->id,
-                'hari'             => $j->hari,
-                'jam_ke'           => $j->jam_ke ?? '-',
-                'jam_mulai'        => substr($j->jam_mulai, 0, 5),
-                'jam_selesai'      => substr($j->jam_selesai, 0, 5),
-                'jam_format'       => $j->jam_format,
-                'ruangan'          => $j->ruangan ?? '-',
+                'id'                     => $j->id,
+                'hari'                   => $j->hari,
+                'jam_ke'                 => $j->jam_ke ?? '-',
+                'jam_mulai'              => substr($j->jam_mulai, 0, 5),
+                'jam_selesai'            => substr($j->jam_selesai, 0, 5),
+                'jam_format'             => $j->jam_format,
+                'has_istirahat'          => $breakInfo['has_istirahat'],
+                'istirahat_label'        => $breakInfo['istirahat_label'],
+                'istirahat_text'         => $breakInfo['istirahat_text'],
+                'durasi_istirahat_menit' => $breakInfo['durasi_istirahat_menit'],
+                'jam_detail_format'      => $breakInfo['segments_format'],
+                'jeda_istirahat'         => $breakInfo['list'],
+                'ruangan'                => $j->ruangan ?? '-',
                 'kelas_id'         => $j->kelas_id,
                 'kelas_nama'       => $isMulti ? implode(', ', $parallelKelasNames) : ($j->kelas?->nama_kelas ?? '-'),
                 'is_multi_kelas'   => $isMulti,
@@ -262,14 +270,22 @@ class MobileJadwalPelajaranController extends Controller
                 $isMulti = $parallels->count() > 1;
                 $parallelKelasNames = $parallels->map(fn($p) => $p->kelas?->nama_kelas)->filter()->unique()->values()->all();
 
+                $breakInfo = $j->jeda_istirahat_info;
+
                 $dayList->push([
-                    'id'               => $j->id,
-                    'hari'             => $j->hari,
-                    'jam_ke'           => $j->jam_ke ?? '-',
-                    'jam_mulai'        => substr($j->jam_mulai, 0, 5),
-                    'jam_selesai'      => substr($j->jam_selesai, 0, 5),
-                    'jam_format'       => $j->jam_format,
-                    'ruangan'          => $j->ruangan ?? '-',
+                    'id'                     => $j->id,
+                    'hari'                   => $j->hari,
+                    'jam_ke'                 => $j->jam_ke ?? '-',
+                    'jam_mulai'              => substr($j->jam_mulai, 0, 5),
+                    'jam_selesai'            => substr($j->jam_selesai, 0, 5),
+                    'jam_format'             => $j->jam_format,
+                    'has_istirahat'          => $breakInfo['has_istirahat'],
+                    'istirahat_label'        => $breakInfo['istirahat_label'],
+                    'istirahat_text'         => $breakInfo['istirahat_text'],
+                    'durasi_istirahat_menit' => $breakInfo['durasi_istirahat_menit'],
+                    'jam_detail_format'      => $breakInfo['segments_format'],
+                    'jeda_istirahat'         => $breakInfo['list'],
+                    'ruangan'                => $j->ruangan ?? '-',
                     'kelas_id'         => $j->kelas_id,
                     'kelas_nama'       => $isMulti ? implode(', ', $parallelKelasNames) : ($j->kelas?->nama_kelas ?? '-'),
                     'is_multi_kelas'   => $isMulti,
@@ -407,13 +423,19 @@ class MobileJadwalPelajaranController extends Controller
             'success' => true,
             'data'    => [
                 'jadwal' => [
-                    'id'               => $jadwal->id,
-                    'hari'             => $jadwal->hari,
-                    'jam_ke'           => $jadwal->jam_ke ?? '-',
-                    'jam_mulai'        => substr($jadwal->jam_mulai, 0, 5),
-                    'jam_selesai'      => substr($jadwal->jam_selesai, 0, 5),
-                    'jam_format'       => $jadwal->jam_format,
-                    'ruangan'          => $jadwal->ruangan ?? '-',
+                    'id'                     => $jadwal->id,
+                    'hari'                   => $jadwal->hari,
+                    'jam_ke'                 => $jadwal->jam_ke ?? '-',
+                    'jam_mulai'              => substr($jadwal->jam_mulai, 0, 5),
+                    'jam_selesai'            => substr($jadwal->jam_selesai, 0, 5),
+                    'jam_format'             => $jadwal->jam_format,
+                    'has_istirahat'          => $jadwal->jeda_istirahat_info['has_istirahat'],
+                    'istirahat_label'        => $jadwal->jeda_istirahat_info['istirahat_label'],
+                    'istirahat_text'         => $jadwal->jeda_istirahat_info['istirahat_text'],
+                    'durasi_istirahat_menit' => $jadwal->jeda_istirahat_info['durasi_istirahat_menit'],
+                    'jam_detail_format'      => $jadwal->jeda_istirahat_info['segments_format'],
+                    'jeda_istirahat'         => $jadwal->jeda_istirahat_info['list'],
+                    'ruangan'                => $jadwal->ruangan ?? '-',
                     'kelas'            => [
                         'id'   => $jadwal->kelas?->id,
                         'nama' => $isMultiKelas ? implode(', ', $parallelKelasNames) : ($jadwal->kelas?->nama_kelas ?? '-'),
@@ -783,15 +805,23 @@ class MobileJadwalPelajaranController extends Controller
                 $statCounts['belum_absen']++;
             }
 
+            $breakInfo = $j->jeda_istirahat_info;
+
             return [
-                'id'                  => $j->id,
-                'jadwal_pelajaran_id' => $j->id,
-                'hari'                => $j->hari,
-                'jam_ke'              => $j->jam_ke ?? '-',
-                'jam_mulai'           => substr($j->jam_mulai, 0, 5),
-                'jam_selesai'         => substr($j->jam_selesai, 0, 5),
-                'jam_format'          => $j->jam_format,
-                'ruangan'             => $j->ruangan ?? '-',
+                'id'                     => $j->id,
+                'jadwal_pelajaran_id'    => $j->id,
+                'hari'                   => $j->hari,
+                'jam_ke'                 => $j->jam_ke ?? '-',
+                'jam_mulai'              => substr($j->jam_mulai, 0, 5),
+                'jam_selesai'            => substr($j->jam_selesai, 0, 5),
+                'jam_format'             => $j->jam_format,
+                'has_istirahat'          => $breakInfo['has_istirahat'],
+                'istirahat_label'        => $breakInfo['istirahat_label'],
+                'istirahat_text'         => $breakInfo['istirahat_text'],
+                'durasi_istirahat_menit' => $breakInfo['durasi_istirahat_menit'],
+                'jam_detail_format'      => $breakInfo['segments_format'],
+                'jeda_istirahat'         => $breakInfo['list'],
+                'ruangan'                => $j->ruangan ?? '-',
                 'kelas_id'            => $student->kelas_id,
                 'kelas_nama'          => $student->kelas ? ($student->kelas->nama_kelas ?? $student->kelas->nama) : ($j->kelas?->nama_kelas ?? '-'),
                 'mapel_id'            => $j->mapel_id,
@@ -884,14 +914,22 @@ class MobileJadwalPelajaranController extends Controller
 
         $grouped = $jadwals->groupBy('hari')->map(function ($items, $day) use ($student) {
             return $items->map(function ($j) use ($student) {
+                $breakInfo = $j->jeda_istirahat_info;
+
                 return [
-                    'id'          => $j->id,
-                    'hari'        => $j->hari,
-                    'jam_ke'      => $j->jam_ke ?? '-',
-                    'jam_mulai'   => substr($j->jam_mulai, 0, 5),
-                    'jam_selesai' => substr($j->jam_selesai, 0, 5),
-                    'jam_format'  => $j->jam_format,
-                    'ruangan'     => $j->ruangan ?? '-',
+                    'id'                     => $j->id,
+                    'hari'                   => $j->hari,
+                    'jam_ke'                 => $j->jam_ke ?? '-',
+                    'jam_mulai'              => substr($j->jam_mulai, 0, 5),
+                    'jam_selesai'            => substr($j->jam_selesai, 0, 5),
+                    'jam_format'             => $j->jam_format,
+                    'has_istirahat'          => $breakInfo['has_istirahat'],
+                    'istirahat_label'        => $breakInfo['istirahat_label'],
+                    'istirahat_text'         => $breakInfo['istirahat_text'],
+                    'durasi_istirahat_menit' => $breakInfo['durasi_istirahat_menit'],
+                    'jam_detail_format'      => $breakInfo['segments_format'],
+                    'jeda_istirahat'         => $breakInfo['list'],
+                    'ruangan'                => $j->ruangan ?? '-',
                     'kelas_id'    => $student->kelas_id,
                     'kelas_nama'  => $student->kelas ? ($student->kelas->nama_kelas ?? $student->kelas->nama) : ($j->kelas?->nama_kelas ?? '-'),
                     'mapel_id'    => $j->mapel_id,

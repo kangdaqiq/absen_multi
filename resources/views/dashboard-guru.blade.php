@@ -299,6 +299,11 @@
                             <span class="text-[11px] sm:text-xs opacity-75 font-mono">
                                 s/d {{ substr($j->jam_selesai, 0, 5) }}
                             </span>
+                            @if(!empty($j->jeda_istirahat_info['has_istirahat']))
+                                <span class="mt-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-200 border border-amber-200 dark:border-amber-700 whitespace-nowrap" title="Jeda Istirahat: {{ $j->jeda_istirahat_info['istirahat_text'] }}">
+                                    ☕ {{ $j->jeda_istirahat_info['istirahat_text'] }}
+                                </span>
+                            @endif
                         </div>
 
                         <!-- Info Mata Pelajaran & Kelas -->
@@ -349,6 +354,13 @@
                                 @if($j->jam_ke)
                                     <span class="inline-flex items-center font-mono font-bold text-brand-700 dark:text-brand-300 bg-brand-50 dark:bg-brand-500/15 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg border border-brand-200 dark:border-brand-500/20 text-[11px] sm:text-xs">
                                         Ke-{{ $j->jam_ke }}
+                                    </span>
+                                @endif
+
+                                @if(!empty($j->jeda_istirahat_info['has_istirahat']))
+                                    <span class="inline-flex items-center gap-1 font-mono font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-500/15 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg border border-amber-200 dark:border-amber-500/30 text-[11px] sm:text-xs" title="Jeda Istirahat di Sela KBM: {{ $j->jeda_istirahat_info['istirahat_text'] }} ({{ $j->jeda_istirahat_info['segments_format'] }})">
+                                        <i class="fas fa-coffee text-amber-500 text-[11px]"></i>
+                                        {{ $j->jeda_istirahat_info['istirahat_label'] }}
                                     </span>
                                 @endif
 

@@ -297,6 +297,11 @@
                 <span class="font-semibold text-gray-800 dark:text-white text-xs sm:text-sm font-mono block">
                     {{ substr($jadwal->jam_mulai, 0, 5) }} - {{ substr($jadwal->jam_selesai, 0, 5) }}
                 </span>
+                @if(!empty($jadwal->jeda_istirahat_info['has_istirahat']))
+                    <span class="text-[10px] text-amber-600 dark:text-amber-400 font-semibold block mt-0.5">
+                        <i class="fas fa-coffee text-[9px]"></i> {{ $jadwal->jeda_istirahat_info['istirahat_label'] }}
+                    </span>
+                @endif
             </div>
             <div>
                 <span class="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 block">Ruangan</span>

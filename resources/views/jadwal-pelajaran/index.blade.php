@@ -260,6 +260,11 @@
                                     <span class="text-xs font-medium text-gray-600 dark:text-gray-300 mt-1">
                                         <i class="far fa-clock text-gray-400 mr-1"></i> {{ substr($j->jam_mulai, 0, 5) }} - {{ substr($j->jam_selesai, 0, 5) }}
                                     </span>
+                                    @if(!empty($j->jeda_istirahat_info['has_istirahat']))
+                                        <span class="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-500/15 px-1.5 py-0.5 rounded border border-amber-200 dark:border-amber-500/30 mt-0.5" title="Ada Jeda Istirahat di Sela KBM: {{ $j->jeda_istirahat_info['istirahat_text'] }}">
+                                            <i class="fas fa-coffee text-amber-500 text-[9px]"></i> {{ $j->jeda_istirahat_info['istirahat_label'] }}
+                                        </span>
+                                    @endif
                                 </div>
                             </td>
                             <td class="border-b border-gray-100 px-4 py-4 dark:border-gray-800">

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Carbon\Carbon;
 
 class JadwalPelajaran extends Model
 {
@@ -119,5 +120,169 @@ class JadwalPelajaran extends Model
             7 => 'Minggu',
         ];
         return $map[$index] ?? 'Senin';
+    }
+
+    /**
+     * Cache static per request agar tidak query JamPelajaran berulang kali
+     */
+    protected static $cachedSchoolJamPelajarans = [];
+
+    /**
+     * Deteksi jeda istirahat yang berada di tengah rentang jam KBM ini.
+     * Mengembalikan array jeda istirahat:
+     * [
+     *   [
+     *     'jam_mulai' => '10:00',
+     *     'jam_selesai' => '10:15',
+     *     'durasi_menit' => 15,
+     *     'label' => '10:00 - 10:15',
+     *     'setelah_jam_ke' => '4'
+     *   ]
+     * ]
+     *
+     * @param \Illuminate\Support\Collection|null $cachedJamPelajarans
+     * @return array
+     */
+    public function getJedaIstirahat($cachedJamPelajarans = null): array
+    {
+        if (empty($this->jam_mulai) || empty($this->jam_selesai)) {
+            return [];
+        }
+
+        $mulai = substr($this->jam_mulai, 0, 5);
+        $selesai = substr($this->jam_selesai, 0, 5);
+
+        if ($mulai >= $selesai) {
+            return [];
+        }
+
+        $jps = $cachedJamPelajarans;
+        if ($jps === null) {
+            $schoolId = $this->school_id ?? 0;
+            $hari = $this->hari;
+            $cacheKey = "{$schoolId}_{$hari}";
+
+            if (!isset(self::$cachedSchoolJamPelajarans[$cacheKey])) {
+                self::$cachedSchoolJamPelajarans[$cacheKey] = JamPelajaran::where('school_id', $schoolId)
+                    ->where('is_active', true)
+                    ->when($hari, function ($q) use ($hari) {
+                        $q->where(function ($sq) use ($hari) {
+                            $sq->whereNull('hari')
+                                ->orWhere('hari', 'like', "%{$hari}%");
+                        });
+                    })
+                    ->orderBy('urutan')
+                    ->orderBy('jam_mulai')
+                    ->get();
+            }
+            $jps = self::$cachedSchoolJamPelajarans[$cacheKey];
+        }
+
+        if (!$jps || $jps->isEmpty()) {
+            return [];
+        }
+
+        // 1. Coba cocokkan periode berdasarkan jam_pelajaran_id dan jam_pelajaran_id_akhir
+        $matched = collect();
+        $awal = $this->jam_pelajaran_id ? $jps->firstWhere('id', $this->jam_pelajaran_id) : null;
+        $akhir = $this->jam_pelajaran_id_akhir ? $jps->firstWhere('id', $this->jam_pelajaran_id_akhir) : $awal;
+
+        if ($awal && $akhir) {
+            $minUrutan = min($awal->urutan, $akhir->urutan);
+            $maxUrutan = max($awal->urutan, $akhir->urutan);
+            $matched = $jps->filter(function ($jp) use ($awal, $minUrutan, $maxUrutan) {
+                $isSameSession = empty($awal->nama_jam) || empty($jp->nama_jam) || (strcasecmp(trim($jp->nama_jam), trim($awal->nama_jam)) === 0);
+                return $isSameSession && $jp->urutan >= $minUrutan && $jp->urutan <= $maxUrutan;
+            })->sortBy('urutan')->values();
+        }
+
+        // 2. Fallback: jika tidak ditemukan via ID atau kurang dari 2 periode, cari berdasarkan irisan jam
+        if ($matched->count() < 2) {
+            $matched = $jps->filter(function ($jp) use ($mulai, $selesai) {
+                $jpMulai = substr($jp->jam_mulai, 0, 5);
+                $jpSelesai = substr($jp->jam_selesai, 0, 5);
+                return $jpMulai >= $mulai && $jpSelesai <= $selesai;
+            })->sortBy('jam_mulai')->values();
+        }
+
+        if ($matched->count() < 2) {
+            return [];
+        }
+
+        $breaks = [];
+        $prev = null;
+
+        foreach ($matched as $curr) {
+            if ($prev !== null) {
+                $prevEnd = substr($prev->jam_selesai, 0, 5);
+                $currStart = substr($curr->jam_mulai, 0, 5);
+
+                // Cek jeda waktu kosong di antara 2 jam pelajaran berurutan
+                if ($currStart > $prevEnd) {
+                    try {
+                        $pEndCarbon = Carbon::parse($prevEnd);
+                        $cStartCarbon = Carbon::parse($currStart);
+                        $durasi = abs($cStartCarbon->diffInMinutes($pEndCarbon));
+
+                        if ($durasi >= 5) {
+                            $breaks[] = [
+                                'jam_mulai' => $prevEnd,
+                                'jam_selesai' => $currStart,
+                                'durasi_menit' => $durasi,
+                                'label' => "{$prevEnd} - {$currStart}",
+                                'setelah_jam_ke' => $prev->jam_ke ?? null,
+                            ];
+                        }
+                    } catch (\Throwable $e) {
+                        // ignore parsing error
+                    }
+                }
+            }
+            $prev = $curr;
+        }
+
+        return $breaks;
+    }
+
+    /**
+     * Dapatkan detail jeda istirahat terformat (Aksesori)
+     */
+    public function getJedaIstirahatInfoAttribute(): array
+    {
+        $breaks = $this->getJedaIstirahat();
+        $hasBreak = !empty($breaks);
+
+        $labels = array_map(fn($b) => "{$b['jam_mulai']} - {$b['jam_selesai']}", $breaks);
+        $labelsText = implode(', ', $labels);
+        $totalDurasi = array_sum(array_column($breaks, 'durasi_menit'));
+
+        $segments = [];
+        $mulai = substr($this->jam_mulai, 0, 5);
+        $selesai = substr($this->jam_selesai, 0, 5);
+
+        if ($hasBreak) {
+            $currStart = $mulai;
+            foreach ($breaks as $b) {
+                if ($b['jam_mulai'] > $currStart) {
+                    $segments[] = "{$currStart} - {$b['jam_mulai']}";
+                }
+                $currStart = $b['jam_selesai'];
+            }
+            if ($currStart < $selesai) {
+                $segments[] = "{$currStart} - {$selesai}";
+            }
+        } else {
+            $segments[] = "{$mulai} - {$selesai}";
+        }
+
+        return [
+            'has_istirahat'          => $hasBreak,
+            'istirahat_label'        => $hasBreak ? "Istirahat: {$labelsText}" : null,
+            'istirahat_text'         => $labelsText ?: null,
+            'durasi_istirahat_menit' => $totalDurasi,
+            'segments'               => $segments,
+            'segments_format'        => implode(' & ', $segments),
+            'list'                   => $breaks,
+        ];
     }
 }

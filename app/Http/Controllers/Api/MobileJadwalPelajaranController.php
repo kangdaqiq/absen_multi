@@ -769,7 +769,7 @@ class MobileJadwalPelajaranController extends Controller
             'belum_absen' => 0,
         ];
 
-        $list = $jadwals->map(function ($j) use ($jurnals, $absensis, &$statCounts) {
+        $list = $jadwals->map(function ($j) use ($jurnals, $absensis, &$statCounts, $student) {
             $jurnal = $jurnals->get($j->id);
             $absen = $absensis->get($j->id);
 

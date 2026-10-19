@@ -543,16 +543,22 @@ class MobileJadwalPelajaranController extends Controller
                 $rawUrl = trim($request->input('foto_dokumentasi'));
                 $ext = strtolower(pathinfo(parse_url($rawUrl, PHP_URL_PATH) ?? '', PATHINFO_EXTENSION));
                 $isVid = in_array($ext, ['mp4', 'mov', 'webm', '3gp', 'mkv']) || str_contains(strtolower($rawUrl), 'video');
+
+                $thumbUrl = $request->input('thumbnail_url');
+                if (empty($thumbUrl) && str_contains($rawUrl, '/api/v1/files/')) {
+                    $thumbUrl = preg_replace('#/api/v1/files/([^/]+)/view#', '/api/v1/files/$1/thumbnail', $rawUrl);
+                }
                 
                 $dokumentasiPayload = [
                     [
-                        'url'          => $rawUrl,
-                        'view_url'     => $rawUrl,
-                        'download_url' => $rawUrl,
-                        'type'         => $isVid ? 'video' : 'image',
-                        'is_video'     => $isVid,
-                        'is_image'     => !$isVid,
-                        'name'         => basename(parse_url($rawUrl, PHP_URL_PATH) ?? ($isVid ? 'video.mp4' : 'foto.jpg')),
+                        'url'           => $rawUrl,
+                        'view_url'      => $rawUrl,
+                        'download_url'  => $rawUrl,
+                        'thumbnail_url' => $thumbUrl,
+                        'type'          => $isVid ? 'video' : 'image',
+                        'is_video'      => $isVid,
+                        'is_image'      => !$isVid,
+                        'name'          => basename(parse_url($rawUrl, PHP_URL_PATH) ?? ($isVid ? 'video.mp4' : 'foto.jpg')),
                     ]
                 ];
             } elseif ($request->has('dokumentasi')) {
@@ -601,14 +607,15 @@ class MobileJadwalPelajaranController extends Controller
                             $resData = $res->json('data') ?? [];
                             $isVid = str_starts_with($uploadedFile->getMimeType() ?? '', 'video/');
                             $dokumentasiPayload[] = [
-                                'id'           => $resData['id'] ?? null,
-                                'url'          => $resData['view_url'] ?? '',
-                                'view_url'     => $resData['view_url'] ?? '',
-                                'download_url' => $resData['download_url'] ?? '',
-                                'type'         => $isVid ? 'video' : 'image',
-                                'name'         => $uploadedFile->getClientOriginalName(),
-                                'size'         => $uploadedFile->getSize(),
-                                'mime_type'    => $uploadedFile->getMimeType(),
+                                'id'            => $resData['id'] ?? null,
+                                'url'           => $resData['view_url'] ?? '',
+                                'view_url'      => $resData['view_url'] ?? '',
+                                'download_url'  => $resData['download_url'] ?? '',
+                                'thumbnail_url' => $resData['thumbnail_url'] ?? null,
+                                'type'          => $isVid ? 'video' : 'image',
+                                'name'          => $uploadedFile->getClientOriginalName(),
+                                'size'          => $uploadedFile->getSize(),
+                                'mime_type'     => $uploadedFile->getMimeType(),
                             ];
                         }
                     } catch (\Exception $e) {
@@ -1161,14 +1168,15 @@ class MobileJadwalPelajaranController extends Controller
             $isVideo = str_starts_with($mime, 'video/');
 
             $docItem = [
-                'id'           => $storageData['id'] ?? null,
-                'url'          => $storageData['view_url'] ?? '',
-                'view_url'     => $storageData['view_url'] ?? '',
-                'download_url' => $storageData['download_url'] ?? '',
-                'type'         => $isVideo ? 'video' : 'image',
-                'name'         => $file->getClientOriginalName(),
-                'size'         => $file->getSize(),
-                'mime_type'    => $mime,
+                'id'            => $storageData['id'] ?? null,
+                'url'           => $storageData['view_url'] ?? '',
+                'view_url'      => $storageData['view_url'] ?? '',
+                'download_url'  => $storageData['download_url'] ?? '',
+                'thumbnail_url' => $storageData['thumbnail_url'] ?? null,
+                'type'          => $isVideo ? 'video' : 'image',
+                'name'          => $file->getClientOriginalName(),
+                'size'          => $file->getSize(),
+                'mime_type'     => $mime,
             ];
 
             // Jika jadwal_pelajaran_id & tanggal disertakan, langsung lampirkan ke jurnal KBM

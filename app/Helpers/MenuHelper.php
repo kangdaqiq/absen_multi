@@ -33,6 +33,11 @@ class MenuHelper
                     'name' => 'Rekap Absensi Mapel',
                     'path' => route('absensi-pelajaran.rekap', [], false),
                 ],
+                [
+                    'icon' => 'charts',
+                    'name' => 'Dokumentasi KBM',
+                    'path' => route('absensi-pelajaran.dokumentasi', [], false),
+                ],
             ];
 
             // Jika guru ini juga wali kelas (mengampu kelas), tampilkan Absensi Siswa & Rekap Absensi Siswa (khusus kelasnya)
@@ -203,6 +208,7 @@ class MenuHelper
                 $rekapSubItems[] = ['name' => 'Rekap Siswa', 'path' => route('rekap.index', [], false)];
                 $rekapSubItems[] = ['name' => 'Rekap Kelas', 'path' => route('rekap-kelas.index', [], false)];
                 $rekapSubItems[] = ['name' => 'Rekap Absensi Mapel', 'path' => route('absensi-pelajaran.rekap', [], false)];
+                $rekapSubItems[] = ['name' => 'Dokumentasi KBM', 'path' => route('absensi-pelajaran.dokumentasi', [], false)];
             }
 
             // Rekap Guru / Karyawan untuk Admin & Waka Kurikulum

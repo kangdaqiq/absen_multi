@@ -789,4 +789,144 @@ class AbsensiPelajaranController extends Controller
             'isGuru'
         ));
     }
+
+    /**
+     * Halaman Galeri Dokumentasi Pembelajaran (Foto & Video)
+     * Dikelompokkan per Guru dengan filter tanggal, kelas, mapel, tipe media.
+     */
+    public function dokumentasi(Request $request)
+    {
+        $user = auth()->user();
+        $schoolId = $user->school_id;
+        $isGuru = !empty($user->guru);
+        $guruId = $user->guru?->id;
+        $role = $user->role;
+        $isAdminOrWaka = in_array($role, ['admin', 'super_admin', 'waka_kurikulum']);
+
+        // Default rentang tanggal: 1 bulan terakhir
+        $defaultStart = Carbon::now()->startOfMonth()->format('Y-m-d');
+        $defaultEnd   = Carbon::now()->format('Y-m-d');
+
+        $startDate = $request->query('start_date', $defaultStart);
+        $endDate   = $request->query('end_date', $defaultEnd);
+
+        $selectedGuruId = $request->query('guru_id');
+        $kelasId        = $request->query('kelas_id');
+        $mapelId        = $request->query('mapel_id');
+        $mediaType      = $request->query('media_type', 'all'); // 'all', 'image', 'video'
+        $search         = trim($request->query('q', ''));
+
+        $query = JurnalPelajaran::where('jurnal_pelajaran.school_id', $schoolId)
+            ->whereNotNull('jurnal_pelajaran.dokumentasi')
+            ->where('jurnal_pelajaran.dokumentasi', '!=', '[]')
+            ->where('jurnal_pelajaran.dokumentasi', '!=', '""')
+            ->where('jurnal_pelajaran.dokumentasi', '!=', '')
+            ->with([
+                'guru',
+                'jadwalPelajaran.kelas',
+                'jadwalPelajaran.mapel',
+            ]);
+
+        if (!empty($startDate) && !empty($endDate)) {
+            $query->whereBetween('jurnal_pelajaran.tanggal', [$startDate, $endDate]);
+        }
+
+        if (!$isAdminOrWaka && $isGuru) {
+            $query->where('jurnal_pelajaran.guru_id', $guruId);
+        } elseif (!empty($selectedGuruId)) {
+            $query->where('jurnal_pelajaran.guru_id', $selectedGuruId);
+        }
+
+        if (!empty($kelasId)) {
+            $query->whereHas('jadwalPelajaran', fn($q) => $q->where('kelas_id', $kelasId));
+        }
+
+        if (!empty($mapelId)) {
+            $query->whereHas('jadwalPelajaran', fn($q) => $q->where('mapel_id', $mapelId));
+        }
+
+        if (!empty($search)) {
+            $query->where(function ($q) use ($search) {
+                $q->where('materi', 'like', "%{$search}%")
+                  ->orWhere('catatan', 'like', "%{$search}%")
+                  ->orWhereHas('guru', fn($g) => $g->where('nama', 'like', "%{$search}%"))
+                  ->orWhereHas('jadwalPelajaran.mapel', fn($m) => $m->where('nama_mapel', 'like', "%{$search}%"))
+                  ->orWhereHas('jadwalPelajaran.kelas', fn($k) => $k->where('nama_kelas', 'like', "%{$search}%"));
+            });
+        }
+
+        $allJurnals = $query->orderBy('tanggal', 'desc')->orderBy('id', 'desc')->get();
+
+        // Filter media_type pada masing-masing item dokumentasi
+        $filteredJurnals = $allJurnals->filter(function ($jurnal) use ($mediaType) {
+            $list = $jurnal->dokumentasi_list;
+            if (empty($list)) return false;
+
+            if ($mediaType === 'image') {
+                $filtered = array_values(array_filter($list, fn($item) => !empty($item['is_image'])));
+                $jurnal->filtered_docs = $filtered;
+                return !empty($filtered);
+            } elseif ($mediaType === 'video') {
+                $filtered = array_values(array_filter($list, fn($item) => !empty($item['is_video'])));
+                $jurnal->filtered_docs = $filtered;
+                return !empty($filtered);
+            }
+
+            $jurnal->filtered_docs = $list;
+            return true;
+        });
+
+        // Grouping per Guru
+        $groupedByGuru = $filteredJurnals->groupBy(function ($j) {
+            return $j->guru_id ?? 0;
+        })->map(function ($items, $gId) {
+            $guru = $items->first()->guru;
+            $allDocs = $items->flatMap(fn($j) => $j->filtered_docs ?? $j->dokumentasi_list);
+
+            return (object) [
+                'guru'         => $guru,
+                'guru_id'      => $gId,
+                'guru_nama'    => $guru ? $guru->nama : 'Guru Tidak Diketahui',
+                'guru_nip'     => $guru?->nip ?? '-',
+                'guru_foto'    => $guru?->foto_url ?? null,
+                'total_kbm'    => $items->count(),
+                'total_files'  => $allDocs->count(),
+                'total_images' => $allDocs->where('is_image', true)->count(),
+                'total_videos' => $allDocs->where('is_video', true)->count(),
+                'jurnals'      => $items,
+            ];
+        })->sortByDesc('total_files')->values();
+
+        // Statistik Keseluruhan
+        $allDocsFlattened = $filteredJurnals->flatMap(fn($j) => $j->filtered_docs ?? $j->dokumentasi_list);
+        $stats = [
+            'total_gurus'    => $groupedByGuru->count(),
+            'total_sessions' => $filteredJurnals->count(),
+            'total_files'    => $allDocsFlattened->count(),
+            'total_images'   => $allDocsFlattened->where('is_image', true)->count(),
+            'total_videos'   => $allDocsFlattened->where('is_video', true)->count(),
+        ];
+
+        // Master dropdown filters
+        $kelases = Kelas::where('school_id', $schoolId)->orderBy('nama_kelas')->get();
+        $gurus   = Guru::where('school_id', $schoolId)->orderBy('nama')->get();
+        $mapels  = Mapel::where('school_id', $schoolId)->orderBy('nama_mapel')->get();
+
+        return view('absensi-pelajaran.dokumentasi', compact(
+            'groupedByGuru',
+            'stats',
+            'startDate',
+            'endDate',
+            'selectedGuruId',
+            'kelasId',
+            'mapelId',
+            'mediaType',
+            'search',
+            'kelases',
+            'gurus',
+            'mapels',
+            'isAdminOrWaka',
+            'isGuru'
+        ));
+    }
 }

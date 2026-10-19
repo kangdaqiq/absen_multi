@@ -191,6 +191,8 @@ Route::middleware('auth')->group(function () {
         Route::post('/absensi-pelajaran/update-single', [App\Http\Controllers\AbsensiPelajaranController::class, 'updateSingle'])->name('absensi-pelajaran.update-single');
         Route::post('/absensi-pelajaran/set-all', [App\Http\Controllers\AbsensiPelajaranController::class, 'setAllHadir'])->name('absensi-pelajaran.set-all');
         Route::get('/absensi-pelajaran-rekap', [App\Http\Controllers\AbsensiPelajaranController::class, 'rekap'])->name('absensi-pelajaran.rekap');
+        Route::get('/absensi-pelajaran/dokumentasi', [App\Http\Controllers\AbsensiPelajaranController::class, 'dokumentasi'])->name('absensi-pelajaran.dokumentasi');
+        Route::get('/absensi-pelajaran-dokumentasi', [App\Http\Controllers\AbsensiPelajaranController::class, 'dokumentasi']);
 
         // Absensi
         Route::get('/absensi', [App\Http\Controllers\AttendanceController::class, 'index'])->name('absensi.index');

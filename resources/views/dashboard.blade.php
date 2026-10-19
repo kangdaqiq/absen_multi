@@ -28,7 +28,7 @@
         <div>
           <div class="flex flex-wrap items-center gap-2">
             <h3 class="text-base font-bold text-gray-800 dark:text-white/90 md:text-lg">
-              Aplikasi Mobile Jagat Absen (Android)
+              Aplikasi Mobile Jagat Absen v2.0.0(Android)
             </h3>
             <span class="rounded-full bg-success-50 px-2.5 py-0.5 text-xs font-semibold text-success-700 dark:bg-success-500/15 dark:text-success-400"
                   style="background-color: #ecfdf3; color: #027a48;">
@@ -92,7 +92,7 @@
         </div>
         <div>
           <h3 class="text-lg font-bold text-gray-800 dark:text-white/90">
-            Download Jagat Absen (Android)
+            Download Jagat Absen V2.0.0 (Android)
           </h3>
           <p class="text-xs text-gray-500 dark:text-gray-400">
             Pindai QR code dari HP atau unduh langsung file instalasi APK

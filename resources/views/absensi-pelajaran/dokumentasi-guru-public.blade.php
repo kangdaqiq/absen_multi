@@ -182,9 +182,10 @@
                         <div class="relative shrink-0">
                             @if(!empty($guru->foto_url))
                                 <img src="{{ $guru->foto_url }}" alt="{{ $guru->nama }}"
-                                     class="h-18 w-18 sm:h-22 sm:w-22 rounded-2xl object-cover border-2 border-brand-500/30 dark:border-brand-500/40 shadow-md">
+                                     style="width:80px;height:80px;object-fit:cover;"
+                                     class="rounded-2xl border-2 border-brand-500/30 dark:border-brand-500/40 shadow-md">
                             @else
-                                <div class="flex h-18 w-18 sm:h-22 sm:w-22 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white font-bold text-2xl sm:text-3xl shadow-md">
+                                <div style="width:80px;height:80px;" class="flex shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white font-bold text-2xl shadow-md">
                                     {{ strtoupper(substr($guru->nama, 0, 2)) }}
                                 </div>
                             @endif

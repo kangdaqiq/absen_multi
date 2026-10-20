@@ -59,12 +59,63 @@ class JadwalPelajaranController extends Controller
             });
         }
 
-        // Urutkan berdasarkan hari (Senin - Minggu) lalu jam mulai
-        $jadwals = $query->with(['guru', 'kelas', 'mapel', 'jamPelajaran', 'jamPelajaranAkhir'])
+        // Ambil semua jadwal yang sesuai filter
+        $allJadwals = $query->with(['guru', 'kelas', 'mapel', 'jamPelajaran', 'jamPelajaranAkhir'])
             ->orderByRaw("FIELD(hari, 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu')")
             ->orderBy('jam_mulai')
-            ->paginate(25)
-            ->withQueryString();
+            ->get();
+
+        // Satukan jadwal kelas gabungan (guru sama, mapel sama, hari sama, jam mulai & selesai sama)
+        $groupedJadwals = collect();
+        $processedIds = [];
+
+        foreach ($allJadwals as $jadwal) {
+            if (in_array($jadwal->id, $processedIds)) {
+                continue;
+            }
+
+            $parallels = $allJadwals->filter(function ($item) use ($jadwal) {
+                return $item->guru_id === $jadwal->guru_id
+                    && $item->mapel_id === $jadwal->mapel_id
+                    && $item->hari === $jadwal->hari
+                    && substr($item->jam_mulai, 0, 5) === substr($jadwal->jam_mulai, 0, 5)
+                    && substr($item->jam_selesai, 0, 5) === substr($jadwal->jam_selesai, 0, 5);
+            });
+
+            foreach ($parallels as $p) {
+                $processedIds[] = $p->id;
+            }
+
+            if ($parallels->count() > 1) {
+                $primary = clone $jadwal;
+                $primary->is_multi_kelas = true;
+                $primary->parallel_count = $parallels->count();
+                $primary->parallel_ids = $parallels->pluck('id')->all();
+                $primary->parallel_kelas_ids = $parallels->pluck('kelas_id')->all();
+
+                $allKelases = $parallels->map(fn($p) => $p->kelas?->nama_kelas)->filter()->values();
+                $primary->parallel_kelases = $allKelases->unique()->values()->all();
+                $groupedJadwals->push($primary);
+            } else {
+                $jadwal->is_multi_kelas = false;
+                $jadwal->parallel_count = 1;
+                $jadwal->parallel_ids = [$jadwal->id];
+                $jadwal->parallel_kelas_ids = [$jadwal->kelas_id];
+                $jadwal->parallel_kelases = [$jadwal->kelas?->nama_kelas];
+                $groupedJadwals->push($jadwal);
+            }
+        }
+
+        $perPage = 25;
+        $currentPage = \Illuminate\Pagination\Paginator::resolveCurrentPage() ?: 1;
+        $currentItems = $groupedJadwals->slice(($currentPage - 1) * $perPage, $perPage)->values();
+        $jadwals = new \Illuminate\Pagination\LengthAwarePaginator(
+            $currentItems,
+            $groupedJadwals->count(),
+            $perPage,
+            $currentPage,
+            ['path' => \Illuminate\Pagination\Paginator::resolveCurrentPath(), 'query' => $request->query()]
+        );
 
         $kelases = Kelas::where('school_id', $schoolId)->orderBy('nama_kelas')->get();
         $gurus = Guru::where('school_id', $schoolId)->orderBy('nama')->get();
@@ -218,32 +269,79 @@ class JadwalPelajaranController extends Controller
             $jamKe = $jamKeAwal;
         }
 
-        $firstKelasId = array_shift($kelasIds);
+        // Ambil semua jadwal paralel yang ada saat ini sebelum update
+        $existingParallels = JadwalPelajaran::where('school_id', $schoolId)
+            ->where('guru_id', $jadwal->guru_id)
+            ->where('mapel_id', $jadwal->mapel_id)
+            ->where('hari', $jadwal->hari)
+            ->where('jam_mulai', $jadwal->jam_mulai)
+            ->where('jam_selesai', $jadwal->jam_selesai)
+            ->get();
 
-        // Update jadwal yang sedang diedit dengan kelas pertama
-        $jadwal->update([
-            'jam_pelajaran_id'        => $jpAwal->id,
-            'jam_pelajaran_id_akhir'  => $jpAkhir?->id,
-            'guru_id'                 => $request->guru_id,
-            'kelas_id'                => $firstKelasId,
-            'mapel_id'                => $request->mapel_id,
-            'hari'                    => $request->hari,
-            'jam_ke'                  => $jamKe,
-            'jam_mulai'               => $jamMulai,
-            'jam_selesai'             => $jamSelesai,
-            'ruangan'                 => $request->ruangan,
-            'keterangan'              => $request->keterangan,
-        ]);
+        $submittedKelasIds = $kelasIds;
+        $usedParallelIds = [];
+        $unassignedKelasIds = [];
 
-        // Buat jadwal baru untuk kelas-kelas tambahan jika user memilih lebih dari 1 kelas saat edit
-        $extraCount = 0;
-        foreach ($kelasIds as $extraKelasId) {
+        foreach ($submittedKelasIds as $kId) {
+            $existing = $existingParallels->firstWhere('kelas_id', $kId);
+            if ($existing) {
+                $existing->update([
+                    'jam_pelajaran_id'        => $jpAwal->id,
+                    'jam_pelajaran_id_akhir'  => $jpAkhir?->id,
+                    'guru_id'                 => $request->guru_id,
+                    'kelas_id'                => $kId,
+                    'mapel_id'                => $request->mapel_id,
+                    'hari'                    => $request->hari,
+                    'jam_ke'                  => $jamKe,
+                    'jam_mulai'               => $jamMulai,
+                    'jam_selesai'             => $jamSelesai,
+                    'ruangan'                 => $request->ruangan,
+                    'keterangan'              => $request->keterangan,
+                ]);
+                $usedParallelIds[] = $existing->id;
+            } else {
+                $unassignedKelasIds[] = $kId;
+            }
+        }
+
+        // Jika jadwal awal yang diedit belum terpakai (misal diganti ke kelas lain)
+        if (!in_array($jadwal->id, $usedParallelIds)) {
+            if (!empty($unassignedKelasIds)) {
+                $newKelasForCurrent = array_shift($unassignedKelasIds);
+                $jadwal->update([
+                    'jam_pelajaran_id'        => $jpAwal->id,
+                    'jam_pelajaran_id_akhir'  => $jpAkhir?->id,
+                    'guru_id'                 => $request->guru_id,
+                    'kelas_id'                => $newKelasForCurrent,
+                    'mapel_id'                => $request->mapel_id,
+                    'hari'                    => $request->hari,
+                    'jam_ke'                  => $jamKe,
+                    'jam_mulai'               => $jamMulai,
+                    'jam_selesai'             => $jamSelesai,
+                    'ruangan'                 => $request->ruangan,
+                    'keterangan'              => $request->keterangan,
+                ]);
+                $usedParallelIds[] = $jadwal->id;
+            } else {
+                $jadwal->delete();
+            }
+        }
+
+        // Hapus existing parallel yang tidak dipilih lagi oleh pengguna
+        foreach ($existingParallels as $ep) {
+            if (!in_array($ep->id, $usedParallelIds)) {
+                $ep->delete();
+            }
+        }
+
+        // Buat record baru untuk kelas tambahan
+        foreach ($unassignedKelasIds as $newKid) {
             JadwalPelajaran::create([
                 'school_id'               => $schoolId,
                 'jam_pelajaran_id'        => $jpAwal->id,
                 'jam_pelajaran_id_akhir'  => $jpAkhir?->id,
                 'guru_id'                 => $request->guru_id,
-                'kelas_id'                => $extraKelasId,
+                'kelas_id'                => $newKid,
                 'mapel_id'                => $request->mapel_id,
                 'hari'                    => $request->hari,
                 'jam_ke'                  => $jamKe,
@@ -252,22 +350,33 @@ class JadwalPelajaranController extends Controller
                 'ruangan'                 => $request->ruangan,
                 'keterangan'              => $request->keterangan,
             ]);
-            $extraCount++;
         }
 
-        $msg = $extraCount > 0
-            ? "Jadwal berhasil diperbarui dan diterapkan ke {$extraCount} kelas lainnya."
+        $totalKelas = count($submittedKelasIds);
+        $msg = $totalKelas > 1
+            ? "Jadwal berhasil diperbarui untuk {$totalKelas} kelas gabungan."
             : 'Jadwal pembelajaran berhasil diperbarui.';
 
         return redirect()->back()->with('success', $msg);
     }
 
-    public function destroy($id)
+    public function destroy(Request $request, $id)
     {
         $schoolId = auth()->user()->school_id;
         $jadwal = JadwalPelajaran::where('school_id', $schoolId)->findOrFail($id);
 
-        $jadwal->delete();
+        // Hapus semua jadwal paralel dalam satu sesi gabungan
+        $parallelIds = JadwalPelajaran::where('school_id', $schoolId)
+            ->where('guru_id', $jadwal->guru_id)
+            ->where('mapel_id', $jadwal->mapel_id)
+            ->where('hari', $jadwal->hari)
+            ->where('jam_mulai', $jadwal->jam_mulai)
+            ->where('jam_selesai', $jadwal->jam_selesai)
+            ->pluck('id');
+
+        JadwalPelajaran::where('school_id', $schoolId)
+            ->whereIn('id', $parallelIds)
+            ->delete();
 
         return redirect()->back()->with('success', 'Jadwal pembelajaran berhasil dihapus.');
     }
@@ -275,13 +384,23 @@ class JadwalPelajaranController extends Controller
     public function bulkDestroy(Request $request)
     {
         $schoolId = auth()->user()->school_id;
-        $ids = $request->input('selected_ids', []);
+        $rawIds = $request->input('selected_ids', []);
+        $ids = [];
+
+        foreach ($rawIds as $item) {
+            foreach (explode(',', (string)$item) as $id) {
+                if (is_numeric(trim($id))) {
+                    $ids[] = (int)trim($id);
+                }
+            }
+        }
+        $ids = array_unique($ids);
 
         if (!empty($ids)) {
-            JadwalPelajaran::where('school_id', $schoolId)
+            $count = JadwalPelajaran::where('school_id', $schoolId)
                 ->whereIn('id', $ids)
                 ->delete();
-            return redirect()->back()->with('success', count($ids) . ' Jadwal berhasil dihapus.');
+            return redirect()->back()->with('success', "{$count} Jadwal berhasil dihapus.");
         }
 
         return redirect()->back()->with('error', 'Tidak ada jadwal yang dipilih.');
@@ -621,7 +740,7 @@ class JadwalPelajaranController extends Controller
                     continue;
                 }
 
-                $rawKelasItems = array_map('trim', explode(',', $kelasRaw));
+                $rawKelasItems = array_map('trim', preg_split('/[,;\/&]+/', $kelasRaw));
                 $kelasIds = [];
                 $unresolvedKelas = [];
 

@@ -453,6 +453,8 @@ class MobileAttendanceController extends Controller
             $jadwalPulang = $shift?->jam_pulang ?? '15:30:00';
             $shiftName = $shift?->nama_shift ?? 'Reguler Pagi';
 
+            $absen?->loadMissing('shift');
+
             return response()->json([
                 'success' => true,
                 'data' => [
@@ -461,6 +463,7 @@ class MobileAttendanceController extends Controller
                     'jam_pulang' => $absen?->jam_pulang,
                     'jadwal_masuk' => $jadwalMasuk,
                     'jadwal_pulang' => $jadwalPulang,
+                    'shift' => $absen?->shift ?? $shift,
                     'shift_name' => $shiftName,
                     'status_kehadiran' => $absen?->status_kehadiran ?? ($absen?->status ?? 'Belum Absen'),
                     'is_checked_in' => !empty($absen?->jam_masuk),
@@ -483,6 +486,7 @@ class MobileAttendanceController extends Controller
                 'jam_pulang' => null,
                 'jadwal_masuk' => '07:00:00',
                 'jadwal_pulang' => '15:30:00',
+                'shift' => null,
                 'shift_name' => 'Reguler Pagi',
                 'status_kehadiran' => 'Belum Absen',
                 'is_checked_in' => false,
@@ -832,6 +836,7 @@ class MobileAttendanceController extends Controller
                 ->first();
 
             if ($existingAbsen && $existingAbsen->jam_masuk) {
+                $existingAbsen->loadMissing('shift');
                 return response()->json([
                     'success' => true,
                     'message' => 'Anda sudah melakukan absen masuk hari ini',
@@ -840,6 +845,8 @@ class MobileAttendanceController extends Controller
                         'jam_masuk' => $existingAbsen->jam_masuk,
                         'jam_pulang' => $existingAbsen->jam_pulang,
                         'status_kehadiran' => $existingAbsen->status_kehadiran,
+                        'shift' => $existingAbsen->shift ?? $shift,
+                        'shift_name' => $existingAbsen->shift?->nama_shift ?? $shift?->nama_shift,
                         'is_checked_in' => true,
                         'is_checked_out' => !empty($existingAbsen->jam_pulang)
                     ]
@@ -900,6 +907,8 @@ class MobileAttendanceController extends Controller
                 'created_at' => now(),
             ]);
 
+            $absen->loadMissing('shift');
+
             return response()->json([
                 'success' => true,
                 'message' => "Absen masuk berhasil dicatat ({$status})",
@@ -910,7 +919,8 @@ class MobileAttendanceController extends Controller
                     'status' => $status,
                     'status_kehadiran' => $statusKehadiran,
                     'menit_terlambat' => $menitTerlambat,
-                    'shift' => $shift->nama_shift,
+                    'shift' => $absen->shift ?? $shift,
+                    'shift_name' => $shift->nama_shift,
                     'face_similarity_score' => $faceSimilarity,
                     'is_face_matched' => $isFaceMatched,
                     'photo_checkin_url' => $photoPath ? asset('storage/' . $photoPath) : null,
@@ -974,6 +984,8 @@ class MobileAttendanceController extends Controller
                             'jam_masuk' => $att->jam_masuk,
                             'jam_pulang' => $att->jam_pulang,
                             'status_kehadiran' => $att->status,
+                            'shift' => null,
+                            'shift_name' => null,
                             'is_checked_in' => true,
                             'is_checked_out' => !empty($att->jam_pulang)
                         ]
@@ -1042,6 +1054,8 @@ class MobileAttendanceController extends Controller
                         'status' => $status,
                         'status_kehadiran' => $status === 'T' ? 'terlambat' : 'hadir',
                         'keterangan' => $keterangan,
+                        'shift' => null,
+                        'shift_name' => null,
                         'face_similarity_score' => $faceSimilarity,
                         'is_face_matched' => $isFaceMatched,
                         'photo_checkin_url' => $photoPath ? asset('storage/' . $photoPath) : null,
@@ -1165,6 +1179,8 @@ class MobileAttendanceController extends Controller
                 'created_at' => now(),
             ]);
 
+            $absen->loadMissing('shift');
+
             return response()->json([
                 'success' => true,
                 'message' => 'Absen pulang berhasil dicatat',
@@ -1173,6 +1189,8 @@ class MobileAttendanceController extends Controller
                     'jam_masuk' => $absen->jam_masuk,
                     'jam_pulang' => $absen->jam_pulang,
                     'status_kehadiran' => $absen->status_kehadiran,
+                    'shift' => $absen->shift ?? $shift,
+                    'shift_name' => $absen->shift?->nama_shift ?? $shift?->nama_shift,
                     'is_checked_in' => true,
                     'is_checked_out' => true
                 ]
@@ -1265,6 +1283,8 @@ class MobileAttendanceController extends Controller
                         'jam_pulang' => $att->jam_pulang,
                         'status' => $newStatus,
                         'status_kehadiran' => $newStatus === 'T' ? 'terlambat' : 'hadir',
+                        'shift' => null,
+                        'shift_name' => null,
                         'is_checked_in' => true,
                         'is_checked_out' => true
                     ]

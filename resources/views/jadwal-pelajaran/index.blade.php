@@ -231,7 +231,7 @@
                         <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                             @if(in_array(auth()->user()->role, ['admin', 'super_admin', 'waka_kurikulum']))
                                 <td class="border-b border-gray-100 px-4 py-4 dark:border-gray-800 xl:pl-6 text-center">
-                                    <input type="checkbox" name="selected_ids[]" value="{{ $j->id }}" class="checkItem rounded border-gray-300 text-brand-600 focus:border-brand-500 focus:ring-brand-500 cursor-pointer">
+                                    <input type="checkbox" name="selected_ids[]" value="{{ implode(',', $j->parallel_ids ?? [$j->id]) }}" class="checkItem rounded border-gray-300 text-brand-600 focus:border-brand-500 focus:ring-brand-500 cursor-pointer">
                                 </td>
                             @endif
                             <td class="border-b border-gray-100 px-4 py-4 dark:border-gray-800">
@@ -268,9 +268,22 @@
                                 </div>
                             </td>
                             <td class="border-b border-gray-100 px-4 py-4 dark:border-gray-800">
-                                <span class="inline-flex rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700 dark:bg-blue-500/15 dark:text-blue-400">
-                                    {{ $j->kelas?->nama_kelas ?? '-' }}
-                                </span>
+                                <div class="flex flex-wrap items-center gap-1.5">
+                                    @if(!empty($j->is_multi_kelas) && !empty($j->parallel_kelases))
+                                        @foreach($j->parallel_kelases as $namaKelas)
+                                            <span class="inline-flex rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700 dark:bg-blue-500/15 dark:text-blue-400">
+                                                {{ $namaKelas }}
+                                            </span>
+                                        @endforeach
+                                        <span class="inline-flex items-center gap-1 text-[10px] font-semibold text-purple-700 bg-purple-50 dark:bg-purple-500/15 px-1.5 py-0.5 rounded border border-purple-200 dark:border-purple-500/30" title="Kelas Gabungan ({{ count($j->parallel_kelases) }} Kelas)">
+                                            <i class="fas fa-layer-group text-[9px]"></i> Gabungan
+                                        </span>
+                                    @else
+                                        <span class="inline-flex rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700 dark:bg-blue-500/15 dark:text-blue-400">
+                                            {{ $j->kelas?->nama_kelas ?? '-' }}
+                                        </span>
+                                    @endif
+                                </div>
                             </td>
                             <td class="border-b border-gray-100 px-4 py-4 dark:border-gray-800 font-medium text-gray-800 dark:text-white/90">
                                 <div class="flex items-center gap-2">
@@ -309,6 +322,8 @@
                                         <!-- Edit -->
                                         <button class="btnEditJadwal text-warning-500 hover:text-warning-700 hover:bg-warning-50 p-1.5 rounded-lg transition"
                                             data-id="{{ $j->id }}"
+                                            data-parallel_ids="{{ json_encode($j->parallel_ids ?? [$j->id]) }}"
+                                            data-kelas_ids="{{ json_encode($j->parallel_kelas_ids ?? [$j->kelas_id]) }}"
                                             data-jam_pelajaran_id="{{ $j->jam_pelajaran_id }}"
                                             data-jam_pelajaran_id_akhir="{{ $j->jam_pelajaran_id_akhir }}"
                                             data-guru_id="{{ $j->guru_id }}"
@@ -327,7 +342,8 @@
                                         <!-- Delete -->
                                         <button class="btnHapusJadwal text-error-500 hover:text-error-700 hover:bg-error-50 p-1.5 rounded-lg transition"
                                             data-id="{{ $j->id }}"
-                                            data-info="{{ ($j->mapel?->nama_mapel ?? '') . ' (' . ($j->kelas?->nama_kelas ?? '') . ' - ' . $j->hari . ')' }}"
+                                            data-parallel_ids="{{ json_encode($j->parallel_ids ?? [$j->id]) }}"
+                                            data-info="{{ ($j->mapel?->nama_mapel ?? '') . ' (' . implode(', ', $j->parallel_kelases ?? [$j->kelas?->nama_kelas ?? '']) . ' - ' . $j->hari . ')' }}"
                                             @click="$dispatch('open-modal', 'modalHapusJadwal')" title="Hapus Jadwal">
                                             <i class="fas fa-trash"></i>
                                         </button>
@@ -1194,10 +1210,12 @@
             $('.btnEditJadwal').on('click', function () {
                 var d = $(this).data();
 
+                var kIds = Array.isArray(d.kelas_ids) ? d.kelas_ids : (d.kelas_id ? [d.kelas_id] : []);
+
                 // Set kelas terpilih di Alpine multiSelectKelasEdit
                 window.dispatchEvent(new CustomEvent('set-edit-kelas', {
                     detail: {
-                        kelasIds: d.kelas_id ? [d.kelas_id] : [],
+                        kelasIds: kIds,
                         preselectedMapelId: d.mapel_id
                     }
                 }));

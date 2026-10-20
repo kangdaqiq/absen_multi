@@ -207,7 +207,8 @@ class RfidController extends Controller
                 return $this->response(true, 'success', $respMsg, 'ok', [
                     'type' => 'absen_masuk_guru',
                     'nama' => $teacher->nama,
-                    'shift' => $shift->nama_shift,
+                    'shift' => $shift,
+                    'shift_name' => $shift->nama_shift,
                     'status' => $status,
                     'menit_terlambat' => $menitTerlambat,
                     'jam' => $now->format('H:i')

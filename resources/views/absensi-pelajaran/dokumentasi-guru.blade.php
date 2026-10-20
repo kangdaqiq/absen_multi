@@ -61,10 +61,61 @@
                     <span class="text-[10px] font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider block">Total</span>
                     <span class="text-sm sm:text-base font-bold text-purple-700 dark:text-purple-300">{{ $teacherStats['total_files'] }}</span>
                 </div>
+
+                <!-- Tombol Halaman Publik & Bagikan -->
+                <a href="{{ route('publik.dokumentasi-guru', $guru->id) }}" target="_blank" rel="noopener noreferrer"
+                   class="inline-flex items-center gap-1.5 rounded-xl border border-brand-200 bg-brand-50 px-3.5 py-2.5 text-xs font-semibold text-brand-700 hover:bg-brand-100 dark:border-brand-800 dark:bg-brand-900/30 dark:text-brand-300 transition shadow-xs"
+                   title="Buka Halaman Publik Guru (Tanpa Login)">
+                    <i class="fas fa-globe text-brand-500"></i>
+                    <span>Halaman Publik</span>
+                    <i class="fas fa-arrow-up-right-from-square text-[9px] opacity-70"></i>
+                </a>
+
+                <button type="button" @click="copyPublicUrl('{{ route('publik.dokumentasi-guru', $guru->id) }}')"
+                   class="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 transition shadow-xs cursor-pointer"
+                   title="Salin Link Publik Guru">
+                    <i class="fas fa-copy text-xs"></i>
+                    <span x-text="copied ? 'Tersalin!' : 'Salin Link'"></span>
+                </button>
+
+                @php
+                    $waText = "Galeri Dokumentasi KBM {$guru->nama}: " . route('publik.dokumentasi-guru', $guru->id);
+                    $waLink = "https://api.whatsapp.com/send?text=" . urlencode($waText);
+                @endphp
+                <a href="{{ $waLink }}" target="_blank" rel="noopener noreferrer"
+                   class="inline-flex items-center justify-center h-9 w-9 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300 transition shadow-xs"
+                   title="Bagikan Tautan ke WhatsApp">
+                    <i class="fab fa-whatsapp text-sm"></i>
+                </a>
+
                 <a href="{{ route('absensi-pelajaran.dokumentasi') }}"
                    class="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 transition shadow-xs">
                     <i class="fas fa-arrow-left"></i>
                     <span>Kembali ke Daftar</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Banner Informasi Link Publik Guru -->
+        <div class="mt-4 pt-3.5 border-t border-gray-100 dark:border-gray-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs">
+            <div class="flex items-center gap-2 text-gray-600 dark:text-gray-300 min-w-0">
+                <span class="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
+                <span class="font-medium shrink-0">Link Publik Guru Ini:</span>
+                <code class="px-2 py-0.5 rounded-md bg-gray-100 dark:bg-gray-800 text-brand-600 dark:text-brand-400 font-mono text-[11px] select-all truncate max-w-xs sm:max-w-md">
+                    {{ route('publik.dokumentasi-guru', $guru->id) }}
+                </code>
+            </div>
+            <div class="flex items-center gap-3 shrink-0">
+                <button type="button" @click="copyPublicUrl('{{ route('publik.dokumentasi-guru', $guru->id) }}')"
+                        class="text-brand-600 hover:text-brand-700 dark:text-brand-400 font-semibold inline-flex items-center gap-1 cursor-pointer">
+                    <i class="fas fa-clone text-[11px]"></i>
+                    <span x-text="copied ? 'Tersalin ke Clipboard!' : 'Salin Tautan'"></span>
+                </button>
+                <span class="text-gray-300 dark:text-gray-700">•</span>
+                <a href="{{ route('publik.dokumentasi-guru', $guru->id) }}" target="_blank" rel="noopener noreferrer"
+                   class="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 inline-flex items-center gap-1">
+                    <span>Lihat Tampilan Publik</span>
+                    <i class="fas fa-arrow-up-right-from-square text-[10px]"></i>
                 </a>
             </div>
         </div>
@@ -267,6 +318,11 @@
                             <p class="font-semibold text-gray-800 dark:text-white/90 line-clamp-2 leading-snug pt-0.5" title="{{ $doc['materi'] }}">
                                 {{ $doc['materi'] ?: 'KBM' }}
                             </p>
+                            @if(!empty($doc['catatan']))
+                                <p class="text-[10px] text-gray-500 dark:text-gray-400 line-clamp-1 italic bg-gray-50 dark:bg-gray-800/60 px-1.5 py-0.5 rounded mt-1" title="{{ $doc['catatan'] }}">
+                                    <i class="fas fa-comment-alt text-[8px] text-brand-500 mr-0.5"></i> {{ $doc['catatan'] }}
+                                </p>
+                            @endif
                         </div>
                     </div>
 
@@ -459,6 +515,38 @@ function dokumentasiGaleri() {
             }
             this.activeMediaPoster = '';
             this.videoModalOpen = false;
+        },
+
+        copied: false,
+
+        copyPublicUrl(url) {
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(url).then(() => {
+                    this.copied = true;
+                    setTimeout(() => { this.copied = false; }, 3000);
+                }).catch(() => {
+                    this.fallbackCopy(url);
+                });
+            } else {
+                this.fallbackCopy(url);
+            }
+        },
+
+        fallbackCopy(text) {
+            const el = document.createElement('textarea');
+            el.value = text;
+            el.style.position = 'fixed';
+            el.style.left = '-999999px';
+            document.body.appendChild(el);
+            el.select();
+            try {
+                document.execCommand('copy');
+                this.copied = true;
+                setTimeout(() => { this.copied = false; }, 3000);
+            } catch (err) {
+                prompt('Salin tautan publik:', text);
+            }
+            document.body.removeChild(el);
         }
     }
 }

@@ -1054,6 +1054,7 @@ class AbsensiPelajaranController extends Controller
         // Filter Options (Kelas & Mapel)
         $kelases = Kelas::where('school_id', $schoolId)->orderBy('nama_kelas')->get();
         $mapels = Mapel::where('school_id', $schoolId)->orderBy('nama_mapel')->get();
+        $publicUrl = route('publik.dokumentasi-guru', $guru->id);
 
         return view('absensi-pelajaran.dokumentasi-guru', compact(
             'guru',
@@ -1069,7 +1070,171 @@ class AbsensiPelajaranController extends Controller
             'kelases',
             'mapels',
             'isDokKbmEnabled',
-            'school'
+            'school',
+            'publicUrl'
+        ));
+    }
+
+    /**
+     * Halaman Publik Galeri Dokumentasi KBM & Jurnal Guru (Tanpa Login / Akses Publik Per Guru)
+     */
+    public function publicDokumentasiGuru(Guru $guru, Request $request)
+    {
+        $guru->load('school');
+        $school = $guru->school;
+
+        if (!$school) {
+            abort(404, 'Data sekolah tidak ditemukan.');
+        }
+
+        $isDokKbmEnabled = app(\App\Services\LicenseService::class)->isDokKbmFeatureEnabled($school);
+
+        $startDate = $request->query('start_date');
+        $endDate   = $request->query('end_date');
+        $kelasId   = $request->query('kelas_id');
+        $mapelId   = $request->query('mapel_id');
+        $mediaType = $request->query('media_type', 'all'); // 'all', 'image', 'video'
+        $search    = trim($request->query('q', ''));
+        $viewMode  = $request->query('view', 'gallery'); // 'gallery' atau 'timeline'
+        $publicUrl = route('publik.dokumentasi-guru', $guru->id);
+
+        if (!$isDokKbmEnabled) {
+            $filteredJurnals = collect();
+            $allDocs = collect();
+            $teacherStats = [
+                'total_sessions' => 0,
+                'total_files'    => 0,
+                'total_images'   => 0,
+                'total_videos'   => 0,
+            ];
+            $kelases = collect();
+            $mapels = collect();
+
+            return view('absensi-pelajaran.dokumentasi-guru-public', compact(
+                'guru',
+                'school',
+                'filteredJurnals',
+                'allDocs',
+                'teacherStats',
+                'startDate',
+                'endDate',
+                'kelasId',
+                'mapelId',
+                'mediaType',
+                'search',
+                'viewMode',
+                'kelases',
+                'mapels',
+                'isDokKbmEnabled',
+                'publicUrl'
+            ));
+        }
+
+        $query = JurnalPelajaran::where('school_id', $school->id)
+            ->where('guru_id', $guru->id)
+            ->whereNotNull('dokumentasi')
+            ->where('dokumentasi', '!=', '[]')
+            ->where('dokumentasi', '!=', '""')
+            ->where('dokumentasi', '!=', '')
+            ->with([
+                'jadwal.kelas',
+                'jadwal.mapel',
+            ]);
+
+        if (!empty($startDate) && !empty($endDate)) {
+            $query->whereBetween('tanggal', [$startDate, $endDate]);
+        } elseif (!empty($startDate)) {
+            $query->where('tanggal', '>=', $startDate);
+        } elseif (!empty($endDate)) {
+            $query->where('tanggal', '<=', $endDate);
+        }
+
+        if (!empty($kelasId)) {
+            $query->whereHas('jadwal', fn($q) => $q->where('kelas_id', $kelasId));
+        }
+
+        if (!empty($mapelId)) {
+            $query->whereHas('jadwal', fn($q) => $q->where('mapel_id', $mapelId));
+        }
+
+        if (!empty($search)) {
+            $query->where(function ($q) use ($search) {
+                $q->where('materi', 'like', "%{$search}%")
+                  ->orWhere('catatan', 'like', "%{$search}%")
+                  ->orWhereHas('jadwal.mapel', fn($m) => $m->where('nama_mapel', 'like', "%{$search}%"))
+                  ->orWhereHas('jadwal.kelas', fn($k) => $k->where('nama_kelas', 'like', "%{$search}%"));
+            });
+        }
+
+        $allJurnals = $query->orderBy('tanggal', 'desc')->orderBy('id', 'desc')->get();
+
+        // Filter media_type pada masing-masing item dokumentasi
+        $filteredJurnals = $allJurnals->filter(function ($jurnal) use ($mediaType) {
+            $list = $jurnal->dokumentasi_list;
+            if (empty($list)) return false;
+
+            if ($mediaType === 'image') {
+                $filtered = array_values(array_filter($list, fn($item) => !empty($item['is_image'])));
+                $jurnal->filtered_docs = $filtered;
+                return !empty($filtered);
+            } elseif ($mediaType === 'video') {
+                $filtered = array_values(array_filter($list, fn($item) => !empty($item['is_video'])));
+                $jurnal->filtered_docs = $filtered;
+                return !empty($filtered);
+            }
+
+            $jurnal->filtered_docs = $list;
+            return true;
+        });
+
+        // Flatten semua berkas media untuk galeri interaktif
+        $allDocs = $filteredJurnals->flatMap(function ($jurnal) {
+            $items = $jurnal->filtered_docs ?? $jurnal->dokumentasi_list;
+            return collect($items)->map(function ($doc) use ($jurnal) {
+                $doc['jurnal_id']    = $jurnal->id;
+                $doc['tanggal']      = $jurnal->tanggal;
+                $doc['jam_ke']       = $jurnal->jam_ke ?: ($jurnal->jadwal?->jam_ke ?: '-');
+                $doc['jam_mulai']    = $jurnal->jam_mulai;
+                $doc['jam_selesai']  = $jurnal->jam_selesai;
+                $doc['nama_kelas']   = $jurnal->jadwal?->kelas?->nama_kelas ?: 'Semua Kelas';
+                $doc['nama_mapel']   = $jurnal->jadwal?->mapel?->nama_mapel ?: 'Mata Pelajaran';
+                $doc['materi']       = $jurnal->materi;
+                $doc['catatan']      = $jurnal->catatan;
+                $doc['jadwal_id']    = $jurnal->jadwal_pelajaran_id;
+                return $doc;
+            });
+        });
+
+        // Statistik Guru Ini
+        $teacherStats = [
+            'total_sessions' => $filteredJurnals->count(),
+            'total_files'    => $allDocs->count(),
+            'total_images'   => $allDocs->where('is_image', true)->count(),
+            'total_videos'   => $allDocs->where('is_video', true)->count(),
+        ];
+
+        // Filter Options (Kelas & Mapel)
+        $kelases = Kelas::where('school_id', $school->id)->orderBy('nama_kelas')->get();
+        $mapels = Mapel::where('school_id', $school->id)->orderBy('nama_mapel')->get();
+
+        return view('absensi-pelajaran.dokumentasi-guru-public', compact(
+            'guru',
+            'school',
+            'filteredJurnals',
+            'allDocs',
+            'teacherStats',
+            'startDate',
+            'endDate',
+            'kelasId',
+            'mapelId',
+            'mediaType',
+            'search',
+            'viewMode',
+            'kelases',
+            'mapels',
+            'isDokKbmEnabled',
+            'publicUrl'
         ));
     }
 }
+

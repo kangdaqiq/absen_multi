@@ -24,17 +24,24 @@ class Setting extends Model
     {
         if ($schoolId !== null && $schoolId > 0) {
             $val = static::where('school_id', $schoolId)->where('setting_key', $key)->value('setting_value');
-            if ($val !== null && $val !== '') {
-                return $val;
+            if ($val !== null && trim($val) !== '') {
+                return trim($val);
             }
         }
 
         $globalVal = static::where('school_id', 0)->where('setting_key', $key)->value('setting_value');
-        if ($globalVal !== null && $globalVal !== '') {
-            return $globalVal;
+        if ($globalVal !== null && trim($globalVal) !== '') {
+            return trim($globalVal);
         }
 
-        $fallbackVal = static::where('setting_key', $key)->value('setting_value');
-        return ($fallbackVal !== null && $fallbackVal !== '') ? $fallbackVal : $default;
+        // Jangan pernah mengambil setting milik sekolah lain jika schoolId spesifik telah diberikan
+        if ($schoolId === null) {
+            $fallbackVal = static::where('setting_key', $key)->value('setting_value');
+            if ($fallbackVal !== null && trim($fallbackVal) !== '') {
+                return trim($fallbackVal);
+            }
+        }
+
+        return $default;
     }
 }

@@ -149,6 +149,17 @@ class UserController extends Controller
         $school = $user?->school;
         $schoolName = Setting::getVal('nama_sekolah', null, $schoolId) ?? ($school?->name ?? 'Sistem Absensi Jagat');
         $schoolAddress = Setting::getVal('alamat_sekolah', null, $schoolId) ?? ($school?->address ?? '');
+
+        // Lokasi penandatanganan
+        $signatureLocation = Setting::getVal('alamat_ttd', null, $schoolId) ?? Setting::getVal('kota_lokasi_ttd', null, $schoolId);
+        if (empty($signatureLocation) || strtolower($signatureLocation) === 'jakarta') {
+            if (!empty($schoolAddress)) {
+                $signatureLocation = trim(explode(',', $schoolAddress)[0]);
+            } else {
+                $signatureLocation = $school?->city ?? 'Tempat';
+            }
+        }
+
         $kopSurat = Setting::getVal('kop_surat', null, $schoolId);
 
         $activeRole = $request->query('role');
@@ -160,7 +171,7 @@ class UserController extends Controller
             default => 'Semua Pengguna'
         };
 
-        $pdf = Pdf::loadView('users.pdf', compact('users', 'schoolName', 'schoolAddress', 'kopSurat', 'activeRole', 'roleTitle', 'school'));
+        $pdf = Pdf::loadView('users.pdf', compact('users', 'schoolName', 'schoolAddress', 'signatureLocation', 'kopSurat', 'activeRole', 'roleTitle', 'school'));
         $pdf->setPaper('a4', 'portrait');
 
         $filename = 'daftar-akun-' . Str::slug($roleTitle) . '-' . date('Ymd-His') . '.pdf';

@@ -218,7 +218,9 @@
             <img src="{{ $kopPath }}" style="width: 100%; max-height: 95px; object-fit: contain; margin-bottom: 6px;">
         @else
             <h2>{{ $schoolName ?? 'SISTEM ABSENSI SEKOLAH' }}</h2>
-            <p>{{ $schoolAddress ?? 'Portal Administrasi & Manajemen Pengguna Terpadu' }}</p>
+            @if(!empty($schoolAddress))
+                <p>{{ $schoolAddress }}</p>
+            @endif
             <div class="header-divider"></div>
         @endif
     </div>
@@ -323,7 +325,7 @@
             </td>
             <td width="40%">
                 <div class="signature-box">
-                    <div>{{ $schoolAddress ? explode(',', $schoolAddress)[0] : 'Tempat' }}, {{ \Carbon\Carbon::now()->locale('id')->isoFormat('D MMMM Y') }}</div>
+                    <div>{{ !empty($signatureLocation) ? $signatureLocation : 'Tempat' }}, {{ \Carbon\Carbon::now()->locale('id')->isoFormat('D MMMM Y') }}</div>
                     <div style="margin-top: 2px;">Administrator Sistem</div>
                     <div class="signature-space"></div>
                     <div class="signature-name">{{ auth()->user()?->full_name ?? 'Administrator' }}</div>

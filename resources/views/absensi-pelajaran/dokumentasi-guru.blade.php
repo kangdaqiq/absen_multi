@@ -63,7 +63,7 @@
                 </div>
 
                 <!-- Tombol Halaman Publik & Bagikan -->
-                <a href="{{ route('publik.dokumentasi-guru', $guru->id) }}" target="_blank" rel="noopener noreferrer"
+                <a href="{{ $publicUrl }}" target="_blank" rel="noopener noreferrer"
                    class="inline-flex items-center gap-1.5 rounded-xl border border-brand-200 bg-brand-50 px-3.5 py-2.5 text-xs font-semibold text-brand-700 hover:bg-brand-100 dark:border-brand-800 dark:bg-brand-900/30 dark:text-brand-300 transition shadow-xs"
                    title="Buka Halaman Publik Guru (Tanpa Login)">
                     <i class="fas fa-globe text-brand-500"></i>
@@ -71,7 +71,7 @@
                     <i class="fas fa-arrow-up-right-from-square text-[9px] opacity-70"></i>
                 </a>
 
-                <button type="button" @click="copyPublicUrl('{{ route('publik.dokumentasi-guru', $guru->id) }}')"
+                <button type="button" @click="copyPublicUrl('{{ $publicUrl }}')"
                    class="inline-flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 transition shadow-xs cursor-pointer"
                    title="Salin Link Publik Guru">
                     <i class="fas fa-copy text-xs"></i>
@@ -79,7 +79,7 @@
                 </button>
 
                 @php
-                    $waText = "Galeri Dokumentasi KBM {$guru->nama}: " . route('publik.dokumentasi-guru', $guru->id);
+                    $waText = "Galeri Dokumentasi KBM {$guru->nama}: " . $publicUrl;
                     $waLink = "https://api.whatsapp.com/send?text=" . urlencode($waText);
                 @endphp
                 <a href="{{ $waLink }}" target="_blank" rel="noopener noreferrer"
@@ -102,17 +102,17 @@
                 <span class="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
                 <span class="font-medium shrink-0">Link Publik Guru Ini:</span>
                 <code class="px-2 py-0.5 rounded-md bg-gray-100 dark:bg-gray-800 text-brand-600 dark:text-brand-400 font-mono text-[11px] select-all truncate max-w-xs sm:max-w-md">
-                    {{ route('publik.dokumentasi-guru', $guru->id) }}
+                    {{ $publicUrl }}
                 </code>
             </div>
             <div class="flex items-center gap-3 shrink-0">
-                <button type="button" @click="copyPublicUrl('{{ route('publik.dokumentasi-guru', $guru->id) }}')"
+                <button type="button" @click="copyPublicUrl('{{ $publicUrl }}')"
                         class="text-brand-600 hover:text-brand-700 dark:text-brand-400 font-semibold inline-flex items-center gap-1 cursor-pointer">
                     <i class="fas fa-clone text-[11px]"></i>
                     <span x-text="copied ? 'Tersalin ke Clipboard!' : 'Salin Tautan'"></span>
                 </button>
                 <span class="text-gray-300 dark:text-gray-700">•</span>
-                <a href="{{ route('publik.dokumentasi-guru', $guru->id) }}" target="_blank" rel="noopener noreferrer"
+                <a href="{{ $publicUrl }}" target="_blank" rel="noopener noreferrer"
                    class="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 inline-flex items-center gap-1">
                     <span>Lihat Tampilan Publik</span>
                     <i class="fas fa-arrow-up-right-from-square text-[10px]"></i>

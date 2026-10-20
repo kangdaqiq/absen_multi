@@ -50,7 +50,23 @@ class Guru extends Model
         'last_seen'
     ];
 
-    protected $appends = ['foto_url'];
+    protected $appends = ['foto_url', 'username', 'public_identifier'];
+
+    public function getUsernameAttribute(): ?string
+    {
+        if ($this->relationLoaded('user') && $this->user) {
+            return $this->user->username;
+        }
+        if ($this->user_id) {
+            return $this->user?->username;
+        }
+        return null;
+    }
+
+    public function getPublicIdentifierAttribute(): string
+    {
+        return $this->username ?: (string)$this->id;
+    }
 
     public function getFotoUrlAttribute(): string
     {

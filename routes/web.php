@@ -55,9 +55,9 @@ Route::get('/pengajuan-izin/status/{code}', [App\Http\Controllers\PortalIzinCont
 Route::get('/app/download', [DashboardController::class, 'downloadAndroidApp'])->name('public.download.android');
 Route::get('/download/android', [DashboardController::class, 'downloadAndroidApp']);
 
-// ── Galeri Publik Dokumentasi KBM & Jurnal Guru (Tanpa Login / Akses Publik Per Guru) ────────────
-Route::get('/dokumentasi-kbm/{guru}', [App\Http\Controllers\AbsensiPelajaranController::class, 'publicDokumentasiGuru'])->name('publik.dokumentasi-guru');
-Route::get('/galeri-guru/{guru}', [App\Http\Controllers\AbsensiPelajaranController::class, 'publicDokumentasiGuru']);
+// ── Galeri Publik Dokumentasi KBM & Jurnal Guru (Tanpa Login / Akses Publik Pakai Username Guru) ────────────
+Route::get('/dokumentasi-kbm/{identifier}', [App\Http\Controllers\AbsensiPelajaranController::class, 'publicDokumentasiGuru'])->name('publik.dokumentasi-guru');
+Route::get('/galeri-guru/{identifier}', [App\Http\Controllers\AbsensiPelajaranController::class, 'publicDokumentasiGuru']);
 
 // ── Log Request Inspector (Wajib Login & Multi-Tenant Scoped) ────────────
 Route::middleware(['auth'])->group(function () {

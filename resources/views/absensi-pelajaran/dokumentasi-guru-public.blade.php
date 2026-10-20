@@ -175,21 +175,19 @@
                 <div class="absolute -top-24 -right-24 h-64 w-64 rounded-full bg-brand-500/10 blur-3xl pointer-events-none"></div>
                 <div class="absolute -bottom-24 -left-24 h-64 w-64 rounded-full bg-indigo-500/10 blur-3xl pointer-events-none"></div>
 
-                <div class="relative flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                <!-- Profile Header Row: Avatar, Identity & Quick Action Buttons -->
+                <div class="relative flex flex-col md:flex-row md:items-center justify-between gap-5">
                     <!-- Avatar & Teacher Bio -->
                     <div class="flex items-center gap-4 sm:gap-5 min-w-0">
                         <div class="relative shrink-0">
                             @if(!empty($guru->foto_url))
                                 <img src="{{ $guru->foto_url }}" alt="{{ $guru->nama }}"
-                                     class="h-20 w-20 sm:h-24 sm:w-24 rounded-2xl sm:rounded-3xl object-cover border-2 border-brand-500/30 dark:border-brand-500/40 shadow-md">
+                                     class="h-18 w-18 sm:h-22 sm:w-22 rounded-2xl object-cover border-2 border-brand-500/30 dark:border-brand-500/40 shadow-md">
                             @else
-                                <div class="flex h-20 w-20 sm:h-24 sm:w-24 items-center justify-center rounded-2xl sm:rounded-3xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white font-bold text-2xl sm:text-3xl shadow-md">
+                                <div class="flex h-18 w-18 sm:h-22 sm:w-22 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white font-bold text-2xl sm:text-3xl shadow-md">
                                     {{ strtoupper(substr($guru->nama, 0, 2)) }}
                                 </div>
                             @endif
-                            <div class="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-white text-[10px] shadow-sm ring-2 ring-white dark:ring-gray-900" title="Guru Terdaftar">
-                                <i class="fas fa-check"></i>
-                            </div>
                         </div>
 
                         <div class="min-w-0">
@@ -198,14 +196,19 @@
                                     <i class="fas fa-chalkboard-teacher text-[11px]"></i> Profil Pendidik
                                 </span>
                                 <span class="text-xs text-gray-400 dark:text-gray-500">•</span>
-                                <span class="text-xs text-gray-500 dark:text-gray-400 font-medium truncate max-w-[200px]">
+                                <span class="text-xs text-gray-500 dark:text-gray-400 font-medium truncate max-w-[220px]">
                                     {{ $school->name }}
                                 </span>
                             </div>
 
-                            <h2 class="text-xl sm:text-3xl font-bold text-gray-900 dark:text-white tracking-tight truncate">
-                                {{ $guru->nama }}
-                            </h2>
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <h2 class="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white tracking-tight">
+                                    {{ $guru->nama }}
+                                </h2>
+                                <span class="inline-flex items-center text-emerald-500 text-base sm:text-lg" title="Pendidik Terdaftar & Terverifikasi">
+                                    <i class="fas fa-check-circle"></i>
+                                </span>
+                            </div>
 
                             <div class="flex items-center gap-3 text-xs sm:text-sm text-gray-500 dark:text-gray-400 font-mono mt-1 flex-wrap">
                                 <span class="inline-flex items-center gap-1.5">
@@ -222,56 +225,101 @@
                         </div>
                     </div>
 
-                    <!-- Statistics Chips Grid -->
-                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3 shrink-0">
-                        <!-- Sesi KBM -->
-                        <div class="rounded-2xl border border-gray-100 bg-gray-50/80 dark:border-gray-800 dark:bg-gray-800/40 p-3 text-center min-w-[85px] sm:min-w-[95px]">
-                            <span class="text-[10px] font-semibold text-gray-400 dark:text-gray-400 uppercase tracking-wider block">Sesi KBM</span>
-                            <span class="text-lg sm:text-2xl font-bold text-emerald-600 dark:text-emerald-400">{{ $teacherStats['total_sessions'] }}</span>
-                            <span class="text-[10px] text-gray-400 block -mt-0.5">Pertemuan</span>
-                        </div>
+                    <!-- Action Buttons: Salin Link & Share WA -->
+                    <div class="flex items-center gap-2.5 shrink-0 self-start md:self-center">
+                        <button type="button" @click="copyShareLink()"
+                                class="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-750 text-xs font-semibold shadow-2xs transition cursor-pointer">
+                            <i class="fas fa-copy text-brand-500"></i>
+                            <span>Salin Tautan</span>
+                        </button>
 
-                        <!-- Foto -->
-                        <div class="rounded-2xl border border-gray-100 bg-gray-50/80 dark:border-gray-800 dark:bg-gray-800/40 p-3 text-center min-w-[85px] sm:min-w-[95px]">
-                            <span class="text-[10px] font-semibold text-gray-400 dark:text-gray-400 uppercase tracking-wider block">Foto</span>
-                            <span class="text-lg sm:text-2xl font-bold text-blue-600 dark:text-blue-400">{{ $teacherStats['total_images'] }}</span>
-                            <span class="text-[10px] text-gray-400 block -mt-0.5">Dokumentasi</span>
-                        </div>
+                        <a href="https://api.whatsapp.com/send?text={{ urlencode('Dokumentasi KBM Guru ' . $guru->nama . ' - ' . $school->name . ': ' . $publicUrl) }}"
+                           target="_blank" rel="noopener noreferrer"
+                           class="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold shadow-xs transition">
+                            <i class="fab fa-whatsapp text-sm"></i>
+                            <span class="hidden sm:inline">Bagikan</span> WA
+                        </a>
+                    </div>
+                </div>
 
-                        <!-- Video -->
-                        <div class="rounded-2xl border border-gray-100 bg-gray-50/80 dark:border-gray-800 dark:bg-gray-800/40 p-3 text-center min-w-[85px] sm:min-w-[95px]">
-                            <span class="text-[10px] font-semibold text-gray-400 dark:text-gray-400 uppercase tracking-wider block">Video</span>
-                            <span class="text-lg sm:text-2xl font-bold text-amber-500 dark:text-amber-400">{{ $teacherStats['total_videos'] }}</span>
-                            <span class="text-[10px] text-gray-400 block -mt-0.5">Rekaman KBM</span>
+                <!-- Statistics Metrics Bar (Full Width Balanced Grid) -->
+                <div class="mt-6 pt-5 border-t border-gray-100 dark:border-gray-800 grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+                    <!-- 1. Sesi KBM -->
+                    <div class="flex items-center gap-3.5 p-3.5 rounded-2xl bg-gray-50/80 dark:bg-gray-800/40 border border-gray-100 dark:border-gray-800">
+                        <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400">
+                            <i class="fas fa-chalkboard-teacher text-lg"></i>
                         </div>
+                        <div class="min-w-0">
+                            <span class="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white leading-tight block">
+                                {{ $teacherStats['total_sessions'] }}
+                            </span>
+                            <span class="text-[11px] font-medium text-gray-500 dark:text-gray-400 block truncate">
+                                Sesi Pertemuan
+                            </span>
+                        </div>
+                    </div>
 
-                        <!-- Total Berkas -->
-                        <div class="rounded-2xl border border-purple-100 bg-purple-50/60 dark:border-purple-900/30 dark:bg-purple-950/20 p-3 text-center min-w-[85px] sm:min-w-[95px]">
-                            <span class="text-[10px] font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider block">Total Media</span>
-                            <span class="text-lg sm:text-2xl font-bold text-purple-700 dark:text-purple-300">{{ $teacherStats['total_files'] }}</span>
-                            <span class="text-[10px] text-purple-500/80 block -mt-0.5">Foto & Video</span>
+                    <!-- 2. Foto Dokumentasi -->
+                    <div class="flex items-center gap-3.5 p-3.5 rounded-2xl bg-gray-50/80 dark:bg-gray-800/40 border border-gray-100 dark:border-gray-800">
+                        <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-400">
+                            <i class="fas fa-camera text-lg"></i>
+                        </div>
+                        <div class="min-w-0">
+                            <span class="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white leading-tight block">
+                                {{ $teacherStats['total_images'] }}
+                            </span>
+                            <span class="text-[11px] font-medium text-gray-500 dark:text-gray-400 block truncate">
+                                Foto KBM
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- 3. Video Pembelajaran -->
+                    <div class="flex items-center gap-3.5 p-3.5 rounded-2xl bg-gray-50/80 dark:bg-gray-800/40 border border-gray-100 dark:border-gray-800">
+                        <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-400">
+                            <i class="fas fa-video text-lg"></i>
+                        </div>
+                        <div class="min-w-0">
+                            <span class="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white leading-tight block">
+                                {{ $teacherStats['total_videos'] }}
+                            </span>
+                            <span class="text-[11px] font-medium text-gray-500 dark:text-gray-400 block truncate">
+                                Rekaman Video
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- 4. Total Media -->
+                    <div class="flex items-center gap-3.5 p-3.5 rounded-2xl bg-purple-50/60 dark:bg-purple-950/20 border border-purple-100 dark:border-purple-900/30">
+                        <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300">
+                            <i class="fas fa-photo-video text-lg"></i>
+                        </div>
+                        <div class="min-w-0">
+                            <span class="text-lg sm:text-2xl font-bold text-purple-700 dark:text-purple-300 leading-tight block">
+                                {{ $teacherStats['total_files'] }}
+                            </span>
+                            <span class="text-[11px] font-medium text-purple-600/80 dark:text-purple-400/80 block truncate">
+                                Total Media Berkas
+                            </span>
                         </div>
                     </div>
                 </div>
 
-                <!-- Public Info Banner Bar -->
-                <div class="mt-5 pt-4 border-t border-gray-100 dark:border-gray-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-gray-500 dark:text-gray-400">
+                <!-- Verification Subtext -->
+                <div class="mt-4 pt-3 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between gap-3 text-xs text-gray-500 dark:text-gray-400">
                     <div class="flex items-center gap-2">
                         <i class="fas fa-shield-alt text-brand-500"></i>
-                        <span>Halaman ini diverifikasi resmi dari sistem kehadiran & jurnal KBM <strong>{{ $school->name }}</strong>.</span>
+                        <span>Diverifikasi resmi dari sistem kehadiran & jurnal KBM <strong>{{ $school->name }}</strong>.</span>
                     </div>
-                    <div class="flex items-center gap-3">
-                        <button type="button" @click="copyShareLink()" class="inline-flex items-center gap-1.5 text-brand-600 hover:text-brand-700 dark:text-brand-400 font-semibold cursor-pointer">
-                            <i class="fas fa-copy"></i>
-                            <span>Salin Tautan Guru</span>
-                        </button>
-                    </div>
+                    <span class="hidden sm:inline font-mono text-[11px] text-gray-400">
+                        {{ $publicUrl }}
+                    </span>
                 </div>
             </div>
 
             <!-- ========================= FILTER & PENCARIAN ========================= -->
             <div class="rounded-3xl border border-gray-200 bg-white p-5 sm:p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900 transition-colors">
-                <form method="GET" action="{{ route('publik.dokumentasi-guru', $guru->id) }}" class="space-y-4">
+                <form method="GET" action="{{ $publicUrl }}" class="space-y-4">
                     <input type="hidden" name="view" value="{{ $viewMode }}">
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5">
@@ -369,7 +417,7 @@
                                 <i class="fas fa-search text-xs"></i>
                             </span>
                             @if(!empty($search))
-                                <a href="{{ route('publik.dokumentasi-guru', $guru->id) }}" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                                <a href="{{ $publicUrl }}" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
                                     <i class="fas fa-times text-xs"></i>
                                 </a>
                             @endif
@@ -378,7 +426,7 @@
                         <!-- Action Buttons -->
                         <div class="flex items-center gap-2 self-end md:self-auto shrink-0">
                             @if(!empty($startDate) || !empty($endDate) || !empty($kelasId) || !empty($mapelId) || $mediaType !== 'all' || !empty($search))
-                                <a href="{{ route('publik.dokumentasi-guru', $guru->id) }}"
+                                <a href="{{ $publicUrl }}"
                                    class="inline-flex items-center gap-1.5 rounded-2xl border border-gray-200 bg-white px-4 py-2.5 text-xs font-semibold text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 transition shadow-xs">
                                     <i class="fas fa-undo text-[10px]"></i>
                                     <span>Reset Filter</span>
@@ -519,6 +567,14 @@
                                                     "{{ $doc['catatan'] }}"
                                                 </p>
                                             @endif
+
+                                            <!-- Indikator Siswa Tidak Hadir Pada Media Card -->
+                                            @if(!empty($doc['absent_count']) && $doc['absent_count'] > 0)
+                                                <div class="pt-1 flex items-center gap-1.5 text-[11px] font-semibold text-rose-600 dark:text-rose-400">
+                                                    <i class="fas fa-user-times text-[10px]"></i>
+                                                    <span>{{ $doc['absent_count'] }} Siswa Tidak Hadir</span>
+                                                </div>
+                                            @endif
                                         </div>
                                     </div>
                                 </div>
@@ -554,7 +610,7 @@
                             Tidak ada foto atau video pembelajaran yang sesuai dengan kriteria filter yang Anda pilih untuk guru ini.
                         </p>
                         <div class="mt-5">
-                            <a href="{{ route('publik.dokumentasi-guru', $guru->id) }}"
+                            <a href="{{ $publicUrl }}"
                                class="inline-flex items-center gap-2 rounded-2xl bg-brand-500 hover:bg-brand-600 px-5 py-2.5 text-xs font-semibold text-white transition shadow-sm">
                                 <i class="fas fa-sync-alt"></i>
                                 <span>Reset Semua Filter</span>
@@ -608,10 +664,56 @@
                                                 <span>{{ $jurnal->catatan }}</span>
                                             </div>
                                         @endif
+
+                                        <!-- Siswa Tidak Hadir Pada Sesi Ini -->
+                                        @if(!empty($jurnal->absent_students) && count($jurnal->absent_students) > 0)
+                                            <div class="mt-2.5 pt-2.5 border-t border-gray-100 dark:border-gray-800">
+                                                <div class="text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5 flex items-center gap-1.5">
+                                                    <i class="fas fa-user-times text-rose-500 text-[10px]"></i>
+                                                    <span>Siswa Tidak Hadir ({{ count($jurnal->absent_students) }}):</span>
+                                                </div>
+                                                <div class="flex flex-wrap gap-1.5">
+                                                    @foreach($jurnal->absent_students as $st)
+                                                        @php
+                                                            $badgeStyle = match($st['status'] ?? '') {
+                                                                'S' => 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:border-amber-500/30',
+                                                                'I' => 'bg-blue-50 text-blue-800 border-blue-200 dark:bg-blue-500/15 dark:text-blue-300 dark:border-blue-500/30',
+                                                                'A' => 'bg-rose-50 text-rose-800 border-rose-200 dark:bg-rose-500/15 dark:text-rose-300 dark:border-rose-500/30',
+                                                                default => 'bg-purple-50 text-purple-800 border-purple-200 dark:bg-purple-500/15 dark:text-purple-300 dark:border-purple-500/30',
+                                                            };
+                                                        @endphp
+                                                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border {{ $badgeStyle }}">
+                                                            <i class="fas fa-user text-[9px] opacity-70"></i>
+                                                            {{ $st['nama'] }} ({{ $st['status_label'] ?? $st['status'] }})
+                                                        </span>
+                                                    @endforeach
+                                                </div>
+                                            </div>
+                                        @else
+                                            <div class="mt-2 flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+                                                <i class="fas fa-check-circle text-[11px]"></i>
+                                                <span>Siswa hadir lengkap (Nihil)</span>
+                                            </div>
+                                        @endif
                                     </div>
 
-                                    <!-- Counter Dok Sesi Ini -->
+                                    <!-- Counter Dok Sesi Ini & Tombol Rincian -->
                                     <div class="shrink-0 flex items-center gap-2">
+                                        <button type="button"
+                                                @click="openJournalModal({
+                                                    tanggal: '{{ $jurnal->tanggal }}',
+                                                    jam_ke: '{{ $jurnal->jam_ke ?: ($jurnal->jadwal?->jam_ke ?: '-') }}',
+                                                    nama_kelas: '{{ $jurnal->jadwal?->kelas?->nama_kelas ?: "Semua Kelas" }}',
+                                                    nama_mapel: '{{ $jurnal->jadwal?->mapel?->nama_mapel ?: "Mata Pelajaran" }}',
+                                                    materi: @js($jurnal->materi),
+                                                    catatan: @js($jurnal->catatan),
+                                                    absent_students: @js($jurnal->absent_students ?? []),
+                                                    absent_count: {{ $jurnal->absent_count ?? 0 }}
+                                                })"
+                                                class="px-3 py-1.5 rounded-xl bg-brand-50 hover:bg-brand-100 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300 dark:hover:bg-brand-500/25 text-xs font-semibold border border-brand-200/50 dark:border-brand-500/30 flex items-center gap-1.5 transition cursor-pointer">
+                                            <i class="fas fa-info-circle text-[11px]"></i>
+                                            <span>Rincian Jurnal</span>
+                                        </button>
                                         <span class="px-3 py-1.5 rounded-xl bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 text-xs font-bold border border-purple-200/60 dark:border-purple-800/30">
                                             <i class="fas fa-photo-video mr-1"></i> {{ count($sessionDocs) }} Berkas Media
                                         </span>
@@ -789,10 +891,10 @@
          x-transition:leave-start="opacity-100"
          x-transition:leave-end="opacity-0"
          @keydown.escape.window="journalModalOpen = false">
-        <div class="relative max-w-xl w-full bg-white dark:bg-gray-900 rounded-3xl p-6 shadow-2xl border border-gray-200 dark:border-gray-800"
+        <div class="relative max-w-xl sm:max-w-2xl w-full bg-white dark:bg-gray-900 rounded-3xl p-6 shadow-2xl border border-gray-200 dark:border-gray-800 max-h-[90vh] overflow-y-auto"
              @click.away="journalModalOpen = false">
             <div class="flex items-center justify-between pb-3 border-b border-gray-100 dark:border-gray-800">
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-2.5">
                     <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
                         <i class="fas fa-book-reader text-sm"></i>
                     </div>
@@ -801,57 +903,108 @@
                         <p class="text-[11px] text-gray-500 dark:text-gray-400">Dokumentasi resmi kegiatan belajar mengajar</p>
                     </div>
                 </div>
-                <button type="button" @click="journalModalOpen = false" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1.5 rounded-lg">
+                <button type="button" @click="journalModalOpen = false" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1.5 rounded-lg transition">
                     <i class="fas fa-times text-sm"></i>
                 </button>
             </div>
 
-            <div class="mt-4 space-y-3.5 text-xs">
-                <!-- Sesi Metadata -->
-                <div class="grid grid-cols-2 gap-2.5 bg-gray-50 dark:bg-gray-800/50 p-3 rounded-2xl border border-gray-100 dark:border-gray-800">
+            <div class="mt-4 space-y-4 text-xs">
+                <!-- Sesi Metadata Grid -->
+                <div class="grid grid-cols-2 gap-2.5 bg-gray-50 dark:bg-gray-800/50 p-3.5 rounded-2xl border border-gray-100 dark:border-gray-800">
                     <div>
-                        <span class="text-[10px] text-gray-400 uppercase font-semibold block">Tanggal KBM</span>
-                        <span class="font-bold text-gray-800 dark:text-gray-200" x-text="activeJournal.tanggal_formatted"></span>
+                        <span class="text-[10px] text-gray-400 dark:text-gray-500 uppercase font-bold tracking-wider block">Tanggal KBM</span>
+                        <span class="font-bold text-gray-900 dark:text-gray-100 text-xs sm:text-sm" x-text="activeJournal.tanggal_formatted"></span>
                     </div>
                     <div>
-                        <span class="text-[10px] text-gray-400 uppercase font-semibold block">Jam Pelajaran</span>
-                        <span class="font-bold text-gray-800 dark:text-gray-200 font-mono" x-text="'Jam ke-' + (activeJournal.jam_ke || '-')"></span>
+                        <span class="text-[10px] text-gray-400 dark:text-gray-500 uppercase font-bold tracking-wider block">Jam Pelajaran</span>
+                        <span class="font-bold text-gray-900 dark:text-gray-100 font-mono text-xs sm:text-sm" x-text="'Jam ke-' + (activeJournal.jam_ke || '-')"></span>
                     </div>
                     <div>
-                        <span class="text-[10px] text-gray-400 uppercase font-semibold block">Kelas</span>
-                        <span class="font-bold text-blue-600 dark:text-blue-400" x-text="activeJournal.nama_kelas"></span>
+                        <span class="text-[10px] text-gray-400 dark:text-gray-500 uppercase font-bold tracking-wider block">Kelas</span>
+                        <span class="font-bold text-blue-600 dark:text-blue-400 text-xs sm:text-sm" x-text="activeJournal.nama_kelas"></span>
                     </div>
                     <div>
-                        <span class="text-[10px] text-gray-400 uppercase font-semibold block">Mata Pelajaran</span>
-                        <span class="font-bold text-emerald-600 dark:text-emerald-400" x-text="activeJournal.nama_mapel"></span>
+                        <span class="text-[10px] text-gray-400 dark:text-gray-500 uppercase font-bold tracking-wider block">Mata Pelajaran</span>
+                        <span class="font-bold text-emerald-600 dark:text-emerald-400 text-xs sm:text-sm" x-text="activeJournal.nama_mapel"></span>
                     </div>
                 </div>
 
                 <!-- Materi KBM -->
                 <div>
-                    <span class="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider block mb-1">
-                        Materi Pembelajaran:
+                    <span class="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider block mb-1 flex items-center gap-1.5">
+                        <i class="fas fa-book-reader text-brand-500 text-[10px]"></i>
+                        <span>Materi Pembelajaran:</span>
                     </span>
-                    <div class="p-3.5 rounded-2xl bg-brand-50/50 dark:bg-brand-500/10 border border-brand-200/50 dark:border-brand-500/20 text-xs sm:text-sm font-semibold text-gray-900 dark:text-white"
+                    <div class="p-3.5 rounded-2xl bg-brand-50/50 dark:bg-brand-500/10 border border-brand-200/50 dark:border-brand-500/20 text-xs sm:text-sm font-semibold text-gray-900 dark:text-white leading-relaxed"
                          x-text="activeJournal.materi || 'Tidak ada materi tertulis.'">
                     </div>
                 </div>
 
-                <!-- Catatan Guru -->
+                <!-- Catatan Guru (Jika Ada) -->
                 <template x-if="activeJournal.catatan">
                     <div>
-                        <span class="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider block mb-1">
-                            Catatan / Evaluasi Pembelajaran:
+                        <span class="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider block mb-1 flex items-center gap-1.5">
+                            <i class="fas fa-comment-alt text-brand-500 text-[10px]"></i>
+                            <span>Catatan / Evaluasi Pembelajaran:</span>
                         </span>
                         <div class="p-3.5 rounded-2xl bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-800 text-xs text-gray-700 dark:text-gray-300 italic"
                              x-text="activeJournal.catatan">
                         </div>
                     </div>
                 </template>
+
+                <!-- Daftar Siswa Tidak Hadir -->
+                <div>
+                    <div class="flex items-center justify-between mb-1.5">
+                        <span class="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                            <i class="fas fa-user-times text-rose-500 text-[10px]"></i>
+                            <span>Daftar Siswa Tidak Hadir:</span>
+                        </span>
+                        <template x-if="activeJournal.absent_students && activeJournal.absent_students.length > 0">
+                            <span class="text-[10px] font-bold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-500/15 px-2.5 py-0.5 rounded-full border border-rose-200/60 dark:border-rose-500/30"
+                                  x-text="activeJournal.absent_students.length + ' Siswa'">
+                            </span>
+                        </template>
+                    </div>
+
+                    <!-- Jika ada siswa tidak hadir: tampilkan chip "Nama Siswa (Status)" -->
+                    <template x-if="activeJournal.absent_students && activeJournal.absent_students.length > 0">
+                        <div class="p-3.5 rounded-2xl bg-gray-50/90 dark:bg-gray-800/60 border border-gray-200/80 dark:border-gray-800">
+                            <div class="flex flex-wrap gap-2">
+                                <template x-for="(st, idx) in activeJournal.absent_students" :key="idx">
+                                    <div class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border shadow-2xs transition"
+                                         :class="{
+                                             'bg-amber-50 text-amber-800 border-amber-200/80 dark:bg-amber-500/15 dark:text-amber-300 dark:border-amber-500/30': st.status === 'S',
+                                             'bg-blue-50 text-blue-800 border-blue-200/80 dark:bg-blue-500/15 dark:text-blue-300 dark:border-blue-500/30': st.status === 'I',
+                                             'bg-rose-50 text-rose-800 border-rose-200/80 dark:bg-rose-500/15 dark:text-rose-300 dark:border-rose-500/30': st.status === 'A',
+                                             'bg-purple-50 text-purple-800 border-purple-200/80 dark:bg-purple-500/15 dark:text-purple-300 dark:border-purple-500/30': st.status === 'D' || st.status === 'T',
+                                         }">
+                                        <i class="fas text-[10px]"
+                                           :class="{
+                                               'fa-head-side-cough text-amber-600 dark:text-amber-400': st.status === 'S',
+                                               'fa-envelope-open-text text-blue-600 dark:text-blue-400': st.status === 'I',
+                                               'fa-user-slash text-rose-600 dark:text-rose-400': st.status === 'A',
+                                               'fa-clock text-purple-600 dark:text-purple-400': st.status === 'D' || st.status === 'T',
+                                           }"></i>
+                                        <span class="tracking-tight" x-text="st.nama + ' (' + (st.status_label || st.status) + ')'"></span>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </template>
+
+                    <!-- Jika nihil (seluruh siswa hadir) -->
+                    <template x-if="!activeJournal.absent_students || activeJournal.absent_students.length === 0">
+                        <div class="p-3.5 rounded-2xl bg-emerald-50/70 dark:bg-emerald-500/10 border border-emerald-200/60 dark:border-emerald-500/20 flex items-center gap-2.5 text-xs font-semibold text-emerald-800 dark:text-emerald-300">
+                            <i class="fas fa-check-circle text-emerald-500 text-sm"></i>
+                            <span>Seluruh siswa hadir lengkap pada sesi ini (Nihil tidak hadir).</span>
+                        </div>
+                    </template>
+                </div>
             </div>
 
             <div class="mt-5 pt-3 border-t border-gray-100 dark:border-gray-800 flex justify-end">
-                <button type="button" @click="journalModalOpen = false" class="px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 text-xs font-semibold transition cursor-pointer">
+                <button type="button" @click="journalModalOpen = false" class="px-5 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 text-xs font-semibold transition cursor-pointer">
                     Tutup Rincian
                 </button>
             </div>

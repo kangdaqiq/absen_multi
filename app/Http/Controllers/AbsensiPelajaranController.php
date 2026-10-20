@@ -838,7 +838,7 @@ class AbsensiPelajaranController extends Controller
             ->where('dokumentasi', '!=', '[]')
             ->where('dokumentasi', '!=', '""')
             ->where('dokumentasi', '!=', '')
-            ->with(['guru']);
+            ->with(['guru.user']);
 
         if (!$isAdminOrWaka && $isGuru) {
             $query->where('guru_id', $guruId);
@@ -852,18 +852,21 @@ class AbsensiPelajaranController extends Controller
         })->map(function ($items, $gId) {
             $guru = $items->first()->guru;
             $allDocs = $items->flatMap(fn($j) => $j->dokumentasi_list);
+            $publicSlug = $guru?->username ?: ($guru?->user?->username ?: $gId);
 
             return (object) [
-                'guru'         => $guru,
-                'guru_id'      => $gId,
-                'guru_nama'    => $guru ? $guru->nama : 'Guru Tidak Diketahui',
-                'guru_nip'     => $guru?->nip ?? '-',
-                'guru_foto'    => $guru?->foto_url ?? null,
-                'total_kbm'    => $items->count(),
-                'total_files'  => $allDocs->count(),
-                'total_images' => $allDocs->where('is_image', true)->count(),
-                'total_videos' => $allDocs->where('is_video', true)->count(),
-                'latest_kbm'   => $items->max('tanggal'),
+                'guru'             => $guru,
+                'guru_id'          => $gId,
+                'guru_username'    => $publicSlug,
+                'guru_public_slug' => $publicSlug,
+                'guru_nama'        => $guru ? $guru->nama : 'Guru Tidak Diketahui',
+                'guru_nip'         => $guru?->nip ?? '-',
+                'guru_foto'        => $guru?->foto_url ?? null,
+                'total_kbm'        => $items->count(),
+                'total_files'      => $allDocs->count(),
+                'total_images'     => $allDocs->where('is_image', true)->count(),
+                'total_videos'     => $allDocs->where('is_video', true)->count(),
+                'latest_kbm'       => $items->max('tanggal'),
             ];
         });
 
@@ -1006,6 +1009,9 @@ class AbsensiPelajaranController extends Controller
 
         $allJurnals = $query->orderBy('tanggal', 'desc')->orderBy('id', 'desc')->get();
 
+        // Lampirkan data siswa tidak hadir pada tiap jurnal
+        $this->attachAbsentStudentsToJurnals($allJurnals, $schoolId);
+
         // Filter media_type pada masing-masing item dokumentasi
         $filteredJurnals = $allJurnals->filter(function ($jurnal) use ($mediaType) {
             $list = $jurnal->dokumentasi_list;
@@ -1029,16 +1035,18 @@ class AbsensiPelajaranController extends Controller
         $allDocs = $filteredJurnals->flatMap(function ($jurnal) {
             $items = $jurnal->filtered_docs ?? $jurnal->dokumentasi_list;
             return collect($items)->map(function ($doc) use ($jurnal) {
-                $doc['jurnal_id']    = $jurnal->id;
-                $doc['tanggal']      = $jurnal->tanggal;
-                $doc['jam_ke']       = $jurnal->jam_ke ?: ($jurnal->jadwal?->jam_ke ?: '-');
-                $doc['jam_mulai']    = $jurnal->jam_mulai;
-                $doc['jam_selesai']  = $jurnal->jam_selesai;
-                $doc['nama_kelas']   = $jurnal->jadwal?->kelas?->nama_kelas ?: 'Semua Kelas';
-                $doc['nama_mapel']   = $jurnal->jadwal?->mapel?->nama_mapel ?: 'Mata Pelajaran';
-                $doc['materi']       = $jurnal->materi;
-                $doc['catatan']      = $jurnal->catatan;
-                $doc['jadwal_id']    = $jurnal->jadwal_pelajaran_id;
+                $doc['jurnal_id']       = $jurnal->id;
+                $doc['tanggal']         = $jurnal->tanggal;
+                $doc['jam_ke']          = $jurnal->jam_ke ?: ($jurnal->jadwal?->jam_ke ?: '-');
+                $doc['jam_mulai']       = $jurnal->jam_mulai;
+                $doc['jam_selesai']     = $jurnal->jam_selesai;
+                $doc['nama_kelas']      = $jurnal->jadwal?->kelas?->nama_kelas ?: 'Semua Kelas';
+                $doc['nama_mapel']      = $jurnal->jadwal?->mapel?->nama_mapel ?: 'Mata Pelajaran';
+                $doc['materi']          = $jurnal->materi;
+                $doc['catatan']         = $jurnal->catatan;
+                $doc['jadwal_id']       = $jurnal->jadwal_pelajaran_id;
+                $doc['absent_students'] = $jurnal->absent_students ?? [];
+                $doc['absent_count']    = $jurnal->absent_count ?? 0;
                 return $doc;
             });
         });
@@ -1054,7 +1062,10 @@ class AbsensiPelajaranController extends Controller
         // Filter Options (Kelas & Mapel)
         $kelases = Kelas::where('school_id', $schoolId)->orderBy('nama_kelas')->get();
         $mapels = Mapel::where('school_id', $schoolId)->orderBy('nama_mapel')->get();
-        $publicUrl = route('publik.dokumentasi-guru', $guru->id);
+
+        $guru->load('user');
+        $publicSlug = $guru->username ?: (string)$guru->id;
+        $publicUrl = route('publik.dokumentasi-guru', $publicSlug);
 
         return view('absensi-pelajaran.dokumentasi-guru', compact(
             'guru',
@@ -1076,11 +1087,38 @@ class AbsensiPelajaranController extends Controller
     }
 
     /**
-     * Halaman Publik Galeri Dokumentasi KBM & Jurnal Guru (Tanpa Login / Akses Publik Per Guru)
+     * Halaman Publik Galeri Dokumentasi KBM & Jurnal Guru (Tanpa Login / Akses Publik Pakai Username Guru)
      */
-    public function publicDokumentasiGuru(Guru $guru, Request $request)
+    public function publicDokumentasiGuru($identifier, Request $request)
     {
-        $guru->load('school');
+        // 1. Cari Guru berdasarkan username dari User yang terkait
+        $guru = Guru::whereHas('user', function ($q) use ($identifier) {
+            $q->where('username', $identifier);
+        })->first();
+
+        // 2. Jika belum ditemukan, cari User dengan username tersebut lalu ambil relasi gurunya
+        if (!$guru) {
+            $user = User::where('username', $identifier)->first();
+            if ($user) {
+                $guru = $user->guru ?: Guru::where('user_id', $user->id)->first();
+            }
+        }
+
+        // 3. Fallback: jika identifier berupa ID Guru numerik (kompatibilitas link lama)
+        if (!$guru && is_numeric($identifier)) {
+            $guru = Guru::find($identifier);
+        }
+
+        // 4. Fallback: jika identifier berupa NIP guru
+        if (!$guru) {
+            $guru = Guru::where('nip', $identifier)->first();
+        }
+
+        if (!$guru) {
+            abort(404, 'Data guru atau dokumentasi KBM tidak ditemukan.');
+        }
+
+        $guru->load('school', 'user');
         $school = $guru->school;
 
         if (!$school) {
@@ -1096,7 +1134,9 @@ class AbsensiPelajaranController extends Controller
         $mediaType = $request->query('media_type', 'all'); // 'all', 'image', 'video'
         $search    = trim($request->query('q', ''));
         $viewMode  = $request->query('view', 'gallery'); // 'gallery' atau 'timeline'
-        $publicUrl = route('publik.dokumentasi-guru', $guru->id);
+
+        $publicSlug = $guru->username ?: (string)$guru->id;
+        $publicUrl = route('publik.dokumentasi-guru', $publicSlug);
 
         if (!$isDokKbmEnabled) {
             $filteredJurnals = collect();
@@ -1168,6 +1208,9 @@ class AbsensiPelajaranController extends Controller
 
         $allJurnals = $query->orderBy('tanggal', 'desc')->orderBy('id', 'desc')->get();
 
+        // Lampirkan data siswa tidak hadir pada tiap jurnal
+        $this->attachAbsentStudentsToJurnals($allJurnals, $school->id);
+
         // Filter media_type pada masing-masing item dokumentasi
         $filteredJurnals = $allJurnals->filter(function ($jurnal) use ($mediaType) {
             $list = $jurnal->dokumentasi_list;
@@ -1191,16 +1234,18 @@ class AbsensiPelajaranController extends Controller
         $allDocs = $filteredJurnals->flatMap(function ($jurnal) {
             $items = $jurnal->filtered_docs ?? $jurnal->dokumentasi_list;
             return collect($items)->map(function ($doc) use ($jurnal) {
-                $doc['jurnal_id']    = $jurnal->id;
-                $doc['tanggal']      = $jurnal->tanggal;
-                $doc['jam_ke']       = $jurnal->jam_ke ?: ($jurnal->jadwal?->jam_ke ?: '-');
-                $doc['jam_mulai']    = $jurnal->jam_mulai;
-                $doc['jam_selesai']  = $jurnal->jam_selesai;
-                $doc['nama_kelas']   = $jurnal->jadwal?->kelas?->nama_kelas ?: 'Semua Kelas';
-                $doc['nama_mapel']   = $jurnal->jadwal?->mapel?->nama_mapel ?: 'Mata Pelajaran';
-                $doc['materi']       = $jurnal->materi;
-                $doc['catatan']      = $jurnal->catatan;
-                $doc['jadwal_id']    = $jurnal->jadwal_pelajaran_id;
+                $doc['jurnal_id']       = $jurnal->id;
+                $doc['tanggal']         = $jurnal->tanggal;
+                $doc['jam_ke']          = $jurnal->jam_ke ?: ($jurnal->jadwal?->jam_ke ?: '-');
+                $doc['jam_mulai']       = $jurnal->jam_mulai;
+                $doc['jam_selesai']     = $jurnal->jam_selesai;
+                $doc['nama_kelas']      = $jurnal->jadwal?->kelas?->nama_kelas ?: 'Semua Kelas';
+                $doc['nama_mapel']      = $jurnal->jadwal?->mapel?->nama_mapel ?: 'Mata Pelajaran';
+                $doc['materi']          = $jurnal->materi;
+                $doc['catatan']         = $jurnal->catatan;
+                $doc['jadwal_id']       = $jurnal->jadwal_pelajaran_id;
+                $doc['absent_students'] = $jurnal->absent_students ?? [];
+                $doc['absent_count']    = $jurnal->absent_count ?? 0;
                 return $doc;
             });
         });
@@ -1235,6 +1280,89 @@ class AbsensiPelajaranController extends Controller
             'isDokKbmEnabled',
             'publicUrl'
         ));
+    }
+
+    /**
+     * Lampirkan data siswa yang tidak hadir (Sakit, Izin, Alpa, Dispen) ke setiap jurnal
+     */
+    private function attachAbsentStudentsToJurnals($allJurnals, $schoolId): void
+    {
+        if ($allJurnals->isEmpty()) {
+            return;
+        }
+
+        $jurnalIds = $allJurnals->pluck('id')->filter()->toArray();
+
+        $absentsQuery = AbsensiPelajaran::where('school_id', $schoolId)
+            ->whereIn('status', ['S', 'I', 'A', 'D'])
+            ->with('student:id,nama,nis,kelas_id');
+
+        $absentsQuery->where(function ($q) use ($jurnalIds, $allJurnals) {
+            $hasCondition = false;
+            if (!empty($jurnalIds)) {
+                $q->whereIn('jurnal_pelajaran_id', $jurnalIds);
+                $hasCondition = true;
+            }
+            foreach ($allJurnals as $j) {
+                $tanggalStr = $j->tanggal instanceof \Carbon\Carbon ? $j->tanggal->format('Y-m-d') : substr((string)$j->tanggal, 0, 10);
+                if (!empty($j->jadwal_pelajaran_id) && !empty($tanggalStr)) {
+                    if ($hasCondition) {
+                        $q->orWhere(function ($sub) use ($j, $tanggalStr) {
+                            $sub->where('jadwal_pelajaran_id', $j->jadwal_pelajaran_id)
+                                ->whereDate('tanggal', $tanggalStr);
+                        });
+                    } else {
+                        $q->where(function ($sub) use ($j, $tanggalStr) {
+                            $sub->where('jadwal_pelajaran_id', $j->jadwal_pelajaran_id)
+                                ->whereDate('tanggal', $tanggalStr);
+                        });
+                        $hasCondition = true;
+                    }
+                }
+            }
+        });
+
+        $allAbsents = $absentsQuery->get();
+
+        $absentsByJurnal = [];
+        foreach ($allAbsents as $abs) {
+            $statusLabel = match ($abs->status) {
+                'S' => 'Sakit',
+                'I' => 'Izin',
+                'A' => 'Alpa',
+                'D' => 'Dispen',
+                default => $abs->status,
+            };
+            $studentName = $abs->student?->nama ?: 'Siswa';
+            $itemData = [
+                'nama'         => $studentName,
+                'status'       => $abs->status,
+                'status_label' => $statusLabel,
+                'keterangan'   => $abs->keterangan,
+                'display'      => $studentName . ' (' . $statusLabel . ')',
+            ];
+
+            if (!empty($abs->jurnal_pelajaran_id)) {
+                $absentsByJurnal['j_' . $abs->jurnal_pelajaran_id][] = $itemData;
+            }
+            $tglKey = $abs->tanggal instanceof \Carbon\Carbon ? $abs->tanggal->format('Y-m-d') : substr((string)$abs->tanggal, 0, 10);
+            if (!empty($abs->jadwal_pelajaran_id)) {
+                $absentsByJurnal['jt_' . $abs->jadwal_pelajaran_id . '_' . $tglKey][] = $itemData;
+            }
+        }
+
+        foreach ($allJurnals as $jurnal) {
+            $tglStr = $jurnal->tanggal instanceof \Carbon\Carbon ? $jurnal->tanggal->format('Y-m-d') : substr((string)$jurnal->tanggal, 0, 10);
+            $listByJurnalId = !empty($jurnal->id) && isset($absentsByJurnal['j_' . $jurnal->id]) ? $absentsByJurnal['j_' . $jurnal->id] : [];
+            $listByJadwalTgl = (!empty($jurnal->jadwal_pelajaran_id) && !empty($tglStr) && isset($absentsByJurnal['jt_' . $jurnal->jadwal_pelajaran_id . '_' . $tglStr]))
+                ? $absentsByJurnal['jt_' . $jurnal->jadwal_pelajaran_id . '_' . $tglStr]
+                : [];
+
+            $combined = array_merge($listByJurnalId, $listByJadwalTgl);
+            $uniqueList = collect($combined)->unique('nama')->sortBy('nama')->values()->all();
+            $jurnal->absent_students = $uniqueList;
+            $jurnal->absent_count = count($uniqueList);
+        }
     }
 }
 

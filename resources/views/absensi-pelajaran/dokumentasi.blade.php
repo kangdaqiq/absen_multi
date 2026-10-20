@@ -232,7 +232,7 @@
                             <td class="py-3.5 px-4 sm:px-6 text-right">
                                 <div class="inline-flex items-center gap-1.5 justify-end">
                                     @if($item->guru_id)
-                                        <a href="{{ route('publik.dokumentasi-guru', $item->guru_id) }}" target="_blank" rel="noopener noreferrer"
+                                        <a href="{{ route('publik.dokumentasi-guru', $item->guru_public_slug ?? $item->guru_id) }}" target="_blank" rel="noopener noreferrer"
                                            class="inline-flex items-center gap-1 rounded-xl border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700 dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-300 px-2.5 py-2 text-xs font-semibold transition shadow-xs"
                                            title="Buka Halaman Publik Guru (Akses Publik Tanpa Login)">
                                             <i class="fas fa-globe text-[11px]"></i>

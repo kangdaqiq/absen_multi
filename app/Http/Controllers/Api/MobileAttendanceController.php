@@ -309,29 +309,36 @@ class MobileAttendanceController extends Controller
         }
 
         $guruData = null;
-        if ($user->guru) {
-            $allKelasWali = Kelas::where('wali_kelas_id', $user->guru->id)
-                ->orWhere('wali_kelas_2_id', $user->guru->id)
+        $resolvedGuruUser = $user->guru ?? Guru::where('user_id', $user->id)
+            ->orWhere('nama', $user->full_name)
+            ->orWhere('nama', 'like', '%' . ($user->full_name ?? '') . '%')
+            ->first();
+        if ($resolvedGuruUser) {
+            if (!$resolvedGuruUser->user_id) {
+                $resolvedGuruUser->update(['user_id' => $user->id]);
+            }
+            $allKelasWali = Kelas::where('wali_kelas_id', $resolvedGuruUser->id)
+                ->orWhere('wali_kelas_2_id', $resolvedGuruUser->id)
                 ->get();
             $kelasWali = $allKelasWali->first();
             $isWaliKelas = $allKelasWali->isNotEmpty() || $user->role === 'wali_kelas';
-            $waliKelases = $allKelasWali->map(function ($kw) use ($user) {
-                $peran = ($kw->wali_kelas_id == $user->guru->id) ? 'Wali Kelas 1' : 'Wali Kelas 2';
+            $waliKelases = $allKelasWali->map(function ($kw) use ($resolvedGuruUser) {
+                $peran = ($kw->wali_kelas_id == $resolvedGuruUser->id) ? 'Wali Kelas 1' : 'Wali Kelas 2';
                 return [
                     'id' => $kw->id,
                     'nama' => $kw->nama_kelas ?? $kw->nama,
                     'nama_kelas' => $kw->nama_kelas ?? $kw->nama,
                     'peran' => $peran,
-                    'is_utama' => ($kw->wali_kelas_id == $user->guru->id),
+                    'is_utama' => ($kw->wali_kelas_id == $resolvedGuruUser->id),
                 ];
             })->values()->all();
 
             $guruData = [
-                'id' => $user->guru->id,
-                'nama' => $user->guru->nama,
-                'nip' => $user->guru->nip,
-                'foto' => $user->guru->foto,
-                'foto_url' => $user->guru->foto_url,
+                'id' => $resolvedGuruUser->id,
+                'nama' => $resolvedGuruUser->nama,
+                'nip' => $resolvedGuruUser->nip,
+                'foto' => $resolvedGuruUser->foto,
+                'foto_url' => $resolvedGuruUser->foto_url,
                 'is_wali_kelas' => $isWaliKelas,
                 'kelas_id' => $kelasWali?->id,
                 'kelas_name' => $kelasWali ? ($kelasWali->nama_kelas ?? $kelasWali->nama) : null,
@@ -810,9 +817,22 @@ class MobileAttendanceController extends Controller
             $photoPath = $request->file('photo')->store('absensi_photos', 'public');
         }
 
-        // Case 1: Guru / Admin / Wali Kelas
-        if ($user && ($user->role === 'guru' || $user->guru) && $user->guru) {
-            $teacher = $user->guru;
+        // Case 1: Guru / Admin / Wali Kelas / Waka
+        $teacher = $user?->guru ?? Guru::where('user_id', $user?->id)
+            ->orWhere('nama', $user?->full_name)
+            ->orWhere('nama', 'like', '%' . ($user?->full_name ?? '') . '%')
+            ->first();
+
+        $isTeacherRole = in_array(strtolower($user?->role ?? ''), [
+            'guru', 'teacher', 'wali_kelas', 'admin', 'super_admin', 'waka', 'kurikulum', 'waka_kurikulum', 'pegawai', 'kepsek'
+        ]) || str_contains(strtolower($user?->role ?? ''), 'waka')
+           || str_contains(strtolower($user?->role ?? ''), 'kurikulum')
+           || str_contains(strtolower($user?->role ?? ''), 'guru');
+
+        if ($user && ($isTeacherRole || $teacher) && $teacher) {
+            if (!$teacher->user_id) {
+                $teacher->update(['user_id' => $user->id]);
+            }
 
             // CEK SHIFT GURU
             $shift = $teacher->getShiftForDate($now);
@@ -1132,9 +1152,22 @@ class MobileAttendanceController extends Controller
             ], 422);
         }
 
-        // Case 1: Guru
-        if ($user && ($user->role === 'guru' || $user->guru) && $user->guru) {
-            $teacher = $user->guru;
+        // Case 1: Guru / Admin / Wali Kelas / Waka
+        $teacher = $user?->guru ?? Guru::where('user_id', $user?->id)
+            ->orWhere('nama', $user?->full_name)
+            ->orWhere('nama', 'like', '%' . ($user?->full_name ?? '') . '%')
+            ->first();
+
+        $isTeacherRole = in_array(strtolower($user?->role ?? ''), [
+            'guru', 'teacher', 'wali_kelas', 'admin', 'super_admin', 'waka', 'kurikulum', 'waka_kurikulum', 'pegawai', 'kepsek'
+        ]) || str_contains(strtolower($user?->role ?? ''), 'waka')
+           || str_contains(strtolower($user?->role ?? ''), 'kurikulum')
+           || str_contains(strtolower($user?->role ?? ''), 'guru');
+
+        if ($user && ($isTeacherRole || $teacher) && $teacher) {
+            if (!$teacher->user_id) {
+                $teacher->update(['user_id' => $user->id]);
+            }
 
             $absen = AbsensiGuru::where('guru_id', $teacher->id)
                 ->where('tanggal', $today)
@@ -1357,9 +1390,22 @@ class MobileAttendanceController extends Controller
             }
         }
 
-        if ($user && (in_array($user->role, ['guru', 'teacher', 'wali_kelas', 'admin']) || $user->role === 'guru') && $user->guru) {
-            $query = AbsensiGuru::where('guru_id', $user->guru->id)
-                ->whereNull('jadwal_pelajaran_id');
+        $teacher = $user?->guru ?? Guru::where('user_id', $user?->id)
+            ->orWhere('nama', $user?->full_name)
+            ->orWhere('nama', 'like', '%' . ($user?->full_name ?? '') . '%')
+            ->first();
+
+        $isTeacherRole = in_array(strtolower($user?->role ?? ''), [
+            'guru', 'teacher', 'wali_kelas', 'admin', 'super_admin', 'waka', 'kurikulum', 'waka_kurikulum', 'pegawai', 'kepsek'
+        ]) || str_contains(strtolower($user?->role ?? ''), 'waka')
+           || str_contains(strtolower($user?->role ?? ''), 'kurikulum')
+           || str_contains(strtolower($user?->role ?? ''), 'guru');
+
+        if ($user && ($isTeacherRole || $teacher) && $teacher) {
+            if (!$teacher->user_id) {
+                $teacher->update(['user_id' => $user->id]);
+            }
+            $query = AbsensiGuru::where('guru_id', $teacher->id);
 
             // Jika ada filter range tanggal
             if ($startDate && $endDate) {
@@ -1445,8 +1491,22 @@ class MobileAttendanceController extends Controller
         }
 
         // Rekap Guru / Karyawan
-        if ($user && (in_array($user->role, ['guru', 'teacher', 'wali_kelas', 'admin']) || $user->guru) && $user->guru) {
-            $allStats = AbsensiGuru::where('guru_id', $user->guru->id)
+        $teacher = $user?->guru ?? Guru::where('user_id', $user?->id)
+            ->orWhere('nama', $user?->full_name)
+            ->orWhere('nama', 'like', '%' . ($user?->full_name ?? '') . '%')
+            ->first();
+
+        $isTeacherRole = in_array(strtolower($user?->role ?? ''), [
+            'guru', 'teacher', 'wali_kelas', 'admin', 'super_admin', 'waka', 'kurikulum', 'waka_kurikulum', 'pegawai', 'kepsek'
+        ]) || str_contains(strtolower($user?->role ?? ''), 'waka')
+           || str_contains(strtolower($user?->role ?? ''), 'kurikulum')
+           || str_contains(strtolower($user?->role ?? ''), 'guru');
+
+        if ($user && ($isTeacherRole || $teacher) && $teacher) {
+            if (!$teacher->user_id) {
+                $teacher->update(['user_id' => $user->id]);
+            }
+            $allStats = AbsensiGuru::where('guru_id', $teacher->id)
                 ->whereNull('jadwal_pelajaran_id')
                 ->whereBetween('tanggal', [$startDate, $endDate])
                 ->get();

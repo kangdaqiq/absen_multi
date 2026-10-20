@@ -442,13 +442,24 @@ class MobileAttendanceController extends Controller
             }
         }
 
-        // Case 2: Guru / Pegawai / Admin
-        if ($user && (in_array($user->role, ['guru', 'teacher', 'wali_kelas', 'admin']) || $user->guru) && $user->guru) {
-            $absen = AbsensiGuru::where('guru_id', $user->guru->id)
+        // Case 2: Guru / Pegawai / Admin / Waka
+        $isTeacherRole = in_array(strtolower($user?->role ?? ''), [
+            'guru', 'teacher', 'wali_kelas', 'admin', 'super_admin', 'waka', 'kurikulum', 'waka_kurikulum', 'pegawai', 'kepsek'
+        ]) || str_contains(strtolower($user?->role ?? ''), 'waka')
+           || str_contains(strtolower($user?->role ?? ''), 'kurikulum')
+           || str_contains(strtolower($user?->role ?? ''), 'guru');
+
+        $resolvedGuru = $user?->guru ?? Guru::where('user_id', $user?->id)
+            ->orWhere('nama', $user?->full_name)
+            ->orWhere('nama', 'like', '%' . ($user?->full_name ?? '') . '%')
+            ->first();
+
+        if ($user && ($isTeacherRole || $resolvedGuru) && $resolvedGuru) {
+            $absen = AbsensiGuru::where('guru_id', $resolvedGuru->id)
                 ->where('tanggal', $today)
                 ->first();
 
-            $shift = $user->guru->getShiftForDate($now);
+            $shift = method_exists($resolvedGuru, 'getShiftForDate') ? $resolvedGuru->getShiftForDate($now) : null;
             $jadwalMasuk = $shift?->jam_masuk ?? '07:00:00';
             $jadwalPulang = $shift?->jam_pulang ?? '15:30:00';
             $shiftName = $shift?->nama_shift ?? 'Reguler Pagi';
@@ -1715,7 +1726,8 @@ class MobileAttendanceController extends Controller
                 'foto_url' => $siswa->foto_url,
                 'kelas_id' => $siswa->kelas_id,
                 'kelas_name' => $kelasName,
-                'status' => $absen ? $absen->status : 'H',
+                'is_attended' => (bool)$absen,
+                'status' => $absen ? $absen->status : '',
                 'status_kehadiran' => $absen ? $absen->status : 'Belum Absen',
                 'keterangan' => $absen ? $absen->keterangan : null,
                 'jam_masuk' => $absen?->jam_masuk,

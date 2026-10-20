@@ -85,6 +85,14 @@ class MobileJadwalPelajaranController extends Controller
             ->get()
             ->keyBy('jadwal_pelajaran_id');
 
+        // Ambil data jumlah siswa riil terdaftar per kelas
+        $allKelasIds = $jadwals->pluck('kelas_id')->filter()->unique()->values();
+        $studentCountsByKelas = Siswa::where('school_id', $schoolId)
+            ->whereIn('kelas_id', $allKelasIds)
+            ->selectRaw('kelas_id, COUNT(*) as count')
+            ->groupBy('kelas_id')
+            ->pluck('count', 'kelas_id');
+
         $formatted = collect();
         $processedIds = [];
 
@@ -118,7 +126,11 @@ class MobileJadwalPelajaranController extends Controller
 
             $isMulti = $parallels->count() > 1;
             $parallelIds = $parallels->pluck('id')->all();
-            $parallelKelasNames = $parallels->map(fn($p) => $p->kelas?->nama_kelas)->filter()->unique()->values()->all();
+            $parallelKelasIds = $parallels->pluck('kelas_id')->filter()->unique()->values()->all();
+            $parallelKelasIds = $parallels->pluck('kelas_id')->filter()->unique()->values()->all();
+                $parallelKelasNames = $parallels->map(fn($p) => $p->kelas?->nama_kelas)->filter()->unique()->values()->all();
+                $totalSiswaKelas = collect($parallelKelasIds)->sum(fn($cid) => $studentCountsMingguan[$cid] ?? 0);
+            $totalSiswaKelas = collect($parallelKelasIds)->sum(fn($cid) => $studentCountsByKelas[$cid] ?? 0);
 
             // Ambil jurnal KBM jika ada yang terisi di antara jadwal paralel
             $jurnal = null;
@@ -131,8 +143,10 @@ class MobileJadwalPelajaranController extends Controller
 
             // Akumulasi statistik kehadiran dari seluruh kelas paralel
             $stats = [
-                'total' => 0,
-                'h'     => 0,
+                'total'       => 0,
+                'total_absen' => 0,
+                'total_siswa' => $totalSiswaKelas,
+                'h'           => 0,
                 's'     => 0,
                 'i'     => 0,
                 'a'     => 0,
@@ -151,10 +165,16 @@ class MobileJadwalPelajaranController extends Controller
                     $stats['a']     += (int)$counts->count_a;
                     $stats['t']     += (int)$counts->count_t;
                     $stats['d']     += (int)$counts->count_d;
+                    $stats['total_absen'] += (int)$counts->total_absen;
                     if ($counts->total_absen > 0) {
                         $isAttended = true;
                     }
                 }
+            }
+
+            // Jika belum ada presensi yang tersimpan hari ini, fallback stats.total ke jumlah siswa riil di kelas
+            if ($stats['total'] === 0) {
+                $stats['total'] = $totalSiswaKelas;
             }
 
             $breakInfo = $j->jeda_istirahat_info;
@@ -175,6 +195,8 @@ class MobileJadwalPelajaranController extends Controller
                 'ruangan'                => $j->ruangan ?? '-',
                 'kelas_id'         => $j->kelas_id,
                 'kelas_nama'       => $isMulti ? implode(', ', $parallelKelasNames) : ($j->kelas?->nama_kelas ?? '-'),
+                'total_siswa'      => $totalSiswaKelas,
+                'jumlah_siswa'     => $totalSiswaKelas,
                 'is_multi_kelas'   => $isMulti,
                 'parallel_count'   => $parallels->count(),
                 'parallel_kelases' => $parallelKelasNames,
@@ -252,7 +274,14 @@ class MobileJadwalPelajaranController extends Controller
             ->orderBy('jam_mulai')
             ->get();
 
-        $grouped = $jadwals->groupBy('hari')->map(function ($items, $day) {
+        $allMingguanKelasIds = $jadwals->pluck('kelas_id')->filter()->unique()->values();
+        $studentCountsMingguan = Siswa::where('school_id', $schoolId)
+            ->whereIn('kelas_id', $allMingguanKelasIds)
+            ->selectRaw('kelas_id, COUNT(*) as count')
+            ->groupBy('kelas_id')
+            ->pluck('count', 'kelas_id');
+
+        $grouped = $jadwals->groupBy('hari')->map(function ($items, $day) use ($studentCountsMingguan) {
             $processedIds = [];
             $dayList = collect();
 
@@ -284,7 +313,9 @@ class MobileJadwalPelajaranController extends Controller
                 }
 
                 $isMulti = $parallels->count() > 1;
+                $parallelKelasIds = $parallels->pluck('kelas_id')->filter()->unique()->values()->all();
                 $parallelKelasNames = $parallels->map(fn($p) => $p->kelas?->nama_kelas)->filter()->unique()->values()->all();
+                $totalSiswaKelas = collect($parallelKelasIds)->sum(fn($cid) => $studentCountsMingguan[$cid] ?? 0);
 
                 $breakInfo = $j->jeda_istirahat_info;
 
@@ -304,6 +335,8 @@ class MobileJadwalPelajaranController extends Controller
                     'ruangan'                => $j->ruangan ?? '-',
                     'kelas_id'         => $j->kelas_id,
                     'kelas_nama'       => $isMulti ? implode(', ', $parallelKelasNames) : ($j->kelas?->nama_kelas ?? '-'),
+                    'total_siswa'      => $totalSiswaKelas,
+                    'jumlah_siswa'     => $totalSiswaKelas,
                     'is_multi_kelas'   => $isMulti,
                     'parallel_count'   => $parallels->count(),
                     'parallel_kelases' => $parallelKelasNames,
@@ -388,7 +421,9 @@ class MobileJadwalPelajaranController extends Controller
         $isMultiKelas = $parallels->count() > 1;
         $parallelIds = $parallels->pluck('id')->all();
         $parallelKelasIds = $parallels->pluck('kelas_id')->filter()->unique()->values()->all();
-        $parallelKelasNames = $parallels->map(fn($p) => $p->kelas?->nama_kelas)->filter()->unique()->values()->all();
+        $parallelKelasIds = $parallels->pluck('kelas_id')->filter()->unique()->values()->all();
+                $parallelKelasNames = $parallels->map(fn($p) => $p->kelas?->nama_kelas)->filter()->unique()->values()->all();
+                $totalSiswaKelas = collect($parallelKelasIds)->sum(fn($cid) => $studentCountsMingguan[$cid] ?? 0);
 
         // Ambil Jurnal (cari dari jadwal ini atau sister jadwal jika multi-kelas)
         $jurnal = JurnalPelajaran::whereIn('jadwal_pelajaran_id', $parallelIds)

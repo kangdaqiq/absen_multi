@@ -63,3 +63,6 @@ Schedule::command('absen:send-birthdays')->dailyAt('00:01')->withoutOverlapping(
 // Kirim Reminder Last Seen ke Guru, Siswa & Ortu (Runs every 2 hours)
 Schedule::command('absen:send-last-seen-reminder')->everyTwoHours()->withoutOverlapping(10);
 
+// Kirim Push Notification ke Guru Pengajar 5 Menit Sebelum Pelajaran Dimulai
+Schedule::command('absen:notify-jadwal-mengajar --minutes=5')->everyMinute()->withoutOverlapping(5);
+

@@ -1154,6 +1154,82 @@ class MobileAttendanceController extends Controller
             ], 422);
         }
 
+        // 2. Face Recognition & Liveness Verification (Checkout)
+        $studentUser = $user?->student ?? Siswa::where('user_id', $user?->id)->orWhere('nis', str_replace('siswa_', '', $user?->username ?? ''))->first();
+        $teacherUser = $user?->guru ?? Guru::where('user_id', $user?->id)->first();
+        $faceData = UserFaceData::where(function ($q) use ($user, $studentUser, $teacherUser) {
+            $q->where('user_id', $user?->id);
+            if ($studentUser) {
+                $q->orWhere('siswa_id', $studentUser->id);
+            }
+            if ($teacherUser) {
+                $q->orWhere('guru_id', $teacherUser->id);
+            }
+        })->first();
+
+        $faceSimilarity = null;
+        $isFaceMatched = false;
+        $simPercent = null;
+        $isFaceEnabled = app(\App\Services\LicenseService::class)->isFaceFeatureEnabled($user?->school);
+
+        if ($faceData && $isFaceEnabled) {
+            if (!$request->hasFile('photo')) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Absen pulang ditolak: Foto selfie verifikasi wajah wajib disertakan saat absen pulang.'
+                ], 422);
+            }
+
+            $compareResult = FaceRecognitionService::compareFace($faceData->face_embedding, $request->file('photo'));
+
+            if (!$compareResult['success']) {
+                ApiLog::create([
+                    'school_id' => $schoolId,
+                    'api_key' => 'MOBILE_APP',
+                    'action' => 'mobile_checkout_face_failed',
+                    'uid' => $user?->username ?? $user?->email,
+                    'success' => false,
+                    'message' => "Verifikasi Wajah Pulang Gagal: " . ($compareResult['message'] ?? 'Wajah tidak terdeteksi'),
+                    'ip_address' => $request->ip(),
+                    'user_agent' => $request->userAgent() ?? 'Android Mobile App',
+                    'created_at' => now(),
+                ]);
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Absen pulang ditolak: ' . ($compareResult['message'] ?? 'Wajah tidak terdeteksi saat absen pulang')
+                ], 400);
+            }
+
+            $faceSimilarity = $compareResult['similarity'];
+            $isFaceMatched = (bool) $compareResult['is_match'];
+            $simPercent = (float) ($compareResult['similarity_percent'] ?? round($faceSimilarity * 100, 1));
+
+            if (!$isFaceMatched) {
+                ApiLog::create([
+                    'school_id' => $schoolId,
+                    'api_key' => 'MOBILE_APP',
+                    'action' => 'mobile_checkout_face_mismatch',
+                    'uid' => $user?->username ?? $user?->email,
+                    'success' => false,
+                    'message' => "Wajah Pulang Tidak Cocok: {$user?->full_name} (Kemiripan: {$simPercent}%)",
+                    'ip_address' => $request->ip(),
+                    'user_agent' => $request->userAgent() ?? 'Android Mobile App',
+                    'created_at' => now(),
+                ]);
+
+                return response()->json([
+                    'success' => false,
+                    'message' => "Absen pulang ditolak: Wajah Anda tidak cocok dengan foto terdaftar (Kemiripan: {$simPercent}%)."
+                ], 400);
+            }
+        }
+
+        $photoPath = null;
+        if ($request->hasFile('photo')) {
+            $photoPath = $request->file('photo')->store('absensi_photos', 'public');
+        }
+
         // Case 1: Guru / Admin / Wali Kelas / Waka
         $teacher = $user?->guru ?? Guru::where('user_id', $user?->id)
             ->orWhere('nama', $user?->full_name)
@@ -1213,13 +1289,14 @@ class MobileAttendanceController extends Controller
                 // Ignore FCM failure
             }
 
+            $faceNote = (isset($faceSimilarity) && $faceSimilarity !== null) ? " [Wajah Cocok: {$simPercent}%]" : "";
             ApiLog::create([
                 'school_id' => $schoolId,
                 'api_key' => 'MOBILE_APP',
                 'action' => 'mobile_checkout',
                 'uid' => $teacher->nip ?? ($user->username ?? $user->email),
                 'success' => true,
-                'message' => "Absen Pulang: {$user->full_name} (Lat: {$request->latitude}, Lng: {$request->longitude})",
+                'message' => "Absen Pulang: {$user->full_name} (Lat: {$request->latitude}, Lng: {$request->longitude}){$faceNote}",
                 'ip_address' => $request->ip(),
                 'user_agent' => $request->userAgent() ?? 'Android Mobile App',
                 'created_at' => now(),
@@ -1308,13 +1385,14 @@ class MobileAttendanceController extends Controller
                     // Ignore FCM failure
                 }
 
+                $faceNoteSiswa = (isset($faceSimilarity) && $faceSimilarity !== null) ? " [Wajah Cocok: {$simPercent}%]" : "";
                 ApiLog::create([
                     'school_id' => $schoolId,
                     'api_key' => 'MOBILE_APP',
                     'action' => 'mobile_checkout_student',
                     'uid' => $student->nis,
                     'success' => true,
-                    'message' => "Absen Pulang Siswa: {$student->nama} (Lat: {$request->latitude}, Lng: {$request->longitude})",
+                    'message' => "Absen Pulang Siswa: {$student->nama} (Lat: {$request->latitude}, Lng: {$request->longitude}){$faceNoteSiswa}",
                     'ip_address' => $request->ip(),
                     'user_agent' => $request->userAgent() ?? 'Android Mobile App',
                     'created_at' => now(),

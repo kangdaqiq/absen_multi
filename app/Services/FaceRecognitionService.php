@@ -17,11 +17,11 @@ class FaceRecognitionService
     }
 
     /**
-     * Get similarity threshold (default 75% / 0.75)
+     * Get similarity threshold (default 68% / 0.68)
      */
     public static function getThreshold(): float
     {
-        return (float) (config('services.face_engine.threshold') ?: env('FACE_SIMILARITY_THRESHOLD', 0.75));
+        return (float) (config('services.face_engine.threshold') ?: env('FACE_SIMILARITY_THRESHOLD', 0.68));
     }
 
     /**

@@ -34,3 +34,9 @@ Thumbs.db
 
 # Abaikan kode perangkat keras (ESP)
 /esp8266_code/
+
+# Python cache & virtual environment
+__pycache__/
+*.py[cod]
+/face_engine/venv/
+

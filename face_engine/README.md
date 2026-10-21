@@ -56,6 +56,6 @@ systemctl status face-engine
 ```
 
 ## 📡 Endpoints
-1. `GET /health`: Health check status service.
-2. `POST /extract-face-vector`: Ekstraksi 512-dimensi vektor embedding dari foto master.
-3. `POST /compare-face`: Membandingkan master embedding dengan foto selfie absen (threshold: 75%).
+1. `GET /health`: Health check status service, threshold info, & quality filter settings.
+2. `POST /extract-face-vector`: Ekstraksi 512-dimensi vektor embedding dari foto master dengan validasi ketajaman (Blur Detection) & orientasi wajah (Pose Filtering).
+3. `POST /compare-face`: Membandingkan master embedding dengan foto selfie absen (threshold: 68% / 0.68) dengan validasi blur & pose.

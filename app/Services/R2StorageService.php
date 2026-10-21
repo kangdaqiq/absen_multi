@@ -251,6 +251,119 @@ class R2StorageService
     }
 
     /**
+     * Generate S3 Presigned URL untuk Direct Upload dari Client (PWA/Android) langsung ke Cloudflare R2
+     * Memotong transit ke server Laravel, 0% beban bandwidth dan RAM di VPS
+     *
+     * @param School|int|null $school
+     * @param string $originalName
+     * @param string $mimeType
+     * @param int $sizeBytes
+     * @param string $category
+     * @param string|null $customFolder
+     * @param int|null $uploaderId
+     * @return array
+     * @throws StorageQuotaExceededException
+     */
+    public function createPresignedUpload(
+        School|int|null $school = null,
+        string $originalName = 'file.jpg',
+        string $mimeType = 'image/jpeg',
+        int $sizeBytes = 0,
+        string $category = 'kbm',
+        ?string $customFolder = null,
+        ?int $uploaderId = null
+    ): array {
+        $schoolModel = is_int($school) ? School::find($school) : $school;
+        $schoolId = $schoolModel?->id;
+
+        // 1. Validasi kuota jika ada estimasi ukuran berkas
+        if ($schoolModel && $sizeBytes > 0 && !$this->checkSchoolQuota($schoolModel, $sizeBytes)) {
+            $stats = $this->getSchoolStorageStats($schoolModel);
+            throw new StorageQuotaExceededException(
+                "Kapasitas penyimpanan sekolah '{$schoolModel->name}' telah penuh ({$stats['used_human']} dari {$stats['quota_human']}). Silakan hubungi Super Admin untuk menambah kuota.",
+                $stats['used_bytes'],
+                $stats['quota_bytes'],
+                $sizeBytes
+            );
+        }
+
+        // 2. Tentukan path unik di Cloudflare R2
+        $extension = strtolower(pathinfo($originalName, PATHINFO_EXTENSION) ?: 'bin');
+        $folderPrefix = $customFolder ?: match ($category) {
+            'kbm'        => 'kbm/' . ($schoolId ? "sch_{$schoolId}" : 'general') . '/' . date('Y/m'),
+            'face'       => 'faces/' . ($schoolId ? "sch_{$schoolId}" : 'general'),
+            'siswa'      => 'siswa/' . ($schoolId ? "sch_{$schoolId}" : 'general'),
+            'guru'       => 'guru/' . ($schoolId ? "sch_{$schoolId}" : 'general'),
+            'attendance' => 'attendance/' . ($schoolId ? "sch_{$schoolId}" : 'general') . '/' . date('Y/m'),
+            'logo'       => 'schools/logos',
+            default      => 'uploads/' . date('Y/m'),
+        };
+
+        $uniqueName = Str::random(24) . '_' . time() . '.' . $extension;
+        $cloudPath = trim($folderPrefix, '/') . '/' . $uniqueName;
+
+        // 3. Generate Presigned PUT Request via AWS S3 SDK (+30 menit)
+        $s3Client = Storage::disk($this->disk)->getClient();
+        $cmd = $s3Client->getCommand('PutObject', [
+            'Bucket'      => $this->bucket,
+            'Key'         => $cloudPath,
+            'ContentType' => $mimeType,
+        ]);
+        $request = $s3Client->createPresignedRequest($cmd, '+30 minutes');
+        $presignedUrl = (string) $request->getUri();
+
+        // 4. Catat ke tabel storage_files
+        $publicUrl = $this->baseUrl . '/' . ltrim($cloudPath, '/');
+        $storageFile = StorageFile::create([
+            'school_id'     => $schoolId,
+            'disk'          => $this->disk,
+            'path'          => $cloudPath,
+            'url'           => $publicUrl,
+            'original_name' => $originalName,
+            'size_bytes'    => $sizeBytes,
+            'mime_type'     => $mimeType,
+            'category'      => $category,
+            'uploader_id'   => $uploaderId,
+        ]);
+
+        $isVideo = str_starts_with($mimeType, 'video/') || in_array($extension, ['mp4', 'mov', 'avi', 'mkv', '3gp', 'webm']);
+
+        return [
+            'upload_url'   => $presignedUrl,
+            'method'       => 'PUT',
+            'headers'      => [
+                'Content-Type' => $mimeType,
+            ],
+            'file_id'      => $storageFile->id,
+            'data'         => [
+                'id'            => $storageFile->id,
+                'path'          => $cloudPath,
+                'url'           => $publicUrl,
+                'view_url'      => $publicUrl,
+                'download_url'  => $publicUrl,
+                'thumbnail_url' => $isVideo ? null : $publicUrl,
+                'type'          => $isVideo ? 'video' : 'image',
+                'name'          => $originalName,
+                'size'          => $sizeBytes,
+                'mime_type'     => $mimeType,
+            ],
+        ];
+    }
+
+    /**
+     * Konfirmasi upload direct selesai untuk mengupdate ukuran berkas sebenarnya
+     */
+    public function confirmUpload(int $fileId, ?int $actualSizeBytes = null): ?StorageFile
+    {
+        $file = StorageFile::find($fileId);
+        if ($file && $actualSizeBytes !== null && $actualSizeBytes > 0) {
+            $file->size_bytes = $actualSizeBytes;
+            $file->save();
+        }
+        return $file;
+    }
+
+    /**
      * Hapus berkas dari Cloudflare R2 dan tabel tracking
      */
     public function deleteFileByPath(string $path): bool

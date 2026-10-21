@@ -545,9 +545,17 @@
 
                                         <!-- Badge Kelas & Mapel -->
                                         <div class="flex flex-wrap items-center gap-1.5">
-                                            <span class="px-2 py-0.5 rounded-md text-[11px] font-bold bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300 border border-blue-200/50 dark:border-blue-500/20">
-                                                <i class="fas fa-chalkboard text-[10px] mr-1"></i>{{ $doc['nama_kelas'] }}
-                                            </span>
+                                            @if(!empty($doc['parallel_kelases']) && count($doc['parallel_kelases']) > 1)
+                                                @foreach($doc['parallel_kelases'] as $kName)
+                                                    <span class="px-2 py-0.5 rounded-md text-[11px] font-bold bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300 border border-blue-200/50 dark:border-blue-500/20">
+                                                        <i class="fas fa-chalkboard text-[10px] mr-1"></i>{{ $kName }}
+                                                    </span>
+                                                @endforeach
+                                            @else
+                                                <span class="px-2 py-0.5 rounded-md text-[11px] font-bold bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300 border border-blue-200/50 dark:border-blue-500/20">
+                                                    <i class="fas fa-chalkboard text-[10px] mr-1"></i>{{ $doc['nama_kelas'] }}
+                                                </span>
+                                            @endif
                                             <span class="px-2 py-0.5 rounded-md text-[11px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300 border border-emerald-200/50 dark:border-emerald-500/20 truncate max-w-[140px]" title="{{ $doc['nama_mapel'] }}">
                                                 <i class="fas fa-book text-[10px] mr-1"></i>{{ $doc['nama_mapel'] }}
                                             </span>
@@ -644,9 +652,20 @@
                                                     ({{ substr($jurnal->jam_mulai, 0, 5) }} - {{ substr($jurnal->jam_selesai, 0, 5) }})
                                                 @endif
                                             </span>
-                                            <span class="px-2.5 py-0.5 rounded-md text-xs font-bold bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300 border border-blue-200/50">
-                                                <i class="fas fa-school mr-1 text-[10px]"></i>{{ $jurnal->jadwal?->kelas?->nama_kelas ?: 'Kelas' }}
-                                            </span>
+                                            @if(!empty($jurnal->parallel_kelas_names) && count($jurnal->parallel_kelas_names) > 1)
+                                                @foreach($jurnal->parallel_kelas_names as $kName)
+                                                    <span class="px-2.5 py-0.5 rounded-md text-xs font-bold bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300 border border-blue-200/50">
+                                                        <i class="fas fa-school mr-1 text-[10px]"></i>{{ $kName }}
+                                                    </span>
+                                                @endforeach
+                                                <span class="px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                                                    <i class="fas fa-layer-group mr-1"></i>Gabungan
+                                                </span>
+                                            @else
+                                                <span class="px-2.5 py-0.5 rounded-md text-xs font-bold bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300 border border-blue-200/50">
+                                                    <i class="fas fa-school mr-1 text-[10px]"></i>{{ $jurnal->nama_kelas ?: ($jurnal->jadwal?->kelas?->nama_kelas ?: 'Kelas') }}
+                                                </span>
+                                            @endif
                                             <span class="px-2.5 py-0.5 rounded-md text-xs font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300 border border-emerald-200/50">
                                                 <i class="fas fa-book mr-1 text-[10px]"></i>{{ $jurnal->jadwal?->mapel?->nama_mapel ?: 'Mata Pelajaran' }}
                                             </span>
@@ -686,6 +705,9 @@
                                                         <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border {{ $badgeStyle }}">
                                                             <i class="fas fa-user text-[9px] opacity-70"></i>
                                                             {{ $st['nama'] }} ({{ $st['status_label'] ?? $st['status'] }})
+                                                            @if(!empty($st['kelas']))
+                                                                <span class="text-[10px] opacity-75 font-mono">[{{ $st['kelas'] }}]</span>
+                                                            @endif
                                                         </span>
                                                     @endforeach
                                                 </div>
@@ -704,7 +726,7 @@
                                                 @click="openJournalModal({
                                                     tanggal: '{{ $jurnal->tanggal }}',
                                                     jam_ke: '{{ $jurnal->jam_ke ?: ($jurnal->jadwal?->jam_ke ?: '-') }}',
-                                                    nama_kelas: '{{ $jurnal->jadwal?->kelas?->nama_kelas ?: "Semua Kelas" }}',
+                                                    nama_kelas: '{{ $jurnal->nama_kelas ?: ($jurnal->jadwal?->kelas?->nama_kelas ?: "Semua Kelas") }}',
                                                     nama_mapel: '{{ $jurnal->jadwal?->mapel?->nama_mapel ?: "Mata Pelajaran" }}',
                                                     materi: @js($jurnal->materi),
                                                     catatan: @js($jurnal->catatan),
@@ -987,7 +1009,7 @@
                                                'fa-user-slash text-rose-600 dark:text-rose-400': st.status === 'A',
                                                'fa-clock text-purple-600 dark:text-purple-400': st.status === 'D' || st.status === 'T',
                                            }"></i>
-                                        <span class="tracking-tight" x-text="st.nama + ' (' + (st.status_label || st.status) + ')'"></span>
+                                        <span class="tracking-tight" x-text="st.nama + ' (' + (st.status_label || st.status) + ')' + (st.kelas ? ' • ' + st.kelas : '')"></span>
                                     </div>
                                 </template>
                             </div>

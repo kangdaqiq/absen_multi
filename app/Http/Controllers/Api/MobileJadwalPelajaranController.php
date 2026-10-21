@@ -238,7 +238,7 @@ class MobileJadwalPelajaranController extends Controller
                 ],
                 'dok_kbm'   => [
                     'enabled'     => $dokKbmEnabled,
-                    'storage_url' => $storageCfg['url'] ?? 'https://storage.jagattech.my.id',
+                    'storage_url' => config('filesystems.disks.r2.url', 'https://r2-cloud.jagattech.my.id'),
                     'api_key'     => $dokKbmEnabled ? ($storageCfg['key'] ?? '') : '',
                     'folder'      => $storageCfg['folder'] ?? 'kbm_docs',
                 ],
@@ -519,7 +519,7 @@ class MobileJadwalPelajaranController extends Controller
                 ] : null,
                 'dok_kbm'  => [
                     'enabled'     => app(\App\Services\LicenseService::class)->isDokKbmFeatureEnabled($jadwal->school ?? $user->school),
-                    'storage_url' => config('services.storage_server.url'),
+                    'storage_url' => config('filesystems.disks.r2.url', 'https://r2-cloud.jagattech.my.id'),
                     'api_key'     => app(\App\Services\LicenseService::class)->isDokKbmFeatureEnabled($jadwal->school ?? $user->school) ? (($jadwal->school ?? $user->school)?->storage_api_key ?: config('services.storage_server.key')) : '',
                     'folder'      => config('services.storage_server.folder'),
                     'quota_mb'    => ($jadwal->school ?? $user->school)?->storage_quota_mb ?? 1000,
@@ -549,15 +549,24 @@ class MobileJadwalPelajaranController extends Controller
             ], 403);
         }
 
+        // Auto-decode stringified JSON jika dikirim via FormData
+        $attendancesInput = $request->input('attendances');
+        if (is_string($attendancesInput)) {
+            $decoded = json_decode($attendancesInput, true);
+            if (is_array($decoded)) {
+                $request->merge(['attendances' => $decoded]);
+            }
+        }
+
         $request->validate([
-            'tanggal'          => 'required|date',
-            'materi'           => 'required|string|max:1000',
-            'catatan'          => 'nullable|string|max:1000',
-            'foto_dokumentasi' => 'nullable|string|max:1000',
-            'dokumentasi'      => 'nullable',
-            'attendances'      => 'required|array',
-            'attendances.*.student_id' => 'required|exists:siswa,id',
-            'attendances.*.status'     => 'required|in:H,S,I,A,T,D',
+            'tanggal'                  => 'required|date',
+            'materi'                   => 'required|string|max:1000',
+            'catatan'                  => 'nullable|string|max:1000',
+            'foto_dokumentasi'         => 'nullable|string|max:1000',
+            'dokumentasi'              => 'nullable',
+            'attendances'              => 'nullable|array',
+            'attendances.*.student_id' => 'required_with:attendances|exists:siswa,id',
+            'attendances.*.status'     => 'required_with:attendances|in:H,S,I,A,T,D',
             'attendances.*.keterangan' => 'nullable|string|max:255',
         ]);
 
@@ -699,37 +708,14 @@ class MobileJadwalPelajaranController extends Controller
                 }
 
                 $schoolForUpload = $jadwal->school ?? $user->school;
-                $storageUrl = rtrim(config('services.storage_server.url'), '/');
-                $storageKey = $schoolForUpload?->storage_api_key ?: config('services.storage_server.key');
-                $storageFolder = config('services.storage_server.folder') ?? 'kbm_docs';
+                $r2Service = app(\App\Services\R2StorageService::class);
 
                 foreach ($uploadedFiles as $uploadedFile) {
                     try {
-                        $res = Http::timeout(60)
-                            ->withHeaders(['X-API-Key' => $storageKey])
-                            ->attach('file', file_get_contents($uploadedFile->getRealPath()), $uploadedFile->getClientOriginalName())
-                            ->post($storageUrl . '/api/v1/files/upload', [
-                                'folder' => $storageFolder,
-                                'name'   => $uploadedFile->getClientOriginalName(),
-                            ]);
-
-                        if ($res->successful()) {
-                            $resData = $res->json('data') ?? [];
-                            $isVid = str_starts_with($uploadedFile->getMimeType() ?? '', 'video/');
-                            $dokumentasiPayload[] = [
-                                'id'            => $resData['id'] ?? null,
-                                'url'           => $resData['view_url'] ?? '',
-                                'view_url'      => $resData['view_url'] ?? '',
-                                'download_url'  => $resData['download_url'] ?? '',
-                                'thumbnail_url' => $resData['thumbnail_url'] ?? null,
-                                'type'          => $isVid ? 'video' : 'image',
-                                'name'          => $uploadedFile->getClientOriginalName(),
-                                'size'          => $uploadedFile->getSize(),
-                                'mime_type'     => $uploadedFile->getMimeType(),
-                            ];
-                        }
+                        $docItem = $r2Service->uploadFile($uploadedFile, $schoolForUpload, 'kbm', null, $user->id);
+                        $dokumentasiPayload[] = $docItem;
                     } catch (\Exception $e) {
-                        Log::error('[DokKbm] Direct file upload failed: ' . $e->getMessage());
+                        Log::error('[DokKbm] Direct file upload to R2 failed: ' . $e->getMessage());
                     }
                 }
             }
@@ -1311,6 +1297,90 @@ class MobileJadwalPelajaranController extends Controller
                 'message' => 'Terjadi kesalahan saat upload berkas: ' . $e->getMessage()
             ], 500);
         }
+    }
+
+    /**
+     * Minta S3 Presigned URL untuk Direct Upload dari HP/Browser langsung ke Cloudflare R2
+     * POST /api/mobile/storage/presigned-url
+     * POST /api/mobile/jadwal-pelajaran/presigned-url
+     */
+    public function getPresignedUploadUrl(Request $request)
+    {
+        $user = $request->user();
+        $schoolId = $user->school_id ?? ($user->guru ? $user->guru->school_id : null);
+        $school = $user->school ?? \App\Models\School::find($schoolId);
+
+        $licenseService = app(\App\Services\LicenseService::class);
+        if (!$licenseService->isDokKbmFeatureEnabled($school)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Fitur Dokumentasi KBM dinonaktifkan untuk sekolah Anda. Hubungi Super Administrator.'
+            ], 403);
+        }
+
+        $request->validate([
+            'filename'  => 'required|string|max:255',
+            'mime_type' => 'required|string|max:100',
+            'size'      => 'nullable|integer|min:0',
+            'category'  => 'nullable|string|in:kbm,face,siswa,guru,attendance',
+        ]);
+
+        try {
+            $r2Service = app(\App\Services\R2StorageService::class);
+            $res = $r2Service->createPresignedUpload(
+                school: $school,
+                originalName: $request->filename,
+                mimeType: $request->mime_type,
+                sizeBytes: (int) ($request->size ?? 0),
+                category: $request->category ?? 'kbm',
+                uploaderId: $user->id
+            );
+
+            return response()->json([
+                'success'    => true,
+                'upload_url' => $res['upload_url'],
+                'method'     => $res['method'],
+                'headers'    => $res['headers'],
+                'file_id'    => $res['file_id'],
+                'data'       => $res['data'],
+            ]);
+        } catch (\App\Exceptions\StorageQuotaExceededException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+                'error'   => [
+                    'used_bytes'  => $e->usedBytes,
+                    'quota_bytes' => $e->quotaBytes,
+                ],
+            ], 413);
+        } catch (\Throwable $e) {
+            Log::error('[DirectR2] Presigned URL error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal membuat URL upload: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Konfirmasi ukuran upload direct selesai
+     * POST /api/mobile/storage/confirm-upload
+     */
+    public function confirmDirectUpload(Request $request)
+    {
+        $request->validate([
+            'file_id' => 'required|integer',
+            'size'    => 'nullable|integer|min:0',
+        ]);
+
+        $r2Service = app(\App\Services\R2StorageService::class);
+        $file = $r2Service->confirmUpload((int)$request->file_id, $request->size ? (int)$request->size : null);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Upload berhasil dikonfirmasi.',
+            'data'    => $file,
+        ]);
     }
 }
 

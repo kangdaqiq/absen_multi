@@ -1047,9 +1047,12 @@ class AbsensiPelajaranController extends Controller
         // Lampirkan data siswa tidak hadir pada tiap jurnal
         $this->attachAbsentStudentsToJurnals($allJurnals, $schoolId);
 
+        // Gabungkan kelas gabungan (paralel) agar sesi & foto/video tidak dobel
+        $consolidatedJurnals = $this->consolidateParallelJurnals($allJurnals);
+
         // Filter media_type pada masing-masing item dokumentasi
-        $filteredJurnals = $allJurnals->filter(function ($jurnal) use ($mediaType) {
-            $list = $jurnal->dokumentasi_list;
+        $filteredJurnals = $consolidatedJurnals->filter(function ($jurnal) use ($mediaType) {
+            $list = $jurnal->consolidated_docs ?? $jurnal->dokumentasi_list;
             if (empty($list)) return false;
 
             if ($mediaType === 'image') {
@@ -1068,20 +1071,22 @@ class AbsensiPelajaranController extends Controller
 
         // Flatten semua berkas media untuk galeri interaktif
         $allDocs = $filteredJurnals->flatMap(function ($jurnal) {
-            $items = $jurnal->filtered_docs ?? $jurnal->dokumentasi_list;
+            $items = $jurnal->filtered_docs ?? ($jurnal->consolidated_docs ?? $jurnal->dokumentasi_list);
             return collect($items)->map(function ($doc) use ($jurnal) {
-                $doc['jurnal_id']       = $jurnal->id;
-                $doc['tanggal']         = $jurnal->tanggal;
-                $doc['jam_ke']          = $jurnal->jam_ke ?: ($jurnal->jadwal?->jam_ke ?: '-');
-                $doc['jam_mulai']       = $jurnal->jam_mulai;
-                $doc['jam_selesai']     = $jurnal->jam_selesai;
-                $doc['nama_kelas']      = $jurnal->jadwal?->kelas?->nama_kelas ?: 'Semua Kelas';
-                $doc['nama_mapel']      = $jurnal->jadwal?->mapel?->nama_mapel ?: 'Mata Pelajaran';
-                $doc['materi']          = $jurnal->materi;
-                $doc['catatan']         = $jurnal->catatan;
-                $doc['jadwal_id']       = $jurnal->jadwal_pelajaran_id;
-                $doc['absent_students'] = $jurnal->absent_students ?? [];
-                $doc['absent_count']    = $jurnal->absent_count ?? 0;
+                $doc['jurnal_id']        = $jurnal->id;
+                $doc['tanggal']          = $jurnal->tanggal;
+                $doc['jam_ke']           = $jurnal->jam_ke ?: ($jurnal->jadwal?->jam_ke ?: '-');
+                $doc['jam_mulai']        = $jurnal->jam_mulai;
+                $doc['jam_selesai']      = $jurnal->jam_selesai;
+                $doc['nama_kelas']       = $jurnal->nama_kelas ?? ($jurnal->jadwal?->kelas?->nama_kelas ?: 'Semua Kelas');
+                $doc['is_multi_kelas']   = $jurnal->is_multi_kelas ?? false;
+                $doc['parallel_kelases'] = $jurnal->parallel_kelas_names ?? [];
+                $doc['nama_mapel']       = $jurnal->jadwal?->mapel?->nama_mapel ?: 'Mata Pelajaran';
+                $doc['materi']           = $jurnal->materi;
+                $doc['catatan']          = $jurnal->catatan;
+                $doc['jadwal_id']        = $jurnal->jadwal_pelajaran_id;
+                $doc['absent_students']  = $jurnal->absent_students ?? [];
+                $doc['absent_count']     = $jurnal->absent_count ?? 0;
                 return $doc;
             });
         });
@@ -1246,9 +1251,12 @@ class AbsensiPelajaranController extends Controller
         // Lampirkan data siswa tidak hadir pada tiap jurnal
         $this->attachAbsentStudentsToJurnals($allJurnals, $school->id);
 
+        // Gabungkan kelas gabungan (paralel) agar sesi & foto/video tidak dobel
+        $consolidatedJurnals = $this->consolidateParallelJurnals($allJurnals);
+
         // Filter media_type pada masing-masing item dokumentasi
-        $filteredJurnals = $allJurnals->filter(function ($jurnal) use ($mediaType) {
-            $list = $jurnal->dokumentasi_list;
+        $filteredJurnals = $consolidatedJurnals->filter(function ($jurnal) use ($mediaType) {
+            $list = $jurnal->consolidated_docs ?? $jurnal->dokumentasi_list;
             if (empty($list)) return false;
 
             if ($mediaType === 'image') {
@@ -1267,20 +1275,22 @@ class AbsensiPelajaranController extends Controller
 
         // Flatten semua berkas media untuk galeri interaktif
         $allDocs = $filteredJurnals->flatMap(function ($jurnal) {
-            $items = $jurnal->filtered_docs ?? $jurnal->dokumentasi_list;
+            $items = $jurnal->filtered_docs ?? ($jurnal->consolidated_docs ?? $jurnal->dokumentasi_list);
             return collect($items)->map(function ($doc) use ($jurnal) {
-                $doc['jurnal_id']       = $jurnal->id;
-                $doc['tanggal']         = $jurnal->tanggal;
-                $doc['jam_ke']          = $jurnal->jam_ke ?: ($jurnal->jadwal?->jam_ke ?: '-');
-                $doc['jam_mulai']       = $jurnal->jam_mulai;
-                $doc['jam_selesai']     = $jurnal->jam_selesai;
-                $doc['nama_kelas']      = $jurnal->jadwal?->kelas?->nama_kelas ?: 'Semua Kelas';
-                $doc['nama_mapel']      = $jurnal->jadwal?->mapel?->nama_mapel ?: 'Mata Pelajaran';
-                $doc['materi']          = $jurnal->materi;
-                $doc['catatan']         = $jurnal->catatan;
-                $doc['jadwal_id']       = $jurnal->jadwal_pelajaran_id;
-                $doc['absent_students'] = $jurnal->absent_students ?? [];
-                $doc['absent_count']    = $jurnal->absent_count ?? 0;
+                $doc['jurnal_id']        = $jurnal->id;
+                $doc['tanggal']          = $jurnal->tanggal;
+                $doc['jam_ke']           = $jurnal->jam_ke ?: ($jurnal->jadwal?->jam_ke ?: '-');
+                $doc['jam_mulai']        = $jurnal->jam_mulai;
+                $doc['jam_selesai']      = $jurnal->jam_selesai;
+                $doc['nama_kelas']       = $jurnal->nama_kelas ?? ($jurnal->jadwal?->kelas?->nama_kelas ?: 'Semua Kelas');
+                $doc['is_multi_kelas']   = $jurnal->is_multi_kelas ?? false;
+                $doc['parallel_kelases'] = $jurnal->parallel_kelas_names ?? [];
+                $doc['nama_mapel']       = $jurnal->jadwal?->mapel?->nama_mapel ?: 'Mata Pelajaran';
+                $doc['materi']           = $jurnal->materi;
+                $doc['catatan']          = $jurnal->catatan;
+                $doc['jadwal_id']        = $jurnal->jadwal_pelajaran_id;
+                $doc['absent_students']  = $jurnal->absent_students ?? [];
+                $doc['absent_count']     = $jurnal->absent_count ?? 0;
                 return $doc;
             });
         });
@@ -1398,6 +1408,108 @@ class AbsensiPelajaranController extends Controller
             $jurnal->absent_students = $uniqueList;
             $jurnal->absent_count = count($uniqueList);
         }
+    }
+
+    /**
+     * Menggabungkan jurnal sesi paralel (kelas gabungan) menjadi 1 sesi terpadu,
+     * sehingga dokumentasi foto & video tidak muncul ganda (duplicate).
+     */
+    protected function consolidateParallelJurnals($jurnals)
+    {
+        if ($jurnals->isEmpty()) {
+            return collect();
+        }
+
+        $grouped = [];
+
+        foreach ($jurnals as $jurnal) {
+            $tgl = $jurnal->tanggal instanceof \Carbon\Carbon
+                ? $jurnal->tanggal->format('Y-m-d')
+                : substr((string)$jurnal->tanggal, 0, 10);
+            $guruId = $jurnal->guru_id ?? 0;
+            $mapelId = $jurnal->jadwal?->mapel_id ?? 0;
+            $jamKe = str_replace(' ', '', strtolower((string)($jurnal->jam_ke ?: ($jurnal->jadwal?->jam_ke ?: ''))));
+            $jamMulai = substr(trim((string)($jurnal->jam_mulai ?: ($jurnal->jadwal?->jam_mulai ?: ''))), 0, 5);
+            $jamSelesai = substr(trim((string)($jurnal->jam_selesai ?: ($jurnal->jadwal?->jam_selesai ?: ''))), 0, 5);
+            $timeSlot = ($jamMulai !== '' || $jamSelesai !== '') ? "{$jamMulai}-{$jamSelesai}" : '';
+
+            $slotKey = ($timeSlot !== '') ? $timeSlot : ($jamKe ?: 'slot');
+            $groupKey = "{$tgl}_{$guruId}_{$mapelId}_{$slotKey}";
+
+            // Cek juga jika ada kesamaan URL media dengan grup yang sudah ada pada tanggal dan guru yang sama
+            $docUrls = collect($jurnal->dokumentasi_list)->map(fn($d) => $d['url'] ?? ($d['view_url'] ?? ''))->filter()->all();
+            if (!empty($docUrls)) {
+                foreach ($grouped as $existKey => $gData) {
+                    if (str_starts_with($existKey, "{$tgl}_{$guruId}_")) {
+                        $existUrls = array_keys($gData['docs']);
+                        if (!empty(array_intersect($docUrls, $existUrls))) {
+                            $groupKey = $existKey;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (!isset($grouped[$groupKey])) {
+                $grouped[$groupKey] = [
+                    'primary'  => $jurnal,
+                    'kelases'  => [],
+                    'docs'     => [],
+                    'absents'  => [],
+                ];
+            }
+
+            // Kumpulkan nama kelas
+            $kelasNama = $jurnal->jadwal?->kelas?->nama_kelas;
+            if ($kelasNama && !in_array($kelasNama, $grouped[$groupKey]['kelases'])) {
+                $grouped[$groupKey]['kelases'][] = $kelasNama;
+            }
+
+            // Kumpulkan dokumen/media dan de-duplicate berdasarkan URL
+            $docs = $jurnal->dokumentasi_list;
+            foreach ($docs as $d) {
+                $dUrl = $d['url'] ?? ($d['view_url'] ?? '');
+                if (!empty($dUrl) && !isset($grouped[$groupKey]['docs'][$dUrl])) {
+                    $grouped[$groupKey]['docs'][$dUrl] = $d;
+                }
+            }
+
+            // Kumpulkan siswa tidak hadir dan de-duplicate
+            if (!empty($jurnal->absent_students) && is_array($jurnal->absent_students)) {
+                foreach ($jurnal->absent_students as $st) {
+                    $stKey = $st['nama'] ?? ($st['id'] ?? uniqid());
+                    if (!isset($grouped[$groupKey]['absents'][$stKey])) {
+                        if ($kelasNama) {
+                            $st['kelas'] = $kelasNama;
+                        }
+                        $grouped[$groupKey]['absents'][$stKey] = $st;
+                    }
+                }
+            }
+        }
+
+        $result = collect();
+        foreach ($grouped as $group) {
+            $j = clone $group['primary'];
+            $kelasNames = $group['kelases'];
+            $j->is_multi_kelas = count($kelasNames) > 1;
+            $j->parallel_kelas_names = $kelasNames;
+            $j->nama_kelas = !empty($kelasNames) ? implode(', ', $kelasNames) : ($j->jadwal?->kelas?->nama_kelas ?: 'Semua Kelas');
+            
+            // Set dokumentasi yang sudah di-deduplicate
+            $uniqueDocs = array_values($group['docs']);
+            $j->consolidated_docs = $uniqueDocs;
+            $j->dokumentasi_list = $uniqueDocs;
+
+            // Set siswa tidak hadir yang sudah digabung
+            $mergedAbsents = array_values($group['absents']);
+            $j->absent_students = $mergedAbsents;
+            $j->absent_count = count($mergedAbsents);
+
+            $result->push($j);
+        }
+
+        return $result;
     }
 }
 

@@ -123,6 +123,87 @@
         </div>
     </div>
 
+    {{-- ───────── Widget Kuota Storage ───────── --}}
+    @if(!empty($storageInfo))
+    @php
+        $pct        = $storageInfo['percent'];
+        $isCritical = $storageInfo['is_critical'];
+        $isWarning  = $storageInfo['is_warning'];
+        $barColor   = $isCritical ? 'bg-red-500' : ($isWarning ? 'bg-amber-500' : 'bg-brand-500');
+        $textColor  = $isCritical ? 'text-red-600 dark:text-red-400' : ($isWarning ? 'text-amber-600 dark:text-amber-400' : 'text-brand-600 dark:text-brand-400');
+        $bgIcon     = $isCritical ? 'bg-red-50 text-red-500 dark:bg-red-500/15' : ($isWarning ? 'bg-amber-50 text-amber-500 dark:bg-amber-500/15' : 'bg-brand-50 text-brand-500 dark:bg-brand-500/15');
+    @endphp
+    <div class="rounded-2xl border {{ $isCritical ? 'border-red-200 dark:border-red-800/50' : ($isWarning ? 'border-amber-200 dark:border-amber-800/50' : 'border-gray-200 dark:border-gray-800') }} bg-white dark:bg-gray-dark shadow-theme-xs p-4 sm:p-5">
+        <div class="flex flex-col sm:flex-row sm:items-center gap-4">
+            {{-- Ikon --}}
+            <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl {{ $bgIcon }}">
+                <i class="fas fa-server text-xl"></i>
+            </div>
+
+            {{-- Info teks --}}
+            <div class="flex-1 min-w-0">
+                <div class="flex flex-wrap items-center justify-between gap-2 mb-1.5">
+                    <div>
+                        <span class="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-gray-400">Kuota Cloud Storage Sekolah</span>
+                        <div class="flex flex-wrap items-baseline gap-2 mt-0.5">
+                            @if($storageInfo['used_human'])
+                                <span class="text-lg font-bold {{ $textColor }}">{{ $storageInfo['used_human'] }} terpakai</span>
+                                <span class="text-sm text-gray-400">dari</span>
+                                <span class="text-sm font-semibold text-gray-700 dark:text-gray-200">{{ $storageInfo['quota_human'] }}</span>
+                            @else
+                                <span class="text-sm font-medium text-gray-500 dark:text-gray-400">Batas kuota:</span>
+                                <span class="text-lg font-bold text-gray-700 dark:text-gray-200">{{ $storageInfo['quota_human'] }}</span>
+                            @endif
+                        </div>
+                    </div>
+
+                    {{-- Badge persen & sisa --}}
+                    <div class="flex items-center gap-2 shrink-0">
+                        @if($storageInfo['free_human'])
+                            <span class="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold
+                                {{ $isCritical ? 'bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-300' : ($isWarning ? 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300' : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300') }}">
+                                <i class="fas fa-database text-[10px]"></i>
+                                {{ $storageInfo['free_human'] }} sisa
+                            </span>
+                        @endif
+                        @if($pct !== null)
+                            <span class="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-bold
+                                {{ $isCritical ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' : ($isWarning ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300') }}">
+                                {{ $pct }}%
+                            </span>
+                        @endif
+                    </div>
+                </div>
+
+                {{-- Progress bar --}}
+                @if($pct !== null)
+                <div class="relative h-2.5 w-full rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
+                    <div class="h-full rounded-full transition-all duration-700 {{ $barColor }}"
+                         style="width: {{ $pct }}%"></div>
+                </div>
+                @if($isCritical)
+                <p class="mt-1.5 text-[11px] text-red-500 dark:text-red-400 flex items-center gap-1">
+                    <i class="fas fa-exclamation-triangle text-[10px]"></i>
+                    Kuota hampir penuh! Hubungi superadmin untuk menambah kapasitas.
+                </p>
+                @elseif($isWarning)
+                <p class="mt-1.5 text-[11px] text-amber-500 dark:text-amber-400 flex items-center gap-1">
+                    <i class="fas fa-exclamation-circle text-[10px]"></i>
+                    Penggunaan storage sudah melewati 70% kapasitas.
+                </p>
+                @endif
+                @else
+                <p class="mt-1 text-[11px] text-gray-400 flex items-center gap-1">
+                    <i class="fas fa-info-circle text-[10px]"></i>
+                    Data penggunaan realtime tidak tersedia (storage server offline). Kapasitas terdaftar di atas.
+                </p>
+                @endif
+            </div>
+        </div>
+    </div>
+    @endif
+    {{-- ─────── /Widget Kuota Storage ─────── --}}
+
     <!-- Panel Daftar Guru Pengunggah Dokumentasi -->
     <div class="rounded-2xl border border-gray-200 bg-white shadow-theme-xs dark:border-gray-800 dark:bg-gray-dark">
         <!-- Header Tabel & Search Bar -->

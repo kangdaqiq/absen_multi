@@ -9,6 +9,7 @@ use App\Models\Kelas;
 use App\Models\Mapel;
 use App\Models\Guru;
 use App\Models\Siswa;
+use App\Services\StorageServerService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -808,6 +809,49 @@ class AbsensiPelajaranController extends Controller
             ? true
             : app(\App\Services\LicenseService::class)->isDokKbmFeatureEnabled($school);
 
+        // Ambil data kuota storage untuk sekolah ini
+        $storageInfo = null;
+        if ($school && !empty($school->storage_api_key)) {
+            try {
+                $raw = app(StorageServerService::class)->getUserStorage($school->storage_api_key);
+                if ($raw) {
+                    $usedBytes  = $raw['used_bytes']  ?? ($raw['used_mb']  ?? 0) * 1024 * 1024;
+                    $quotaBytes = $raw['quota_bytes'] ?? ($raw['quota_mb'] ?? 0) * 1024 * 1024;
+                    $quotaMbDb  = (int) ($school->storage_quota_mb ?? 1000);
+                    if ($quotaBytes <= 0) {
+                        $quotaBytes = $quotaMbDb * 1024 * 1024;
+                    }
+                    $percent = $quotaBytes > 0 ? round(($usedBytes / $quotaBytes) * 100, 1) : 0;
+                    $storageInfo = [
+                        'used_bytes'   => $usedBytes,
+                        'quota_bytes'  => $quotaBytes,
+                        'used_human'   => $raw['used_human']  ?? $raw['human_used']  ?? self::formatBytes($usedBytes),
+                        'quota_human'  => $raw['quota_human'] ?? $raw['human_quota'] ?? self::formatBytes($quotaBytes),
+                        'free_human'   => self::formatBytes(max(0, $quotaBytes - $usedBytes)),
+                        'percent'      => min(100, $percent),
+                        'is_critical'  => $percent >= 90,
+                        'is_warning'   => $percent >= 70 && $percent < 90,
+                    ];
+                }
+            } catch (\Throwable) {
+                // Storage server tidak bisa diakses, abaikan
+            }
+        }
+        // Fallback: tampilkan info dari DB jika storage server tidak responsif
+        if (!$storageInfo && $school) {
+            $quotaMbDb  = (int) ($school->storage_quota_mb ?? 1000);
+            $storageInfo = [
+                'used_bytes'  => null,
+                'quota_bytes' => $quotaMbDb * 1024 * 1024,
+                'used_human'  => null,
+                'quota_human' => self::formatBytes($quotaMbDb * 1024 * 1024),
+                'free_human'  => null,
+                'percent'     => null,
+                'is_critical' => false,
+                'is_warning'  => false,
+            ];
+        }
+
         if (!$isDokKbmEnabled) {
             $groupedByGuru = collect();
             $stats = [
@@ -826,7 +870,8 @@ class AbsensiPelajaranController extends Controller
                 'isAdminOrWaka',
                 'isGuru',
                 'isDokKbmEnabled',
-                'school'
+                'school',
+                'storageInfo'
             ));
         }
 
@@ -897,8 +942,21 @@ class AbsensiPelajaranController extends Controller
             'isAdminOrWaka',
             'isGuru',
             'isDokKbmEnabled',
-            'school'
+            'school',
+            'storageInfo'
         ));
+    }
+
+    /**
+     * Format bytes ke satuan manusia (KB, MB, GB)
+     */
+    protected static function formatBytes(int $bytes): string
+    {
+        if ($bytes <= 0) return '0 B';
+        $units = ['B', 'KB', 'MB', 'GB', 'TB'];
+        $i = (int) floor(log($bytes, 1024));
+        $i = min($i, count($units) - 1);
+        return round($bytes / pow(1024, $i), 2) . ' ' . $units[$i];
     }
 
     /**

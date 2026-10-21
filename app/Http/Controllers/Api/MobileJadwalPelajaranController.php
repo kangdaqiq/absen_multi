@@ -1255,23 +1255,6 @@ class MobileJadwalPelajaranController extends Controller
         try {
             $r2Service = app(\App\Services\R2StorageService::class);
             $docItem = $r2Service->uploadFile($file, $schoolForUpload, 'kbm', null, $user->id);
-        } catch (\App\Exceptions\StorageQuotaExceededException $e) {
-            Log::warning('[DokKbm] R2 Storage quota exceeded for school ' . ($schoolForUpload?->id ?? 'unknown'));
-            return response()->json([
-                'success' => false,
-                'message' => $e->getMessage(),
-                'error'   => [
-                    'used_bytes'  => $e->usedBytes,
-                    'quota_bytes' => $e->quotaBytes,
-                ],
-            ], 413);
-        } catch (\Throwable $e) {
-            Log::error('[DokKbm] R2 upload error: ' . $e->getMessage());
-            return response()->json([
-                'success' => false,
-                'message' => 'Gagal mengupload berkas ke cloud storage: ' . $e->getMessage(),
-            ], 500);
-        }
 
             // Jika jadwal_pelajaran_id & tanggal disertakan, langsung lampirkan ke jurnal KBM
             if ($request->filled('jadwal_pelajaran_id') && $request->filled('tanggal')) {
@@ -1311,7 +1294,17 @@ class MobileJadwalPelajaranController extends Controller
                 'message' => 'Dokumentasi berhasil diupload.',
                 'data'    => $docItem,
             ]);
-        } catch (\Exception $e) {
+        } catch (\App\Exceptions\StorageQuotaExceededException $e) {
+            Log::warning('[DokKbm] R2 Storage quota exceeded for school ' . ($schoolForUpload?->id ?? 'unknown'));
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+                'error'   => [
+                    'used_bytes'  => $e->usedBytes,
+                    'quota_bytes' => $e->quotaBytes,
+                ],
+            ], 413);
+        } catch (\Throwable $e) {
             Log::error('[DokKbm] Upload exception: ' . $e->getMessage());
             return response()->json([
                 'success' => false,

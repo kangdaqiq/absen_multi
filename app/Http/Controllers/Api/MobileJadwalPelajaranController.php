@@ -520,8 +520,9 @@ class MobileJadwalPelajaranController extends Controller
                 'dok_kbm'  => [
                     'enabled'     => app(\App\Services\LicenseService::class)->isDokKbmFeatureEnabled($jadwal->school ?? $user->school),
                     'storage_url' => config('services.storage_server.url'),
-                    'api_key'     => app(\App\Services\LicenseService::class)->isDokKbmFeatureEnabled($jadwal->school ?? $user->school) ? config('services.storage_server.key') : '',
+                    'api_key'     => app(\App\Services\LicenseService::class)->isDokKbmFeatureEnabled($jadwal->school ?? $user->school) ? (($jadwal->school ?? $user->school)?->storage_api_key ?: config('services.storage_server.key')) : '',
                     'folder'      => config('services.storage_server.folder'),
+                    'quota_mb'    => ($jadwal->school ?? $user->school)?->storage_quota_mb ?? 1000,
                 ],
                 'summary'  => $stats,
                 'students' => $studentList,
@@ -697,8 +698,9 @@ class MobileJadwalPelajaranController extends Controller
                     $uploadedFiles = [$request->file('file')];
                 }
 
+                $schoolForUpload = $jadwal->school ?? $user->school;
                 $storageUrl = rtrim(config('services.storage_server.url'), '/');
-                $storageKey = config('services.storage_server.key');
+                $storageKey = $schoolForUpload?->storage_api_key ?: config('services.storage_server.key');
                 $storageFolder = config('services.storage_server.folder') ?? 'kbm_docs';
 
                 foreach ($uploadedFiles as $uploadedFile) {
@@ -1248,8 +1250,9 @@ class MobileJadwalPelajaranController extends Controller
         ]);
 
         $file = $request->file('file');
+        $schoolForUpload = $jadwal->school ?? $user->school;
         $storageUrl = rtrim(config('services.storage_server.url'), '/');
-        $storageKey = config('services.storage_server.key');
+        $storageKey = $schoolForUpload?->storage_api_key ?: config('services.storage_server.key');
         $storageFolder = config('services.storage_server.folder') ?? 'kbm_docs';
 
         try {
@@ -1262,6 +1265,15 @@ class MobileJadwalPelajaranController extends Controller
                     'folder' => $storageFolder,
                     'name'   => $file->getClientOriginalName(),
                 ]);
+
+            if ($response->status() === 413) {
+                Log::warning('[DokKbm] Storage quota exceeded for school ' . ($schoolForUpload?->id ?? 'unknown'));
+                return response()->json([
+                    'success' => false,
+                    'message' => $response->json('message') ?? 'Kapasitas penyimpanan sekolah telah penuh. Hubungi administrator untuk menambah kuota.',
+                    'error'   => $response->json('error') ?? null,
+                ], 413);
+            }
 
             if (!$response->successful()) {
                 Log::error('[DokKbm] Storage server response error: ' . $response->body());

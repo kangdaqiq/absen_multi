@@ -23,6 +23,7 @@ class LicenseController extends Controller
             'max_teachers'         => 'required|integer|min:0',
             'max_bot_users'        => 'required|integer|min:0',
             'history_quota_months' => 'nullable|integer|min:0',
+            'storage_quota_mb'     => 'nullable|integer|min:0',
             'expired_at'           => 'nullable|date|after:today',
             'allowed_hostname'     => 'nullable|string|max:255',
             'notes'                => 'nullable|string',
@@ -34,8 +35,16 @@ class LicenseController extends Controller
         $validated['face_enabled']         = $request->has('face_enabled');
         $validated['dok_kbm_enabled']      = $request->has('dok_kbm_enabled');
         $validated['history_quota_months'] = empty($request->history_quota_months) ? null : (int) $request->history_quota_months;
+        $validated['storage_quota_mb']     = $request->filled('storage_quota_mb') ? (int) $request->storage_quota_mb : 1000;
+        $validated['storage_api_key']      = 'sk_lic_' . strtolower(\Illuminate\Support\Str::random(24));
 
-        License::create($validated);
+        $license = License::create($validated);
+
+        try {
+            app(\App\Services\StorageServerService::class)->syncLicenseUser($license);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning("[LicenseController] Gagal auto-sync storage server: " . $e->getMessage());
+        }
 
         return redirect()->route('super-admin.licenses.index')
             ->with('success', 'Lisensi berhasil dibuat untuk ' . $validated['client_name']);
@@ -50,6 +59,7 @@ class LicenseController extends Controller
             'max_teachers'         => 'required|integer|min:0',
             'max_bot_users'        => 'required|integer|min:0',
             'history_quota_months' => 'nullable|integer|min:0',
+            'storage_quota_mb'     => 'nullable|integer|min:0',
             'expired_at'           => 'nullable|date',
             'allowed_hostname'     => 'nullable|string|max:255',
             'notes'                => 'nullable|string',
@@ -60,8 +70,19 @@ class LicenseController extends Controller
         $validated['face_enabled']         = $request->has('face_enabled');
         $validated['dok_kbm_enabled']      = $request->has('dok_kbm_enabled');
         $validated['history_quota_months'] = empty($request->history_quota_months) ? null : (int) $request->history_quota_months;
+        $validated['storage_quota_mb']     = $request->filled('storage_quota_mb') ? (int) $request->storage_quota_mb : ($license->storage_quota_mb ?? 1000);
+
+        if (empty($license->storage_api_key)) {
+            $validated['storage_api_key'] = 'sk_lic_' . strtolower(\Illuminate\Support\Str::random(24));
+        }
 
         $license->update($validated);
+
+        try {
+            app(\App\Services\StorageServerService::class)->syncLicenseUser($license);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning("[LicenseController] Gagal auto-sync storage server saat update: " . $e->getMessage());
+        }
 
         return redirect()->route('super-admin.licenses.index')
             ->with('success', 'Lisensi ' . $license->client_name . ' berhasil diperbarui.');
@@ -121,7 +142,16 @@ class LicenseController extends Controller
     public function destroy(License $license)
     {
         $name = $license->client_name;
+        $storageUserId = $license->storage_user_id;
         $license->delete();
+
+        if (!empty($storageUserId)) {
+            try {
+                app(\App\Services\StorageServerService::class)->deleteUser($storageUserId);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning("[LicenseController] Gagal hapus user storage: " . $e->getMessage());
+            }
+        }
 
         return redirect()->route('super-admin.licenses.index')
             ->with('success', 'Lisensi ' . $name . ' berhasil dihapus.');

@@ -72,6 +72,7 @@ class LicenseValidateController extends Controller
                 'photo_enabled'        => (bool) ($license->photo_enabled ?? true),
                 'face_enabled'         => (bool) ($license->face_enabled ?? true),
                 'dok_kbm_enabled'      => (bool) ($license->dok_kbm_enabled ?? false),
+                'storage_quota_mb'     => (int) ($license->storage_quota_mb ?? 1000),
                 'history_quota_months' => $license->history_quota_months,
                 'message'              => 'Lisensi telah expired pada ' . $license->expired_at->format('d M Y') . '. Hubungi KangDaQiQ untuk perpanjangan.',
             ]);
@@ -87,6 +88,8 @@ class LicenseValidateController extends Controller
             'photo_enabled'        => (bool) ($license->photo_enabled ?? true),
             'face_enabled'         => (bool) ($license->face_enabled ?? true),
             'dok_kbm_enabled'      => (bool) ($license->dok_kbm_enabled ?? false),
+            'storage_quota_mb'     => (int) ($license->storage_quota_mb ?? 1000),
+            'storage_api_key'      => $license->storage_api_key ?: config('services.storage_server.key'),
             'history_quota_months' => $license->history_quota_months,
             'expired_at'           => $license->expired_at?->format('Y-m-d'),
             'message'              => 'Lisensi aktif.',

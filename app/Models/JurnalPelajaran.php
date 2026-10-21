@@ -53,7 +53,8 @@ class JurnalPelajaran extends Model
             return [];
         }
 
-        $storageKey = config('services.storage_server.key') ?: '812194c6c53ee6557e088b897f5ec08abafb49a8fa5e656f5acf75f70a93145f';
+        $school = $this->relationLoaded('school') ? $this->school : ($this->school_id ? \App\Models\School::find($this->school_id) : null);
+        $storageKey = $school?->storage_api_key ?: config('services.storage_server.key') ?: '812194c6c53ee6557e088b897f5ec08abafb49a8fa5e656f5acf75f70a93145f';
 
         // Helper untuk menyertakan api_key pada URL storage server agar browser tidak terkena 401 Unauthorized
         $attachApiKey = function (?string $url) use ($storageKey): ?string {

@@ -20,6 +20,9 @@ class School extends Model
         'photo_enabled',
         'face_enabled',
         'dok_kbm_enabled',
+        'storage_quota_mb',
+        'storage_api_key',
+        'storage_user_id',
         'wa_enabled',
         'bot_enabled',
         'bot_user_limit',
@@ -37,6 +40,7 @@ class School extends Model
         'photo_enabled'        => 'boolean',
         'face_enabled'         => 'boolean',
         'dok_kbm_enabled'      => 'boolean',
+        'storage_quota_mb'     => 'integer',
         'wa_enabled'           => 'boolean',
         'bot_enabled'          => 'boolean',
         'bot_user_limit'       => 'integer',
@@ -50,7 +54,31 @@ class School extends Model
 
     protected $appends = [
         'logo_url',
+        'storage_quota_human',
     ];
+
+    /**
+     * Human-readable storage quota (e.g. 1000 MB, 2 GB, Unlimited)
+     */
+    public function getStorageQuotaHumanAttribute(): string
+    {
+        $mb = $this->storage_quota_mb;
+        if ($mb === null || $mb <= 0) {
+            return 'Unlimited';
+        }
+        if ($mb >= 1024) {
+            return round($mb / 1024, 2) . ' GB';
+        }
+        return $mb . ' MB';
+    }
+
+    /**
+     * API Key yang berlaku untuk upload ke storage server
+     */
+    public function getEffectiveStorageApiKey(): string
+    {
+        return $this->storage_api_key ?: config('services.storage_server.key') ?: 'android-storage-secret-key';
+    }
 
     /**
      * Accessor for full logo URL.

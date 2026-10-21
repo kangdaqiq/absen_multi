@@ -19,6 +19,7 @@ class Package extends Model
         'photo_enabled',
         'face_enabled',
         'dok_kbm_enabled',
+        'storage_quota_mb',
         'is_active',
     ];
 
@@ -30,6 +31,7 @@ class Package extends Model
         'photo_enabled' => 'boolean',
         'face_enabled' => 'boolean',
         'dok_kbm_enabled' => 'boolean',
+        'storage_quota_mb' => 'integer',
         'is_active' => 'boolean',
     ];
 

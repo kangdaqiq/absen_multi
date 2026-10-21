@@ -34,6 +34,7 @@
                     <th class="py-4 px-4 text-center border-b border-stroke dark:border-strokedark">Foto Siswa</th>
                     <th class="py-4 px-4 text-center border-b border-stroke dark:border-strokedark">Scanner Wajah</th>
                     <th class="py-4 px-4 text-center border-b border-stroke dark:border-strokedark">Dok KBM</th>
+                    <th class="py-4 px-4 text-center border-b border-stroke dark:border-strokedark">Kuota Storage</th>
                     <th class="py-4 px-4 border-b border-stroke dark:border-strokedark">Aksi</th>
                 </tr>
             </thead>
@@ -171,6 +172,12 @@
                                 {{ ($school->dok_kbm_enabled ?? false) ? 'Aktif' : 'Mati' }}
                             </p>
                         </td>
+                        {{-- Kuota Storage --}}
+                        <td class="border-b border-[#eee] py-5 px-4 dark:border-strokedark align-top text-center">
+                            <span class="inline-flex items-center gap-1 rounded-full bg-brand-50 px-2.5 py-1 text-xs font-bold text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
+                                <i class="fas fa-database text-[10px]"></i> {{ $school->storage_quota_human }}
+                            </span>
+                        </td>
                         <td class="border-b border-[#eee] py-5 px-4 dark:border-strokedark align-top">
                             <div class="flex items-center space-x-3">
                                 <a href="{{ route('super-admin.schools.edit', $school) }}" class="text-warning-500 hover:text-warning-700 hover:bg-warning-50 p-2 rounded-lg transition" title="Edit">
@@ -197,7 +204,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="11" class="border-b border-[#eee] py-5 px-4 dark:border-strokedark text-center text-gray-500">
+                        <td colspan="12" class="border-b border-[#eee] py-5 px-4 dark:border-strokedark text-center text-gray-500">
                             Belum ada sekolah
                         </td>
                     </tr>

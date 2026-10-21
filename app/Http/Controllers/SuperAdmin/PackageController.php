@@ -34,6 +34,7 @@ class PackageController extends Controller
             'photo_enabled' => 'nullable|boolean',
             'face_enabled' => 'nullable|boolean',
             'dok_kbm_enabled' => 'nullable|boolean',
+            'storage_quota_mb' => 'nullable|integer|min:0',
             'is_active' => 'nullable|boolean',
         ]);
 
@@ -42,6 +43,7 @@ class PackageController extends Controller
         $validated['photo_enabled'] = $request->has('photo_enabled');
         $validated['face_enabled'] = $request->has('face_enabled');
         $validated['dok_kbm_enabled'] = $request->has('dok_kbm_enabled');
+        $validated['storage_quota_mb'] = $request->filled('storage_quota_mb') ? (int) $request->storage_quota_mb : 1000;
         $validated['is_active'] = $request->has('is_active');
         
         // Convert null strings to actual null for limits (0 means unlimited in DB logic, but null is safer for empty)
@@ -76,6 +78,7 @@ class PackageController extends Controller
             'photo_enabled' => 'nullable|boolean',
             'face_enabled' => 'nullable|boolean',
             'dok_kbm_enabled' => 'nullable|boolean',
+            'storage_quota_mb' => 'nullable|integer|min:0',
             'is_active' => 'nullable|boolean',
         ]);
 
@@ -84,6 +87,7 @@ class PackageController extends Controller
         $validated['photo_enabled'] = $request->has('photo_enabled');
         $validated['face_enabled'] = $request->has('face_enabled');
         $validated['dok_kbm_enabled'] = $request->has('dok_kbm_enabled');
+        $validated['storage_quota_mb'] = $request->filled('storage_quota_mb') ? (int) $request->storage_quota_mb : 1000;
         $validated['is_active'] = $request->has('is_active');
 
         $validated['student_limit'] = $validated['student_limit'] ?? 0;

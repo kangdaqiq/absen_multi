@@ -86,10 +86,19 @@ Route::middleware(['auth', 'self_hosted_guard'])->prefix('super-admin')->name('s
         Route::patch('schools/{school}/toggle-photo', [App\Http\Controllers\SuperAdmin\SchoolController::class, 'togglePhoto'])->name('schools.toggle-photo');
         Route::patch('schools/{school}/toggle-face', [App\Http\Controllers\SuperAdmin\SchoolController::class, 'toggleFace'])->name('schools.toggle-face');
         Route::patch('schools/{school}/toggle-dok-kbm', [App\Http\Controllers\SuperAdmin\SchoolController::class, 'toggleDokKbm'])->name('schools.toggle-dok-kbm');
+        Route::patch('schools/{school}/storage-quota', [App\Http\Controllers\SuperAdmin\SchoolController::class, 'updateStorageQuota'])->name('schools.storage-quota');
         Route::post('schools/{school}/send-invoice-wa', function (\App\Models\School $school, \App\Services\SubscriptionNotificationService $service) {
             $res = $service->sendRenewalInvoiceWhatsApp($school);
             return back()->with($res['success'] ? 'success' : 'error', $res['message']);
         })->name('schools.send-invoice-wa');
+
+        // Storage Server & Client Quota Management
+        Route::get('/storage', [App\Http\Controllers\SuperAdmin\StorageServerController::class, 'index'])->name('storage.index');
+        Route::post('/storage/quota', [App\Http\Controllers\SuperAdmin\StorageServerController::class, 'updateQuota'])->name('storage.update-quota');
+        Route::post('/storage/schools/{school}/sync', [App\Http\Controllers\SuperAdmin\StorageServerController::class, 'syncSchool'])->name('storage.sync-school');
+        Route::post('/storage/sync-all', [App\Http\Controllers\SuperAdmin\StorageServerController::class, 'syncAll'])->name('storage.sync-all');
+        Route::post('/storage/recalculate', [App\Http\Controllers\SuperAdmin\StorageServerController::class, 'recalculate'])->name('storage.recalculate');
+        Route::get('/storage/test-connection', [App\Http\Controllers\SuperAdmin\StorageServerController::class, 'testConnection'])->name('storage.test-connection');
 
         // School Admins Management (nested resource)
         Route::resource('schools.admins', App\Http\Controllers\SuperAdmin\SchoolAdminController::class);

@@ -48,6 +48,7 @@ class SchoolController extends Controller
             'teacher_limit'        => 'nullable|integer|min:0',
             'bot_user_limit'       => 'nullable|integer|min:0',
             'history_quota_months' => 'nullable|integer|min:0',
+            'storage_quota_mb'     => 'nullable|integer|min:0',
             'package_id'           => 'nullable|exists:packages,id',
             'billing_cycle'        => 'nullable|in:monthly,yearly',
         ]);
@@ -78,6 +79,8 @@ class SchoolController extends Controller
         $validated['student_limit']       = $request->student_limit ?: null;
         $validated['teacher_limit']       = $request->teacher_limit ?: null;
         $validated['history_quota_months'] = $request->history_quota_months ?: null;
+        $validated['storage_quota_mb']     = $request->filled('storage_quota_mb') ? (int) $request->storage_quota_mb : 1000;
+        $validated['storage_api_key']      = 'sk_sch_' . strtolower(\Illuminate\Support\Str::random(24));
 
         // Apply package configuration if selected
         $packageId = $request->package_id;
@@ -101,11 +104,21 @@ class SchoolController extends Controller
                 if (isset($package->dok_kbm_enabled)) {
                     $validated['dok_kbm_enabled'] = (bool) $package->dok_kbm_enabled;
                 }
+                if (isset($package->storage_quota_mb)) {
+                    $validated['storage_quota_mb'] = (int) $package->storage_quota_mb;
+                }
                 $validated['expired_at'] = $billingCycle === 'yearly' ? now()->addYear() : now()->addMonth();
             }
         }
 
         $school = School::create($validated);
+
+        // Sinkronisasi otomatis ke storage server jika fitur Dok KBM aktif atau kuota diatur
+        try {
+            app(\App\Services\StorageServerService::class)->syncSchoolUser($school);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning("[SchoolController] Gagal auto-sync storage server: " . $e->getMessage());
+        }
 
         // Record Subscription
         if ($packageId && isset($package)) {
@@ -193,6 +206,7 @@ class SchoolController extends Controller
             'teacher_limit'        => 'nullable|integer|min:0',
             'bot_user_limit'       => 'nullable|integer|min:0',
             'history_quota_months' => 'nullable|integer|min:0',
+            'storage_quota_mb'     => 'nullable|integer|min:0',
             'package_id'           => 'nullable|exists:packages,id',
             'billing_cycle'        => 'nullable|in:monthly,yearly',
         ]);
@@ -228,6 +242,12 @@ class SchoolController extends Controller
         $validated['student_limit']        = $request->student_limit ?: null;
         $validated['teacher_limit']        = $request->teacher_limit ?: null;
         $validated['history_quota_months'] = $request->history_quota_months ?: null;
+        $validated['storage_quota_mb']     = $request->filled('storage_quota_mb') ? (int) $request->storage_quota_mb : ($school->storage_quota_mb ?? 1000);
+
+        // Pastikan storage_api_key sudah ada
+        if (empty($school->storage_api_key)) {
+            $validated['storage_api_key'] = 'sk_sch_' . strtolower(\Illuminate\Support\Str::random(24));
+        }
 
         // Apply package configuration if a new package is selected or updated
         $packageId = $request->package_id;
@@ -253,6 +273,9 @@ class SchoolController extends Controller
                     }
                     if (isset($package->dok_kbm_enabled)) {
                         $validated['dok_kbm_enabled'] = (bool) $package->dok_kbm_enabled;
+                    }
+                    if (isset($package->storage_quota_mb)) {
+                        $validated['storage_quota_mb'] = (int) $package->storage_quota_mb;
                     }
                     // For update, we don't automatically change bot_enabled to prevent accidentally turning it back on if manually disabled by admin
                     // But if it's a completely new package, we might want to respect the package. Let's respect the package but only if turning ON.
@@ -284,6 +307,13 @@ class SchoolController extends Controller
         }
 
         $school->update($validated);
+
+        // Sinkronisasi otomatis ke storage server
+        try {
+            app(\App\Services\StorageServerService::class)->syncSchoolUser($school);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning("[SchoolController] Gagal sync storage server saat update: " . $e->getMessage());
+        }
 
         // Sync Name and Address with Settings
         \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(
@@ -319,28 +349,19 @@ class SchoolController extends Controller
             // Settings
             \App\Models\Setting::where('school_id', $school->id)->delete();
 
-            // Hari Libur (Removed)
-
             // Jadwal
             \App\Models\Jadwal::where('school_id', $school->id)->delete();
-
-            // Mapel (if linked to school? Mapel table usually has no school_id in simple implementations unless upgraded)
-            // Checking Mapel model/schema might be needed, but assuming simple deletion for now. 
-            // Better check if Mapel has school_id. Assuming yes from context.
-            // If not, we skip. Let's be safe and check schema first? 
-            // Actually, let's look at what we KNOW has school_id.
 
             // Classes
             \App\Models\Kelas::where('school_id', $school->id)->delete();
 
-            // Students (and their attendance/fingerprints via database constraints or manual?)
-            // If DB doesn't have ON DELETE CASCADE, we must delete manually.
+            // Students
             $studentIds = \App\Models\Siswa::where('school_id', $school->id)->pluck('id');
             \App\Models\Attendance::whereIn('student_id', $studentIds)->delete();
             \App\Models\SiswaFingerprint::whereIn('student_id', $studentIds)->delete();
             \App\Models\Siswa::whereIn('id', $studentIds)->delete();
 
-            // Teachers (and their attendance/fingerprints)
+            // Teachers
             $teacherIds = \App\Models\Guru::where('school_id', $school->id)->pluck('id');
             \App\Models\AbsensiGuru::whereIn('guru_id', $teacherIds)->delete();
             \App\Models\GuruFingerprint::whereIn('guru_id', $teacherIds)->delete();
@@ -355,6 +376,9 @@ class SchoolController extends Controller
                 \Storage::disk('public')->delete($school->logo);
             }
 
+            // Simpan storage_user_id sebelum model dihapus
+            $storageUserId = $school->storage_user_id;
+
             // 3. Delete School
             $school->delete();
 
@@ -362,6 +386,15 @@ class SchoolController extends Controller
 
             // Delete WA Device
             $this->deleteWaDevice($school);
+
+            // Hapus user di storage server jika ada
+            if (!empty($storageUserId)) {
+                try {
+                    app(\App\Services\StorageServerService::class)->deleteUser($storageUserId);
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::warning("[SchoolController] Gagal hapus user storage: " . $e->getMessage());
+                }
+            }
 
             return redirect()
                 ->route('super-admin.schools.index')
@@ -373,6 +406,29 @@ class SchoolController extends Controller
                 ->route('super-admin.schools.index')
                 ->with('error', 'Gagal menghapus sekolah: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Update Kuota Storage Sekolah (AJAX dari Super Admin Dashboard / Tabel Sekolah)
+     */
+    public function updateStorageQuota(Request $request, School $school)
+    {
+        $validated = $request->validate([
+            'storage_quota_mb' => 'required|integer|min:0',
+        ]);
+
+        $school->storage_quota_mb = (int) $validated['storage_quota_mb'];
+        $school->save();
+
+        $syncResult = app(\App\Services\StorageServerService::class)->syncSchoolUser($school);
+
+        return response()->json([
+            'success'             => true,
+            'storage_quota_mb'    => $school->storage_quota_mb,
+            'storage_quota_human' => $school->storage_quota_human,
+            'message'             => "Batas kuota storage untuk {$school->name} berhasil diubah menjadi {$school->storage_quota_human}.",
+            'sync'                => $syncResult,
+        ]);
     }
 
     /**

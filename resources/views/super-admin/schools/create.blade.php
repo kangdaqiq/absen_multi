@@ -206,6 +206,16 @@
                                 <p class="mt-1 text-xs text-danger">{{ $message }}</p>
                             @enderror
                         </div>
+                        <div class="w-full sm:w-1/2">
+                            <label class="mb-2.5 block text-black dark:text-white">
+                                <i class="fas fa-database text-brand-500 mr-1"></i> Batas Kuota Storage (MB)
+                            </label>
+                            <input type="number" id="input_storage_quota_mb" name="storage_quota_mb" value="{{ old('storage_quota_mb', 1000) }}" min="0" step="100" class="w-full rounded border border-stroke bg-transparent py-3 px-5 outline-none transition focus:border-brand-500 active:border-brand-500 dark:border-form-strokedark dark:bg-form-input dark:focus:border-brand-500 disabled:bg-gray-2 disabled:cursor-not-allowed dark:disabled:bg-meta-4 @error('storage_quota_mb') border-danger @enderror" />
+                            <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">Default: 1000 MB (1 GB). Masukkan 0 untuk Unlimited.</p>
+                            @error('storage_quota_mb')
+                                <p class="mt-1 text-xs text-danger">{{ $message }}</p>
+                            @enderror
+                        </div>
                     </div>
 
                     <div class="mb-5.5">
@@ -394,7 +404,8 @@ document.addEventListener('DOMContentLoaded', function() {
         waEnabled: document.getElementById('wa_enabled'),
         botEnabled: document.getElementById('bot_enabled'),
         photoEnabled: document.getElementById('photo_enabled'),
-        faceEnabled: document.getElementById('face_enabled')
+        faceEnabled: document.getElementById('face_enabled'),
+        storageQuota: document.getElementById('input_storage_quota_mb')
     };
 
     function applyPackageValues() {
@@ -409,6 +420,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 elements.teacherLimit.value = pkg.teacher_limit || '';
                 elements.botUserLimit.value = pkg.bot_user_limit || '';
                 elements.historyQuota.value = pkg.history_quota_months || '';
+                if (elements.storageQuota && pkg.storage_quota_mb !== undefined) {
+                    elements.storageQuota.value = pkg.storage_quota_mb;
+                }
                 
                 elements.waEnabled.checked = pkg.wa_enabled == 1;
                 elements.botEnabled.checked = pkg.bot_enabled == 1;
@@ -417,6 +431,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 elements.studentLimit.readOnly = true;
                 elements.teacherLimit.readOnly = true;
                 elements.botUserLimit.readOnly = true;
+                if (elements.storageQuota) elements.storageQuota.readOnly = true;
                 
                 elements.historyQuota.style.pointerEvents = 'none';
                 elements.waEnabled.style.pointerEvents = 'none';

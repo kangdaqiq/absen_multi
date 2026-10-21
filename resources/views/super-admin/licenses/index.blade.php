@@ -81,6 +81,14 @@
                         </div>
                     </div>
 
+                    <div class="mb-4.5">
+                        <label class="mb-2.5 block text-black dark:text-white">
+                            <i class="fas fa-database text-brand-500 mr-1"></i> Kuota Storage Server (MB)
+                        </label>
+                        <input type="number" name="storage_quota_mb" value="{{ old('storage_quota_mb', 1000) }}" min="0" step="100" class="w-full rounded border border-stroke bg-transparent py-3 px-5 outline-none transition focus:border-brand-500 active:border-brand-500 dark:border-form-strokedark dark:bg-form-input dark:focus:border-brand-500" />
+                        <p class="mt-1.5 text-xs text-gray-500">Kapasitas penyimpanan foto/video KBM (MB). Default 1000 MB (1 GB). 0 = unlimited.</p>
+                    </div>
+
                     <div class="mb-4.5 flex flex-col gap-5 sm:flex-row">
                         <div class="w-full sm:w-1/2">
                             <label class="mb-2.5 block text-black dark:text-white">Expired At</label>
@@ -222,6 +230,7 @@
                                     <p class="text-gray-600 dark:text-gray-400">Guru: <span class="font-medium text-black dark:text-white">{{ $license->max_teachers === 0 ? '∞' : $license->max_teachers }}</span></p>
                                     <p class="text-gray-600 dark:text-gray-400">Bot: <span class="font-medium text-black dark:text-white">{{ $license->max_bot_users === 0 ? '∞' : $license->max_bot_users }}</span></p>
                                     <p class="text-gray-600 dark:text-gray-400">Histori: <span class="font-medium text-black dark:text-white">{{ is_null($license->history_quota_months) || $license->history_quota_months === 0 ? '∞' : $license->history_quota_months . ' Bln' }}</span></p>
+                                    <p class="text-gray-600 dark:text-gray-400">Storage: <span class="font-bold text-brand-500">{{ $license->storage_quota_mb ? (($license->storage_quota_mb >= 1024) ? round($license->storage_quota_mb/1024, 1).' GB' : $license->storage_quota_mb.' MB') : '∞' }}</span></p>
                                 </td>
                                 <td class="border-b border-[#eee] py-5 px-4 dark:border-strokedark align-top text-sm">
                                     @if($license->expired_at)
@@ -414,6 +423,14 @@
 
                     <div class="mb-4.5">
                         <label class="mb-2.5 block text-black dark:text-white">
+                            <i class="fas fa-database text-brand-500 mr-1"></i> Kuota Storage Server (MB)
+                        </label>
+                        <input type="number" name="storage_quota_mb" x-model="editData.storage_quota_mb" min="0" step="100" class="w-full rounded border border-stroke bg-transparent py-3 px-5 outline-none transition focus:border-brand-500 active:border-brand-500 dark:border-form-strokedark dark:bg-form-input dark:focus:border-brand-500" />
+                        <p class="mt-1.5 text-xs text-gray-500">Kapasitas penyimpanan (MB). 0 = unlimited.</p>
+                    </div>
+
+                    <div class="mb-4.5">
+                        <label class="mb-2.5 block text-black dark:text-white">
                             <i class="fas fa-lock text-warning mr-1"></i> Lock Hostname
                         </label>
                         <input type="text" name="allowed_hostname" x-model="editData.allowed_hostname" placeholder="Kosongkan = semua hostname" class="w-full rounded border border-stroke bg-transparent py-3 px-5 outline-none transition focus:border-brand-500 active:border-brand-500 dark:border-form-strokedark dark:bg-form-input dark:focus:border-brand-500" />
@@ -526,6 +543,7 @@ function licenseManager() {
             expired_at: '',
             allowed_hostname: '',
             notes: '',
+            storage_quota_mb: 1000,
             is_active: true,
             photo_enabled: true,
             face_enabled: true,
@@ -540,6 +558,7 @@ function licenseManager() {
                 max_teachers: license.max_teachers,
                 max_bot_users: license.max_bot_users,
                 history_quota_months: license.history_quota_months ?? 0,
+                storage_quota_mb: license.storage_quota_mb ?? 1000,
                 expired_at: license.expired_at ? license.expired_at.substring(0, 10) : '',
                 allowed_hostname: license.allowed_hostname ?? '',
                 notes: license.notes ?? '',

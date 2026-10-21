@@ -65,9 +65,10 @@ return [
     ],
 
     'storage_server' => [
-        'url'    => env('STORAGE_SERVER_URL', 'https://storage.jagattech.my.id'),
-        'key'    => env('STORAGE_SERVER_KEY', '812194c6c53ee6557e088b897f5ec08abafb49a8fa5e656f5acf75f70a93145f'),
-        'folder' => env('STORAGE_SERVER_KBM_FOLDER', 'kbm_docs'),
+        'url'       => env('STORAGE_SERVER_URL', 'https://storage.jagattech.my.id'),
+        'key'       => env('STORAGE_SERVER_KEY', '812194c6c53ee6557e088b897f5ec08abafb49a8fa5e656f5acf75f70a93145f'),
+        'admin_key' => env('STORAGE_SERVER_ADMIN_KEY', env('STORAGE_SERVER_KEY', 'android-storage-secret-key')),
+        'folder'    => env('STORAGE_SERVER_KBM_FOLDER', 'kbm_docs'),
     ],
 
 ];

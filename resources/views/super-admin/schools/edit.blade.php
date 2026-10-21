@@ -248,6 +248,30 @@
                         @enderror
                     </div>
 
+                    {{-- Kuota Storage Server --}}
+                    <div class="mb-4.5">
+                        <label class="mb-2.5 block text-black dark:text-white">
+                            <i class="fas fa-database text-brand-500 mr-1"></i>
+                            Batas Kuota Storage Server (MB)
+                            <span class="ml-2 inline-flex rounded-full bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400 px-2 py-0.5 text-xs font-bold">
+                                {{ $school->storage_quota_human }}
+                            </span>
+                        </label>
+                        <input type="number" id="input_storage_quota_mb" name="storage_quota_mb" value="{{ old('storage_quota_mb', $school->storage_quota_mb ?? 1000) }}" min="0" step="100" class="w-full rounded border border-stroke bg-transparent py-3 px-5 outline-none transition focus:border-brand-500 active:border-brand-500 dark:border-form-strokedark dark:bg-form-input dark:focus:border-brand-500 disabled:bg-gray-2 disabled:cursor-not-allowed dark:disabled:bg-meta-4 @error('storage_quota_mb') border-danger @enderror" />
+                        <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                            Batas kapasitas berkas foto & video dokumentasi KBM untuk sekolah ini (dalam MB). 1000 MB = 1 GB. Masukkan 0 untuk Unlimited.
+                        </p>
+                        @if($school->storage_api_key)
+                            <div class="mt-2 flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                                <span>Storage API Key:</span>
+                                <code class="rounded bg-gray-100 dark:bg-gray-800 px-2 py-0.5 font-mono text-gray-700 dark:text-gray-300">{{ $school->storage_api_key }}</code>
+                            </div>
+                        @endif
+                        @error('storage_quota_mb')
+                            <p class="mt-1 text-xs text-danger">{{ $message }}</p>
+                        @enderror
+                    </div>
+
                     <div class="mb-5.5">
                         <label class="mb-2.5 block text-black dark:text-white">
                             <i class="fas fa-history text-warning mr-1"></i> Kuota Retensi History Absen

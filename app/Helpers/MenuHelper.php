@@ -130,6 +130,7 @@ class MenuHelper
             $superAdminItems = [
                 ['icon' => 'tables', 'name' => 'Data Sekolah', 'path' => route('super-admin.schools.index', [], false)],
                 ['icon' => 'ecommerce', 'name' => 'Paket Langganan', 'path' => route('super-admin.packages.index', [], false)],
+                ['icon' => 'pages', 'name' => 'Storage Server & Kuota', 'path' => route('super-admin.storage.index', [], false)],
                 ['icon' => 'chat', 'name' => 'Koneksi WA (Pusat)', 'path' => route('whatsapp.device.index', [], false)],
                 ['icon' => 'chat', 'name' => 'Status WA Device', 'path' => route('super-admin.whatsapp-devices.index', [], false)],
                 ['icon' => 'forms', 'name' => 'Pengumuman', 'path' => route('super-admin.announcements.index', [], false)],

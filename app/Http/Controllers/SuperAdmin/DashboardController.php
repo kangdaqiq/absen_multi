@@ -7,12 +7,12 @@ use App\Models\School;
 use App\Models\User;
 use App\Models\Siswa;
 use App\Models\Guru;
-use App\Services\StorageServerService;
+use App\Services\R2StorageService;
 use Illuminate\Http\Request;
 
 class DashboardController extends Controller
 {
-    public function index(StorageServerService $storageService)
+    public function index(R2StorageService $r2Service)
     {
         // Get statistics for all schools
         $totalSchools = School::count();
@@ -35,20 +35,20 @@ class DashboardController extends Controller
             ->take(5)
             ->get();
 
-        // Storage Server & Quota metrics
-        $storageHealth = $storageService->getHealth();
-        $storageOnline = !empty($storageHealth);
+        // Cloudflare R2 Storage & Quota metrics
+        $globalStats = $r2Service->getGlobalStats();
         $dokKbmSchoolsCount = School::where('dok_kbm_enabled', true)->count();
         $totalAllocatedQuotaMb = School::sum('storage_quota_mb');
 
         $storageStats = [
-            'is_online'             => $storageOnline,
+            'is_online'             => $globalStats['is_online'],
             'dok_kbm_schools_count' => $dokKbmSchoolsCount,
             'total_quota_human'     => ($totalAllocatedQuotaMb >= 1024)
                 ? round($totalAllocatedQuotaMb / 1024, 2) . ' GB'
                 : $totalAllocatedQuotaMb . ' MB',
-            'server_version'        => $storageHealth['version'] ?? '1.1.0',
-            'server_url'            => $storageService->getBaseUrl(),
+            'server_version'        => 'Cloudflare R2',
+            'server_url'            => $globalStats['server_url'],
+            'bucket'                => $globalStats['bucket'],
         ];
 
         return view('super-admin.dashboard', compact(

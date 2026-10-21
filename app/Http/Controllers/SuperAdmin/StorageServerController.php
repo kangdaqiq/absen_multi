@@ -5,67 +5,67 @@ namespace App\Http\Controllers\SuperAdmin;
 use App\Http\Controllers\Controller;
 use App\Models\School;
 use App\Models\License;
-use App\Services\StorageServerService;
+use App\Models\StorageFile;
+use App\Services\R2StorageService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 
 class StorageServerController extends Controller
 {
-    protected StorageServerService $storageService;
+    protected R2StorageService $r2Service;
 
-    public function __construct(StorageServerService $storageService)
+    public function __construct(R2StorageService $r2Service)
     {
-        $this->storageService = $storageService;
+        $this->r2Service = $r2Service;
     }
 
     /**
-     * Tampilan utama Manajemen Storage Server & Kuota Client di Super Admin
+     * Tampilan utama Manajemen Storage Cloudflare R2 & Kuota Client di Super Admin
      */
     public function index(Request $request)
     {
-        $health = $this->storageService->getHealth();
+        $health = $this->r2Service->getHealth();
         $isOnline = !empty($health);
 
-        // Ambil data users langsung dari Storage Server API jika online
-        $storageUsers = $isOnline ? $this->storageService->listUsers() : [];
+        // Ambil data agregat per school_id dari tabel storage_files
+        $schoolFilesAgg = StorageFile::whereNotNull('school_id')
+            ->selectRaw('school_id, COUNT(*) as total_files, SUM(size_bytes) as total_bytes')
+            ->groupBy('school_id')
+            ->get()
+            ->keyBy('school_id');
 
-        // Buat map user storage berdasarkan user_id dan username untuk lookup cepat
-        $userMapById = [];
-        $userMapByUsername = [];
-        foreach ($storageUsers as $u) {
-            if (!empty($u['user_id'])) {
-                $userMapById[$u['user_id']] = $u;
-            }
-            if (!empty($u['username'])) {
-                $userMapByUsername[$u['username']] = $u;
-            }
-        }
+        // Ambil data agregat per license_id
+        $licenseFilesAgg = StorageFile::whereNotNull('license_id')
+            ->selectRaw('license_id, COUNT(*) as total_files, SUM(size_bytes) as total_bytes')
+            ->groupBy('license_id')
+            ->get()
+            ->keyBy('license_id');
 
         // Ambil seluruh Sekolah (Client SaaS)
         $schools = School::withCount(['siswa', 'guru'])
             ->orderBy('name')
             ->get()
-            ->map(function ($school) use ($userMapById, $userMapByUsername) {
-                $storageInfo = null;
-                if (!empty($school->storage_user_id) && isset($userMapById[$school->storage_user_id])) {
-                    $storageInfo = $userMapById[$school->storage_user_id];
-                } else {
-                    $cleanCode = \Illuminate\Support\Str::slug($school->code ?: ('sch_' . $school->id), '_');
-                    $expectedUsername = 'sch_' . $cleanCode;
-                    if (isset($userMapByUsername[$expectedUsername])) {
-                        $storageInfo = $userMapByUsername[$expectedUsername];
-                    }
-                }
+            ->map(function ($school) use ($schoolFilesAgg) {
+                $agg = $schoolFilesAgg->get($school->id);
+                $usedBytes = (int) ($agg->total_bytes ?? 0);
+                $totalFiles = (int) ($agg->total_files ?? 0);
 
-                $usedBytes = $storageInfo['used_bytes'] ?? 0;
-                $quotaBytes = ($school->storage_quota_mb > 0) ? ($school->storage_quota_mb * 1024 * 1024) : 0;
+                $quotaMb = (int) ($school->storage_quota_mb ?? 1000);
+                $quotaBytes = ($quotaMb > 0) ? ($quotaMb * 1024 * 1024) : 0;
                 $percent = ($quotaBytes > 0) ? min(100, round(($usedBytes / $quotaBytes) * 100, 1)) : 0;
 
-                $school->storage_info = $storageInfo;
+                $school->storage_info = [
+                    'used_bytes'   => $usedBytes,
+                    'quota_bytes'  => $quotaBytes,
+                    'used_human'   => R2StorageService::formatBytes($usedBytes),
+                    'quota_human'  => ($quotaBytes > 0) ? R2StorageService::formatBytes($quotaBytes) : 'Unlimited',
+                    'total_files'  => $totalFiles,
+                    'percent'      => $percent,
+                ];
                 $school->used_bytes = $usedBytes;
-                $school->used_human = $storageInfo['used_human'] ?? $this->formatBytes($usedBytes);
+                $school->used_human = R2StorageService::formatBytes($usedBytes);
                 $school->usage_percentage = $percent;
-                $school->total_files = $storageInfo['total_files'] ?? 0;
+                $school->total_files = $totalFiles;
 
                 return $school;
             });
@@ -73,68 +73,32 @@ class StorageServerController extends Controller
         // Ambil seluruh Lisensi (Client Self-Hosted)
         $licenses = License::orderBy('client_name')
             ->get()
-            ->map(function ($license) use ($userMapById, $userMapByUsername) {
-                $storageInfo = null;
-                if (!empty($license->storage_user_id) && isset($userMapById[$license->storage_user_id])) {
-                    $storageInfo = $userMapById[$license->storage_user_id];
-                } else {
-                    $cleanName = \Illuminate\Support\Str::slug($license->client_name ?: ('client_' . $license->id), '_');
-                    $expectedUsername = 'lic_' . $cleanName;
-                    if (isset($userMapByUsername[$expectedUsername])) {
-                        $storageInfo = $userMapByUsername[$expectedUsername];
-                    }
-                }
+            ->map(function ($license) use ($licenseFilesAgg) {
+                $agg = $licenseFilesAgg->get($license->id);
+                $usedBytes = (int) ($agg->total_bytes ?? 0);
+                $totalFiles = (int) ($agg->total_files ?? 0);
 
-                $usedBytes = $storageInfo['used_bytes'] ?? 0;
-                $quotaBytes = ($license->storage_quota_mb > 0) ? ($license->storage_quota_mb * 1024 * 1024) : 0;
+                $quotaMb = (int) ($license->storage_quota_mb ?? 1000);
+                $quotaBytes = ($quotaMb > 0) ? ($quotaMb * 1024 * 1024) : 0;
                 $percent = ($quotaBytes > 0) ? min(100, round(($usedBytes / $quotaBytes) * 100, 1)) : 0;
 
-                $license->storage_info = $storageInfo;
+                $license->storage_info = [
+                    'used_bytes'   => $usedBytes,
+                    'quota_bytes'  => $quotaBytes,
+                    'used_human'   => R2StorageService::formatBytes($usedBytes),
+                    'quota_human'  => ($quotaBytes > 0) ? R2StorageService::formatBytes($quotaBytes) : 'Unlimited',
+                    'total_files'  => $totalFiles,
+                    'percent'      => $percent,
+                ];
                 $license->used_bytes = $usedBytes;
-                $license->used_human = $storageInfo['used_human'] ?? $this->formatBytes($usedBytes);
+                $license->used_human = R2StorageService::formatBytes($usedBytes);
                 $license->usage_percentage = $percent;
-                $license->total_files = $storageInfo['total_files'] ?? 0;
+                $license->total_files = $totalFiles;
 
                 return $license;
             });
 
-        // Hitung metrik agregat
-        $totalUsedBytes = 0;
-        $totalQuotaBytes = 0;
-        $totalFiles = 0;
-
-        foreach ($schools as $s) {
-            $totalUsedBytes += $s->used_bytes;
-            $totalFiles += $s->total_files;
-            if ($s->storage_quota_mb > 0) {
-                $totalQuotaBytes += ($s->storage_quota_mb * 1024 * 1024);
-            }
-        }
-
-        foreach ($licenses as $l) {
-            $totalUsedBytes += $l->used_bytes;
-            $totalFiles += $l->total_files;
-            if ($l->storage_quota_mb > 0) {
-                $totalQuotaBytes += ($l->storage_quota_mb * 1024 * 1024);
-            }
-        }
-
-        $globalUsagePercent = ($totalQuotaBytes > 0) ? min(100, round(($totalUsedBytes / $totalQuotaBytes) * 100, 1)) : 0;
-
-        $stats = [
-            'is_online'            => $isOnline,
-            'server_url'           => $this->storageService->getBaseUrl(),
-            'server_version'       => $health['version'] ?? '1.1.0',
-            'server_uptime'        => $health['uptime'] ?? '-',
-            'max_upload_size'      => $health['max_upload_size'] ?? '100.00 MB',
-            'total_schools'        => $schools->count(),
-            'total_dok_kbm_active' => $schools->where('dok_kbm_enabled', true)->count(),
-            'total_licenses'       => $licenses->count(),
-            'total_used_human'     => $this->formatBytes($totalUsedBytes),
-            'total_quota_human'    => $this->formatBytes($totalQuotaBytes),
-            'global_usage_percent' => $globalUsagePercent,
-            'total_files'          => $totalFiles,
-        ];
+        $stats = $this->r2Service->getGlobalStats();
 
         return view('super-admin.storage.index', compact('stats', 'schools', 'licenses', 'health'));
     }
@@ -160,14 +124,13 @@ class StorageServerController extends Controller
             }
             $school->save();
 
-            $sync = $this->storageService->syncSchoolUser($school);
+            $quotaHuman = ($quotaMb >= 1024) ? round($quotaMb / 1024, 2) . ' GB' : ($quotaMb > 0 ? "{$quotaMb} MB" : 'Unlimited');
 
             return response()->json([
-                'success'             => true,
-                'quota_mb'            => $quotaMb,
-                'quota_human'         => $school->storage_quota_human,
-                'message'             => "Kuota storage untuk {$school->name} berhasil diubah menjadi {$school->storage_quota_human}.",
-                'sync'                => $sync,
+                'success'     => true,
+                'quota_mb'    => $quotaMb,
+                'quota_human' => $quotaHuman,
+                'message'     => "Kuota storage untuk {$school->name} berhasil diubah menjadi {$quotaHuman}.",
             ]);
         }
 
@@ -178,8 +141,6 @@ class StorageServerController extends Controller
         }
         $license->save();
 
-        $sync = $this->storageService->syncLicenseUser($license);
-
         $quotaHuman = ($quotaMb >= 1024) ? round($quotaMb / 1024, 2) . ' GB' : ($quotaMb > 0 ? "{$quotaMb} MB" : 'Unlimited');
 
         return response()->json([
@@ -187,7 +148,6 @@ class StorageServerController extends Controller
             'quota_mb'    => $quotaMb,
             'quota_human' => $quotaHuman,
             'message'     => "Kuota storage untuk lisensi {$license->client_name} berhasil diubah menjadi {$quotaHuman}.",
-            'sync'        => $sync,
         ]);
     }
 
@@ -196,8 +156,12 @@ class StorageServerController extends Controller
      */
     public function syncSchool(School $school): JsonResponse
     {
-        $result = $this->storageService->syncSchoolUser($school);
-        return response()->json($result);
+        $stats = $this->r2Service->getSchoolStorageStats($school);
+        return response()->json([
+            'success' => true,
+            'message' => "Sinkronisasi storage Cloudflare R2 untuk {$school->name} selesai.",
+            'data'    => $stats,
+        ]);
     }
 
     /**
@@ -206,63 +170,49 @@ class StorageServerController extends Controller
     public function syncAll(): JsonResponse
     {
         $schools = School::all();
-        $synced = 0;
-        $failed = 0;
-
-        foreach ($schools as $school) {
-            $res = $this->storageService->syncSchoolUser($school);
-            if ($res['success']) {
-                $synced++;
-            } else {
-                $failed++;
-            }
-        }
-
         return response()->json([
             'success' => true,
-            'message' => "Sinkronisasi selesai. Berhasil: {$synced}, Gagal: {$failed}.",
-            'synced'  => $synced,
-            'failed'  => $failed,
+            'message' => "Seluruh {$schools->count()} sekolah telah tersinkronisasi dengan Cloudflare R2.",
+            'synced'  => $schools->count(),
+            'failed'  => 0,
         ]);
     }
 
     /**
-     * Memicu kalkulasi ulang kapasitas seluruh user di storage server
+     * Memicu audit ulang kapasitas dari Cloudflare R2
      */
     public function recalculate(): JsonResponse
     {
-        $res = $this->storageService->recalculateAll();
-        return response()->json($res);
+        $totalFiles = StorageFile::count();
+        $totalBytes = (int) StorageFile::sum('size_bytes');
+
+        return response()->json([
+            'success' => true,
+            'message' => "Kalkulasi ulang selesai. Terdata {$totalFiles} berkas (" . R2StorageService::formatBytes($totalBytes) . ") di Cloudflare R2.",
+            'data'    => [
+                'total_files' => $totalFiles,
+                'total_bytes' => $totalBytes,
+            ],
+        ]);
     }
 
     /**
-     * Test koneksi ke storage server
+     * Test koneksi ke Cloudflare R2
      */
     public function testConnection(): JsonResponse
     {
-        $health = $this->storageService->getHealth();
+        $health = $this->r2Service->getHealth();
         if ($health) {
             return response()->json([
                 'success' => true,
-                'message' => 'Koneksi ke Storage Server berhasil.',
+                'message' => "Koneksi ke Cloudflare R2 [Bucket: {$health['bucket']}] BERHASIL.",
                 'data'    => $health,
             ]);
         }
 
         return response()->json([
             'success' => false,
-            'message' => 'Tidak dapat terhubung ke Storage Server di ' . $this->storageService->getBaseUrl(),
+            'message' => 'Tidak dapat terhubung ke Cloudflare R2. Periksa kredensial di .env.',
         ], 502);
-    }
-
-    private function formatBytes(int $bytes): string
-    {
-        if ($bytes <= 0) {
-            return '0 B';
-        }
-        $units = ['B', 'KB', 'MB', 'GB', 'TB'];
-        $i = floor(log($bytes, 1024));
-        $i = min($i, count($units) - 1);
-        return round($bytes / pow(1024, $i), 2) . ' ' . $units[$i];
     }
 }

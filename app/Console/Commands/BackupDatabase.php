@@ -139,16 +139,17 @@ class BackupDatabase extends Command
                 $this->cleanLocalBackupsExceptCurrent($path, $filename);
             } else {
                 // Mode Hosted: Upload ke Cloudflare R2 jika dikonfigurasi
-                $r2Endpoint = config('filesystems.disks.r2.endpoint') ?: env('CLOUDFLARE_R2_ENDPOINT');
-                $r2Key = config('filesystems.disks.r2.key') ?: env('CLOUDFLARE_R2_ACCESS_KEY_ID');
-                $r2Bucket = config('filesystems.disks.r2.bucket') ?: env('CLOUDFLARE_R2_BUCKET');
+                $backupDisk = config('filesystems.disks.r2_backup.bucket') ? 'r2_backup' : 'r2';
+                $r2Endpoint = config("filesystems.disks.{$backupDisk}.endpoint") ?: env('CLOUDFLARE_R2_ENDPOINT');
+                $r2Key = config("filesystems.disks.{$backupDisk}.key") ?: env('CLOUDFLARE_R2_ACCESS_KEY_ID');
+                $r2Bucket = config("filesystems.disks.{$backupDisk}.bucket") ?: env('CLOUDFLARE_R2_BACKUP_BUCKET') ?: env('CLOUDFLARE_R2_BUCKET');
 
                 if (!empty($r2Endpoint) && !empty($r2Key) && !empty($r2Bucket)) {
                     $cloudPath = "{$cloudFolder}/{$filename}";
-                    $this->info("Uploading backup to Cloudflare R2 ({$cloudPath})...");
+                    $this->info("Uploading backup to Cloudflare R2 [{$r2Bucket}] ({$cloudPath})...");
                     try {
                         $stream = fopen($filePath, 'r');
-                        $uploaded = Storage::disk('r2')->put($cloudPath, $stream);
+                        $uploaded = Storage::disk($backupDisk)->put($cloudPath, $stream);
                         if (is_resource($stream)) {
                             fclose($stream);
                         }

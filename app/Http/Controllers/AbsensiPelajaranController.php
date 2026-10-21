@@ -809,33 +809,10 @@ class AbsensiPelajaranController extends Controller
             ? true
             : app(\App\Services\LicenseService::class)->isDokKbmFeatureEnabled($school);
 
-        // Ambil data kuota storage untuk sekolah ini
+        // Ambil data kuota storage untuk sekolah ini dari R2StorageService
         $storageInfo = null;
-        if ($school && !empty($school->storage_api_key)) {
-            try {
-                $raw = app(StorageServerService::class)->getUserStorage($school->storage_api_key);
-                if ($raw) {
-                    $usedBytes  = $raw['used_bytes']  ?? ($raw['used_mb']  ?? 0) * 1024 * 1024;
-                    $quotaBytes = $raw['quota_bytes'] ?? ($raw['quota_mb'] ?? 0) * 1024 * 1024;
-                    $quotaMbDb  = (int) ($school->storage_quota_mb ?? 1000);
-                    if ($quotaBytes <= 0) {
-                        $quotaBytes = $quotaMbDb * 1024 * 1024;
-                    }
-                    $percent = $quotaBytes > 0 ? round(($usedBytes / $quotaBytes) * 100, 1) : 0;
-                    $storageInfo = [
-                        'used_bytes'   => $usedBytes,
-                        'quota_bytes'  => $quotaBytes,
-                        'used_human'   => $raw['used_human']  ?? $raw['human_used']  ?? self::formatBytes($usedBytes),
-                        'quota_human'  => $raw['quota_human'] ?? $raw['human_quota'] ?? self::formatBytes($quotaBytes),
-                        'free_human'   => self::formatBytes(max(0, $quotaBytes - $usedBytes)),
-                        'percent'      => min(100, $percent),
-                        'is_critical'  => $percent >= 90,
-                        'is_warning'   => $percent >= 70 && $percent < 90,
-                    ];
-                }
-            } catch (\Throwable) {
-                // Storage server tidak bisa diakses, abaikan
-            }
+        if ($school) {
+            $storageInfo = app(\App\Services\R2StorageService::class)->getSchoolStorageStats($school);
         }
         // Fallback: tampilkan info dari DB jika storage server tidak responsif
         if (!$storageInfo && $school) {

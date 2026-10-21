@@ -170,29 +170,29 @@
             </div>
         </div>
 
-        <!-- Storage Server Widget -->
+        <!-- Cloudflare R2 Storage Widget -->
         <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-sm dark:border-gray-800 dark:bg-gray-dark sm:p-7.5">
             <div class="flex items-center justify-between mb-4">
                 <h5 class="text-lg font-semibold text-gray-800 dark:text-white/90">
-                    <i class="fas fa-server text-brand-500 mr-1.5"></i> Storage Server
+                    <i class="fas fa-cloud text-brand-500 mr-1.5"></i> Cloudflare R2 Storage
                 </h5>
                 @if($storageStats['is_online'] ?? false)
                     <span class="inline-flex items-center gap-1 rounded-full bg-success-50 px-2 py-0.5 text-xs font-semibold text-success-600 dark:bg-success-500/15 dark:text-success-400">
-                        <span class="h-1.5 w-1.5 rounded-full bg-success-500 animate-pulse"></span> Online
+                        <span class="h-1.5 w-1.5 rounded-full bg-success-500 animate-pulse"></span> R2 Aktif
                     </span>
                 @else
                     <span class="inline-flex items-center gap-1 rounded-full bg-error-50 px-2 py-0.5 text-xs font-semibold text-error-600 dark:bg-error-500/15 dark:text-error-400">
-                        Offline
+                        Terputus
                     </span>
                 @endif
             </div>
             <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
-                Server penyimpanan multi-user untuk foto & video dokumentasi KBM.
+                Penyimpanan cloud global untuk foto siswa, absensi, dan dokumentasi KBM (Zero Egress Bandwidth).
             </p>
             <div class="space-y-2 text-xs">
                 <div class="flex justify-between border-b border-gray-100 pb-2 dark:border-gray-800">
-                    <span class="text-gray-500 dark:text-gray-400">Sekolah Aktif Dok KBM:</span>
-                    <span class="font-bold text-gray-800 dark:text-white">{{ $storageStats['dok_kbm_schools_count'] ?? 0 }} sekolah</span>
+                    <span class="text-gray-500 dark:text-gray-400">Bucket Cloud:</span>
+                    <span class="font-bold text-gray-800 dark:text-white">{{ $storageStats['bucket'] ?? 'jagatabsen' }}</span>
                 </div>
                 <div class="flex justify-between border-b border-gray-100 pb-2 dark:border-gray-800">
                     <span class="text-gray-500 dark:text-gray-400">Total Kuota Dialokasikan:</span>
@@ -201,7 +201,7 @@
             </div>
             <div class="mt-4">
                 <a href="{{ route('super-admin.storage.index') }}" class="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700 transition">
-                    <span>Kelola Kuota & Storage Server</span>
+                    <span>Kelola Kuota & Cloudflare R2</span>
                     <i class="fas fa-arrow-right"></i>
                 </a>
             </div>

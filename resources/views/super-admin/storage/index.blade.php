@@ -5,9 +5,9 @@
 @section('content')
 <div class="mb-6">
     <x-page-header 
-        title="Storage Server & Kuota Client" 
-        subtitle="Monitoring kapasitas disk, pembatasan kuota multi-user, dan manajemen API key tiap client sekolah" 
-        icon="fas fa-server" 
+        title="Cloudflare R2 Storage & Kuota Client" 
+        subtitle="Monitoring kapasitas cloud storage, pembatasan kuota tiap sekolah, dan CDN distribusi berkas media" 
+        icon="fas fa-cloud" 
     />
 </div>
 
@@ -16,29 +16,28 @@
 
 {{-- ── Top Metrics ── --}}
 <div class="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-2 xl:grid-cols-4 md:gap-6">
-    {{-- Status Server --}}
+    {{-- Status Cloud Storage --}}
     <div class="rounded-2xl border {{ $stats['is_online'] ? 'border-success-200 dark:border-success-800/40 bg-success-50/30 dark:bg-success-500/5' : 'border-error-200 dark:border-error-800/40 bg-error-50/30 dark:bg-error-500/5' }} p-5 shadow-theme-sm md:p-6">
         <div class="flex items-center justify-between">
-            <span class="text-sm font-medium text-gray-500 dark:text-gray-400">Status Server</span>
+            <span class="text-sm font-medium text-gray-500 dark:text-gray-400">Cloud Storage</span>
             @if($stats['is_online'])
                 <span class="inline-flex items-center gap-1.5 rounded-full bg-success-50 px-2.5 py-1 text-xs font-semibold text-success-600 dark:bg-success-500/15 dark:text-success-500">
-                    <span class="h-2 w-2 rounded-full bg-success-500 animate-pulse"></span> Online
+                    <span class="h-2 w-2 rounded-full bg-success-500 animate-pulse"></span> R2 Aktif
                 </span>
             @else
                 <span class="inline-flex items-center gap-1.5 rounded-full bg-error-50 px-2.5 py-1 text-xs font-semibold text-error-600 dark:bg-error-500/15 dark:text-error-500">
-                    <span class="h-2 w-2 rounded-full bg-error-500"></span> Offline
+                    <span class="h-2 w-2 rounded-full bg-error-500"></span> Terputus
                 </span>
             @endif
         </div>
         <div class="mt-4">
-            <h4 class="text-lg font-bold text-gray-800 dark:text-white/90 truncate" title="{{ $stats['server_url'] }}">
-                {{ parse_url($stats['server_url'], PHP_URL_HOST) ?: $stats['server_url'] }}
+            <h4 class="text-lg font-bold text-gray-800 dark:text-white/90 truncate" title="Bucket: {{ $stats['bucket'] ?? 'jagatabsen' }}">
+                <i class="fas fa-box text-brand-500 mr-1 text-sm"></i> {{ $stats['bucket'] ?? 'jagatabsen' }}
             </h4>
-            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                v<span class="font-semibold">{{ $stats['server_version'] }}</span>
-                &bull; Uptime: {{ $stats['server_uptime'] }}
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400 truncate" title="{{ $stats['server_url'] }}">
+                <i class="fas fa-globe text-info-500 mr-1 text-[11px]"></i> {{ parse_url($stats['server_url'], PHP_URL_HOST) ?: $stats['server_url'] }}
             </p>
-            <p class="text-xs text-gray-500 dark:text-gray-400">Max Upload: <span class="font-semibold text-brand-500">{{ $stats['max_upload_size'] }}</span></p>
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Egress Bandwidth: <span class="font-semibold text-success-600 dark:text-success-400">Rp 0 (Free)</span></p>
         </div>
     </div>
 

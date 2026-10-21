@@ -1250,54 +1250,28 @@ class MobileJadwalPelajaranController extends Controller
         ]);
 
         $file = $request->file('file');
-        $schoolForUpload = $jadwal->school ?? $user->school;
-        $storageUrl = rtrim(config('services.storage_server.url'), '/');
-        $storageKey = $schoolForUpload?->storage_api_key ?: config('services.storage_server.key');
-        $storageFolder = config('services.storage_server.folder') ?? 'kbm_docs';
+        $schoolForUpload = $school;
 
         try {
-            $response = Http::timeout(120)
-                ->withHeaders([
-                    'X-API-Key' => $storageKey,
-                ])
-                ->attach('file', file_get_contents($file->getRealPath()), $file->getClientOriginalName())
-                ->post($storageUrl . '/api/v1/files/upload', [
-                    'folder' => $storageFolder,
-                    'name'   => $file->getClientOriginalName(),
-                ]);
-
-            if ($response->status() === 413) {
-                Log::warning('[DokKbm] Storage quota exceeded for school ' . ($schoolForUpload?->id ?? 'unknown'));
-                return response()->json([
-                    'success' => false,
-                    'message' => $response->json('message') ?? 'Kapasitas penyimpanan sekolah telah penuh. Hubungi administrator untuk menambah kuota.',
-                    'error'   => $response->json('error') ?? null,
-                ], 413);
-            }
-
-            if (!$response->successful()) {
-                Log::error('[DokKbm] Storage server response error: ' . $response->body());
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Gagal mengupload berkas ke server penyimpanan (' . $response->status() . ').'
-                ], 502);
-            }
-
-            $storageData = $response->json('data') ?? [];
-            $mime = $file->getMimeType() ?? '';
-            $isVideo = str_starts_with($mime, 'video/');
-
-            $docItem = [
-                'id'            => $storageData['id'] ?? null,
-                'url'           => $storageData['view_url'] ?? '',
-                'view_url'      => $storageData['view_url'] ?? '',
-                'download_url'  => $storageData['download_url'] ?? '',
-                'thumbnail_url' => $storageData['thumbnail_url'] ?? null,
-                'type'          => $isVideo ? 'video' : 'image',
-                'name'          => $file->getClientOriginalName(),
-                'size'          => $file->getSize(),
-                'mime_type'     => $mime,
-            ];
+            $r2Service = app(\App\Services\R2StorageService::class);
+            $docItem = $r2Service->uploadFile($file, $schoolForUpload, 'kbm', null, $user->id);
+        } catch (\App\Exceptions\StorageQuotaExceededException $e) {
+            Log::warning('[DokKbm] R2 Storage quota exceeded for school ' . ($schoolForUpload?->id ?? 'unknown'));
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+                'error'   => [
+                    'used_bytes'  => $e->usedBytes,
+                    'quota_bytes' => $e->quotaBytes,
+                ],
+            ], 413);
+        } catch (\Throwable $e) {
+            Log::error('[DokKbm] R2 upload error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal mengupload berkas ke cloud storage: ' . $e->getMessage(),
+            ], 500);
+        }
 
             // Jika jadwal_pelajaran_id & tanggal disertakan, langsung lampirkan ke jurnal KBM
             if ($request->filled('jadwal_pelajaran_id') && $request->filled('tanggal')) {

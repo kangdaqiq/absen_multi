@@ -831,7 +831,7 @@
 
     <!-- ========================= MODAL LIGHTBOX FOTO ========================= -->
     <div x-show="photoModalOpen" x-cloak style="display: none;"
-         class="fixed inset-0 z-99999 flex items-center justify-center bg-black/90 p-3 sm:p-5 backdrop-blur-sm"
+         class="fixed inset-0 z-99999 flex flex-col bg-black/95 backdrop-blur-md"
          x-transition:enter="transition ease-out duration-200"
          x-transition:enter-start="opacity-0"
          x-transition:enter-end="opacity-100"
@@ -839,35 +839,38 @@
          x-transition:leave-start="opacity-100"
          x-transition:leave-end="opacity-0"
          @keydown.escape.window="photoModalOpen = false">
-        <div class="relative max-w-5xl w-full flex flex-col items-center"
-             @click.away="photoModalOpen = false">
-            <!-- Modal Header Bar -->
-            <div class="w-full flex items-center justify-between text-white mb-3 px-2">
-                <div class="flex items-center gap-2 truncate mr-3">
-                    <span class="px-2.5 py-0.5 rounded-md text-[10px] font-bold bg-blue-600 text-white shrink-0">FOTO</span>
-                    <span class="truncate font-semibold text-xs sm:text-sm text-gray-200" x-text="activeMediaName"></span>
-                </div>
-                <div class="flex items-center gap-2 shrink-0">
-                    <a :href="activeMediaUrl" target="_blank" download class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold transition shadow cursor-pointer">
-                        <i class="fas fa-download text-[11px]"></i>
-                        <span class="hidden sm:inline">Unduh Foto</span>
-                    </a>
-                    <button type="button" @click="photoModalOpen = false" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/15 hover:bg-white/25 text-white text-xs font-semibold transition cursor-pointer">
-                        <i class="fas fa-times text-[11px]"></i>
-                        <span>Tutup (ESC)</span>
-                    </button>
-                </div>
+        
+        <!-- Header Bar: Selalu fixed di atas, tidak bisa tertutup gambar -->
+        <div class="shrink-0 w-full z-20 flex items-center justify-between px-4 sm:px-6 py-3 bg-black/75 border-b border-white/10 text-white shadow-lg">
+            <div class="flex items-center gap-2.5 truncate mr-4">
+                <span class="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider bg-blue-600 text-white shrink-0 shadow-sm">FOTO</span>
+                <span class="truncate font-semibold text-xs sm:text-sm text-gray-200" x-text="activeMediaName"></span>
             </div>
-            <!-- Media Preview Container -->
-            <div class="max-h-[82vh] overflow-hidden rounded-3xl shadow-2xl border border-white/10 bg-black flex items-center justify-center p-1 sm:p-2">
-                <img :src="activeMediaUrl" :alt="activeMediaName" class="max-h-[79vh] w-auto max-w-full object-contain rounded-2xl">
+            <div class="flex items-center gap-2 shrink-0">
+                <a :href="activeMediaUrl" target="_blank" download class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold transition shadow cursor-pointer active:scale-95">
+                    <i class="fas fa-download text-xs"></i>
+                    <span class="hidden sm:inline">Unduh Foto</span>
+                </a>
+                <button type="button" @click="photoModalOpen = false" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white/15 hover:bg-white/25 text-white text-xs font-semibold transition shadow cursor-pointer active:scale-95">
+                    <i class="fas fa-times text-xs"></i>
+                    <span>Tutup (ESC)</span>
+                </button>
             </div>
+        </div>
+
+        <!-- Media Preview Area: Memakai sisa ruang layar dan membatasi ukuran gambar -->
+        <div class="flex-1 min-h-0 w-full flex items-center justify-center p-3 sm:p-5 overflow-hidden"
+             @click.self="photoModalOpen = false">
+            <img :src="activeMediaUrl" :alt="activeMediaName"
+                 class="max-h-[calc(100vh-85px)] max-w-[calc(100vw-30px)] md:max-w-6xl w-auto h-auto object-contain rounded-2xl shadow-2xl border border-white/10"
+                 style="max-height: calc(100vh - 85px); max-width: calc(100vw - 30px);"
+                 @click.stop>
         </div>
     </div>
 
     <!-- ========================= MODAL VIDEO STREAMING PLAYER ========================= -->
     <div x-show="videoModalOpen" x-cloak style="display: none;"
-         class="fixed inset-0 z-99999 flex items-center justify-center bg-black/90 p-3 sm:p-5 backdrop-blur-sm"
+         class="fixed inset-0 z-99999 flex flex-col bg-black/95 backdrop-blur-md"
          x-transition:enter="transition ease-out duration-200"
          x-transition:enter-start="opacity-0"
          x-transition:enter-end="opacity-100"
@@ -875,32 +878,34 @@
          x-transition:leave-start="opacity-100"
          x-transition:leave-end="opacity-0"
          @keydown.escape.window="closeVideoModal()">
-        <div class="relative max-w-4xl w-full flex flex-col items-center"
-             @click.away="closeVideoModal()">
-            <!-- Modal Header Bar -->
-            <div class="w-full flex items-center justify-between text-white mb-3 px-2">
-                <div class="flex items-center gap-2 truncate mr-3">
-                    <span class="px-2.5 py-0.5 rounded-md text-[10px] font-bold bg-amber-500 text-white shrink-0">VIDEO</span>
-                    <span class="truncate font-semibold text-xs sm:text-sm text-gray-200" x-text="activeMediaName"></span>
-                </div>
-                <div class="flex items-center gap-2 shrink-0">
-                    <a :href="activeMediaUrl" target="_blank" download class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold transition shadow cursor-pointer">
-                        <i class="fas fa-download text-[11px]"></i>
-                        <span class="hidden sm:inline">Unduh Video</span>
-                    </a>
-                    <button type="button" @click="closeVideoModal()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/15 hover:bg-white/25 text-white text-xs font-semibold transition cursor-pointer">
-                        <i class="fas fa-times text-[11px]"></i>
-                        <span>Tutup (ESC)</span>
-                    </button>
-                </div>
+        
+        <!-- Header Bar: Selalu fixed di atas, tidak bisa tertutup video -->
+        <div class="shrink-0 w-full z-20 flex items-center justify-between px-4 sm:px-6 py-3 bg-black/75 border-b border-white/10 text-white shadow-lg">
+            <div class="flex items-center gap-2.5 truncate mr-4">
+                <span class="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider bg-amber-500 text-white shrink-0 shadow-sm">VIDEO</span>
+                <span class="truncate font-semibold text-xs sm:text-sm text-gray-200" x-text="activeMediaName"></span>
             </div>
-            <!-- Video Player Container (Mendukung potret ponsel & landscape) -->
-            <div class="w-full bg-black/95 rounded-3xl overflow-hidden shadow-2xl border border-white/10 flex items-center justify-center p-1 sm:p-2">
-                <video id="publicModalVideoPlayer" controls autoplay playsinline preload="auto" :poster="activeMediaPoster"
-                       class="max-h-[76vh] w-auto max-w-full rounded-2xl object-contain mx-auto">
-                    Browser Anda tidak mendukung tag pemutar video.
-                </video>
+            <div class="flex items-center gap-2 shrink-0">
+                <a :href="activeMediaUrl" target="_blank" download class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold transition shadow cursor-pointer active:scale-95">
+                    <i class="fas fa-download text-xs"></i>
+                    <span class="hidden sm:inline">Unduh Video</span>
+                </a>
+                <button type="button" @click="closeVideoModal()" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white/15 hover:bg-white/25 text-white text-xs font-semibold transition shadow cursor-pointer active:scale-95">
+                    <i class="fas fa-times text-xs"></i>
+                    <span>Tutup (ESC)</span>
+                </button>
             </div>
+        </div>
+
+        <!-- Video Player Area -->
+        <div class="flex-1 min-h-0 w-full flex items-center justify-center p-3 sm:p-5 overflow-hidden"
+             @click.self="closeVideoModal()">
+            <video id="publicModalVideoPlayer" controls autoplay playsinline preload="auto" :poster="activeMediaPoster"
+                   class="max-h-[calc(100vh-85px)] max-w-[calc(100vw-30px)] md:max-w-5xl w-auto h-auto rounded-2xl shadow-2xl border border-white/10 object-contain mx-auto"
+                   style="max-height: calc(100vh - 85px); max-width: calc(100vw - 30px);"
+                   @click.stop>
+                Browser Anda tidak mendukung tag pemutar video.
+            </video>
         </div>
     </div>
 

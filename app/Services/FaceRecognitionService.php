@@ -121,11 +121,20 @@ class FaceRecognitionService
                 $data = $response->json();
                 $similarity = (float) ($data['similarity'] ?? 0.0);
                 $isMatch = (bool) ($data['is_match'] ?? ($similarity >= self::getThreshold()));
+                $simPercent = (float) ($data['similarity_percent'] ?? round($similarity * 100, 2));
+                $thresholdPercent = round(self::getThreshold() * 100, 1);
+
+                if ($isMatch) {
+                    Log::info("[Face Engine] Pencocokan Wajah COCOK: Kemiripan {$simPercent}% (Skor: {$similarity}, Min Threshold: {$thresholdPercent}%)");
+                } else {
+                    Log::warning("[Face Engine] Pencocokan Wajah TIDAK COCOK: Kemiripan {$simPercent}% (Skor: {$similarity}, Min Threshold: {$thresholdPercent}%)");
+                }
 
                 return [
                     'success' => (bool) ($data['success'] ?? false),
                     'is_match' => $isMatch,
                     'similarity' => $similarity,
+                    'similarity_percent' => $simPercent,
                     'message' => $data['message'] ?? null,
                 ];
             }

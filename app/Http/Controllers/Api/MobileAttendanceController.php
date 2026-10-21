@@ -790,9 +790,9 @@ class MobileAttendanceController extends Controller
 
             $faceSimilarity = $compareResult['similarity'];
             $isFaceMatched = (bool) $compareResult['is_match'];
+            $simPercent = (float) ($compareResult['similarity_percent'] ?? round($faceSimilarity * 100, 1));
 
             if (!$isFaceMatched) {
-                $simPercent = round($faceSimilarity * 100);
                 ApiLog::create([
                     'school_id' => $schoolId,
                     'api_key' => 'MOBILE_APP',
@@ -926,13 +926,14 @@ class MobileAttendanceController extends Controller
                 // Ignore FCM failure
             }
 
+            $faceNote = (isset($faceSimilarity) && $faceSimilarity !== null) ? " [Wajah Cocok: {$simPercent}%]" : "";
             ApiLog::create([
                 'school_id' => $schoolId,
                 'api_key' => 'MOBILE_APP',
                 'action' => 'mobile_checkin',
                 'uid' => $teacher->nip ?? ($user->username ?? $user->email),
                 'success' => true,
-                'message' => "Absen Masuk: {$user->full_name} ({$shift->nama_shift} - {$status})",
+                'message' => "Absen Masuk: {$user->full_name} ({$shift->nama_shift} - {$status}){$faceNote}",
                 'ip_address' => $request->ip(),
                 'user_agent' => $request->userAgent() ?? 'Android Mobile App',
                 'created_at' => now(),
@@ -1063,13 +1064,14 @@ class MobileAttendanceController extends Controller
                     // Ignore FCM failure
                 }
 
+                $faceNoteSiswa = (isset($faceSimilarity) && $faceSimilarity !== null) ? " [Wajah Cocok: {$simPercent}%]" : "";
                 ApiLog::create([
                     'school_id' => $schoolId,
                     'api_key' => 'MOBILE_APP',
                     'action' => 'mobile_checkin_student',
                     'uid' => $student->nis,
                     'success' => true,
-                    'message' => "Absen Masuk Siswa: {$student->nama} ({$status} - {$keterangan})",
+                    'message' => "Absen Masuk Siswa: {$student->nama} ({$status} - {$keterangan}){$faceNoteSiswa}",
                     'ip_address' => $request->ip(),
                     'user_agent' => $request->userAgent() ?? 'Android Mobile App',
                     'created_at' => now(),

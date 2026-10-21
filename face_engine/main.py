@@ -1,11 +1,19 @@
 import os
 import json
+import logging
 import numpy as np
 import cv2
 from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 import insightface
 from insightface.app import FaceAnalysis
+
+# Inisialisasi format logging standar untuk systemd & console
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] [FACE-ENGINE] %(message)s"
+)
+logger = logging.getLogger("face_engine")
 
 app = FastAPI(
     title="Jagat Absen Face Recognition Engine",
@@ -230,19 +238,23 @@ async def compare_face(
         img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
         if img is None:
+            logger.warning("[COMPARE] Gagal: Format gambar selfie tidak valid atau rusak (Kemiripan: 0.00%)")
             return {
                 "success": False,
                 "message": "Format gambar selfie tidak valid atau rusak",
                 "similarity": 0.0,
+                "similarity_percent": 0.0,
                 "is_match": False
             }
 
         faces = face_app.get(img)
         if len(faces) == 0:
+            logger.warning("[COMPARE] Gagal: Wajah tidak terdeteksi saat absen (Kemiripan: 0.00%)")
             return {
                 "success": False,
                 "message": "Wajah tidak terdeteksi saat absen. Pastikan wajah terlihat jelas di layar.",
                 "similarity": 0.0,
+                "similarity_percent": 0.0,
                 "is_match": False
             }
 
@@ -257,22 +269,26 @@ async def compare_face(
         # 1. Validasi Ketajaman Foto (Blur Detection)
         blur_score, is_clear = check_face_blur(img, target_face.bbox)
         if not is_clear:
+            logger.warning(f"[COMPARE] Gagal: Foto selfie absen terlalu buram (Skor blur: {blur_score} < {MIN_BLUR_SCORE}) (Kemiripan: 0.00%)")
             return {
                 "success": False,
                 "message": f"Foto selfie absen terlalu buram. Harap tahan kamera lebih tenang dan coba lagi.",
                 "blur_score": blur_score,
                 "similarity": 0.0,
+                "similarity_percent": 0.0,
                 "is_match": False
             }
 
         # 2. Validasi Orientasi Wajah (Pose Filtering)
         is_pose_valid, pose_error, pose_info = check_face_pose(target_face)
         if not is_pose_valid:
+            logger.warning(f"[COMPARE] Gagal: {pose_error} (Kemiripan: 0.00%)")
             return {
                 "success": False,
                 "message": pose_error,
                 "pose": pose_info,
                 "similarity": 0.0,
+                "similarity_percent": 0.0,
                 "is_match": False
             }
 
@@ -288,19 +304,35 @@ async def compare_face(
 
         # Threshold sinkronisasi 0.68
         is_match = bool(similarity >= THRESHOLD)
+        sim_percent = round(similarity * 100, 2)
+        threshold_percent = round(THRESHOLD * 100, 1)
+
+        # LOG LIVE PENCOCOKAN WAJAH DENGAN PRESENTASE KEMIRIPAN
+        if is_match:
+            logger.info(
+                f"[COMPARE] [COCOK / MATCH] Kemiripan: {sim_percent}% (Skor: {similarity:.4f} | Min Threshold: {threshold_percent}%) | Blur Score: {blur_score}"
+            )
+        else:
+            logger.warning(
+                f"[COMPARE] [TIDAK COCOK / MISMATCH] Kemiripan: {sim_percent}% (Skor: {similarity:.4f} | Min Threshold: {threshold_percent}%) | Blur Score: {blur_score}"
+            )
 
         return {
             "success": True,
             "similarity": round(float(similarity), 4),
+            "similarity_percent": sim_percent,
             "is_match": is_match,
             "threshold": THRESHOLD,
+            "threshold_percent": threshold_percent,
             "blur_score": blur_score,
             "pose": pose_info
         }
     except Exception as e:
+        logger.error(f"[COMPARE] Terjadi exception saat komparasi: {str(e)}")
         return {
             "success": False,
             "message": f"Gagal membandingkan wajah: {str(e)}",
             "similarity": 0.0,
+            "similarity_percent": 0.0,
             "is_match": False
         }

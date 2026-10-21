@@ -2,6 +2,48 @@
 
 @section('title', 'Galeri Dokumentasi KBM - ' . $guru->nama)
 
+@push('styles')
+<style>
+.media-modal-backdrop {
+    background-color: rgba(8, 12, 22, 0.94) !important;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+}
+.media-modal-header {
+    background-color: rgba(15, 23, 42, 0.92) !important;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12) !important;
+    box-shadow: 0 4px 24px -2px rgba(0, 0, 0, 0.5);
+}
+.media-modal-btn-download {
+    background: linear-gradient(135deg, #4f6bed 0%, #3d57d6 100%) !important;
+    color: #ffffff !important;
+    border: 1px solid rgba(255, 255, 255, 0.25) !important;
+    box-shadow: 0 4px 12px rgba(79, 107, 237, 0.35);
+}
+.media-modal-btn-download:hover {
+    background: linear-gradient(135deg, #4361ee 0%, #2b47cf 100%) !important;
+    box-shadow: 0 6px 18px rgba(79, 107, 237, 0.55);
+    color: #ffffff !important;
+}
+.media-modal-btn-close {
+    background-color: rgba(255, 255, 255, 0.14) !important;
+    color: #ffffff !important;
+    border: 1px solid rgba(255, 255, 255, 0.25) !important;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+.media-modal-btn-close:hover {
+    background-color: rgba(239, 68, 68, 0.9) !important;
+    border-color: rgba(239, 68, 68, 1) !important;
+    color: #ffffff !important;
+    box-shadow: 0 4px 14px rgba(239, 68, 68, 0.45);
+}
+</style>
+@endpush
+
 @section('content')
 <div class="relative w-full min-h-[550px]">
 @if(isset($isDokKbmEnabled) && !$isDokKbmEnabled)
@@ -371,7 +413,7 @@
 
     <!-- ========================= MODAL LIGHTBOX FOTO ========================= -->
     <div x-show="photoModalOpen" style="display: none;"
-         class="fixed inset-0 z-99999 flex items-center justify-center bg-black/90 p-4"
+         class="fixed inset-0 z-99999 flex items-center justify-center media-modal-backdrop p-4"
          x-transition:enter="transition ease-out duration-200"
          x-transition:enter-start="opacity-0"
          x-transition:enter-end="opacity-100"
@@ -382,19 +424,24 @@
         <div class="relative max-w-4xl w-full flex flex-col items-center"
              @click.away="photoModalOpen = false">
             <!-- Modal Header Bar -->
-            <div class="w-full flex items-center justify-between text-white mb-2.5 px-2">
+            <div class="w-full flex items-center justify-between text-white mb-3 px-1">
                 <div class="flex items-center gap-2 truncate mr-3">
-                    <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-600 text-white shrink-0">FOTO</span>
-                    <span class="truncate font-medium text-xs sm:text-sm text-gray-200" x-text="activeMediaName"></span>
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] sm:text-[11px] font-black uppercase tracking-wider bg-blue-600 text-white shrink-0 shadow-sm border border-blue-400/30">
+                        <i class="fas fa-camera text-[10px]"></i>
+                        <span>FOTO</span>
+                    </span>
+                    <span class="truncate font-semibold text-xs sm:text-sm text-gray-100" x-text="activeMediaName"></span>
                 </div>
                 <div class="flex items-center gap-2 shrink-0">
-                    <a :href="activeMediaUrl" target="_blank" download class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold transition shadow">
-                        <i class="fas fa-download text-[11px]"></i>
-                        <span>Unduh Foto</span>
+                    <a :href="activeMediaUrl" target="_blank" download
+                       class="media-modal-btn-download inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-white text-xs sm:text-sm font-semibold transition cursor-pointer active:scale-95 shadow-md">
+                        <i class="fas fa-download text-xs"></i>
+                        <span>Unduh <span class="hidden sm:inline">Foto</span></span>
                     </a>
-                    <button type="button" @click="photoModalOpen = false" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 text-white text-xs font-semibold transition cursor-pointer">
-                        <i class="fas fa-times text-[11px]"></i>
-                        <span>Tutup (ESC)</span>
+                    <button type="button" @click="photoModalOpen = false"
+                            class="media-modal-btn-close inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-white text-xs sm:text-sm font-semibold transition cursor-pointer active:scale-95 shadow-md">
+                        <i class="fas fa-times text-xs"></i>
+                        <span>Tutup <span class="hidden md:inline text-white/70 text-[11px] font-normal">(ESC)</span></span>
                     </button>
                 </div>
             </div>
@@ -407,7 +454,7 @@
 
     <!-- ========================= MODAL VIDEO STREAMING PLAYER ========================= -->
     <div x-show="videoModalOpen" style="display: none;"
-         class="fixed inset-0 z-99999 flex items-center justify-center bg-black/90 p-4"
+         class="fixed inset-0 z-99999 flex items-center justify-center media-modal-backdrop p-4"
          x-transition:enter="transition ease-out duration-200"
          x-transition:enter-start="opacity-0"
          x-transition:enter-end="opacity-100"
@@ -418,19 +465,24 @@
         <div class="relative max-w-4xl w-full flex flex-col items-center"
              @click.away="closeVideoModal()">
             <!-- Modal Header Bar -->
-            <div class="w-full flex items-center justify-between text-white mb-2.5 px-2">
+            <div class="w-full flex items-center justify-between text-white mb-3 px-1">
                 <div class="flex items-center gap-2 truncate mr-3">
-                    <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500 text-white shrink-0">VIDEO</span>
-                    <span class="truncate font-medium text-xs sm:text-sm text-gray-200" x-text="activeMediaName"></span>
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] sm:text-[11px] font-black uppercase tracking-wider bg-amber-500 text-white shrink-0 shadow-sm border border-amber-300/30">
+                        <i class="fas fa-video text-[10px]"></i>
+                        <span>VIDEO</span>
+                    </span>
+                    <span class="truncate font-semibold text-xs sm:text-sm text-gray-100" x-text="activeMediaName"></span>
                 </div>
                 <div class="flex items-center gap-2 shrink-0">
-                    <a :href="activeMediaUrl" target="_blank" download class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold transition shadow">
-                        <i class="fas fa-download text-[11px]"></i>
-                        <span>Unduh Video</span>
+                    <a :href="activeMediaUrl" target="_blank" download
+                       class="media-modal-btn-download inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-white text-xs sm:text-sm font-semibold transition cursor-pointer active:scale-95 shadow-md">
+                        <i class="fas fa-download text-xs"></i>
+                        <span>Unduh <span class="hidden sm:inline">Video</span></span>
                     </a>
-                    <button type="button" @click="closeVideoModal()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 text-white text-xs font-semibold transition cursor-pointer">
-                        <i class="fas fa-times text-[11px]"></i>
-                        <span>Tutup (ESC)</span>
+                    <button type="button" @click="closeVideoModal()"
+                            class="media-modal-btn-close inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-white text-xs sm:text-sm font-semibold transition cursor-pointer active:scale-95 shadow-md">
+                        <i class="fas fa-times text-xs"></i>
+                        <span>Tutup <span class="hidden md:inline text-white/70 text-[11px] font-normal">(ESC)</span></span>
                     </button>
                 </div>
             </div>

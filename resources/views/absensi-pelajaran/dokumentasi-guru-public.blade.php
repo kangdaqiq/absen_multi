@@ -67,6 +67,51 @@
             background: rgba(156, 163, 175, 0.4);
             border-radius: 9999px;
         }
+
+        /* ========================= MEDIA LIGHTBOX & MODAL ========================= */
+        .media-modal-backdrop {
+            background-color: rgba(8, 12, 22, 0.94) !important;
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+        }
+        .media-modal-header {
+            background-color: rgba(15, 23, 42, 0.92) !important;
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.12) !important;
+            box-shadow: 0 4px 24px -2px rgba(0, 0, 0, 0.5);
+        }
+        .media-modal-btn-download {
+            background: linear-gradient(135deg, #4f6bed 0%, #3d57d6 100%) !important;
+            color: #ffffff !important;
+            border: 1px solid rgba(255, 255, 255, 0.25) !important;
+            box-shadow: 0 4px 12px rgba(79, 107, 237, 0.35);
+        }
+        .media-modal-btn-download:hover {
+            background: linear-gradient(135deg, #4361ee 0%, #2b47cf 100%) !important;
+            box-shadow: 0 6px 18px rgba(79, 107, 237, 0.55);
+            color: #ffffff !important;
+        }
+        .media-modal-btn-close {
+            background-color: rgba(255, 255, 255, 0.14) !important;
+            color: #ffffff !important;
+            border: 1px solid rgba(255, 255, 255, 0.25) !important;
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+        }
+        .media-modal-btn-close:hover {
+            background-color: rgba(239, 68, 68, 0.9) !important;
+            border-color: rgba(239, 68, 68, 1) !important;
+            color: #ffffff !important;
+            box-shadow: 0 4px 14px rgba(239, 68, 68, 0.45);
+        }
+        .toast-popup {
+            background-color: rgba(15, 23, 42, 0.95) !important;
+            border: 1px solid rgba(255, 255, 255, 0.15) !important;
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+        }
     </style>
 </head>
 <body x-data="publicDokumentasiApp()" class="min-h-full bg-slate-50 text-slate-800 antialiased dark:bg-gray-950 dark:text-gray-100 flex flex-col justify-between selection:bg-brand-500 selection:text-white">
@@ -79,7 +124,7 @@
          x-transition:leave="transition ease-in duration-200"
          x-transition:leave-start="opacity-100 translate-y-0"
          x-transition:leave-end="opacity-0 -translate-y-4"
-         class="fixed top-5 right-5 z-99999 flex items-center gap-3 px-4 py-3 rounded-2xl bg-gray-900/95 text-white shadow-2xl border border-white/10 backdrop-blur-md">
+         class="toast-popup fixed top-5 right-5 z-99999 flex items-center gap-3 px-4 py-3 rounded-2xl text-white shadow-2xl">
         <div class="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-400">
             <i class="fas fa-check-circle text-base"></i>
         </div>
@@ -831,7 +876,7 @@
 
     <!-- ========================= MODAL LIGHTBOX FOTO ========================= -->
     <div x-show="photoModalOpen" x-cloak style="display: none;"
-         class="fixed inset-0 z-99999 flex flex-col bg-black/95 backdrop-blur-md"
+         class="fixed inset-0 z-99999 flex flex-col media-modal-backdrop"
          x-transition:enter="transition ease-out duration-200"
          x-transition:enter-start="opacity-0"
          x-transition:enter-end="opacity-100"
@@ -841,19 +886,24 @@
          @keydown.escape.window="photoModalOpen = false">
         
         <!-- Header Bar: Selalu fixed di atas, tidak bisa tertutup gambar -->
-        <div class="shrink-0 w-full z-20 flex items-center justify-between px-4 sm:px-6 py-3 bg-black/75 border-b border-white/10 text-white shadow-lg">
+        <div class="media-modal-header shrink-0 w-full z-20 flex items-center justify-between px-4 sm:px-6 py-3 text-white">
             <div class="flex items-center gap-2.5 truncate mr-4">
-                <span class="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider bg-blue-600 text-white shrink-0 shadow-sm">FOTO</span>
-                <span class="truncate font-semibold text-xs sm:text-sm text-gray-200" x-text="activeMediaName"></span>
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] sm:text-[11px] font-black uppercase tracking-wider bg-blue-600 text-white shrink-0 shadow-sm border border-blue-400/30">
+                    <i class="fas fa-camera text-[10px]"></i>
+                    <span>FOTO</span>
+                </span>
+                <span class="truncate font-semibold text-xs sm:text-sm text-gray-100" x-text="activeMediaName"></span>
             </div>
-            <div class="flex items-center gap-2 shrink-0">
-                <a :href="activeMediaUrl" target="_blank" download class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold transition shadow cursor-pointer active:scale-95">
+            <div class="flex items-center gap-2 sm:gap-2.5 shrink-0">
+                <a :href="activeMediaUrl" target="_blank" download
+                   class="media-modal-btn-download inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-white text-xs sm:text-sm font-semibold transition cursor-pointer active:scale-95 shadow-md">
                     <i class="fas fa-download text-xs"></i>
-                    <span class="hidden sm:inline">Unduh Foto</span>
+                    <span>Unduh <span class="hidden sm:inline">Foto</span></span>
                 </a>
-                <button type="button" @click="photoModalOpen = false" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white/15 hover:bg-white/25 text-white text-xs font-semibold transition shadow cursor-pointer active:scale-95">
+                <button type="button" @click="photoModalOpen = false"
+                        class="media-modal-btn-close inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-white text-xs sm:text-sm font-semibold transition cursor-pointer active:scale-95 shadow-md">
                     <i class="fas fa-times text-xs"></i>
-                    <span>Tutup (ESC)</span>
+                    <span>Tutup <span class="hidden md:inline text-white/70 text-[11px] font-normal">(ESC)</span></span>
                 </button>
             </div>
         </div>
@@ -870,7 +920,7 @@
 
     <!-- ========================= MODAL VIDEO STREAMING PLAYER ========================= -->
     <div x-show="videoModalOpen" x-cloak style="display: none;"
-         class="fixed inset-0 z-99999 flex flex-col bg-black/95 backdrop-blur-md"
+         class="fixed inset-0 z-99999 flex flex-col media-modal-backdrop"
          x-transition:enter="transition ease-out duration-200"
          x-transition:enter-start="opacity-0"
          x-transition:enter-end="opacity-100"
@@ -880,19 +930,24 @@
          @keydown.escape.window="closeVideoModal()">
         
         <!-- Header Bar: Selalu fixed di atas, tidak bisa tertutup video -->
-        <div class="shrink-0 w-full z-20 flex items-center justify-between px-4 sm:px-6 py-3 bg-black/75 border-b border-white/10 text-white shadow-lg">
+        <div class="media-modal-header shrink-0 w-full z-20 flex items-center justify-between px-4 sm:px-6 py-3 text-white">
             <div class="flex items-center gap-2.5 truncate mr-4">
-                <span class="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider bg-amber-500 text-white shrink-0 shadow-sm">VIDEO</span>
-                <span class="truncate font-semibold text-xs sm:text-sm text-gray-200" x-text="activeMediaName"></span>
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] sm:text-[11px] font-black uppercase tracking-wider bg-amber-500 text-white shrink-0 shadow-sm border border-amber-300/30">
+                    <i class="fas fa-video text-[10px]"></i>
+                    <span>VIDEO</span>
+                </span>
+                <span class="truncate font-semibold text-xs sm:text-sm text-gray-100" x-text="activeMediaName"></span>
             </div>
-            <div class="flex items-center gap-2 shrink-0">
-                <a :href="activeMediaUrl" target="_blank" download class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold transition shadow cursor-pointer active:scale-95">
+            <div class="flex items-center gap-2 sm:gap-2.5 shrink-0">
+                <a :href="activeMediaUrl" target="_blank" download
+                   class="media-modal-btn-download inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-white text-xs sm:text-sm font-semibold transition cursor-pointer active:scale-95 shadow-md">
                     <i class="fas fa-download text-xs"></i>
-                    <span class="hidden sm:inline">Unduh Video</span>
+                    <span>Unduh <span class="hidden sm:inline">Video</span></span>
                 </a>
-                <button type="button" @click="closeVideoModal()" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white/15 hover:bg-white/25 text-white text-xs font-semibold transition shadow cursor-pointer active:scale-95">
+                <button type="button" @click="closeVideoModal()"
+                        class="media-modal-btn-close inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-white text-xs sm:text-sm font-semibold transition cursor-pointer active:scale-95 shadow-md">
                     <i class="fas fa-times text-xs"></i>
-                    <span>Tutup (ESC)</span>
+                    <span>Tutup <span class="hidden md:inline text-white/70 text-[11px] font-normal">(ESC)</span></span>
                 </button>
             </div>
         </div>
@@ -911,7 +966,7 @@
 
     <!-- ========================= MODAL DETAIL JURNAL KBM ========================= -->
     <div x-show="journalModalOpen" x-cloak style="display: none;"
-         class="fixed inset-0 z-99999 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+         class="fixed inset-0 z-99999 flex items-center justify-center media-modal-backdrop p-4"
          x-transition:enter="transition ease-out duration-200"
          x-transition:enter-start="opacity-0"
          x-transition:enter-end="opacity-100"

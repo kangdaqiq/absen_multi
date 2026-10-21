@@ -21,8 +21,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Konfigurasi Model InsightFace
-MODEL_NAME = os.getenv("FACE_MODEL_NAME", "buffalo_s")
+# Konfigurasi Model InsightFace (Default: buffalo_l ResNet-50 untuk akurasi maksimal)
+MODEL_NAME = os.getenv("FACE_MODEL_NAME", "buffalo_l")
 DET_SIZE = int(os.getenv("FACE_DET_SIZE", "640"))
 CTX_ID = int(os.getenv("FACE_CTX_ID", "-1")) # -1 for CPU, 0 for CUDA GPU
 

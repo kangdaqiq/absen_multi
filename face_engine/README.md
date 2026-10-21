@@ -41,6 +41,8 @@ After=network.target
 [Service]
 User=www-data
 WorkingDirectory=/var/www/web/face_engine
+Environment="FACE_MODEL_NAME=buffalo_l"
+Environment="FACE_THRESHOLD=0.68"
 ExecStart=/var/www/web/face_engine/venv/bin/uvicorn main:app --host 127.0.0.1 --port 8000 --workers 1
 Restart=always
 RestartSec=3

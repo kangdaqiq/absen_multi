@@ -108,13 +108,25 @@ class FcmNotificationService
             Cache::put($dedupKey, true, now()->addSeconds(5));
 
             try {
-                // DATA-ONLY Payload (tanpa root key 'notification')
-                // Menjamin HP Samsung (OneUI), Xiaomi, Oppo, Vivo selalu memicu onMessageReceived/background handler
-                // dan menampilkan pop-up banner heads-up melayang di atas layar
+                // Payload mendukung Android Native & Web Browser / PWA
                 $payload = [
                     'message' => [
                         'token' => $token,
                         'data'  => $stringData,
+                        'notification' => [
+                            'title' => (string) $title,
+                            'body'  => (string) $message,
+                        ],
+                        'webpush' => [
+                            'notification' => [
+                                'title' => (string) $title,
+                                'body'  => (string) $message,
+                                'icon'  => '/logo-icon.svg',
+                            ],
+                            'fcm_options' => [
+                                'link' => url('/'),
+                            ]
+                        ],
                         'android' => [
                             'priority' => 'high',
                         ]

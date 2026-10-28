@@ -51,6 +51,9 @@ Schedule::command('absen:auto-delete-history')->dailyAt('01:00')->withoutOverlap
 // Auto-clean API logs older than 7 days per school (Runs at 01:30 AM)
 Schedule::command('absen:clean-api-logs --days=7')->dailyAt('01:30')->withoutOverlapping();
 
+// Auto-clean orphan storage files older than 24 hours (Runs daily at 03:00 AM)
+Schedule::command('storage:clean-orphans --hours=24 --force')->dailyAt('03:00')->withoutOverlapping();
+
 // Refresh license validation cache (Runs at 00:30 AM) — only in self_hosted mode
 Schedule::command('license:validate')->dailyAt('00:30')->withoutOverlapping();
 

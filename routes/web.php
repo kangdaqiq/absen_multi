@@ -99,6 +99,8 @@ Route::middleware(['auth', 'self_hosted_guard'])->prefix('super-admin')->name('s
         Route::post('/storage/sync-all', [App\Http\Controllers\SuperAdmin\StorageServerController::class, 'syncAll'])->name('storage.sync-all');
         Route::post('/storage/recalculate', [App\Http\Controllers\SuperAdmin\StorageServerController::class, 'recalculate'])->name('storage.recalculate');
         Route::get('/storage/test-connection', [App\Http\Controllers\SuperAdmin\StorageServerController::class, 'testConnection'])->name('storage.test-connection');
+        Route::get('/storage/scan-garbage', [App\Http\Controllers\SuperAdmin\StorageServerController::class, 'scanGarbage'])->name('storage.scan-garbage');
+        Route::post('/storage/purge-garbage', [App\Http\Controllers\SuperAdmin\StorageServerController::class, 'purgeGarbage'])->name('storage.purge-garbage');
 
         // School Admins Management (nested resource)
         Route::resource('schools.admins', App\Http\Controllers\SuperAdmin\SchoolAdminController::class);

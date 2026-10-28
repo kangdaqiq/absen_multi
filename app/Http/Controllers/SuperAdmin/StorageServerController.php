@@ -7,16 +7,19 @@ use App\Models\School;
 use App\Models\License;
 use App\Models\StorageFile;
 use App\Services\R2StorageService;
+use App\Services\StorageCleanerService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 
 class StorageServerController extends Controller
 {
     protected R2StorageService $r2Service;
+    protected StorageCleanerService $cleanerService;
 
-    public function __construct(R2StorageService $r2Service)
+    public function __construct(R2StorageService $r2Service, StorageCleanerService $cleanerService)
     {
         $this->r2Service = $r2Service;
+        $this->cleanerService = $cleanerService;
     }
 
     /**
@@ -214,5 +217,56 @@ class StorageServerController extends Controller
             'success' => false,
             'message' => 'Tidak dapat terhubung ke Cloudflare R2. Periksa kredensial di .env.',
         ], 502);
+    }
+
+    /**
+     * Pindai dan analisis file sampah di storage (Dry Run)
+     */
+    public function scanGarbage(Request $request): JsonResponse
+    {
+        $schoolId = $request->filled('school_id') ? (int) $request->input('school_id') : null;
+        $hours    = $request->filled('hours') ? (int) $request->input('hours') : 24;
+        $category = $request->input('category', 'kbm');
+
+        $result = $this->cleanerService->scanOrphanFiles([
+            'school_id' => $schoolId,
+            'hours'     => $hours,
+            'category'  => $category,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'data'    => $result,
+        ]);
+    }
+
+    /**
+     * Eksekusi pembersihan file sampah di Cloudflare R2
+     */
+    public function purgeGarbage(Request $request): JsonResponse
+    {
+        $schoolId = $request->filled('school_id') ? (int) $request->input('school_id') : null;
+        $hours    = $request->filled('hours') ? (int) $request->input('hours') : 24;
+        $category = $request->input('category', 'kbm');
+        $fileIds  = $request->input('file_ids');
+
+        $result = $this->cleanerService->purgeOrphanFiles([
+            'school_id' => $schoolId,
+            'hours'     => $hours,
+            'category'  => $category,
+            'file_ids'  => is_array($fileIds) ? $fileIds : null,
+        ]);
+
+        // Hitung ulang total files & bytes global setelah pembersihan
+        $totalFiles = StorageFile::count();
+        $totalBytes = (int) StorageFile::sum('size_bytes');
+
+        $result['global_stats'] = [
+            'total_files' => $totalFiles,
+            'total_bytes' => $totalBytes,
+            'total_human' => R2StorageService::formatBytes($totalBytes),
+        ];
+
+        return response()->json($result);
     }
 }

@@ -117,6 +117,10 @@
             class="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3.5 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 transition">
             <i class="fas fa-sync-alt text-warning-500"></i> Hitung Ulang Kapasitas
         </button>
+        <button type="button" id="btnOpenCleaner"
+            class="inline-flex items-center gap-2 rounded-xl bg-error-500 hover:bg-error-600 px-3.5 py-2 text-xs font-semibold text-white shadow-sm hover:shadow transition">
+            <i class="fas fa-broom"></i> Bersihkan File Sampah
+        </button>
         <button type="button" id="btnSyncAll"
             class="inline-flex items-center gap-2 rounded-xl bg-brand-500 px-4 py-2 text-xs font-semibold text-white shadow hover:bg-brand-600 transition">
             <i class="fas fa-user-plus"></i> Auto-Sync Semua Client
@@ -264,6 +268,13 @@
                                     data-url="{{ route('super-admin.storage.sync-school', $school) }}"
                                     title="Sinkronkan ke Storage Server">
                                     <i class="fas fa-sync text-xs"></i>
+                                </button>
+                                <button type="button"
+                                    class="btn-clean-school inline-flex items-center justify-center rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 w-8 h-8 text-gray-500 hover:text-error-500 hover:border-error-300 transition"
+                                    data-school-id="{{ $school->id }}"
+                                    data-school-name="{{ $school->name }}"
+                                    title="Pindai & Bersihkan Sampah Sekolah Ini">
+                                    <i class="fas fa-broom text-xs"></i>
                                 </button>
                             </div>
                         </td>
@@ -486,6 +497,147 @@
                 </button>
             </div>
         </form>
+    </div>
+</div>
+
+{{-- ── Modal Pembersihan File Sampah (Storage Cleaner) ── --}}
+<div id="modalCleaner" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div class="relative w-full max-w-4xl rounded-2xl border border-gray-200 bg-white p-6 shadow-2xl dark:border-gray-800 dark:bg-gray-dark flex flex-col max-h-[90vh]" @click.stop>
+        {{-- Header --}}
+        <div class="flex items-center justify-between border-b border-gray-100 pb-4 dark:border-gray-800 shrink-0">
+            <div class="flex items-center gap-3">
+                <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-error-50 text-error-500 dark:bg-error-500/15">
+                    <i class="fas fa-broom fa-lg"></i>
+                </div>
+                <div>
+                    <h5 class="text-base font-bold text-gray-800 dark:text-white">Pembersihan File Sampah Storage</h5>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">Pindai dan bersihkan berkas yang di-upload tapi dibatalkan atau tidak disimpan ke jurnal</p>
+                </div>
+            </div>
+            <button type="button" id="btnCloseCleanerModal"
+                class="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-200 transition">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        {{-- Filter & Actions Toolbar --}}
+        <div class="mt-4 p-4 rounded-xl bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-800 shrink-0">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Filter Sekolah</label>
+                    <select id="cleanerSchoolFilter" class="w-full rounded-xl border border-gray-200 bg-white py-2 px-3 text-xs outline-none focus:border-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white transition">
+                        <option value="">Semua Sekolah (Global)</option>
+                        @foreach($schools as $sch)
+                            <option value="{{ $sch->id }}">{{ $sch->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Batas Umur Upload</label>
+                    <select id="cleanerHoursFilter" class="w-full rounded-xl border border-gray-200 bg-white py-2 px-3 text-xs outline-none focus:border-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white transition">
+                        <option value="24" selected>> 24 Jam Lalu (Sangat Aman & Rekomendasi)</option>
+                        <option value="12">> 12 Jam Lalu</option>
+                        <option value="2">> 2 Jam Lalu</option>
+                        <option value="1">> 1 Jam Lalu</option>
+                        <option value="0">Semua Umur Berkas</option>
+                    </select>
+                </div>
+                <div class="flex gap-2">
+                    <button type="button" id="btnRunScan"
+                        class="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-brand-500 hover:bg-brand-600 py-2 px-4 text-xs font-semibold text-white shadow transition">
+                        <i class="fas fa-search"></i> Pindai Sampah
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        {{-- Metrics Summary Bar (Hidden initially) --}}
+        <div id="cleanerSummaryBar" class="mt-4 grid grid-cols-3 gap-3 shrink-0 hidden">
+            <div class="p-3 rounded-xl bg-error-50/50 dark:bg-error-500/10 border border-error-100 dark:border-error-800/30">
+                <span class="text-[11px] font-medium text-gray-500 dark:text-gray-400">Total Berkas Sampah</span>
+                <p class="text-lg font-bold text-error-600 dark:text-error-400" id="summaryTotalFiles">0 Berkas</p>
+            </div>
+            <div class="p-3 rounded-xl bg-warning-50/50 dark:bg-warning-500/10 border border-warning-100 dark:border-warning-800/30">
+                <span class="text-[11px] font-medium text-gray-500 dark:text-gray-400">Ruang Dapat Dihemat</span>
+                <p class="text-lg font-bold text-warning-600 dark:text-warning-400" id="summaryTotalBytes">0 B</p>
+            </div>
+            <div class="p-3 rounded-xl bg-info-50/50 dark:bg-info-500/10 border border-info-100 dark:border-info-800/30">
+                <span class="text-[11px] font-medium text-gray-500 dark:text-gray-400">Status Penyimpanan</span>
+                <p class="text-xs font-semibold text-info-600 dark:text-info-400 mt-1" id="summaryStatusText">Siap dibersihkan</p>
+            </div>
+        </div>
+
+        {{-- Content Area / Table Container --}}
+        <div class="mt-4 flex-1 overflow-y-auto custom-scrollbar border border-gray-100 dark:border-gray-800 rounded-xl" id="cleanerContentArea">
+            {{-- Default / Initial State --}}
+            <div id="cleanerInitialState" class="p-12 text-center">
+                <div class="flex flex-col items-center gap-2">
+                    <div class="h-12 w-12 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-400 text-xl">
+                        <i class="fas fa-search"></i>
+                    </div>
+                    <h6 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Siap Melakukan Pemindaian</h6>
+                    <p class="text-xs text-gray-400 max-w-sm">Klik tombol <b>Pindai Sampah</b> di atas untuk mendeteksi berkas dokumentasi yang ditinggalkan tanpa disimpan di jurnal.</p>
+                </div>
+            </div>
+
+            {{-- Loading State --}}
+            <div id="cleanerLoadingState" class="p-12 text-center hidden">
+                <div class="flex flex-col items-center gap-3">
+                    <i class="fas fa-spinner fa-spin text-3xl text-brand-500"></i>
+                    <h6 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Sedang Memindai Storage Cloudflare R2...</h6>
+                    <p class="text-xs text-gray-400">Memeriksa referensi pada database jurnal pelajaran</p>
+                </div>
+            </div>
+
+            {{-- Empty State (No Trash Found) --}}
+            <div id="cleanerEmptyState" class="p-12 text-center hidden">
+                <div class="flex flex-col items-center gap-2">
+                    <div class="h-12 w-12 rounded-2xl bg-success-50 dark:bg-success-500/15 flex items-center justify-center text-success-500 text-xl">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <h6 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Storage Bersih!</h6>
+                    <p class="text-xs text-gray-400">Tidak ada berkas sampah yang terdeteksi dengan batas umur yang dipilih.</p>
+                </div>
+            </div>
+
+            {{-- Table Results --}}
+            <table class="w-full table-auto text-left hidden" id="tableCleanerResults">
+                <thead class="sticky top-0 bg-gray-50/95 dark:bg-gray-800/95 backdrop-blur border-b border-gray-100 dark:border-gray-800 text-[11px] font-semibold uppercase text-gray-500 dark:text-gray-400">
+                    <tr>
+                        <th class="py-2.5 px-3 w-8">
+                            <input type="checkbox" id="checkAllCleaner" class="rounded border-gray-300 text-brand-500 focus:ring-brand-500" />
+                        </th>
+                        <th class="py-2.5 px-3">Berkas</th>
+                        <th class="py-2.5 px-3">Sekolah</th>
+                        <th class="py-2.5 px-3">Ukuran</th>
+                        <th class="py-2.5 px-3">Waktu Upload</th>
+                        <th class="py-2.5 px-3">Alasan Sampah</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 text-xs dark:divide-gray-800" id="cleanerTableBody">
+                    {{-- Dynamically populated --}}
+                </tbody>
+            </table>
+        </div>
+
+        {{-- Footer Actions --}}
+        <div class="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 pt-4 dark:border-gray-800 shrink-0">
+            <span class="text-xs text-gray-400" id="cleanerSelectedLabel">0 berkas dipilih</span>
+            <div class="flex items-center gap-2">
+                <button type="button" id="btnCancelCleaner"
+                    class="rounded-xl border border-gray-200 bg-white px-4 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 transition">
+                    Tutup
+                </button>
+                <button type="button" id="btnPurgeSelected" disabled
+                    class="inline-flex items-center gap-2 rounded-xl bg-error-500 hover:bg-error-600 disabled:opacity-40 disabled:cursor-not-allowed px-4 py-2 text-xs font-semibold text-white shadow transition">
+                    <i class="fas fa-trash-alt"></i> Bersihkan Berkas Terpilih
+                </button>
+                <button type="button" id="btnPurgeAll" disabled
+                    class="inline-flex items-center gap-2 rounded-xl bg-error-600 hover:bg-error-700 disabled:opacity-40 disabled:cursor-not-allowed px-5 py-2 text-xs font-semibold text-white shadow hover:shadow-md transition">
+                    <i class="fas fa-fire"></i> Bersihkan Semua Sampah
+                </button>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -721,6 +873,257 @@ document.addEventListener('DOMContentLoaded', function () {
                 this.disabled = false;
             }
         });
+    });
+
+    // =========================================================================
+    // ── MODAL CLEANER (PEMBERSIHAN FILE SAMPAH STORAGE) ──────────────────────
+    // =========================================================================
+    const modalCleaner         = document.getElementById('modalCleaner');
+    const btnOpenCleaner       = document.getElementById('btnOpenCleaner');
+    const btnCloseCleanerModal = document.getElementById('btnCloseCleanerModal');
+    const btnCancelCleaner     = document.getElementById('btnCancelCleaner');
+    const btnRunScan           = document.getElementById('btnRunScan');
+    const btnPurgeSelected     = document.getElementById('btnPurgeSelected');
+    const btnPurgeAll          = document.getElementById('btnPurgeAll');
+
+    const cleanerSchoolFilter  = document.getElementById('cleanerSchoolFilter');
+    const cleanerHoursFilter   = document.getElementById('cleanerHoursFilter');
+
+    const cleanerSummaryBar    = document.getElementById('cleanerSummaryBar');
+    const summaryTotalFiles    = document.getElementById('summaryTotalFiles');
+    const summaryTotalBytes    = document.getElementById('summaryTotalBytes');
+
+    const cleanerInitialState  = document.getElementById('cleanerInitialState');
+    const cleanerLoadingState  = document.getElementById('cleanerLoadingState');
+    const cleanerEmptyState    = document.getElementById('cleanerEmptyState');
+    const tableCleanerResults  = document.getElementById('tableCleanerResults');
+    const cleanerTableBody     = document.getElementById('cleanerTableBody');
+
+    const checkAllCleaner      = document.getElementById('checkAllCleaner');
+    const cleanerSelectedLabel = document.getElementById('cleanerSelectedLabel');
+
+    let currentScanFiles = [];
+
+    function openCleanerModal(schoolId = null) {
+        if (schoolId) {
+            cleanerSchoolFilter.value = schoolId;
+        }
+        modalCleaner.classList.remove('hidden');
+        modalCleaner.classList.add('flex');
+        document.body.style.overflow = 'hidden';
+
+        if (schoolId) {
+            runCleanerScan();
+        }
+    }
+
+    function closeCleanerModal() {
+        modalCleaner.classList.add('hidden');
+        modalCleaner.classList.remove('flex');
+        document.body.style.overflow = '';
+    }
+
+    btnOpenCleaner?.addEventListener('click', () => openCleanerModal());
+    btnCloseCleanerModal?.addEventListener('click', closeCleanerModal);
+    btnCancelCleaner?.addEventListener('click', closeCleanerModal);
+    modalCleaner?.addEventListener('click', (e) => {
+        if (e.target === modalCleaner) closeCleanerModal();
+    });
+
+    // Buka cleaner langsung khusus sekolah tertentu dari tabel
+    document.querySelectorAll('.btn-clean-school').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const schId = this.dataset.schoolId;
+            openCleanerModal(schId);
+        });
+    });
+
+    // ── Jalankan Scan ──
+    async function runCleanerScan() {
+        const schId = cleanerSchoolFilter.value;
+        const hours = cleanerHoursFilter.value;
+
+        // Reset UI states
+        cleanerInitialState.classList.add('hidden');
+        cleanerEmptyState.classList.add('hidden');
+        tableCleanerResults.classList.add('hidden');
+        cleanerLoadingState.classList.remove('hidden');
+        cleanerSummaryBar.classList.add('hidden');
+        btnPurgeSelected.disabled = true;
+        btnPurgeAll.disabled = true;
+        checkAllCleaner.checked = false;
+        cleanerSelectedLabel.innerText = '0 berkas dipilih';
+        cleanerTableBody.innerHTML = '';
+        currentScanFiles = [];
+
+        btnRunScan.disabled = true;
+        btnRunScan.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Memindai...';
+
+        try {
+            const url = `{{ route('super-admin.storage.scan-garbage') }}?school_id=${encodeURIComponent(schId)}&hours=${encodeURIComponent(hours)}&category=kbm`;
+            const res = await fetch(url, {
+                headers: { 'Accept': 'application/json' }
+            });
+            const json = await res.json();
+
+            cleanerLoadingState.classList.add('hidden');
+            btnRunScan.disabled = false;
+            btnRunScan.innerHTML = '<i class="fas fa-search"></i> Pindai Sampah';
+
+            if (!json.success || !json.data) {
+                showToast(json.message || 'Gagal memindai storage.', 'error');
+                cleanerInitialState.classList.remove('hidden');
+                return;
+            }
+
+            const data = json.data;
+            currentScanFiles = data.files || [];
+
+            // Update Metrics Bar
+            summaryTotalFiles.innerText = `${data.total_files} Berkas`;
+            summaryTotalBytes.innerText = data.total_human;
+            cleanerSummaryBar.classList.remove('hidden');
+
+            if (data.total_files === 0) {
+                cleanerEmptyState.classList.remove('hidden');
+                return;
+            }
+
+            // Render Table Rows
+            tableCleanerResults.classList.remove('hidden');
+            btnPurgeAll.disabled = false;
+
+            cleanerTableBody.innerHTML = currentScanFiles.map(f => `
+                <tr class="hover:bg-gray-50/75 dark:hover:bg-gray-800/40 transition">
+                    <td class="py-2.5 px-3 align-middle">
+                        <input type="checkbox" class="cleaner-file-checkbox rounded border-gray-300 text-brand-500 focus:ring-brand-500" value="${f.id}" />
+                    </td>
+                    <td class="py-2.5 px-3 align-middle max-w-[200px]">
+                        <div class="flex items-center gap-2">
+                            <i class="fas fa-file-image text-brand-400 shrink-0 text-sm"></i>
+                            <div class="min-w-0">
+                                <p class="font-semibold text-gray-800 dark:text-gray-200 truncate" title="${f.original_name}">${f.original_name}</p>
+                                <a href="${f.url}" target="_blank" rel="noopener" class="text-[10px] text-brand-500 hover:underline truncate block max-w-[160px] font-mono">${f.path}</a>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="py-2.5 px-3 align-middle text-gray-600 dark:text-gray-400">
+                        ${f.school_name}
+                    </td>
+                    <td class="py-2.5 px-3 align-middle font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                        ${f.size_human}
+                    </td>
+                    <td class="py-2.5 px-3 align-middle whitespace-nowrap text-gray-500 dark:text-gray-400">
+                        ${f.created_at || '-'}<br>
+                        <span class="text-[10px] text-gray-400">(${f.age_human})</span>
+                    </td>
+                    <td class="py-2.5 px-3 align-middle">
+                        <span class="inline-flex items-center gap-1 rounded-full bg-error-50 px-2 py-0.5 text-[10px] font-medium text-error-700 dark:bg-error-500/10 dark:text-error-400">
+                            <i class="fas fa-exclamation-circle text-[9px]"></i> Tidak disimpan ke jurnal
+                        </span>
+                    </td>
+                </tr>
+            `).join('');
+
+            attachCheckboxHandlers();
+
+        } catch (err) {
+            cleanerLoadingState.classList.add('hidden');
+            cleanerInitialState.classList.remove('hidden');
+            btnRunScan.disabled = false;
+            btnRunScan.innerHTML = '<i class="fas fa-search"></i> Pindai Sampah';
+            showToast('Error saat memindai: ' + err.message, 'error');
+        }
+    }
+
+    btnRunScan?.addEventListener('click', runCleanerScan);
+
+    // ── Checkbox Management ──
+    function attachCheckboxHandlers() {
+        const checkboxes = document.querySelectorAll('.cleaner-file-checkbox');
+
+        checkAllCleaner.checked = false;
+        checkAllCleaner.onchange = function() {
+            checkboxes.forEach(cb => cb.checked = this.checked);
+            updateSelectedCount();
+        };
+
+        checkboxes.forEach(cb => {
+            cb.onchange = function() {
+                updateSelectedCount();
+            };
+        });
+    }
+
+    function updateSelectedCount() {
+        const selected = document.querySelectorAll('.cleaner-file-checkbox:checked');
+        const count = selected.length;
+        cleanerSelectedLabel.innerText = `${count} berkas dipilih`;
+        btnPurgeSelected.disabled = (count === 0);
+    }
+
+    // ── Eksekusi Pembersihan (Purge) ──
+    async function executePurge(fileIds = null) {
+        const isAll = (fileIds === null);
+        const countText = isAll ? currentScanFiles.length : fileIds.length;
+        const confirmMsg = isAll
+            ? `Apakah Anda yakin ingin MENGHAPUS PERMANEN seluruh ${countText} berkas sampah dari Cloudflare R2?`
+            : `Apakah Anda yakin ingin MENGHAPUS PERMANEN ${countText} berkas sampah yang dipilih dari Cloudflare R2?`;
+
+        if (!confirm(confirmMsg)) return;
+
+        const schId = cleanerSchoolFilter.value;
+        const hours = cleanerHoursFilter.value;
+
+        const originalBtnText = isAll ? btnPurgeAll.innerHTML : btnPurgeSelected.innerHTML;
+        const targetBtn = isAll ? btnPurgeAll : btnPurgeSelected;
+
+        targetBtn.disabled = true;
+        targetBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Membersihkan...';
+
+        try {
+            const res = await fetch("{{ route('super-admin.storage.purge-garbage') }}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({
+                    school_id: schId || null,
+                    hours: hours || 24,
+                    category: 'kbm',
+                    file_ids: fileIds
+                })
+            });
+
+            const data = await res.json();
+            if (data.success) {
+                showToast(data.message || `Berhasil membersihkan ${data.deleted_files} berkas sampah!`, 'success');
+                // Re-scan
+                setTimeout(() => {
+                    runCleanerScan();
+                }, 800);
+            } else {
+                showToast('Gagal: ' + (data.message || 'Terjadi kesalahan saat membersihkan.'), 'error');
+            }
+        } catch (err) {
+            showToast('Error: ' + err.message, 'error');
+        } finally {
+            targetBtn.disabled = false;
+            targetBtn.innerHTML = originalBtnText;
+        }
+    }
+
+    btnPurgeSelected?.addEventListener('click', function() {
+        const selected = Array.from(document.querySelectorAll('.cleaner-file-checkbox:checked')).map(cb => cb.value);
+        if (selected.length === 0) return;
+        executePurge(selected);
+    });
+
+    btnPurgeAll?.addEventListener('click', function() {
+        if (currentScanFiles.length === 0) return;
+        executePurge(null); // null means all scanned
     });
 });
 </script>

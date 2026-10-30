@@ -1,406 +1,229 @@
-# 📡 Dokumentasi Resmi API & Protokol Komunikasi Firmware RFIDv2
+# 📡 Panduan Integrasi REST API Backend — Perangkat RFIDv2 (ESP8266)
 
-Dokumentasi ini menjelaskan spesifikasi antarmuka pemrograman (API), protokol komunikasi, format pertukaran data (JSON/NDJSON), serta arsitektur integrasi antara **Firmware RFIDv2 (ESP8266)** dan **Backend Server Jagat Absen (Laravel)**.
+Dokumentasi ini ditujukan bagi **pengembang pihak ketiga / klien** yang ingin membangun **Backend Server sendiri** untuk berkomunikasi dengan perangkat mesin absensi **RFIDv2 (ESP8266 Firmware v4.3.0+)**.
 
 ---
 
 ## 📑 Daftar Isi
-1. [Arsitektur & Gambaran Umum](#1-arsitektur--gambaran-umum)
-2. [Spesifikasi Hardware & Pinout](#2-spesifikasi-hardware--pinout)
-3. [Local Web Server API (Embedded di ESP8266)](#3-local-web-server-api-embedded-di-esp8266)
-   - [3.1 Halaman Dashboard & Web Konfigurasi (`GET /`)](#31-halaman-dashboard--web-konfigurasi-get-)
-   - [3.2 Pemindaian Jaringan WiFi (`GET /scan-wifi`)](#32-pemindaian-jaringan-wifi-get-scan-wifi)
-   - [3.3 Simpan Konfigurasi & Reboot (`POST /save`)](#33-simpan-konfigurasi--reboot-post-save)
-   - [3.4 Trigger Sinkronisasi Antrean Offline (`GET /sync`)](#34-trigger-sinkronisasi-antrean-offline-get-sync)
-   - [3.5 Trigger OTA Firmware Online (`GET /update-online` & `GET /ota-trigger`)](#35-trigger-ota-firmware-online-get-update-online--get-ota-trigger)
-4. [Backend Cloud REST API (`/api/rfid`)](#4-backend-cloud-rest-api-apirfid)
-   - [4.1 Ping & Heartbeat Server Check (`GET /api/rfid?ping=1`)](#41-ping--heartbeat-server-check-get-apirfidping1)
-   - [4.2 Transaksi Scan Presensi (`POST /api/rfid`)](#42-transaksi-scan-presensi-post-apirfid)
-   - [4.3 Kamus Respon `type`, Tampilan LCD, dan Nada Buzzer](#43-kamus-respon-type-tampilan-lcd-dan-nada-buzzer)
-5. [Mekanisme Offline Queue & Sinkronisasi Data](#5-mekanisme-offline-queue--sinkronisasi-data)
-   - [5.1 Format Penyimpanan NDJSON](#51-format-penyimpanan-ndjson)
-   - [5.2 Batching & Anti-Duplikasi](#52-batching--anti-duplikasi)
-   - [5.3 Silent Background Sync vs Full Sync](#53-silent-background-sync-vs-full-sync)
-6. [Mekanisme Over-the-Air (OTA) Update](#6-mekanisme-over-the-air-ota-update)
-   - [6.1 ArduinoOTA (Jaringan Lokal)](#61-arduinoota-jaringan-lokal)
-   - [6.2 HTTP/HTTPS Remote Update (ESPhttpUpdate)](#62-httphttps-remote-update-esphttpupdate)
-7. [Penanganan Gangguan & Fail-Safe (Watchdog & Recovery)](#7-penanganan-gangguan--fail-safe-watchdog--recovery)
+1. [Prinsip Komunikasi & Server-Driven](#1-prinsip-komunikasi--server-driven)
+2. [Spesifikasi Endpoint](#2-spesifikasi-endpoint)
+   - [2.1 Heartbeat / Ping Server (`GET /api/rfid/v2?ping=1`)](#21-heartbeat--ping-server-get-apirfidv2ping1)
+   - [2.2 Transaksi Scan Kartu & Sinkronisasi (`POST /api/rfid/v2`)](#22-transaksi-scan-kartu--sinkronisasi-post-apirfidv2)
+3. [Format Data yang Dikirim ESP8266 (Request)](#3-format-data-yang-dikirim-esp8266-request)
+4. [Format Data yang Wajib Dibalas Server (Response)](#4-format-data-yang-wajib-dibalas-server-response)
+   - [4.1 Kontrak Objek `display`](#41-kontrak-objek-display)
+   - [4.2 Kontrak Parameter `sound` (Buzzer)](#42-kontrak-parameter-sound-buzzer)
+5. [Contoh Kasus Respon JSON Server](#5-contoh-kasus-respon-json-server)
+6. [Ketentuan HTTP Status Code & Penanganan Offline](#6-ketentuan-http-status-code--penanganan-offline)
 
 ---
 
-## 1. Arsitektur & Gambaran Umum
+## 1. Prinsip Komunikasi & Server-Driven
 
-Firmware **RFIDv2** berjalan pada mikrokontroler **ESP8266** dengan arsitektur komunikasi dua arah:
-1. **Inbound (Embedded Web Server)**: Berjalan di Port 80 untuk manajemen perangkat, portal konfigurasi Wi-Fi (AP mode / STA mode), pemindaian Wi-Fi lokal, dan pemicuan OTA.
-2. **Outbound (HTTP Client)**: Mengirimkan data pembacaan UID RFID ke endpoint backend Laravel (`/api/rfid`), menerima status presensi, mengecek heartbeat, dan mengunduh firmware biner (`.bin`).
-
-```mermaid
-flowchart TD
-    User([Siswa / Guru]) -->|Tap Kartu RFID| RC522[Modul RFID RC522]
-    RC522 -->|SPI| ESP8266[ESP8266 Firmware RFIDv2]
-    
-    ESP8266 -->|I2C| LCD[LCD 16x2 + I2C Backpack]
-    ESP8266 -->|GPIO| BZ[Buzzer Aktif]
-    ESP8266 -->|I2C| RTC[DS1307 RTC Module]
-    ESP8266 -->|ADC A0| BAT[Monitoring Baterai]
-    
-    subgraph Fail-Safe Offline
-        ESP8266 -->|Simpan jika Offline| FS[(LittleFS: queue.ndjson)]
-    end
-    
-    subgraph Komunikasi Backend
-        ESP8266 -->|POST /api/rfid (Online / Sync)| Cloud[Server Laravel Jagat Absen]
-        ESP8266 -->|GET ?ping=1| Cloud
-        Cloud -->|JSON Response| ESP8266
-    end
-    
-    subgraph Local Access Point
-        Admin[Teknisi / Admin Sekolah] -->|HTTP Web UI| ESP8266
-    end
-```
+Perangkat RFIDv2 menganut arsitektur **Server-Driven**:
+- **ESP8266 tidak menentukan teks atau logika absensi**. Perangkat hanya membaca UID kartu RFID fisik dan meneruskannya ke server Anda.
+- **Server Anda yang menentukan segalanya**: Server membalas dengan teks yang akan dicetak pada layar LCD 16x2 (Baris 1 dan Baris 2) serta jenis bunyi buzzer yang harus dibunyikan.
 
 ---
 
-## 2. Spesifikasi Hardware & Pinout
+## 2. Spesifikasi Endpoint
 
-| Komponen | Pin ESP8266 | Deskripsi / Alamat I2C |
-| :--- | :--- | :--- |
-| **RFID RC522 SDA/SS** | `D0` (GPIO 16) | Chip Select SPI |
-| **RFID RC522 SCK** | `D5` (GPIO 14) | SPI Clock |
-| **RFID RC522 MOSI** | `D7` (GPIO 13) | SPI Master Out |
-| **RFID RC522 MISO** | `D6` (GPIO 12) | SPI Master In |
-| **RFID RC522 RST** | `D3` (GPIO 0) | Reset Pin |
-| **LCD 16x2 I2C** | `D1` (SCL), `D2` (SDA) | Alamat `0x27` |
-| **RTC DS1307** | `D1` (SCL), `D2` (SDA) | Alamat `0x68` |
-| **Buzzer** | `D8` (GPIO 15) | Active High |
-| **Sensor Baterai** | `A0` (ADC0) | Pembagi tegangan rasio `2.29f` |
+Pada menu konfigurasi perangkat, teknisi akan memasukkan URL Server Anda (misal: `https://api.domainanda.com`). Perangkat RFIDv2 akan memanggil dua endpoint berikut:
 
----
+### 2.1 Heartbeat / Ping Server (`GET /api/rfid/v2?ping=1`)
+Digunakan oleh ESP8266 untuk memeriksa apakah server Anda sedang online.
 
-## 3. Local Web Server API (Embedded di ESP8266)
-
-Web server internal berjalan di port **80**.
-- **Mode AP (Access Point)**: SSID `ABSEN-RFID`, Password `12345678`, IP Default `192.168.4.1`.
-- **Mode STA (Terkoneksi)**: Menggunakan IP DHCP lokal dari router Wi-Fi.
-
----
-
-### 3.1 Halaman Dashboard & Web Konfigurasi (`GET /`)
-Mengembalikan antarmuka web modern responsif untuk memantau status perangkat dan konfigurasi sistem.
-
-- **URL**: `/`
 - **Method**: `GET`
-- **Content-Type**: `text/html`
-- **Informasi yang Ditampilkan**:
-  - Status koneksi Wi-Fi & Kualitas sinyal (RSSI dBm dan persentase kualitas).
-  - Alamat IP Perangkat (Local IP / SoftAP IP).
-  - Versi Firmware (contoh: `4.2.2`).
-  - Zona Waktu terkonfigurasi (WIB / WITA / WIT).
-  - Jumlah antrean offline yang belum tersinkronisasi.
-  - Form pengaturan Wi-Fi, Nama Sekolah, API Key, API Server URL, dan OTA URL.
-
----
-
-### 3.2 Pemindaian Jaringan WiFi (`GET /scan-wifi`)
-Memindai jaringan Wi-Fi 2.4 GHz di sekitar perangkat dan mengembalikan daftar SSID berurutan berdasarkan sinyal terkuat.
-
-- **URL**: `/scan-wifi`
-- **Method**: `GET`
-- **Header**:
-  - `Cache-Control: no-cache, no-store, must-revalidate`
-- **Format Response**: `application/json`
-
-#### Contoh Response:
-```json
-[
+- **Path**: `/api/rfid/v2?ping=1`
+- **Timeout ESP**: 3.000 ms
+- **Respon Minimal yang Diharapkan ESP**:
+  - HTTP Status: `200 OK`
+  - Body JSON:
+  ```json
   {
-    "ssid": "SMK_JAGAT_OFFICE",
-    "rssi": -58,
-    "secure": true
-  },
-  {
-    "ssid": "GURU_HOTSPOT",
-    "rssi": -72,
-    "secure": true
-  },
-  {
-    "ssid": "SMK_PUBLIC_FREE",
-    "rssi": -85,
-    "secure": false
+    "ok": true,
+    "message": "pong"
   }
-]
-```
+  ```
 
 ---
 
-### 3.3 Simpan Konfigurasi & Reboot (`POST /save`)
-Menyimpan parameter konfigurasi ke EEPROM (kapasitas 512 byte) lalu me-restart mikrokontroler setelah jeda 1,5 detik.
+### 2.2 Transaksi Scan Kartu & Sinkronisasi (`POST /api/rfid/v2`)
+Dipanggil setiap kali kartu RFID di-tap pada perangkat, atau saat perangkat mengunggah antrean offline ke server.
 
-- **URL**: `/save`
 - **Method**: `POST`
-- **Content-Type**: `application/x-www-form-urlencoded`
-- **Parameter Form**:
-  | Parameter | Tipe | Wajib | Keterangan |
-  | :--- | :--- | :--- | :--- |
-  | `ssid` | `string(32)` | Ya | Nama jaringan Wi-Fi target |
-  | `pass` | `string(32)` | Tidak | Password Wi-Fi (jika kosong, mempertahankan password lama) |
-  | `school` | `string(32)` | Ya | Nama sekolah yang muncul sebagai running text pada LCD |
-  | `timezone` | `int` | Ya | `7` (WIB), `8` (WITA), `9` (WIT) |
-  | `ota` | `string(128)`| Ya | URL binary firmware remote (`.bin`) |
-  | `apikey` | `string(65)` | Ya | API Key perangkat terdaftar di Laravel |
-  | `apiurl` | `string(128)`| Ya | Base URL server backend (contoh: `http://absen.jagattech.my.id`) |
-
-#### Contoh Request:
-```http
-POST /save HTTP/1.1
-Host: 192.168.4.1
-Content-Type: application/x-www-form-urlencoded
-
-ssid=SMK_JAGAT_OFFICE&pass=rahasia123&school=SMK+NEGERI+1+JAGAT&timezone=7&ota=http%3A%2F%2Fabsen.jagattech.my.id%2Ffirmware%2FRFIDV2.bin&apikey=dev_key_abc123xyz456&apiurl=http%3A%2F%2Fabsen.jagattech.my.id
-```
-
-#### Response (200 OK):
-```html
-<h3>Tersimpan! Restart 3 detik...</h3>
-```
+- **Path**: `/api/rfid/v2`
+- **Header**:
+  ```http
+  Content-Type: application/json
+  ```
+- **Timeout ESP**: 8.000 ms
 
 ---
 
-### 3.4 Trigger Sinkronisasi Antrean Offline (`GET /sync`)
-Memicu pengiriman manual seluruh antrean presensi yang tersimpan di LittleFS (`/queue.ndjson`) ke backend server secara batch.
+## 3. Format Data yang Dikirim ESP8266 (Request)
 
-- **URL**: `/sync`
-- **Method**: `GET`
-- **Response**: `text/html` dengan pesan `"<h3>Sinkronisasi dimulai...</h3>"`.
-- **Indikator LCD**: Menampilkan teks `SINKRONISASI` pada baris 1 dan counter `X/Total` pada baris 2.
+ESP8266 akan mengirimkan payload JSON dengan struktur berikut:
 
----
-
-### 3.5 Trigger OTA Firmware Online (`GET /update-online` & `GET /ota-trigger`)
-Memicu pengunduhan firmware secara over-the-air dari URL yang telah ditentukan.
-
-#### A. Trigger dari Konfigurasi EEPROM (`GET /update-online`)
-- **URL**: `/update-online`
-- **Method**: `GET`
-- Menggunakan nilai `cfg.otaUrl` yang tersimpan di EEPROM.
-
-#### B. Trigger Custom URL (`GET /ota-trigger`)
-- **URL**: `/ota-trigger?url={binary_url}`
-- **Method**: `GET`
-- **Query Parameter**:
-  - `url` (URL-encoded): Alamat direct download file `.bin` firmware.
-
-#### Response:
-```html
-<h3>Memicu Update Kustom...</h3><p>Cek layar perangkat.</p>
-```
-
----
-
-## 4. Backend Cloud REST API (`/api/rfid`)
-
-Komunikasi antara firmware RFIDv2 dengan backend Laravel Jagat Absen berlangsung melalui routing controller `App\Http\Controllers\Api\RfidController`.
-
----
-
-### 4.1 Ping & Heartbeat Server Check (`GET /api/rfid?ping=1`)
-Digunakan oleh firmware untuk mengecek apakah server aktif tanpa menyentuh database secara berat.
-
-- **URL**: `{apiurl}/api/rfid?ping=1`
-- **Method**: `GET`
-- **Timeout Firmware**: 3000 ms
-- **Response (200 OK)**:
 ```json
 {
-  "ok": true,
-  "message": "pong"
-}
-```
-*Catatan Perilaku*: Jika server offline, firmware menjalankan recovery ping tiap 2 detik sekali sampai server hidup kembali. Saat server online, ping periodik dihentikan untuk efisiensi jaringan.
-
----
-
-### 4.2 Transaksi Scan Presensi (`POST /api/rfid`)
-Dipanggil setiap kali kartu RFID didekatkan ke sensor atau saat sinkronisasi antrean offline.
-
-- **URL**: `{apiurl}/api/rfid`
-- **Method**: `POST`
-- **Headers**:
-  - `Content-Type: application/json`
-- **Timeout Firmware**: 8000 ms (Online scan), 5000 ms (Batch sync), 3000 ms (Silent sync).
-
-#### Schema Request Body:
-```json
-{
-  "api_key": "string (wajib, max 64 karakter)",
-  "uid": "string (wajib, 8-20 karakter hex uppercase, contoh: 'A1B2C3D4')",
-  "scanned_at": "string (opsional, format 'YYYY-MM-DD HH:mm:ss')"
-}
-```
-> **Catatan `scanned_at`**: Hanya dikirimkan saat sinkronisasi antrean offline (LittleFS). Jika diisi, backend menggunakan waktu tersebut sebagai waktu presensi nyata (dibatasi maksimal mundur 7 hari ke belakang). Jika tidak diisi, backend menggunakan waktu server saat ini (`now()`).
-
-#### Contoh Request:
-```bash
-curl -X POST "http://absen.jagattech.my.id/api/rfid" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "api_key": "abc123devicekey",
-    "uid": "53A26B1E",
-    "scanned_at": "2026-10-30 07:15:22"
-  }'
-```
-
----
-
-### 4.3 Kamus Respon `type`, Tampilan LCD, dan Nada Buzzer
-
-Backend Laravel mengembalikan format standar berikut:
-```json
-{
-  "ok": true,
-  "status": "success",
-  "message": "Pesan deskriptif",
-  "sound": "ok",
-  "timestamp": "2026-10-30 07:15:22",
-  "type": "absen_masuk",
-  "nama": "Ahmad Dani"
+  "api_key": "device_api_key_12345",
+  "uid": "53A26B1E",
+  "scanned_at": "2026-10-30 07:15:00"
 }
 ```
 
-Firmware mem-parsing properti `ok`, `message`, `nama`, dan `type` untuk menentukan teks LCD 16x2 dan pola bunyi buzzer:
-
-| Nilai `type` | `ok` | Baris 1 LCD | Baris 2 LCD | Pola Buzzer | Penjelasan Skenario |
-| :--- | :---: | :--- | :--- | :--- | :--- |
-| `absen_masuk` | `true` | `ABSEN MASUK` | Nama Siswa | `beepOK()` (2x pendek) | Siswa berhasil absen masuk sekolah. |
-| `absen_pulang` | `true` | `ABSEN PULANG` | Nama Siswa | `beepOK()` (2x pendek) | Siswa berhasil absen pulang sekolah. |
-| `absen_masuk_guru` | `true` | `ABSEN MASUK` | Nama Guru | `beepOK()` (2x pendek) | Guru berhasil absen masuk sesuai shift. |
-| `absen_pulang_guru` | `true` | `ABSEN PULANG` | Nama Guru | `beepOK()` (2x pendek) | Guru berhasil absen pulang sesuai shift. |
-| `sudah_absen_masuk` | `true` | `SUDAH ABSEN` | Nama Siswa | `beepShort()` (1x pendek) | Kartu di-tap kembali sebelum jam pulang dibuka. |
-| `sudah_lengkap` | `true` | `ABSEN LENGKAP` | Nama Siswa | `beepShort()` (1x pendek) | Siswa sudah lengkap absen masuk dan pulang hari ini. |
-| `absen_kegiatan` | `true` | `SUKSES` | Nama Siswa | `beepOK()` (2x pendek) | Kartu di-tap saat ada kegiatan ekskul/tambahan aktif. |
-| `enroll_rfid` | `true` | `ENROLL SUKSES` | Nama User | `beepTriple()` (3x cepat) | Kartu baru berhasil didaftarkan ke siswa/guru. |
-| `gate_opened` | `true` | `PULANG DIBUKA` | Nama Kartu Gerbang | `beepTriple()` (3x cepat) | Kartu gerbang di-tap, membuka izin pulang cepat 30 menit. |
-| `gate_closed` | `true` | `PULANG DITUTUP`| Nama Kartu Gerbang | `beepTriple()` (3x cepat) | Sesi izin gerbang ditutup kembali. |
-| `unknown_card` | `false`| `ABSEN GAGAL!` | Pesan Error | `beepError()` (1x panjang) | UID tidak terdaftar di database sekolah. |
-| `class_disabled` | `false`| `ABSEN GAGAL!` | Pesan Error | `beepError()` (1x panjang) | Fitur presensi untuk kelas siswa dinonaktifkan. |
-| `schedule_empty` | `false`| `ABSEN GAGAL!` | Pesan Error | `beepError()` (1x panjang) | Tidak ada jadwal aktif / hari libur sekolah. |
-| `outside_checkin_window` | `false`| `ABSEN GAGAL!` | Pesan Error | `beepError()` (1x panjang) | Di luar jam scan masuk guru/shift. |
-| `outside_checkout_window`| `false`| `ABSEN GAGAL!` | Pesan Error | `beepError()` (1x panjang) | Di luar jam scan pulang guru/shift. |
-| `no_shift` | `false`| `ABSEN GAGAL!` | Pesan Error | `beepError()` (1x panjang) | Guru tidak memiliki shift aktif pada hari ini. |
-| `invalid_uid` | `false`| `ABSEN GAGAL!` | Pesan Error | `beepError()` (1x panjang) | Format UID tidak sesuai pola Hex 8-20 digit. |
-| `scan_cooldown` | `false`| `ABSEN GAGAL!` | Pesan Error | `beepError()` (1x panjang) | Menghindari tap ganda berturut-turut pada backend. |
-| *(Koneksi Gagal / Timeout)* | `false`| `ERROR JARINGAN` | `Err:XXX` / `Conn Failed` | `beepNetwork()` (3x sedang) | Perangkat otomatis beralih menyimpan data ke LittleFS. |
+### Penjelasan Parameter Request:
+| Parameter | Tipe | Status | Deskripsi |
+| :--- | :--- | :---: | :--- |
+| `api_key` | `string` | **Wajib** | API Key unik perangkat yang telah didaftarkan teknisi di menu config alat. Gunakan ini untuk mengotentikasi keabsahan mesin. |
+| `uid` | `string` | **Wajib** | Nomor UID kartu RFID fisik dalam format Hexadecimal Uppercase (contoh: `53A26B1E` atau `1A2B3C4D5E6F`). |
+| `scanned_at` | `string` | *Opsional* | Timestamp kartu di-tap (format: `YYYY-MM-DD HH:mm:ss`). <br>• **Jika ada**: Data berasal dari antrean offline (LittleFS) saat internet sebelumnya sempat putus.<br>• **Jika tidak ada**: Kartu baru saja di-tap saat online secara real-time. |
 
 ---
 
-### 4.4 Backend Cloud REST API V2 (`/api/rfid/v2`) — *Server-Driven LCD & Sound*
+## 4. Format Data yang Wajib Dibalas Server (Response)
 
-Endpoint ini merupakan pembaruan dari `/api/rfid` yang digunakan oleh **Firmware RFIDv2 v4.3.0+**. Pada endpoint ini, teks baris 1, teks baris 2, durasi tampilan, dan jenis bunyi buzzer **dikendalikan secara langsung oleh server melalui objek `display` dan `sound`**, sehingga tidak ada lagi logika *hardcoded* teks di dalam firmware mikrokontroler.
+Agar LCD 16x2 dan Buzzer perangkat menampilkan informasi dengan benar, backend Anda **wajib mengembalikan HTTP Status `200 OK`** dengan format JSON standar berikut:
 
-- **URL**: `{apiurl}/api/rfid/v2`
-- **Method**: `POST` (dan `GET ?ping=1` untuk heartbeat check)
-- **Headers**:
-  - `Content-Type: application/json`
-
-#### Schema Response V2 (Server-Driven):
 ```json
 {
   "ok": true,
-  "status": "success",
-  "message": "Selamat Pagi, Ahmad Dani.",
   "display": {
     "line1": "ABSEN MASUK",
     "line2": "Ahmad Dani",
     "duration_ms": 3000
   },
-  "sound": "ok",
-  "nama": "Ahmad Dani",
-  "type": "absen_masuk",
-  "timestamp": "2026-10-30 07:15:00"
+  "sound": "ok"
 }
 ```
 
-#### Spesifikasi Nilai `sound`:
-- `"ok"`: Membunyikan buzzer 2x bip pendek (`beepOK()`).
-- `"short"`: Membunyikan buzzer 1x bip pendek (`beepShort()`).
-- `"triple"`: Membunyikan buzzer 3x bip cepat (`beepTriple()`).
-- `"error"`: Membunyikan buzzer 1x bip panjang 600ms (`beepError()`).
-- `"none"`: Tidak membunyikan buzzer.
+### 4.1 Kontrak Objek `display`
+Objek ini mengontrol tampilan LCD 16x2 karakter pada mesin:
 
-#### Format Otomatis Baris 2 LCD (Maksimal 16 Karakter):
-- **Tepat Waktu**: Nama user terpotong otomatis maksimal 16 karakter (misal: `"Ahmad Dani"` atau `"Muhammad Riz...""`).
-- **Terlambat**: Format cerdas dengan durasi keterlambatan (misal: `"Dani (+15m)"`).
-- **Pesan Error / Sistem**: Teks pesan error terpotong maksimal 16 karakter (misal: `"KARTU TDK DIKENAL"`, `"DILUAR JAM MASUK"`, `"UID TDK VALID"`).
+| Field | Tipe | Batas Karakter | Deskripsi |
+| :--- | :--- | :---: | :--- |
+| `line1` | `string` | **Maks 16 karakter** | Teks yang dicetak di **Baris 1 LCD**. Contoh: `"ABSEN MASUK"`, `"ABSEN GAGAL!"`, dll. |
+| `line2` | `string` | **Maks 16 karakter** | Teks yang dicetak di **Baris 2 LCD**. Contoh: Nama user `"Ahmad Dani"`, rincian telat `"Dani (+15m)"`, dll. |
+| `duration_ms`| `integer` | *Opsional* | Durasi teks tampil di layar dalam milidetik sebelum kembali ke tampilan jam standby. *(Default ESP: 3000 ms)*. |
 
+> ⚠️ **Catatan Penting Panjang Karakter**: Layar LCD hanya memiliki 16 kolom. Pastikan backend server Anda memotong (*truncate*) string jika panjangnya melebihi 16 karakter agar tidak terpotong acak di layar.
 
 ---
 
-## 5. Mekanisme Offline Queue & Sinkronisasi Data
+### 4.2 Kontrak Parameter `sound` (Buzzer)
+String ini menginstruksikan modul buzzer ESP8266 untuk membunyikan pola nada tertentu:
 
-Firmware dilengkapi sistem antrean offline berbasis flash memory LittleFS untuk menjamin tidak ada data presensi yang hilang saat Wi-Fi atau internet padam.
+| Nilai `sound` | Pola Bunyi Buzzer | Rekomendasi Penggunaan |
+| :--- | :--- | :--- |
+| `"ok"` | **2x bip pendek** | Absen masuk / pulang berhasil. |
+| `"short"` | **1x bip pendek** | Sudah absen / kartu sudah pernah di-tap. |
+| `"triple"` | **3x bip cepat** | Registrasi kartu baru (enroll), buka akses khusus. |
+| `"error"` | **1x bip panjang (600ms)** | Kartu ditolak, jadwal kosong, tidak terdaftar. |
+| `"none"` | **Diam (tanpa suara)** | Notifikasi hening. |
 
-### 5.1 Format Penyimpanan NDJSON
-Antrean disimpan di file `/queue.ndjson` dalam format **Newline Delimited JSON (NDJSON)**: 1 entri per baris tanpa array pembungkus, sehingga hemat RAM dan dapat ditambahkan secara append langsung (`mode: "a"`).
+---
 
+## 5. Contoh Kasus Respon JSON Server
+
+Berikut adalah contoh payload respon yang dapat dibuat oleh backend server Anda untuk berbagai kondisi:
+
+#### 1. Presensi Masuk Berhasil (Tepat Waktu)
 ```json
-{"uid":"53A26B1E","ts":"2026-10-30 07:15:00"}
-{"uid":"7CA12B0F","ts":"2026-10-30 07:15:00"}
-{"uid":"9A3F11E2","ts":"2026-10-30 07:16:15"}
+{
+  "ok": true,
+  "display": {
+    "line1": "ABSEN MASUK",
+    "line2": "Ahmad Dani"
+  },
+  "sound": "ok"
+}
 ```
-- **Kapasitas Maksimal**: 2.000 entri (ukuran file ~100 KB di flash 1-4 MB).
-- **Toleransi Flash**: Sangat aman untuk siklus hidup chip SPI flash ESP8266.
 
-### 5.2 Batching & Anti-Duplikasi
-- **Batching Jeda 30 Menit**: Setiap scan baru akan menggunakan timestamp aktif batch. Jika jeda scan berikutnya melebihi `30 menit` (`OFFLINE_BATCH_TIMEOUT = 1800000 ms`), batch baru dibentuk dari RTC.
-- **Anti-Duplikasi**: Kartu yang sama di-tap berkali-kali dalam batch 30 menit yang sama tidak akan disimpan dobel ke antrean offline.
+#### 2. Presensi Masuk (Terlambat)
+```json
+{
+  "ok": true,
+  "display": {
+    "line1": "MASUK (TELAT)",
+    "line2": "Dani (+15m)"
+  },
+  "sound": "ok"
+}
+```
 
-### 5.3 Silent Background Sync vs Full Sync
-Firmware memiliki 2 mode sinkronisasi:
-1. **Full Sync (`syncOfflineQueue`)**:
-   - Berjalan saat boot pertama kali terkoneksi internet atau saat diakses via menu Web UI `/sync`.
-   - Mengambil alih LCD untuk menampilkan progress `X/Total`.
-   - Entri yang berhasil dihapus, entri yang gagal dituliskan ke file sementara `/queue_tmp.ndjson` untuk dicoba kembali nanti.
-2. **Silent Sync (`syncOneOfflineRecordSilent`)**:
-   - Berjalan otomatis di latar belakang saat kondisi:
-     - Wi-Fi terhubung (`WL_CONNECTED`)
-     - Server terkonfirmasi hidup (`serverOnline == true`)
-     - Layar LCD sedang dalam status `LCD_STANDBY`
-     - Terdapat antrean (`getQueueCount() > 0`)
-   - Mengirimkan **1 entri setiap 3 detik** (`millis() - lastSilentSync > 3000`).
-   - Tidak memblokir pembacaan RFID dan tidak mengubah tampilan LCD, sehingga alur absensi siswa di pagi hari tetap lancar tanpa jeda layar.
+#### 3. Presensi Pulang Berhasil
+```json
+{
+  "ok": true,
+  "display": {
+    "line1": "ABSEN PULANG",
+    "line2": "Siti Nurhaliza"
+  },
+  "sound": "ok"
+}
+```
+
+#### 4. Kartu Sudah Pernah Absen
+```json
+{
+  "ok": true,
+  "display": {
+    "line1": "SUDAH ABSEN",
+    "line2": "Ahmad Dani"
+  },
+  "sound": "short"
+}
+```
+
+#### 5. Kartu Belum Terdaftar di Database
+```json
+{
+  "ok": false,
+  "display": {
+    "line1": "KARTU TDK DIKENAL",
+    "line2": "Hubungi Admin"
+  },
+  "sound": "error"
+}
+```
+
+#### 6. Di Luar Jam Kerja / Shift
+```json
+{
+  "ok": false,
+  "display": {
+    "line1": "DILUAR JADWAL",
+    "line2": "Belum Jam Masuk"
+  },
+  "sound": "error"
+}
+```
+
+#### 7. API Key Salah / Mesin Belum Aktif
+```json
+{
+  "ok": false,
+  "display": {
+    "line1": "AUTH GAGAL",
+    "line2": "API Key Invalid"
+  },
+  "sound": "error"
+}
+```
 
 ---
 
-## 6. Mekanisme Over-the-Air (OTA) Update
+## 6. Ketentuan HTTP Status Code & Penanganan Offline
 
-### 6.1 ArduinoOTA (Jaringan Lokal)
-Memungkinkan teknisi mengunggah firmware langsung dari Arduino IDE / PlatformIO / VS Code melalui jaringan Wi-Fi lokal.
-- **Hostname**: `ABSEN-RFID` (mDNS responder aktif)
-- **Port**: `8266`
-- **Password**: `04112000`
-- **Tampilan LCD**: Menampilkan progress persentase unduhan (`Prog: X%`) dan menyalakan backlight.
+Perangkat ESP8266 mengevaluasi status transmisi data berdasarkan HTTP Response Code:
 
-### 6.2 HTTP/HTTPS Remote Update (ESPhttpUpdate)
-Firmware dapat mengunduh biner baru dari server terpusat secara otomatis.
-- **Dukungan Protokol**:
-  - `HTTP`: Menggunakan `WiFiClient`.
-  - `HTTPS`: Menggunakan `WiFiClientSecure` dengan mode `setInsecure()` dan buffer `1024` byte (kompatibel dengan GitHub Releases / AWS S3 / Cloudflare).
-- **Cache Buster**: Menambahkan parameter timestamp `?t={millis}` pada URL agar unduhan tidak tertahan cache proxy/CDN.
-- **Auto-Reboot**: Jika kode update berhasil (`HTTP_UPDATE_OK`), perangkat otomatis me-reboot mikrokontroler ke firmware baru.
+1. **HTTP Status `200 OK`**:
+   - ESP8266 menganggap transaksi **sukses terkirim**.
+   - ESP8266 langsung mem-parsing JSON, menampilkan baris teks LCD, dan membunyikan buzzer.
+   - Jika transaksi ini adalah sinkronisasi antrean offline, entri kartu terkait akan langsung **dihapus dari antrean memori internal**.
 
----
-
-## 7. Penanganan Gangguan & Fail-Safe
-
-1. **Hardware Watchdog Timer**:
-   - Diatur dengan interval **30 detik** menggunakan `Ticker`.
-   - Rutin `feedWatchdog()` dipanggil di seluruh loop proses pembacaan kartu, sync HTTP, dan scan Wi-Fi.
-   - Jika terjadi *freeze* atau *deadlock*, mikrokontroler akan menampilkan `SYSTEM RESTART - Watchdog Trigger` lalu me-reboot secara otomatis.
-2. **Koreksi Waktu Real-Time (RTC & NTP)**:
-   - Jam utama dikelola oleh RTC DS1307 fisik dengan backup baterai koin CR2032.
-   - Setiap kali terhubung ke internet, firmware melakukan query SNTP ke `pool.ntp.org` / `time.nist.gov` dengan offset zona waktu dinamis (WIB +7, WITA +8, WIT +9), lalu mengoreksi waktu RTC hardware secara otomatis.
-3. **Card Cooldown**:
-   - Proteksi kartu ganda (`CARD_COOLDOWN_TIME = 2000 ms`).
-   - Mencegah kartu yang sama terbaca berulang kali dalam jeda di bawah 2 detik.
-4. **Auto AP Fallback**:
-   - Jika koneksi Wi-Fi terputus lebih dari 30 detik, firmware otomatis menghidupkan kembali SoftAP (`ABSEN-RFID`) agar teknisi dapat terhubung untuk troubleshooting.
+2. **HTTP Status Selain `200` (4xx, 5xx) atau Request Timeout**:
+   - ESP8266 menganggap jaringan/server mengalami gangguan.
+   - Tampilan LCD lokal ESP8266 otomatis menampilkan `"OFFLINE - SIMPAN"` dan membunyikan 2x bip lokal.
+   - UID kartu otomatis diamankan ke penyimpanan flash internal (`/queue.ndjson`) dan akan otomatis dikirim ulang saat server kembali online.

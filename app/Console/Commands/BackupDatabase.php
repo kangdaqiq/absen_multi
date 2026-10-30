@@ -15,7 +15,7 @@ class BackupDatabase extends Command
      *
      * @var string
      */
-    protected $signature = 'db:backup {--client= : Override client name for self-hosted backup} {--selfhosted : Force self-hosted mode} {--force : Ignore 2-day interval limit for self-hosted backup}';
+    protected $signature = 'db:backup {--client= : Override client name for self-hosted backup} {--selfhosted : Force self-hosted mode} {--force : Ignore 2-day interval limit for self-hosted backup} {--clean-only : Hanya bersihkan backup lama tanpa membuat backup baru} {--days= : Override jumlah hari retensi backup (default: 7)}';
 
     /**
      * The console command description.
@@ -67,8 +67,22 @@ class BackupDatabase extends Command
             $clientSlug = null;
             $filename = "backup-" . Carbon::now()->format('Y-m-d-H-i-s') . ".sql";
             $cloudFolder = 'backups';
-            $keepDays = 7;
+            $keepDays = (int) ($this->option('days') ?: 7);
             $this->info("Hosted mode detected. Retention: {$keepDays} days");
+        }
+
+        // Jika opsi --clean-only aktif, lewati proses dump dan langsung bersihkan backup lama
+        if ($this->option('clean-only')) {
+            $this->info("Mode --clean-only aktif: menjalankan pembersihan backup lama...");
+            if (!$isSelfHosted) {
+                $backupDisk = config('filesystems.disks.r2_backup.bucket') ? 'r2_backup' : 'r2';
+                $this->cleanOldCloudBackups($cloudFolder, $keepDays, $clientSlug, $backupDisk);
+                $this->cleanOldBackups($path, $keepDays);
+            } else {
+                $this->cleanLocalBackupsExceptCurrent($path, '');
+            }
+            $this->info("Pembersihan selesai.");
+            return 0;
         }
 
         $filePath = "$path/$filename";
@@ -161,7 +175,7 @@ class BackupDatabase extends Command
                         }
                         
                         // Clean old backups in Cloudflare R2
-                        $this->cleanOldCloudBackups($cloudFolder, $keepDays, $clientSlug);
+                        $this->cleanOldCloudBackups($cloudFolder, $keepDays, $clientSlug, $backupDisk);
                     } catch (\Exception $e) {
                         $this->error("Failed to upload to Cloudflare R2: " . $e->getMessage());
                     }
@@ -290,16 +304,19 @@ class BackupDatabase extends Command
      * @param string $folder Folder in bucket (e.g. 'Client' or 'backups')
      * @param int $keepDays Number of days to keep
      * @param string|null $clientSlug If set, only clean this client's files in 'Client' folder
+     * @param string|null $diskName Disk name to use (e.g. 'r2_backup' or 'r2')
      */
-    private function cleanOldCloudBackups(string $folder, int $keepDays, ?string $clientSlug = null)
+    private function cleanOldCloudBackups(string $folder, int $keepDays, ?string $clientSlug = null, ?string $diskName = null)
     {
-        $this->info("Cleaning old backups from Cloudflare R2 in '{$folder}' (older than {$keepDays} days)...");
+        $backupDisk = $diskName ?: (config('filesystems.disks.r2_backup.bucket') ? 'r2_backup' : 'r2');
+        $this->info("Cleaning old backups from Cloudflare R2 [disk: {$backupDisk}] in '{$folder}' (older than {$keepDays} days)...");
         try {
-            $disk = Storage::disk('r2');
+            $disk = Storage::disk($backupDisk);
             $files = $disk->files($folder);
             $now = time();
             $today = Carbon::today();
             $cutoffDate = $today->copy()->subDays($keepDays - 1);
+            $deletedCount = 0;
 
             foreach ($files as $file) {
                 $basename = basename($file);
@@ -366,12 +383,15 @@ class BackupDatabase extends Command
                 if ($shouldDelete) {
                     try {
                         $disk->delete($file);
+                        $deletedCount++;
                         $this->info("Deleted old cloud backup: {$file}");
                     } catch (\Throwable $e) {
                         $this->error("Failed to delete cloud file {$file}: " . $e->getMessage());
                     }
                 }
             }
+
+            $this->info("Cloud backup cleanup finished. Checked: " . count($files) . " file(s), deleted: {$deletedCount} old backup(s).");
         } catch (\Exception $e) {
             $this->error("Failed to clean old cloud backups: " . $e->getMessage());
         }

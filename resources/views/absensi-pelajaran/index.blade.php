@@ -13,6 +13,10 @@
                 class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-center font-medium text-gray-700 hover:bg-gray-50 transition dark:border-gray-800 dark:bg-gray-dark dark:text-gray-300 dark:hover:bg-gray-800 shadow-sm text-sm">
                 <i class="fas fa-calendar-alt text-brand-500"></i> Kelola Jadwal
             </a>
+            <a href="{{ route('absensi-pelajaran.jurnal-kbm') }}"
+                class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-center font-medium text-gray-700 hover:bg-gray-50 transition dark:border-gray-800 dark:bg-gray-dark dark:text-gray-300 dark:hover:bg-gray-800 shadow-sm text-sm">
+                <i class="fas fa-book-reader text-brand-500"></i> Jurnal KBM
+            </a>
             <a href="{{ route('absensi-pelajaran.rekap') }}"
                 class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-center font-medium text-gray-700 hover:bg-gray-50 transition dark:border-gray-800 dark:bg-gray-dark dark:text-gray-300 dark:hover:bg-gray-800 shadow-sm text-sm">
                 <i class="fas fa-chart-bar text-brand-500"></i> Rekap Absensi

@@ -206,6 +206,15 @@ Route::middleware('auth')->group(function () {
         Route::post('/absensi-pelajaran/update-single', [App\Http\Controllers\AbsensiPelajaranController::class, 'updateSingle'])->name('absensi-pelajaran.update-single');
         Route::post('/absensi-pelajaran/set-all', [App\Http\Controllers\AbsensiPelajaranController::class, 'setAllHadir'])->name('absensi-pelajaran.set-all');
         Route::get('/absensi-pelajaran-rekap', [App\Http\Controllers\AbsensiPelajaranController::class, 'rekap'])->name('absensi-pelajaran.rekap');
+        Route::match(['get', 'post'], '/absensi-pelajaran/rekap/export', [App\Http\Controllers\AbsensiPelajaranController::class, 'rekapExport'])->name('absensi-pelajaran.rekap.export');
+        Route::get('/absensi-pelajaran/rekap/pdf', [App\Http\Controllers\AbsensiPelajaranController::class, 'rekapPdf'])->name('absensi-pelajaran.rekap.pdf');
+        Route::get('/absensi-pelajaran/rekap/{id}', [App\Http\Controllers\AbsensiPelajaranController::class, 'rekapShow'])->name('absensi-pelajaran.rekap.show');
+        Route::get('/absensi-pelajaran/rekap/{id}/export-detail', [App\Http\Controllers\AbsensiPelajaranController::class, 'rekapExportDetail'])->name('absensi-pelajaran.rekap.export-detail');
+        Route::get('/absensi-pelajaran/rekap/detail-siswa', [App\Http\Controllers\AbsensiPelajaranController::class, 'rekapDetailSiswa'])->name('absensi-pelajaran.rekap.detail-siswa');
+        Route::get('/absensi-pelajaran/jurnal-kbm', [App\Http\Controllers\AbsensiPelajaranController::class, 'jurnalKbm'])->name('absensi-pelajaran.jurnal-kbm');
+        Route::get('/absensi-pelajaran/jurnal-kbm/{id}', [App\Http\Controllers\AbsensiPelajaranController::class, 'jurnalKbmShow'])->name('absensi-pelajaran.jurnal-kbm.show');
+        Route::get('/jurnal-kbm', [App\Http\Controllers\AbsensiPelajaranController::class, 'jurnalKbm'])->name('jurnal-kbm.index');
+        Route::get('/jurnal-kbm/{id}', [App\Http\Controllers\AbsensiPelajaranController::class, 'jurnalKbmShow'])->name('jurnal-kbm.show');
         Route::get('/absensi-pelajaran/dokumentasi', [App\Http\Controllers\AbsensiPelajaranController::class, 'dokumentasi'])->name('absensi-pelajaran.dokumentasi');
         Route::get('/absensi-pelajaran/dokumentasi/{guru}', [App\Http\Controllers\AbsensiPelajaranController::class, 'dokumentasiGuru'])->name('absensi-pelajaran.dokumentasi.guru');
         Route::get('/absensi-pelajaran-dokumentasi', [App\Http\Controllers\AbsensiPelajaranController::class, 'dokumentasi']);

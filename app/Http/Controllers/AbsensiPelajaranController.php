@@ -13,6 +13,13 @@ use App\Services\StorageServerService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Border;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class AbsensiPelajaranController extends Controller
 {
@@ -712,7 +719,8 @@ class AbsensiPelajaranController extends Controller
     }
 
     /**
-     * Rekap Absensi Pembelajaran (Per Kelas / Per Mapel / Per Rentang Tanggal)
+     * Rekap Absensi Pembelajaran Berbasis Siswa (Jumlah Hadir, Sakit, Izin, Alpha per Siswa)
+     * Lengkap dengan filter range tanggal, kelas, mapel, pencarian nama, dan sorting.
      */
     public function rekap(Request $request)
     {
@@ -727,65 +735,1133 @@ class AbsensiPelajaranController extends Controller
         $kelasId = $request->query('kelas_id');
         $mapelId = $request->query('mapel_id');
         $selectedGuruId = $request->query('guru_id');
+        $search = trim($request->query('search', $request->query('q', '')));
 
-        $query = AbsensiPelajaran::where('absensi_pelajaran.school_id', $schoolId)
-            ->whereBetween('absensi_pelajaran.tanggal', [$startDate, $endDate])
-            ->with(['student.kelas', 'jadwal.mapel', 'jadwal.guru', 'jurnal']);
+        $sortBy = $request->query('sort_by', 'nama');
+        $sortDir = strtolower($request->query('sort_dir', 'asc')) === 'desc' ? 'desc' : 'asc';
 
+        // 1. Filter Siswa
+        $siswaQuery = Siswa::where('school_id', $schoolId)->with('kelas');
+
+        // Jika guru biasa, batasi kelas ke kelas yang diajar
         if (!$isAdminOrWaka && $isGuru) {
-            $query->whereHas('jadwal', function ($q) use ($guruId) {
-                $q->where('guru_id', $guruId);
-            });
-        } elseif (!empty($selectedGuruId)) {
-            $query->whereHas('jadwal', function ($q) use ($selectedGuruId) {
-                $q->where('guru_id', $selectedGuruId);
-            });
+            $guruKelasIds = JadwalPelajaran::where('school_id', $schoolId)
+                ->where('guru_id', $guruId)
+                ->pluck('kelas_id')
+                ->filter()
+                ->unique()
+                ->all();
+
+            if (empty($kelasId)) {
+                $siswaQuery->whereIn('kelas_id', $guruKelasIds);
+            }
         }
 
         if (!empty($kelasId)) {
-            $query->whereHas('student', function ($q) use ($kelasId) {
-                $q->where('kelas_id', $kelasId);
+            $siswaQuery->where('kelas_id', $kelasId);
+        }
+
+        if (!empty($search)) {
+            $siswaQuery->where(function ($q) use ($search) {
+                $q->where('nama', 'like', "%{$search}%")
+                  ->orWhere('nis', 'like', "%{$search}%");
+                if (\Illuminate\Support\Facades\Schema::hasColumn('siswa', 'nisn')) {
+                    $q->orWhere('nisn', 'like', "%{$search}%");
+                }
             });
         }
 
+        // Sorting
+        if ($sortBy === 'kelas') {
+            $siswaQuery->leftJoin('kelas', 'siswa.kelas_id', '=', 'kelas.id')
+                ->select('siswa.*')
+                ->orderBy('kelas.nama_kelas', $sortDir)
+                ->orderBy('siswa.nama', 'asc');
+        } elseif ($sortBy === 'hadir' || $sortBy === 'sakit' || $sortBy === 'izin' || $sortBy === 'alpha') {
+            $targetStatus = match ($sortBy) {
+                'hadir' => 'H',
+                'sakit' => 'S',
+                'izin'  => 'I',
+                'alpha' => 'A',
+                default => 'H',
+            };
+            $siswaQuery->withCount(['absensiPelajaran as status_count' => function ($q) use ($startDate, $endDate, $mapelId, $guruId, $selectedGuruId, $isAdminOrWaka, $isGuru, $targetStatus) {
+                $q->whereBetween('tanggal', [$startDate, $endDate])
+                  ->where('status', $targetStatus);
+                if (!empty($mapelId)) {
+                    $q->whereHas('jadwal', fn($sq) => $sq->where('mapel_id', $mapelId));
+                }
+                if (!$isAdminOrWaka && $isGuru) {
+                    $q->whereHas('jadwal', fn($sq) => $sq->where('guru_id', $guruId));
+                } elseif (!empty($selectedGuruId)) {
+                    $q->whereHas('jadwal', fn($sq) => $sq->where('guru_id', $selectedGuruId));
+                }
+            }])->orderBy('status_count', $sortDir)->orderBy('nama', 'asc');
+        } else {
+            $siswaQuery->orderBy('nama', $sortDir);
+        }
+
+        $allSiswa = $siswaQuery->paginate(50)->withQueryString();
+        $studentIds = $allSiswa->pluck('id')->all();
+
+        // 2. Agregasi Absensi Mapel untuk Siswa di Halaman Ini
+        $summary = [];
+        foreach ($allSiswa as $s) {
+            $summary[$s->id] = [
+                'H'          => 0,
+                'S'          => 0,
+                'I'          => 0,
+                'A'          => 0,
+                'D'          => 0,
+                'T'          => 0,
+                'total'      => 0,
+                'persentase' => 0,
+            ];
+        }
+
+        if (!empty($studentIds)) {
+            $absensiQuery = AbsensiPelajaran::where('absensi_pelajaran.school_id', $schoolId)
+                ->whereBetween('absensi_pelajaran.tanggal', [$startDate, $endDate])
+                ->whereIn('absensi_pelajaran.student_id', $studentIds);
+
+            if (!empty($mapelId)) {
+                $absensiQuery->whereHas('jadwal', fn($q) => $q->where('mapel_id', $mapelId));
+            }
+            if (!$isAdminOrWaka && $isGuru) {
+                $absensiQuery->whereHas('jadwal', fn($q) => $q->where('guru_id', $guruId));
+            } elseif (!empty($selectedGuruId)) {
+                $absensiQuery->whereHas('jadwal', fn($q) => $q->where('guru_id', $selectedGuruId));
+            }
+
+            $rawSummary = $absensiQuery->selectRaw('
+                student_id,
+                SUM(CASE WHEN status = "H" THEN 1 ELSE 0 END) as count_h,
+                SUM(CASE WHEN status = "S" THEN 1 ELSE 0 END) as count_s,
+                SUM(CASE WHEN status = "I" THEN 1 ELSE 0 END) as count_i,
+                SUM(CASE WHEN status = "A" THEN 1 ELSE 0 END) as count_a,
+                SUM(CASE WHEN status = "D" THEN 1 ELSE 0 END) as count_d,
+                SUM(CASE WHEN status = "T" THEN 1 ELSE 0 END) as count_t,
+                COUNT(*) as total_pertemuan
+            ')
+            ->groupBy('student_id')
+            ->get();
+
+            foreach ($rawSummary as $row) {
+                $h = (int) $row->count_h;
+                $s = (int) $row->count_s;
+                $i = (int) $row->count_i;
+                $a = (int) $row->count_a;
+                $d = (int) $row->count_d;
+                $t = (int) $row->count_t;
+                $tot = (int) $row->total_pertemuan;
+                $pct = $tot > 0 ? round((($h + $t) / $tot) * 100, 1) : 0;
+
+                $summary[$row->student_id] = [
+                    'H'          => $h,
+                    'S'          => $s,
+                    'I'          => $i,
+                    'A'          => $a,
+                    'D'          => $d,
+                    'T'          => $t,
+                    'total'      => $tot,
+                    'persentase' => $pct,
+                ];
+            }
+        }
+
+        // 3. Global Summary Ribbon (Ringkasan Total di Atas)
+        $globalQuery = AbsensiPelajaran::where('absensi_pelajaran.school_id', $schoolId)
+            ->whereBetween('absensi_pelajaran.tanggal', [$startDate, $endDate]);
+
+        if (!empty($kelasId)) {
+            $globalQuery->whereHas('student', fn($q) => $q->where('kelas_id', $kelasId));
+        }
         if (!empty($mapelId)) {
-            $query->whereHas('jadwal', function ($q) use ($mapelId) {
-                $q->where('mapel_id', $mapelId);
+            $globalQuery->whereHas('jadwal', fn($q) => $q->where('mapel_id', $mapelId));
+        }
+        if (!$isAdminOrWaka && $isGuru) {
+            $globalQuery->whereHas('jadwal', fn($q) => $q->where('guru_id', $guruId));
+        } elseif (!empty($selectedGuruId)) {
+            $globalQuery->whereHas('jadwal', fn($q) => $q->where('guru_id', $selectedGuruId));
+        }
+        if (!empty($search)) {
+            $globalQuery->whereHas('student', function ($q) use ($search) {
+                $q->where('nama', 'like', "%{$search}%")
+                  ->orWhere('nis', 'like', "%{$search}%");
             });
         }
 
-        // Summary counts
-        $summary = (clone $query)->selectRaw('
+        $globalSummary = $globalQuery->selectRaw('
             COUNT(*) as total_records,
+            COUNT(DISTINCT student_id) as total_students,
             SUM(CASE WHEN status = "H" THEN 1 ELSE 0 END) as count_h,
             SUM(CASE WHEN status = "S" THEN 1 ELSE 0 END) as count_s,
             SUM(CASE WHEN status = "I" THEN 1 ELSE 0 END) as count_i,
             SUM(CASE WHEN status = "A" THEN 1 ELSE 0 END) as count_a,
-            SUM(CASE WHEN status = "T" THEN 1 ELSE 0 END) as count_t,
-            SUM(CASE WHEN status = "D" THEN 1 ELSE 0 END) as count_d
+            SUM(CASE WHEN status = "D" THEN 1 ELSE 0 END) as count_d,
+            SUM(CASE WHEN status = "T" THEN 1 ELSE 0 END) as count_t
         ')->first();
 
-        // Paginated records
-        $records = $query->orderBy('tanggal', 'desc')
-            ->orderBy('created_at', 'desc')
-            ->paginate(30)
-            ->withQueryString();
+        // 4. Dropdowns Filter
+        $kelasesQuery = Kelas::where('school_id', $schoolId)->orderBy('nama_kelas');
+        $mapelsQuery  = Mapel::where('school_id', $schoolId)->orderBy('nama_mapel');
+        $gurusQuery   = Guru::where('school_id', $schoolId)->orderBy('nama');
 
-        $kelases = Kelas::where('school_id', $schoolId)->orderBy('nama_kelas')->get();
-        $gurus = Guru::where('school_id', $schoolId)->orderBy('nama')->get();
-        $mapels = Mapel::where('school_id', $schoolId)->orderBy('nama_mapel')->get();
+        if (!$isAdminOrWaka && $isGuru) {
+            $guruJadwals = JadwalPelajaran::where('school_id', $schoolId)
+                ->where('guru_id', $guruId)
+                ->get();
+
+            $kelasesQuery->whereIn('id', $guruJadwals->pluck('kelas_id')->filter()->unique());
+            $mapelsQuery->whereIn('id', $guruJadwals->pluck('mapel_id')->filter()->unique());
+        }
+
+        $kelases = $kelasesQuery->get();
+        $mapels  = $mapelsQuery->get();
+        $gurus   = $gurusQuery->get();
 
         return view('absensi-pelajaran.rekap', compact(
-            'records',
+            'allSiswa',
             'summary',
+            'globalSummary',
             'startDate',
             'endDate',
             'kelasId',
             'mapelId',
             'selectedGuruId',
+            'search',
+            'sortBy',
+            'sortDir',
             'kelases',
             'gurus',
             'mapels',
+            'isAdminOrWaka',
+            'isGuru'
+        ));
+    }
+
+    /**
+     * Helper: Dapatkan data siswa dan agregasi presensi mapel lengkap (tanpa limit pagination) untuk Export & PDF
+     */
+    private function getRekapPelajaranData(Request $request): array
+    {
+        $user = auth()->user();
+        $schoolId = $user->school_id;
+        $isGuru = !empty($user->guru);
+        $guruId = $user->guru?->id;
+        $isAdminOrWaka = in_array($user->role, ['admin', 'super_admin', 'waka_kurikulum']);
+
+        $startDate = $request->input('start_date', Carbon::today()->startOfMonth()->format('Y-m-d'));
+        $endDate = $request->input('end_date', Carbon::today()->format('Y-m-d'));
+        $kelasId = $request->input('kelas_id');
+        $mapelId = $request->input('mapel_id');
+        $selectedGuruId = $request->input('guru_id');
+        $search = trim($request->input('search', $request->input('q', '')));
+
+        $sortBy = $request->input('sort_by', 'nama');
+        $sortDir = strtolower($request->input('sort_dir', 'asc')) === 'desc' ? 'desc' : 'asc';
+
+        $siswaQuery = Siswa::where('school_id', $schoolId)->with('kelas');
+
+        if (!$isAdminOrWaka && $isGuru) {
+            $guruKelasIds = JadwalPelajaran::where('school_id', $schoolId)
+                ->where('guru_id', $guruId)
+                ->pluck('kelas_id')
+                ->filter()
+                ->unique()
+                ->all();
+
+            if (empty($kelasId)) {
+                $siswaQuery->whereIn('kelas_id', $guruKelasIds);
+            }
+        }
+
+        if (!empty($kelasId)) {
+            $siswaQuery->where('kelas_id', $kelasId);
+        }
+
+        if (!empty($search)) {
+            $siswaQuery->where(function ($q) use ($search) {
+                $q->where('nama', 'like', "%{$search}%")
+                  ->orWhere('nis', 'like', "%{$search}%");
+                if (\Illuminate\Support\Facades\Schema::hasColumn('siswa', 'nisn')) {
+                    $q->orWhere('nisn', 'like', "%{$search}%");
+                }
+            });
+        }
+
+        if ($sortBy === 'kelas') {
+            $siswaQuery->leftJoin('kelas', 'siswa.kelas_id', '=', 'kelas.id')
+                ->select('siswa.*')
+                ->orderBy('kelas.nama_kelas', $sortDir)
+                ->orderBy('siswa.nama', 'asc');
+        } else {
+            $siswaQuery->orderBy('nama', $sortDir);
+        }
+
+        $allSiswa = $siswaQuery->get();
+        $studentIds = $allSiswa->pluck('id')->all();
+
+        $summary = [];
+        foreach ($allSiswa as $s) {
+            $summary[$s->id] = [
+                'H'          => 0,
+                'S'          => 0,
+                'I'          => 0,
+                'A'          => 0,
+                'D'          => 0,
+                'T'          => 0,
+                'total'      => 0,
+                'persentase' => 0,
+            ];
+        }
+
+        if (!empty($studentIds)) {
+            $absensiQuery = AbsensiPelajaran::where('absensi_pelajaran.school_id', $schoolId)
+                ->whereBetween('absensi_pelajaran.tanggal', [$startDate, $endDate])
+                ->whereIn('absensi_pelajaran.student_id', $studentIds);
+
+            if (!empty($mapelId)) {
+                $absensiQuery->whereHas('jadwal', fn($q) => $q->where('mapel_id', $mapelId));
+            }
+            if (!$isAdminOrWaka && $isGuru) {
+                $absensiQuery->whereHas('jadwal', fn($q) => $q->where('guru_id', $guruId));
+            } elseif (!empty($selectedGuruId)) {
+                $absensiQuery->whereHas('jadwal', fn($q) => $q->where('guru_id', $selectedGuruId));
+            }
+
+            $rawSummary = $absensiQuery->selectRaw('
+                student_id,
+                SUM(CASE WHEN status = "H" THEN 1 ELSE 0 END) as count_h,
+                SUM(CASE WHEN status = "S" THEN 1 ELSE 0 END) as count_s,
+                SUM(CASE WHEN status = "I" THEN 1 ELSE 0 END) as count_i,
+                SUM(CASE WHEN status = "A" THEN 1 ELSE 0 END) as count_a,
+                SUM(CASE WHEN status = "D" THEN 1 ELSE 0 END) as count_d,
+                SUM(CASE WHEN status = "T" THEN 1 ELSE 0 END) as count_t,
+                COUNT(*) as total_pertemuan
+            ')
+            ->groupBy('student_id')
+            ->get();
+
+            foreach ($rawSummary as $row) {
+                $h = (int) $row->count_h;
+                $s = (int) $row->count_s;
+                $i = (int) $row->count_i;
+                $a = (int) $row->count_a;
+                $d = (int) $row->count_d;
+                $t = (int) $row->count_t;
+                $tot = (int) $row->total_pertemuan;
+                $pct = $tot > 0 ? round((($h + $t) / $tot) * 100, 1) : 0;
+
+                $summary[$row->student_id] = [
+                    'H'          => $h,
+                    'S'          => $s,
+                    'I'          => $i,
+                    'A'          => $a,
+                    'D'          => $d,
+                    'T'          => $t,
+                    'total'      => $tot,
+                    'persentase' => $pct,
+                ];
+            }
+        }
+
+        $selectedKelas = $kelasId ? Kelas::find($kelasId) : null;
+        $selectedMapel = $mapelId ? Mapel::find($mapelId) : null;
+        $selectedGuru  = $selectedGuruId ? Guru::find($selectedGuruId) : ($isGuru && !$isAdminOrWaka ? $user->guru : null);
+
+        return [
+            'allSiswa'      => $allSiswa,
+            'summary'       => $summary,
+            'startDate'     => $startDate,
+            'endDate'       => $endDate,
+            'kelasId'       => $kelasId,
+            'mapelId'       => $mapelId,
+            'selectedKelas' => $selectedKelas,
+            'selectedMapel' => $selectedMapel,
+            'selectedGuru'  => $selectedGuru,
+            'school'        => $user->school,
+        ];
+    }
+
+    /**
+     * Export Rekap Absensi Pembelajaran ke Excel (.xlsx)
+     */
+    public function rekapExport(Request $request)
+    {
+        $data = $this->getRekapPelajaranData($request);
+        $allSiswa = $data['allSiswa'];
+        $summary = $data['summary'];
+        $startDate = $data['startDate'];
+        $endDate = $data['endDate'];
+        $selectedKelas = $data['selectedKelas'];
+        $selectedMapel = $data['selectedMapel'];
+        $school = $data['school'];
+
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Rekap Absensi Mapel');
+
+        // Header Dokumen
+        $sheet->setCellValue('A1', 'REKAPITULASI PRESENSI MAPEL SISWA');
+        $sheet->mergeCells('A1:L1');
+        $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
+        $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+        $schoolName = $school?->name ?? 'SEKOLAH';
+        $sheet->setCellValue('A2', strtoupper($schoolName));
+        $sheet->mergeCells('A2:L2');
+        $sheet->getStyle('A2')->getFont()->setBold(true)->setSize(11);
+        $sheet->getStyle('A2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+        $periodeStr = "Periode: " . Carbon::parse($startDate)->format('d/m/Y') . " s/d " . Carbon::parse($endDate)->format('d/m/Y');
+        if ($selectedKelas) $periodeStr .= " | Kelas: " . $selectedKelas->nama_kelas;
+        if ($selectedMapel) $periodeStr .= " | Mapel: " . $selectedMapel->nama_mapel;
+        $sheet->setCellValue('A3', $periodeStr);
+        $sheet->mergeCells('A3:L3');
+        $sheet->getStyle('A3')->getFont()->setItalic(true)->setSize(10);
+        $sheet->getStyle('A3')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+        // Header Kolom Tabel
+        $headers = [
+            'A5' => 'No',
+            'B5' => 'NIS',
+            'C5' => 'Nama Siswa',
+            'D5' => 'Kelas',
+            'E5' => 'Hadir (H)',
+            'F5' => 'Telat (T)',
+            'G5' => 'Sakit (S)',
+            'H5' => 'Izin (I)',
+            'I5' => 'Dispen (D)',
+            'J5' => 'Alpha (A)',
+            'K5' => 'Total Pertemuan',
+            'L5' => '% Kehadiran',
+        ];
+
+        foreach ($headers as $cell => $title) {
+            $sheet->setCellValue($cell, $title);
+        }
+
+        $sheet->getStyle('A5:L5')->getFont()->setBold(true);
+        $sheet->getStyle('A5:L5')->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FFE0E7FF');
+        $sheet->getStyle('A5:L5')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+        $row = 6;
+        $no = 1;
+        foreach ($allSiswa as $s) {
+            $sum = $summary[$s->id] ?? ['H' => 0, 'S' => 0, 'I' => 0, 'A' => 0, 'D' => 0, 'T' => 0, 'total' => 0, 'persentase' => 0];
+
+            $sheet->setCellValue('A' . $row, $no++);
+            $sheet->setCellValueExplicit('B' . $row, (string)($s->nis ?: '-'), DataType::TYPE_STRING);
+            $sheet->setCellValue('C' . $row, $s->nama);
+            $sheet->setCellValue('D' . $row, $s->kelas->nama_kelas ?? '-');
+            $sheet->setCellValue('E' . $row, $sum['H']);
+            $sheet->setCellValue('F' . $row, $sum['T']);
+            $sheet->setCellValue('G' . $row, $sum['S']);
+            $sheet->setCellValue('H' . $row, $sum['I']);
+            $sheet->setCellValue('I' . $row, $sum['D']);
+            $sheet->setCellValue('J' . $row, $sum['A']);
+            $sheet->setCellValue('K' . $row, $sum['total']);
+            $sheet->setCellValue('L' . $row, $sum['persentase'] . '%');
+
+            // Alignment
+            $sheet->getStyle('A' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('B' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('D' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('E' . $row . ':L' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+            $row++;
+        }
+
+        // Apply borders
+        $lastRow = $row - 1;
+        if ($lastRow >= 5) {
+            $sheet->getStyle('A5:L' . $lastRow)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
+        }
+
+        // Auto width
+        foreach (range('A', 'L') as $col) {
+            $sheet->getColumnDimension($col)->setAutoSize(true);
+        }
+
+        $writer = new Xlsx($spreadsheet);
+        $fileName = "rekap_absensi_mapel_{$startDate}_{$endDate}.xlsx";
+
+        return response()->streamDownload(function () use ($writer) {
+            $writer->save('php://output');
+        }, $fileName, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Cache-Control' => 'max-age=0',
+        ]);
+    }
+
+    /**
+     * Cetak / Stream Rekap Absensi Pembelajaran ke PDF
+     */
+    public function rekapPdf(Request $request)
+    {
+        ini_set('memory_limit', '512M');
+        set_time_limit(300);
+
+        $data = $this->getRekapPelajaranData($request);
+        $allSiswa = $data['allSiswa'];
+        $summary = $data['summary'];
+        $startDate = $data['startDate'];
+        $endDate = $data['endDate'];
+        $selectedKelas = $data['selectedKelas'];
+        $selectedMapel = $data['selectedMapel'];
+        $selectedGuru = $data['selectedGuru'];
+        $school = $data['school'];
+        $schoolId = $school?->id;
+
+        $schoolName = \App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'nama_sekolah')->value('setting_value') ?: ($school?->name ?? 'SEKOLAH');
+        $schoolAddress = \App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'alamat_sekolah')->value('setting_value') ?: ($school?->address ?? '');
+        $signatureLocation = \App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'alamat_ttd')->value('setting_value') ?: 'Tempat';
+        $namaKepsek = \App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'nama_kepala_sekolah')->value('setting_value') ?: '';
+        $nipKepsek = \App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'nip_kepala_sekolah')->value('setting_value') ?: '';
+        $namaWaka = \App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'nama_waka_kurikulum')->value('setting_value') ?: (\App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'nama_waka_kesiswaan')->value('setting_value') ?: '');
+        $nipWaka = \App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'nip_waka_kurikulum')->value('setting_value') ?: (\App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'nip_waka_kesiswaan')->value('setting_value') ?: '');
+        $kopSurat = \App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'kop_surat')->value('setting_value');
+
+        $pdf = Pdf::loadView('absensi-pelajaran.rekap-pdf', compact(
+            'allSiswa',
+            'summary',
+            'startDate',
+            'endDate',
+            'selectedKelas',
+            'selectedMapel',
+            'selectedGuru',
+            'schoolName',
+            'schoolAddress',
+            'signatureLocation',
+            'namaKepsek',
+            'nipKepsek',
+            'namaWaka',
+            'nipWaka',
+            'kopSurat'
+        ));
+
+        $pdf->setPaper('a4', 'landscape');
+
+        return $pdf->stream("rekap_absensi_mapel_{$startDate}_{$endDate}.pdf");
+    }
+
+    /**
+     * Halaman Detail Rekap Presensi Mapel Siswa (serupa dengan rekap.show pada Rekap Siswa)
+     */
+    public function rekapShow($id, Request $request)
+    {
+        $user = auth()->user();
+        $schoolId = $user->school_id;
+        $isGuru = !empty($user->guru);
+        $guruId = $user->guru?->id;
+        $isAdminOrWaka = in_array($user->role, ['admin', 'super_admin', 'waka_kurikulum']);
+
+        $siswa = Siswa::where('school_id', $schoolId)->with('kelas')->findOrFail($id);
+
+        $startDate = $request->input('start_date', Carbon::today()->startOfMonth()->format('Y-m-d'));
+        $endDate   = $request->input('end_date', Carbon::today()->format('Y-m-d'));
+        $mapelId   = $request->input('mapel_id');
+        $selectedGuruId = $request->input('guru_id');
+
+        $query = AbsensiPelajaran::where('absensi_pelajaran.school_id', $schoolId)
+            ->where('student_id', $id)
+            ->whereBetween('absensi_pelajaran.tanggal', [$startDate, $endDate])
+            ->with(['jadwal.mapel', 'jadwal.guru', 'jurnal'])
+            ->orderBy('tanggal', 'desc')
+            ->orderBy('id', 'desc');
+
+        if (!empty($mapelId)) {
+            $query->whereHas('jadwal', fn($q) => $q->where('mapel_id', $mapelId));
+        }
+
+        if (!$isAdminOrWaka && $isGuru) {
+            $query->whereHas('jadwal', fn($q) => $q->where('guru_id', $guruId));
+        } elseif (!empty($selectedGuruId)) {
+            $query->whereHas('jadwal', fn($q) => $q->where('guru_id', $selectedGuruId));
+        }
+
+        $attendance = $query->get();
+
+        $counts = [
+            'H' => 0,
+            'T' => 0,
+            'S' => 0,
+            'I' => 0,
+            'D' => 0,
+            'A' => 0,
+            'total' => count($attendance),
+            'persentase' => 0,
+        ];
+
+        foreach ($attendance as $att) {
+            $st = $att->status;
+            if (isset($counts[$st])) {
+                $counts[$st]++;
+            }
+        }
+
+        $counts['persentase'] = $counts['total'] > 0
+            ? round((($counts['H'] + $counts['T']) / $counts['total']) * 100, 1)
+            : 0;
+
+        $selectedMapel = $mapelId ? Mapel::find($mapelId) : null;
+
+        return view('absensi-pelajaran.show', compact(
+            'siswa',
+            'attendance',
+            'startDate',
+            'endDate',
+            'mapelId',
+            'selectedMapel',
+            'counts'
+        ));
+    }
+
+    /**
+     * Export Detail Rekap Presensi Mapel Siswa ke Excel (.xlsx)
+     */
+    public function rekapExportDetail($id, Request $request)
+    {
+        $user = auth()->user();
+        $schoolId = $user->school_id;
+        $isGuru = !empty($user->guru);
+        $guruId = $user->guru?->id;
+        $isAdminOrWaka = in_array($user->role, ['admin', 'super_admin', 'waka_kurikulum']);
+
+        $siswa = Siswa::where('school_id', $schoolId)->with('kelas')->findOrFail($id);
+
+        $startDate = $request->input('start_date', Carbon::today()->startOfMonth()->format('Y-m-d'));
+        $endDate   = $request->input('end_date', Carbon::today()->format('Y-m-d'));
+        $mapelId   = $request->input('mapel_id');
+        $selectedGuruId = $request->input('guru_id');
+
+        $query = AbsensiPelajaran::where('absensi_pelajaran.school_id', $schoolId)
+            ->where('student_id', $id)
+            ->whereBetween('absensi_pelajaran.tanggal', [$startDate, $endDate])
+            ->with(['jadwal.mapel', 'jadwal.guru', 'jurnal'])
+            ->orderBy('tanggal', 'asc');
+
+        if (!empty($mapelId)) {
+            $query->whereHas('jadwal', fn($q) => $q->where('mapel_id', $mapelId));
+        }
+
+        if (!$isAdminOrWaka && $isGuru) {
+            $query->whereHas('jadwal', fn($q) => $q->where('guru_id', $guruId));
+        } elseif (!empty($selectedGuruId)) {
+            $query->whereHas('jadwal', fn($q) => $q->where('guru_id', $selectedGuruId));
+        }
+
+        $attendance = $query->get();
+
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+
+        // Header Dokumen
+        $sheet->setCellValue('A1', 'DETAIL REKAP PRESENSI MATA PELAJARAN');
+        $sheet->setCellValue('A2', 'Nama: ' . $siswa->nama . ' | NIS: ' . ($siswa->nis ?: '-') . ' | Kelas: ' . ($siswa->kelas?->nama_kelas ?: '-'));
+        $sheet->setCellValue('A3', 'Periode: ' . Carbon::parse($startDate)->format('d/m/Y') . ' s/d ' . Carbon::parse($endDate)->format('d/m/Y'));
+
+        $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
+        $sheet->getStyle('A2:A3')->getFont()->setSize(10)->getColor()->setRGB('555555');
+
+        // Table Header
+        $headers = ['No', 'Hari, Tanggal', 'Jam Ke', 'Mata Pelajaran', 'Guru Pengampu', 'Status', 'Catatan / Keterangan', 'Materi KBM'];
+        $cols = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+        foreach ($headers as $idx => $hdr) {
+            $sheet->setCellValue($cols[$idx] . '5', $hdr);
+        }
+
+        $headerStyle = [
+            'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
+            'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '12B76A']],
+            'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER, 'vertical' => Alignment::VERTICAL_CENTER],
+            'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'D0D5DD']]],
+        ];
+        $sheet->getStyle('A5:H5')->applyFromArray($headerStyle);
+        $sheet->getRowDimension(5)->setRowHeight(26);
+
+        $rowIdx = 6;
+        $no = 1;
+        foreach ($attendance as $att) {
+            $tanggal = $att->tanggal ? Carbon::parse($att->tanggal)->locale('id')->isoFormat('dddd, D MMMM Y') : '-';
+            $jamKe = $att->jadwal?->jam_ke ?: ($att->jurnal?->jam_ke ?: '-');
+            $mapel = $att->jadwal?->mapel?->nama_mapel ?? 'Mata Pelajaran';
+            $guru = $att->jadwal?->guru?->nama ?? '-';
+            $status = $att->status_label ?: $att->status;
+            $ket = $att->keterangan ?: '-';
+            $materi = $att->jurnal?->materi ?: '-';
+
+            $sheet->setCellValue('A' . $rowIdx, $no++);
+            $sheet->setCellValue('B' . $rowIdx, $tanggal);
+            $sheet->setCellValue('C' . $rowIdx, $jamKe);
+            $sheet->setCellValue('D' . $rowIdx, $mapel);
+            $sheet->setCellValue('E' . $rowIdx, $guru);
+            $sheet->setCellValue('F' . $rowIdx, $status);
+            $sheet->setCellValue('G' . $rowIdx, $ket);
+            $sheet->setCellValue('H' . $rowIdx, $materi);
+
+            $rowIdx++;
+        }
+
+        $lastRow = max(6, $rowIdx - 1);
+        $sheet->getStyle("A6:H{$lastRow}")->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN)->getColor()->setRGB('E4E7EC');
+        $sheet->getStyle("A6:A{$lastRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        $sheet->getStyle("C6:C{$lastRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        $sheet->getStyle("F6:F{$lastRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+        foreach ($cols as $c) {
+            $sheet->getColumnDimension($c)->setAutoSize(true);
+        }
+
+        $writer = new Xlsx($spreadsheet);
+        $cleanName = preg_replace('/[^A-Za-z0-9]/', '_', $siswa->nama);
+        $fileName = "detail_absensi_mapel_{$cleanName}_{$startDate}_{$endDate}.xlsx";
+
+        return response()->streamDownload(function () use ($writer) {
+            $writer->save('php://output');
+        }, $fileName, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Cache-Control' => 'max-age=0',
+        ]);
+    }
+
+    /**
+     * AJAX: Detail Rincian Presensi Mapel per Siswa untuk Modal
+     */
+    public function rekapDetailSiswa(Request $request)
+    {
+        $user = auth()->user();
+        $schoolId = $user->school_id;
+        $studentId = $request->query('student_id');
+        $startDate = $request->query('start_date', Carbon::today()->startOfMonth()->format('Y-m-d'));
+        $endDate   = $request->query('end_date', Carbon::today()->format('Y-m-d'));
+        $mapelId   = $request->query('mapel_id');
+
+        $siswa = Siswa::where('school_id', $schoolId)->with('kelas')->findOrFail($studentId);
+
+        $query = AbsensiPelajaran::where('absensi_pelajaran.school_id', $schoolId)
+            ->where('student_id', $studentId)
+            ->whereBetween('absensi_pelajaran.tanggal', [$startDate, $endDate])
+            ->with(['jadwal.mapel', 'jadwal.guru', 'jurnal'])
+            ->orderBy('tanggal', 'desc');
+
+        if (!empty($mapelId)) {
+            $query->whereHas('jadwal', fn($q) => $q->where('mapel_id', $mapelId));
+        }
+
+        $records = $query->get()->map(function ($r) {
+            return [
+                'tanggal'      => $r->tanggal ? $r->tanggal->format('d/m/Y') : '-',
+                'jam_ke'       => $r->jadwal?->jam_ke ?: ($r->jurnal?->jam_ke ?: '-'),
+                'nama_mapel'   => $r->jadwal?->mapel?->nama_mapel ?? 'Mata Pelajaran',
+                'nama_guru'    => $r->jadwal?->guru?->nama ?? '-',
+                'status'       => $r->status,
+                'status_label' => $r->status_label,
+                'materi'       => $r->jurnal?->materi ?? '-',
+                'keterangan'   => $r->keterangan ?? '-',
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'siswa'   => [
+                'id'         => $siswa->id,
+                'nama'       => $siswa->nama,
+                'nis'        => $siswa->nis,
+                'nama_kelas' => $siswa->kelas?->nama_kelas ?? '-',
+            ],
+            'records' => $records,
+        ]);
+    }
+
+    /**
+     * Halaman Jurnal KBM (Teaching Journal Logbook)
+     * Menampilkan daftar guru dengan detail jurnal pembelajaran (mapel, kelas, materi, catatan, presensi siswa, dokumentasi).
+     * Dilengkapi filter tanggal tunggal (bukan range), filter kelas, filter mapel, dan kolom pencarian nama guru / materi.
+     */
+    public function jurnalKbm(Request $request)
+    {
+        $user = auth()->user();
+        $schoolId = $user->school_id;
+        $isGuru = !empty($user->guru);
+        $guruId = $user->guru?->id;
+        $role = $user->role;
+        $isAdminOrWaka = in_array($role, ['admin', 'super_admin', 'waka_kurikulum']);
+        $school = $user?->school;
+
+        $isDokKbmEnabled = ($user && $user->role === 'super_admin')
+            ? true
+            : app(\App\Services\LicenseService::class)->isDokKbmFeatureEnabled($school);
+
+        // 1. Filter Tanggal Tunggal (bukan range, default hari ini)
+        $tanggal = $request->query('tanggal', Carbon::today()->format('Y-m-d'));
+        try {
+            $parsedDate = Carbon::parse($tanggal);
+        } catch (\Exception $e) {
+            $parsedDate = Carbon::today();
+            $tanggal = $parsedDate->format('Y-m-d');
+        }
+
+        $kelasId = $request->query('kelas_id');
+        $mapelId = $request->query('mapel_id');
+        $search  = trim($request->query('search', $request->query('q', '')));
+
+        // 2. Query JurnalPelajaran pada tanggal tersebut
+        $query = JurnalPelajaran::where('school_id', $schoolId)
+            ->whereDate('tanggal', $tanggal)
+            ->with([
+                'guru.user',
+                'jadwal.kelas',
+                'jadwal.mapel',
+                'jadwal.guru'
+            ]);
+
+        // Filter Kelas jika dipilih
+        if (!empty($kelasId)) {
+            $query->whereHas('jadwal', fn($q) => $q->where('kelas_id', $kelasId));
+        }
+
+        // Filter Mapel jika dipilih
+        if (!empty($mapelId)) {
+            $query->whereHas('jadwal', fn($q) => $q->where('mapel_id', $mapelId));
+        }
+
+        // Search Form Nama Guru atau Materi/Catatan KBM
+        if (!empty($search)) {
+            $query->where(function ($q) use ($search) {
+                $q->whereHas('guru', fn($g) => $g->where('nama', 'like', "%{$search}%"))
+                  ->orWhereHas('jadwal.guru', fn($g) => $g->where('nama', 'like', "%{$search}%"))
+                  ->orWhere('materi', 'like', "%{$search}%")
+                  ->orWhere('catatan', 'like', "%{$search}%");
+            });
+        }
+
+        $allJurnals = $query->orderBy('jam_mulai')->orderBy('jam_ke')->get();
+
+        // 3. Lampirkan data siswa yang tidak hadir (Sakit, Izin, Alpa, Dispen)
+        $this->attachAbsentStudentsToJurnals($allJurnals, $schoolId);
+
+        // 4. Konsolidasikan kelas paralel (gabungan) agar sesi terpadu rapi & berkas media tidak dobel
+        $consolidatedJurnals = $this->consolidateParallelJurnals($allJurnals);
+
+        // 5. Grouping per Guru dengan detail sesi KBM
+        $groupedByGuru = $consolidatedJurnals->groupBy(function ($jurnal) {
+            return $jurnal->guru_id ?? ($jurnal->jadwal?->guru_id ?? 0);
+        })->map(function ($jurnals, $gId) {
+            $firstJurnal = $jurnals->first();
+            $guru = $firstJurnal->guru ?? $firstJurnal->jadwal?->guru;
+            $publicSlug = $guru?->username ?: ($guru?->user?->username ?: $gId);
+
+            $allDocs = $jurnals->flatMap(fn($j) => $j->consolidated_docs ?? $j->dokumentasi_list);
+
+            return (object) [
+                'guru'         => $guru,
+                'guru_id'      => $gId,
+                'guru_nama'    => $guru ? $guru->nama : 'Guru Tidak Diketahui',
+                'guru_nip'     => $guru?->nip ?? '-',
+                'guru_foto'    => $guru?->foto_url ?? null,
+                'public_slug'  => $publicSlug,
+                'jurnals'      => $jurnals->sortBy(function ($j) {
+                    return $j->jam_mulai ?: ($j->jam_ke ?: 0);
+                })->values(),
+                'total_sesi'   => $jurnals->count(),
+                'total_docs'   => $allDocs->count(),
+                'total_images' => $allDocs->where('is_image', true)->count(),
+                'total_videos' => $allDocs->where('is_video', true)->count(),
+                'total_absent' => $jurnals->sum('absent_count'),
+            ];
+        })->sortBy('guru_nama')->values();
+
+        // 6. Ringkasan Keseluruhan (Top Cards)
+        $allDocsFlattened = $consolidatedJurnals->flatMap(fn($j) => $j->consolidated_docs ?? $j->dokumentasi_list);
+        $stats = [
+            'total_guru'   => $groupedByGuru->count(),
+            'total_sesi'   => $consolidatedJurnals->count(),
+            'total_docs'   => $allDocsFlattened->count(),
+            'total_images' => $allDocsFlattened->where('is_image', true)->count(),
+            'total_videos' => $allDocsFlattened->where('is_video', true)->count(),
+            'total_absent' => $consolidatedJurnals->sum('absent_count'),
+        ];
+
+        // 7. Opsi Filter (Kelas & Mapel)
+        $kelases = Kelas::where('school_id', $schoolId)->orderBy('nama_kelas')->get();
+        $mapels  = Mapel::where('school_id', $schoolId)->orderBy('nama_mapel')->get();
+
+        // Nama hari Indonesia
+        $hariIndonesia = [
+            1 => 'Senin',
+            2 => 'Selasa',
+            3 => 'Rabu',
+            4 => 'Kamis',
+            5 => 'Jumat',
+            6 => 'Sabtu',
+            7 => 'Minggu',
+        ];
+        $namaHari = $hariIndonesia[$parsedDate->dayOfWeekIso] ?? 'Senin';
+
+        return view('absensi-pelajaran.jurnal-kbm', compact(
+            'groupedByGuru',
+            'stats',
+            'tanggal',
+            'parsedDate',
+            'namaHari',
+            'kelasId',
+            'consolidatedJurnals',
+            'mapelId',
+            'search',
+            'kelases',
+            'mapels',
+            'isAdminOrWaka',
+            'isGuru',
+            'isDokKbmEnabled',
+            'school',
+            'user'
+        ));
+    }
+
+    /**
+     * Halaman Detail Jurnal Pembelajaran (KBM) ke Laman Baru
+     * Mendukung Sesi Tunggal maupun Sesi Kelas Gabungan (Multi-Kelas)
+     */
+    public function jurnalKbmShow($id, Request $request)
+    {
+        $user = auth()->user();
+        $schoolId = $user->school_id;
+        $isGuru = !empty($user->guru);
+        $guruId = $user->guru?->id;
+        $isAdminOrWaka = in_array($user->role, ['admin', 'super_admin', 'waka_kurikulum']);
+
+        $jurnal = JurnalPelajaran::where('school_id', $schoolId)
+            ->with([
+                'jadwal.kelas',
+                'jadwal.mapel',
+                'jadwal.guru',
+                'guru'
+            ])
+            ->findOrFail($id);
+
+        $jadwal = $jurnal->jadwal;
+        $tanggalStr = $jurnal->tanggal ? $jurnal->tanggal->format('Y-m-d') : date('Y-m-d');
+        $operatorGuruId = $jurnal->guru_id ?: ($jadwal?->guru_id ?? 0);
+        $mapelId = $jadwal?->mapel_id ?? 0;
+
+        // 1. Temukan semua Jadwal Paralel (Kelas Gabungan pada hari, guru, mapel, & jam yang sama)
+        $parallelJadwals = collect();
+        if ($jadwal) {
+            $parallelJadwals = JadwalPelajaran::where('school_id', $schoolId)
+                ->where('guru_id', $jadwal->guru_id)
+                ->where('mapel_id', $jadwal->mapel_id)
+                ->where('hari', $jadwal->hari)
+                ->where('jam_mulai', $jadwal->jam_mulai)
+                ->where('jam_selesai', $jadwal->jam_selesai)
+                ->with(['kelas', 'mapel', 'guru'])
+                ->orderBy('id')
+                ->get();
+        }
+
+        $parallelJadwalIds = $parallelJadwals->pluck('id')->filter()->unique()->all();
+
+        // 2. Temukan semua JurnalPelajaran paralel pada tanggal KBM yang sama
+        $parallelJurnals = JurnalPelajaran::where('school_id', $schoolId)
+            ->whereDate('tanggal', $tanggalStr)
+            ->where(function ($q) use ($parallelJadwalIds, $jurnal, $operatorGuruId, $mapelId) {
+                $hasCond = false;
+                if (!empty($parallelJadwalIds)) {
+                    $q->whereIn('jadwal_pelajaran_id', $parallelJadwalIds);
+                    $hasCond = true;
+                }
+                if ($operatorGuruId && $mapelId) {
+                    $closure = function ($sub) use ($operatorGuruId, $mapelId, $jurnal) {
+                        $sub->where('guru_id', $operatorGuruId)
+                            ->whereHas('jadwal', fn($j) => $j->where('mapel_id', $mapelId));
+                        if (!empty($jurnal->jam_ke)) {
+                            $sub->where('jam_ke', $jurnal->jam_ke);
+                        }
+                    };
+                    if ($hasCond) {
+                        $q->orWhere($closure);
+                    } else {
+                        $q->where($closure);
+                        $hasCond = true;
+                    }
+                }
+                if ($hasCond) {
+                    $q->orWhere('id', $jurnal->id);
+                } else {
+                    $q->where('id', $jurnal->id);
+                }
+            })
+            ->with(['jadwal.kelas', 'jadwal.mapel', 'jadwal.guru'])
+            ->get();
+
+        $allJurnalIds = $parallelJurnals->pluck('id')->push($jurnal->id)->filter()->unique()->all();
+        $allJadwalIds = $parallelJadwals->pluck('id')
+            ->concat($parallelJurnals->pluck('jadwal_pelajaran_id'))
+            ->push($jurnal->jadwal_pelajaran_id)
+            ->filter()
+            ->unique()
+            ->all();
+
+        // 3. Kumpulkan seluruh kelas yang terlibat dalam sesi ini
+        $kelasCollection = collect();
+        foreach ($parallelJadwals as $pj) {
+            if ($pj->kelas) {
+                $kelasCollection->push($pj->kelas);
+            }
+        }
+        foreach ($parallelJurnals as $pjur) {
+            if ($pjur->jadwal?->kelas) {
+                $kelasCollection->push($pjur->jadwal->kelas);
+            }
+        }
+        if ($jurnal->jadwal?->kelas) {
+            $kelasCollection->push($jurnal->jadwal->kelas);
+        }
+        $involvedClasses = $kelasCollection->unique('id')->values();
+        $isMultiKelas = $involvedClasses->count() > 1;
+        $kelasIds = $involvedClasses->pluck('id')->filter()->unique()->all();
+        $namaKelasGabungan = $involvedClasses->pluck('nama_kelas')->join(' & ');
+
+        // 4. Ambil seluruh siswa dari semua kelas yang terlibat
+        $allStudents = Siswa::where('school_id', $schoolId)
+            ->whereIn('kelas_id', $kelasIds)
+            ->with('kelas')
+            ->orderBy('kelas_id')
+            ->orderBy('nama')
+            ->get();
+
+        // 5. Ambil data presensi yang sudah dicatat pada sesi KBM ini
+        $absensiRecords = AbsensiPelajaran::where('school_id', $schoolId)
+            ->where(function ($q) use ($allJurnalIds, $allJadwalIds, $tanggalStr) {
+                $hasCond = false;
+                if (!empty($allJurnalIds)) {
+                    $q->whereIn('jurnal_pelajaran_id', $allJurnalIds);
+                    $hasCond = true;
+                }
+                if (!empty($allJadwalIds)) {
+                    $closure = function ($sub) use ($allJadwalIds, $tanggalStr) {
+                        $sub->whereIn('jadwal_pelajaran_id', $allJadwalIds)
+                            ->whereDate('tanggal', $tanggalStr);
+                    };
+                    if ($hasCond) {
+                        $q->orWhere($closure);
+                    } else {
+                        $q->where($closure);
+                        $hasCond = true;
+                    }
+                }
+            })
+            ->with('student.kelas')
+            ->get();
+
+        $absensiMap = $absensiRecords->keyBy('student_id');
+
+        // 6. Buat struktur presensi gabungan & breakdown per-kelas
+        $presensiList = [];
+        $counts = [
+            'H' => 0,
+            'T' => 0,
+            'S' => 0,
+            'I' => 0,
+            'D' => 0,
+            'A' => 0,
+            'total' => 0,
+        ];
+
+        $classesBreakdown = [];
+        foreach ($involvedClasses as $cls) {
+            $classesBreakdown[$cls->id] = [
+                'kelas_id'   => $cls->id,
+                'nama_kelas' => $cls->nama_kelas,
+                'counts'     => ['H' => 0, 'T' => 0, 'S' => 0, 'I' => 0, 'D' => 0, 'A' => 0, 'total' => 0],
+                'students'   => [],
+            ];
+        }
+
+        if ($allStudents->isNotEmpty()) {
+            foreach ($allStudents as $st) {
+                $rec = $absensiMap->get($st->id);
+                $status = $rec ? $rec->status : ($absensiRecords->isNotEmpty() ? 'A' : '-');
+                $statusLabel = match($status) {
+                    'H' => 'Hadir',
+                    'T' => 'Telat',
+                    'S' => 'Sakit',
+                    'I' => 'Izin',
+                    'D' => 'Dispen',
+                    'A' => 'Alpha',
+                    default => 'Belum Absen',
+                };
+                $keterangan = $rec ? $rec->keterangan : '-';
+
+                if (isset($counts[$status])) {
+                    $counts[$status]++;
+                }
+
+                $stData = [
+                    'student_id'   => $st->id,
+                    'nama'         => $st->nama,
+                    'nis'          => $st->nis ?: '-',
+                    'kelas_id'     => $st->kelas_id,
+                    'kelas'        => $st->kelas?->nama_kelas ?? '-',
+                    'status'       => $status,
+                    'status_label' => $statusLabel,
+                    'keterangan'   => $keterangan,
+                ];
+
+                $presensiList[] = $stData;
+
+                if (isset($classesBreakdown[$st->kelas_id])) {
+                    $classesBreakdown[$st->kelas_id]['students'][] = $stData;
+                    if (isset($classesBreakdown[$st->kelas_id]['counts'][$status])) {
+                        $classesBreakdown[$st->kelas_id]['counts'][$status]++;
+                    }
+                    $classesBreakdown[$st->kelas_id]['counts']['total']++;
+                }
+            }
+            $counts['total'] = count($presensiList);
+        } else {
+            foreach ($absensiRecords as $rec) {
+                $st = $rec->student;
+                $status = $rec->status;
+                if (isset($counts[$status])) {
+                    $counts[$status]++;
+                }
+                $presensiList[] = [
+                    'student_id'   => $rec->student_id,
+                    'nama'         => $st ? $st->nama : 'Siswa',
+                    'nis'          => $st?->nis ?: '-',
+                    'kelas_id'     => $st?->kelas_id,
+                    'kelas'        => $st?->kelas?->nama_kelas ?? ($jurnal->jadwal?->kelas?->nama_kelas ?? '-'),
+                    'status'       => $status,
+                    'status_label' => $rec->status_label ?: $status,
+                    'keterangan'   => $rec->keterangan ?: '-',
+                ];
+            }
+            $counts['total'] = count($presensiList);
+        }
+
+        // 7. Konsolidasikan dokumentasi media dari seluruh jurnal paralel (de-duplicate URL)
+        $allDocs = collect();
+        foreach ($parallelJurnals as $pjur) {
+            foreach ($pjur->dokumentasi_list as $doc) {
+                $allDocs->push($doc);
+            }
+        }
+        foreach ($jurnal->dokumentasi_list as $doc) {
+            $allDocs->push($doc);
+        }
+        $docs = $allDocs->unique(fn($d) => $d['url'] ?? ($d['view_url'] ?? ''))->values()->all();
+
+        return view('absensi-pelajaran.jurnal-kbm-detail', compact(
+            'jurnal',
+            'isMultiKelas',
+            'involvedClasses',
+            'namaKelasGabungan',
+            'classesBreakdown',
+            'presensiList',
+            'counts',
+            'docs',
             'isAdminOrWaka',
             'isGuru'
         ));
@@ -860,7 +1936,7 @@ class AbsensiPelajaranController extends Controller
             ->where('dokumentasi', '!=', '[]')
             ->where('dokumentasi', '!=', '""')
             ->where('dokumentasi', '!=', '')
-            ->with(['guru.user']);
+            ->with(['guru.user', 'jadwal.kelas', 'jadwal.mapel']);
 
         if (!$isAdminOrWaka && $isGuru) {
             $query->where('guru_id', $guruId);
@@ -868,12 +1944,15 @@ class AbsensiPelajaranController extends Controller
 
         $allJurnals = $query->orderBy('tanggal', 'desc')->get();
 
-        // Grouping per Guru dengan ringkasan statistik
-        $groupedByGuru = $allJurnals->groupBy(function ($j) {
+        // Konsolidasikan kelas paralel agar sesi KBM gabungan & foto/videonya tidak terhitung ganda
+        $consolidatedJurnals = $this->consolidateParallelJurnals($allJurnals);
+
+        // Grouping per Guru dengan ringkasan statistik yang sudah terkonsolidasi & deduplikasi
+        $groupedByGuru = $consolidatedJurnals->groupBy(function ($j) {
             return $j->guru_id ?? 0;
         })->map(function ($items, $gId) {
             $guru = $items->first()->guru;
-            $allDocs = $items->flatMap(fn($j) => $j->dokumentasi_list);
+            $allDocs = $items->flatMap(fn($j) => $j->consolidated_docs ?? $j->dokumentasi_list);
             $publicSlug = $guru?->username ?: ($guru?->user?->username ?: $gId);
 
             return (object) [
@@ -902,11 +1981,11 @@ class AbsensiPelajaranController extends Controller
 
         $groupedByGuru = $groupedByGuru->sortByDesc('total_files')->values();
 
-        // Statistik Keseluruhan (Kartu Atas)
-        $allDocsFlattened = $allJurnals->flatMap(fn($j) => $j->dokumentasi_list);
+        // Statistik Keseluruhan (Kartu Atas) yang telah dikonsolidasikan
+        $allDocsFlattened = $consolidatedJurnals->flatMap(fn($j) => $j->consolidated_docs ?? $j->dokumentasi_list);
         $stats = [
-            'total_gurus'    => $allJurnals->pluck('guru_id')->filter()->unique()->count(),
-            'total_sessions' => $allJurnals->count(),
+            'total_gurus'    => $consolidatedJurnals->pluck('guru_id')->filter()->unique()->count(),
+            'total_sessions' => $consolidatedJurnals->count(),
             'total_files'    => $allDocsFlattened->count(),
             'total_images'   => $allDocsFlattened->where('is_image', true)->count(),
             'total_videos'   => $allDocsFlattened->where('is_video', true)->count(),

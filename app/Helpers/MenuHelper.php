@@ -30,6 +30,11 @@ class MenuHelper
                     'path' => route('absensi-pelajaran.index', [], false),
                 ],
                 [
+                    'icon' => 'forms',
+                    'name' => 'Jurnal KBM',
+                    'path' => route('absensi-pelajaran.jurnal-kbm', [], false),
+                ],
+                [
                     'icon' => 'pages',
                     'name' => 'Rekap Absensi Mapel',
                     'path' => route('absensi-pelajaran.rekap', [], false),
@@ -187,6 +192,7 @@ class MenuHelper
             if (!$isOffice && !$isPesantren) {
                 $absensiSubItems[] = ['name' => 'Absensi Siswa', 'path' => route('absensi.index', [], false)];
                 $absensiSubItems[] = ['name' => 'Absensi Mapel', 'path' => route('absensi-pelajaran.index', [], false)];
+                $absensiSubItems[] = ['name' => 'Jurnal KBM', 'path' => route('absensi-pelajaran.jurnal-kbm', [], false)];
                 // Scanner Absensi Wajah & USB hanya untuk admin
                 if ($role === 'admin') {
                     $isFaceLocked = !app(\App\Services\LicenseService::class)->isFaceFeatureEnabled($school);

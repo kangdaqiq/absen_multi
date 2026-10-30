@@ -57,7 +57,26 @@ Route::get('/download/android', [DashboardController::class, 'downloadAndroidApp
 
 // ── Galeri Publik Dokumentasi KBM & Jurnal Guru (Tanpa Login / Akses Publik Pakai Username Guru) ────────────
 Route::get('/dokumentasi-kbm/{identifier}', [App\Http\Controllers\AbsensiPelajaranController::class, 'publicDokumentasiGuru'])->name('publik.dokumentasi-guru');
-Route::get('/galeri-guru/{identifier}', [App\Http\Controllers\AbsensiPelajaranController::class, 'publicDokumentasiGuru']);
+// ── RFIDv2 Device Simulator (Publik untuk Pengembang & Integrator) ────────────
+Route::get('/simulator', fn () => response()->file(public_path('rfid-simulator.html')))->name('public.simulator');
+Route::get('/rfid-simulator', fn () => response()->file(public_path('rfid-simulator.html')));
+
+// ── Dokumentasi REST API RFIDv2 (Publik) ────────────
+Route::get('/docs/DOKUMENTASI_API_RFIDV2.md', function () {
+    $path = base_path('docs/DOKUMENTASI_API_RFIDV2.md');
+    if (!file_exists($path)) abort(404);
+    if (request()->has('raw') || request()->has('download')) {
+        return response()->file($path, [
+            'Content-Type' => 'text/markdown; charset=UTF-8',
+            'Content-Disposition' => 'inline; filename="DOKUMENTASI_API_RFIDV2.md"',
+        ]);
+    }
+    $markdown = file_get_contents($path);
+    $htmlContent = \Illuminate\Support\Str::markdown($markdown);
+    return view('docs.rfid-v2', compact('htmlContent'));
+})->name('public.docs.rfid-v2');
+Route::get('/docs/rfid-v2', fn () => redirect('/docs/DOKUMENTASI_API_RFIDV2.md'));
+Route::get('/docs/rfid', fn () => redirect('/docs/DOKUMENTASI_API_RFIDV2.md'));
 
 // ── Log Request Inspector (Wajib Login & Multi-Tenant Scoped) ────────────
 Route::middleware(['auth'])->group(function () {

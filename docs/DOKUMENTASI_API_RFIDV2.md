@@ -15,6 +15,7 @@ Dokumentasi ini ditujukan bagi **pengembang pihak ketiga / klien** yang ingin me
    - [4.2 Kontrak Parameter `sound` (Buzzer)](#42-kontrak-parameter-sound-buzzer)
 5. [Contoh Kasus Respon JSON Server](#5-contoh-kasus-respon-json-server)
 6. [Ketentuan HTTP Status Code & Penanganan Offline](#6-ketentuan-http-status-code--penanganan-offline)
+7. [Device Simulator untuk Pengujian](#7-device-simulator-untuk-pengujian)
 
 ---
 
@@ -76,7 +77,7 @@ Device akan mengirimkan payload JSON dengan struktur berikut:
 ### Penjelasan Parameter Request:
 | Parameter | Tipe | Status | Deskripsi |
 | :--- | :--- | :---: | :--- |
-| `api_key` | `string` | **Wajib** | API Key unik perangkat yang telah didaftarkan teknisi di menu config alat. Gunakan ini untuk mengotentikasi keabsahan mesin. |
+| `api_key` | `string` | **Wajib** | API Key unik perangkat yang telah didaftarkan di menu config alat. Gunakan ini untuk mengotentikasi keabsahan mesin. |
 | `uid` | `string` | **Wajib** | Nomor UID kartu RFID fisik dalam format Hexadecimal Uppercase (contoh: `53A26B1E` atau `1A2B3C4D5E6F`). |
 | `scanned_at` | `string` | *Opsional* | Timestamp kartu di-tap (format: `YYYY-MM-DD HH:mm:ss`). <br>• **Jika ada**: Data berasal dari antrean offline (LittleFS) saat internet sebelumnya sempat putus.<br>• **Jika tidak ada**: Kartu baru saja di-tap saat online secara real-time. |
 
@@ -98,7 +99,7 @@ Agar LCD 16x2 dan Buzzer perangkat menampilkan informasi dengan benar, backend A
 }
 ```
 
-### 4.1 Kontrak Objek `display`
+### 4.1 Objek `display`
 Objek ini mengontrol tampilan LCD 16x2 karakter pada mesin:
 
 | Field | Tipe | Batas Karakter | Deskripsi |
@@ -111,7 +112,7 @@ Objek ini mengontrol tampilan LCD 16x2 karakter pada mesin:
 
 ---
 
-### 4.2 Kontrak Parameter `sound` (Buzzer)
+### 4.2  Parameter `sound` (Buzzer)
 String ini menginstruksikan modul buzzer device untuk membunyikan pola nada tertentu:
 
 | Nilai `sound` | Pola Bunyi Buzzer | Rekomendasi Penggunaan |
@@ -227,3 +228,18 @@ Device mengevaluasi status transmisi data berdasarkan HTTP Response Code:
    - Device menganggap jaringan atau server mengalami gangguan.
    - Tampilan LCD device otomatis menampilkan `"OFFLINE - SIMPAN"` dan membunyikan 2x bip indikator.
    - Data kartu otomatis disimpan ke penyimpanan memori internal (`/queue.ndjson`) dan akan disinkronkan kembali saat server dapat dijangkau.
+
+---
+
+## 7. Device Simulator untuk Pengujian
+
+Untuk mempermudah pengujian backend server tanpa memerlukan modul perangkat fisik, telah disediakan **RFIDv2 Virtual Device Simulator** yang dapat diakses publik langsung melalui browser:
+
+- **URL Akses**:
+  - `https://absen.jagattech.my.id/rfid-simulator`
+- **Fitur Simulator**:
+  1. **Simulasi Layar LCD 16x2 **: Menampilkan render baris 1 & 2 persis seperti layar LCD fisik, termasuk animasi running text saat standby dan timer hitung mundur `duration_ms`.
+  2. **Synthesizer Buzzer Audio**: Membunyikan nada asli sesuai frekuensi firmware (`ok`, `short`, `triple`, `error`).
+  3. **Pengujian Scan & Antrean Offline**: Pilihan input UID kartu dengan preset instan serta simulasi pengiriman `scanned_at` untuk antrean offline.
+  4. **Log Respon JSON Real-Time**: Langsung menampilkan payload JSON balasan dari server lengkap dengan kode status HTTP dan latensi respons secara instan.
+

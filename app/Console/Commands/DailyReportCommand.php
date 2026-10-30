@@ -38,7 +38,14 @@ class DailyReportCommand extends Command
         }
 
         foreach ($schools as $school) {
-            $this->processSchoolReport($school, $targetJid);
+            try {
+                $this->processSchoolReport($school, $targetJid);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::error("[DailyReport] Error processing school ID {$school->id} ({$school->name}): " . $e->getMessage(), [
+                    'exception' => $e
+                ]);
+                $this->error("Error processing school ID {$school->id} ({$school->name}): " . $e->getMessage());
+            }
         }
     }
 
@@ -108,12 +115,6 @@ class DailyReportCommand extends Command
             $this->info("DailyReport already ran today for this school.");
             return;
         }
-
-        // Mark done for this school immediately to prevent duplicate runs on next minute cron
-        Setting::updateOrCreate(
-            ['school_id' => $schoolId, 'setting_key' => 'last_daily_report_date'],
-            ['setting_value' => $today]
-        );
 
         // 4. Get classes with WhatsApp Group ID (Per School)
         $kelasWithGroupId = Kelas::where('school_id', $schoolId)
@@ -295,7 +296,6 @@ class DailyReportCommand extends Command
                         'status' => 'A',
                         'keterangan' => $keterangan,
                         'is_auto_alpha' => true,
-                        'lokasi_masuk' => 'System',
                         'created_at' => now(),
                         'updated_at' => now(),
                     ]
@@ -328,6 +328,12 @@ class DailyReportCommand extends Command
                 }
             }
         }
+
+        // Tandai bahwa proses absensi & penandaan Alpha sekolah ini sudah selesai untuk hari ini
+        Setting::updateOrCreate(
+            ['school_id' => $schoolId, 'setting_key' => 'last_daily_report_date'],
+            ['setting_value' => $today]
+        );
 
         // Sort by Jurusan Name, then by Kelas Name
         ksort($statsByJurusan);

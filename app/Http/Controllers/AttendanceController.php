@@ -1725,11 +1725,166 @@ class AttendanceController extends Controller
         ]);
 
         $rawUid = trim($request->input('uid'));
-        $uid = strtoupper(trim($rawUid));
         $reqMode = $request->input('mode', 'auto');
+        $user = auth()->user();
+
+        return $this->processUsbRfidScan($rawUid, $reqMode, $user, now());
+    }
+
+    /**
+     * Batch Sync Offline Scans queued locally during offline/network disruption.
+     */
+    public function syncOfflineScans(Request $request)
+    {
+        $records = $request->input('records', $request->input('scans', []));
+        if (empty($records) || !is_array($records)) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'Tidak ada data antrean absensi offline untuk disinkronkan.',
+            ], 422);
+        }
+
+        $user = auth()->user();
+        $syncedCount = 0;
+        $failedCount = 0;
+        $results = [];
+
+        foreach ($records as $item) {
+            $rawUid = trim($item['uid']);
+            $reqMode = $item['mode'] ?? 'auto';
+            try {
+                $tappedAt = Carbon::parse($item['tapped_at']);
+            } catch (\Exception $e) {
+                $tappedAt = now();
+            }
+
+            try {
+                $res = $this->processUsbRfidScan($rawUid, $reqMode, $user, $tappedAt);
+                $data = $res->getData(true);
+                $isOk = !empty($data['ok']);
+                if ($isOk) {
+                    $syncedCount++;
+                } else {
+                    $failedCount++;
+                }
+
+                $results[] = [
+                    'uid' => $rawUid,
+                    'tapped_at' => $tappedAt->format('Y-m-d H:i:s'),
+                    'ok' => $isOk,
+                    'status' => $data['status'] ?? 'unknown',
+                    'type' => $data['type'] ?? '',
+                    'message' => $data['message'] ?? '',
+                    'nama' => $data['data']['nama'] ?? '-',
+                ];
+            } catch (\Throwable $e) {
+                $failedCount++;
+                $results[] = [
+                    'uid' => $rawUid,
+                    'tapped_at' => $tappedAt->format('Y-m-d H:i:s'),
+                    'ok' => false,
+                    'status' => 'error',
+                    'message' => $e->getMessage(),
+                    'nama' => '-',
+                ];
+            }
+        }
+
+        return response()->json([
+            'ok' => true,
+            'message' => "Sinkronisasi offline selesai: {$syncedCount} berhasil, {$failedCount} gagal/peringatan.",
+            'total' => count($records),
+            'synced' => $syncedCount,
+            'failed' => $failedCount,
+            'results' => $results,
+        ]);
+    }
+
+    /**
+     * Get offline cache master data (students, teachers, gate cards) for the active school.
+     */
+    public function getScannerCache(Request $request)
+    {
+        $user = auth()->user();
+        $schoolId = $user ? $user->school_id : null;
+
+        if (!$schoolId) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'Konteks sekolah tidak ditemukan.',
+                'students' => [],
+                'teachers' => [],
+            ], 422);
+        }
+
+        $students = Siswa::where('school_id', $schoolId)
+            ->whereNotNull('uid_rfid')
+            ->where('uid_rfid', '!=', '')
+            ->with('kelas:id,nama_kelas')
+            ->get()
+            ->map(function ($s) {
+                return [
+                    'uid' => strtoupper(trim($s->uid_rfid)),
+                    'id' => $s->id,
+                    'nama' => $s->nama,
+                    'nis' => $s->nis ?? '-',
+                    'kelas' => $s->kelas->nama_kelas ?? '-',
+                    'foto' => $s->foto_url ?? null,
+                    'role' => 'Siswa',
+                ];
+            });
+
+        $teachers = Guru::where('school_id', $schoolId)
+            ->whereNotNull('uid_rfid')
+            ->where('uid_rfid', '!=', '')
+            ->get()
+            ->map(function ($g) {
+                return [
+                    'uid' => strtoupper(trim($g->uid_rfid)),
+                    'id' => $g->id,
+                    'nama' => $g->nama,
+                    'nis' => $g->nip ?? '-',
+                    'kelas' => 'Guru / Staf',
+                    'foto' => $g->foto_url ?? null,
+                    'role' => 'Guru / Staf',
+                ];
+            });
+
+        $gateCards = GateCard::where('school_id', $schoolId)
+            ->whereNotNull('uid_rfid')
+            ->where('uid_rfid', '!=', '')
+            ->get()
+            ->map(function ($gc) {
+                return [
+                    'uid' => strtoupper(trim($gc->uid_rfid)),
+                    'nama' => $gc->name,
+                    'role' => 'Kartu Gerbang',
+                    'kelas' => 'Akses Gerbang',
+                ];
+            });
+
+        $allData = $students->concat($teachers)->concat($gateCards)->values();
+
+        return response()->json([
+            'ok' => true,
+            'school_id' => $schoolId,
+            'timestamp' => now()->toIso8601String(),
+            'count' => $allData->count(),
+            'data' => $allData,
+            'students' => $students,
+            'teachers' => $teachers,
+            'gate_cards' => $gateCards,
+        ]);
+    }
+
+    /**
+     * Core RFID Attendance Logic (usable for real-time USB scan and batch offline sync)
+     */
+    public function processUsbRfidScan(string $rawUid, string $reqMode = 'auto', $user = null, ?Carbon $customTime = null): \Illuminate\Http\JsonResponse
+    {
+        $uid = strtoupper(trim($rawUid));
 
         // Get school_id from authenticated user
-        $user = auth()->user();
         $schoolId = $user ? $user->school_id : null;
 
         // If user is super admin with null school_id, try to infer school from card
@@ -1763,7 +1918,7 @@ class AttendanceController extends Controller
             config(['app.timezone' => $schoolTz]);
         }
 
-        $now = now();
+        $now = $customTime ? $customTime->copy() : now();
         $today = $now->format('Y-m-d');
         $indexHari = (int) $now->format('N'); // 1 (Mon) - 7 (Sun)
 

@@ -37,7 +37,14 @@ class AutoBolosCommand extends Command
         }
 
         foreach ($schools as $school) {
-            $this->processSchool($school);
+            try {
+                $this->processSchool($school);
+            } catch (\Throwable $e) {
+                Log::error("[AutoBolos] Error processing school ID {$school->id} ({$school->name}): " . $e->getMessage(), [
+                    'exception' => $e
+                ]);
+                $this->error("Error processing school ID {$school->id} ({$school->name}): " . $e->getMessage());
+            }
         }
     }
 
@@ -67,12 +74,6 @@ class AutoBolosCommand extends Command
             $this->info("Daily Process already ran today ($today) for school ID $schoolId. Use --force to run anyway.");
             return;
         }
-
-        // Mark done for this school immediately to prevent duplicate runs on next minute cron
-        Setting::updateOrCreate(
-            ['school_id' => $schoolId, 'setting_key' => 'last_daily_process_date'],
-            ['setting_value' => $today]
-        );
 
         // 2. Check Weekly Holiday via Schedule (Jadwal)
         // If today has NO active schedule, skip process
@@ -243,18 +244,19 @@ class AutoBolosCommand extends Command
                 $countExempt++;
             } else {
                 // Either normal student, or Siswa Khusus on entry day. Must be marked Alpha!
-                \App\Models\Attendance::create([
-                    'student_id' => $s->id,
-                    'tanggal' => $today,
-                    'jam_masuk' => null,
-                    'jam_pulang' => null,
-                    'jam_kerja' => null,
-                    'status' => 'A',
-                    'keterangan' => $s->is_siswa_khusus ? 'Alpha (Tidak Hadir - Hari Masuk Khusus)' : 'Alpha (Tidak Hadir)',
-                    'lokasi_masuk' => 'System',
-                    'created_at' => now(),
-                    'updated_at' => now()
-                ]);
+                \App\Models\Attendance::firstOrCreate(
+                    ['student_id' => $s->id, 'tanggal' => $today],
+                    [
+                        'jam_masuk' => null,
+                        'jam_pulang' => null,
+                        'jam_kerja' => null,
+                        'status' => 'A',
+                        'keterangan' => $s->is_siswa_khusus ? 'Alpha (Tidak Hadir - Hari Masuk Khusus)' : 'Alpha (Tidak Hadir)',
+                        'is_auto_alpha' => true,
+                        'created_at' => now(),
+                        'updated_at' => now()
+                    ]
+                );
                 $countA++;
 
                 // FCM Push Notification to Mobile App (sama dengan absen masuk checkin_siswa)

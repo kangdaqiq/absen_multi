@@ -242,6 +242,8 @@ Route::middleware('auth')->group(function () {
         Route::get('/absensi', [App\Http\Controllers\AttendanceController::class, 'index'])->name('absensi.index');
         Route::get('/absensi/scanner-usb', [App\Http\Controllers\AttendanceController::class, 'scannerUsbView'])->name('absensi.scanner-usb');
         Route::post('/absensi/scan-usb', [App\Http\Controllers\AttendanceController::class, 'scanUsbRfid'])->name('absensi.scan-usb');
+        Route::get('/absensi/scanner-cache', [App\Http\Controllers\AttendanceController::class, 'getScannerCache'])->name('absensi.scanner-cache');
+        Route::post('/absensi/sync-offline', [App\Http\Controllers\AttendanceController::class, 'syncOfflineScans'])->name('absensi.sync-offline');
         Route::get('/absensi/scanner-face', [App\Http\Controllers\AttendanceController::class, 'scannerFaceView'])->name('absensi.scanner-face');
         Route::get('/absensi/face-descriptors', [App\Http\Controllers\AttendanceController::class, 'getFaceDescriptors'])->name('absensi.face-descriptors');
         Route::post('/absensi/scan-face', [App\Http\Controllers\AttendanceController::class, 'scanFaceAttendance'])->name('absensi.scan-face');

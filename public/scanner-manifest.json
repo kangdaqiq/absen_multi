@@ -1,0 +1,17 @@
+{
+  "name": "Scanner Absensi USB RFID",
+  "short_name": "Scanner RFID",
+  "description": "Scanner Absensi RFID USB Mandiri Offline-First",
+  "start_url": "/absensi/scanner-usb",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#4f46e5",
+  "orientation": "landscape",
+  "icons": [
+    {
+      "src": "/images/logo/logo-icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml"
+    }
+  ]
+}

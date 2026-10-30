@@ -2,6 +2,11 @@
 
 @section('title', 'Scanner Absensi USB RFID')
 
+@push('styles')
+<link rel="manifest" href="/scanner-manifest.json">
+<meta name="theme-color" content="#4f46e5">
+@endpush
+
 @section('content')
 <style>
     .custom-scroll-box {
@@ -55,18 +60,45 @@
                     <h2 class="text-xl sm:text-2xl font-bold text-gray-800 dark:text-white/90">
                         Scanner Absensi USB
                     </h2>
-                    <!-- Status Scanner Ready Indicator -->
-                    <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/40">
-                        <span class="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                        Siap Scan
-                    </span>
+                    <!-- Status Connection & Scanner Indicator -->
+                    <template x-if="isOnline">
+                        <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/40" title="Server Terhubung Normal">
+                            <span class="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                            Online
+                        </span>
+                    </template>
+                    <template x-if="!isOnline">
+                        <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700 dark:bg-amber-500/10 dark:text-amber-400 border border-amber-200/60 dark:border-amber-800/40" title="Mode Offline Aktif: Absensi tersimpan lokal dan otomatis sinkron saat online">
+                            <span class="h-1.5 w-1.5 rounded-full bg-amber-500 animate-ping"></span>
+                            Mode Offline (Lokal)
+                        </span>
+                    </template>
                 </div>
-                <p class="text-xs text-gray-500 dark:text-gray-400">Tempelkan kartu RFID pada scanner USB</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400">Tempelkan kartu RFID pada scanner USB (Mendukung Offline & Online)</p>
             </div>
         </div>
 
         <!-- Controls: Jam, Sound, Fullscreen, Table Link -->
         <div class="flex flex-wrap items-center gap-2">
+            <!-- Offline Queue Badge & Manual Sync Button -->
+            <div x-show="offlineQueueCount > 0" x-cloak class="inline-flex items-center gap-2 rounded-xl bg-amber-50 border border-amber-200 px-3 py-1.5 text-xs font-semibold text-amber-800 dark:bg-amber-900/20 dark:border-amber-800/40 dark:text-amber-300 shadow-theme-xs">
+                <i class="fas fa-cloud-upload-alt text-amber-500 animate-bounce"></i>
+                <span x-text="offlineQueueCount + ' Menunggu Sinkron'"></span>
+                <button type="button" @click="syncOfflineQueue()" :disabled="isSyncing || !isOnline"
+                    :title="!isOnline ? 'Koneksi offline, otomatis sinkron saat server kembali aktif' : 'Klik untuk sinkronisasi antrean ke server sekarang'"
+                    class="rounded-lg bg-amber-600 px-2.5 py-0.5 text-[11px] font-bold text-white hover:bg-amber-700 transition disabled:opacity-50 flex items-center gap-1 shadow-sm">
+                    <i class="fas fa-sync" :class="{'fa-spin': isSyncing}"></i>
+                    <span>Sinkron</span>
+                </button>
+            </div>
+
+            <!-- Refresh Student Cache Button -->
+            <button type="button" @click="refreshStudentCache(true)" :disabled="isCaching || !isOnline"
+                title="Perbarui Cache Data Siswa Offline dari Server"
+                class="flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-600 hover:border-brand-500 hover:bg-brand-50 hover:text-brand-600 shadow-theme-xs transition dark:border-gray-800 dark:bg-gray-dark dark:text-gray-400 dark:hover:bg-gray-800 disabled:opacity-50">
+                <i class="fas fa-database text-sm text-brand-500" :class="{'fa-spin': isCaching}"></i>
+            </button>
+
             <!-- Digital Clock & Date -->
             <div class="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3.5 py-2 text-xs font-semibold text-gray-700 shadow-theme-xs dark:border-gray-800 dark:bg-gray-dark dark:text-gray-200">
                 <i class="fas fa-clock text-brand-500"></i>
@@ -104,6 +136,30 @@
                 <i class="fas fa-list text-gray-400"></i>
                 <span>Tabel Data</span>
             </a>
+        </div>
+    </div>
+
+    <!-- BANNER PERINGATAN SESI KEDALUWARSA (JIKA OFFLINE LAMA) -->
+    <div x-show="sessionExpired" x-cloak class="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-xs text-amber-900 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-theme-xs">
+        <div class="flex items-center gap-3">
+            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-200 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300">
+                <i class="fas fa-lock text-base"></i>
+            </div>
+            <div>
+                <p class="font-bold text-sm text-gray-900 dark:text-white">Sesi login telah kedaluwarsa di server</p>
+                <p class="text-xs text-amber-800 dark:text-amber-300">
+                    Data scan absensi (<strong x-text="offlineQueueCount"></strong> antrean) <strong>tetap 100% aman tersimpan di perangkat ini</strong>. Silakan login kembali di tab baru untuk melanjutkan sinkronisasi ke server.
+                </p>
+            </div>
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
+            <a href="{{ route('login') }}" target="_blank" class="rounded-xl bg-brand-500 hover:bg-brand-600 px-4 py-2 font-bold text-white transition shadow-sm text-xs flex items-center gap-1.5">
+                <i class="fas fa-external-link-alt text-[10px]"></i>
+                <span>Login Ulang di Tab Baru</span>
+            </a>
+            <button type="button" @click="syncOfflineQueue()" class="rounded-xl bg-amber-600 hover:bg-amber-700 px-3.5 py-2 font-bold text-white transition text-xs">
+                Coba Sinkron Lagi
+            </button>
         </div>
     </div>
 
@@ -349,9 +405,9 @@
                                             :class="{
                                                 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300': att.status === 'Pulang',
                                                 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300': att.status === 'Hadir',
-                                                'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300': att.status === 'Terlambat',
+                                                'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300': att.status === 'Terlambat' || att.status === 'Offline' || att.status === 'Tersimpan Offline',
                                                 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300': att.status === 'Izin' || att.status === 'Sakit',
-                                                'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300': !['Pulang','Hadir','Terlambat','Izin','Sakit'].includes(att.status)
+                                                'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300': !['Pulang','Hadir','Terlambat','Izin','Sakit','Offline','Tersimpan Offline'].includes(att.status)
                                             }"
                                             x-text="att.status"></span>
                                     </td>
@@ -393,6 +449,14 @@ function usbScannerApp() {
         lastScannedTime: 0,
         audioCtx: null,
 
+        // Offline-First PWA State
+        isOnline: navigator.onLine,
+        offlineQueueCount: 0,
+        isSyncing: false,
+        isCaching: false,
+        sessionExpired: false,
+        db: null,
+
         // Spotlight State
         spotlight: {
             foto: null,
@@ -420,9 +484,29 @@ function usbScannerApp() {
         // Real-time Attendance List
         attendances: @json($initialAttendances ?? []),
 
-        init() {
+        async init() {
             this.updateClock();
             setInterval(() => this.updateClock(), 1000);
+
+            // Register Service Worker for offline asset caching
+            if ('serviceWorker' in navigator) {
+                try {
+                    await navigator.serviceWorker.register('/scanner-sw.js');
+                    console.log('Scanner Service Worker registered successfully.');
+                } catch (e) {
+                    console.warn('Service Worker registration failed:', e);
+                }
+            }
+
+            // Inisialisasi IndexedDB
+            await this.initIndexedDB();
+            await this.updateOfflineQueueCount();
+
+            // Pasang watcher koneksi dan sinkronisasi otomatis
+            this.setupConnectivityWatcher();
+
+            // Prefetch cache data siswa jika belum pernah di-cache hari ini
+            this.refreshStudentCache(false);
 
             // Fokuskan input hidden saat pertama kali dimuat
             this.focusInput();
@@ -483,6 +567,260 @@ function usbScannerApp() {
                     jam_pulang: latest.pulang || '--:--',
                     keterangan: latest.keterangan || 'Silakan tap kartu RFID ...'
                 };
+            }
+        },
+
+        /* ==================== INDEXED-DB OFFLINE STORAGE ==================== */
+        initIndexedDB() {
+            return new Promise((resolve, reject) => {
+                if (!window.indexedDB) {
+                    console.warn('IndexedDB not supported in this browser.');
+                    resolve(null);
+                    return;
+                }
+
+                const req = window.indexedDB.open('rfid_scanner_db', 1);
+                req.onupgradeneeded = (e) => {
+                    const db = e.target.result;
+                    // Store siswa lokal untuk identifikasi kartu saat offline
+                    if (!db.objectStoreNames.contains('students')) {
+                        const sStore = db.createObjectStore('students', { keyPath: 'uid' });
+                        sStore.createIndex('nis', 'nis', { unique: false });
+                    }
+                    // Antrean absensi offline yang belum disinkronkan ke server
+                    if (!db.objectStoreNames.contains('offline_queue')) {
+                        const qStore = db.createObjectStore('offline_queue', { keyPath: 'id', autoIncrement: true });
+                        qStore.createIndex('tapped_at', 'tapped_at', { unique: false });
+                    }
+                    // Meta status
+                    if (!db.objectStoreNames.contains('meta')) {
+                        db.createObjectStore('meta', { keyPath: 'key' });
+                    }
+                };
+
+                req.onsuccess = (e) => {
+                    this.db = e.target.result;
+                    resolve(this.db);
+                };
+
+                req.onerror = (e) => {
+                    console.error('IndexedDB open error:', e);
+                    resolve(null);
+                };
+            });
+        },
+
+        getDb() {
+            if (this.db) return Promise.resolve(this.db);
+            return this.initIndexedDB();
+        },
+
+        async getStudentFromDb(uid) {
+            const db = await this.getDb();
+            if (!db) return null;
+            return new Promise((resolve) => {
+                try {
+                    const tx = db.transaction('students', 'readonly');
+                    const store = tx.objectStore('students');
+                    const req = store.get(uid);
+                    req.onsuccess = () => resolve(req.result || null);
+                    req.onerror = () => resolve(null);
+                } catch (e) {
+                    resolve(null);
+                }
+            });
+        },
+
+        async saveStudentCacheToDb(students) {
+            const db = await this.getDb();
+            if (!db || !Array.isArray(students)) return;
+            return new Promise((resolve) => {
+                try {
+                    const tx = db.transaction(['students', 'meta'], 'readwrite');
+                    const store = tx.objectStore('students');
+                    students.forEach(item => {
+                        if (item.uid) store.put(item);
+                    });
+                    const metaStore = tx.objectStore('meta');
+                    metaStore.put({ key: 'last_cache_time', value: Date.now() });
+                    tx.oncomplete = () => resolve(true);
+                    tx.onerror = () => resolve(false);
+                } catch (e) {
+                    console.warn('Error saving students cache:', e);
+                    resolve(false);
+                }
+            });
+        },
+
+        async addOfflineRecord(record) {
+            const db = await this.getDb();
+            if (!db) return null;
+            return new Promise((resolve) => {
+                try {
+                    const tx = db.transaction('offline_queue', 'readwrite');
+                    const store = tx.objectStore('offline_queue');
+                    const req = store.add(record);
+                    req.onsuccess = () => resolve(req.result);
+                    req.onerror = () => resolve(null);
+                } catch (e) {
+                    resolve(null);
+                }
+            });
+        },
+
+        async getAllOfflineRecords() {
+            const db = await this.getDb();
+            if (!db) return [];
+            return new Promise((resolve) => {
+                try {
+                    const tx = db.transaction('offline_queue', 'readonly');
+                    const store = tx.objectStore('offline_queue');
+                    const req = store.getAll();
+                    req.onsuccess = () => resolve(req.result || []);
+                    req.onerror = () => resolve([]);
+                } catch (e) {
+                    resolve([]);
+                }
+            });
+        },
+
+        async deleteOfflineRecords(ids) {
+            const db = await this.getDb();
+            if (!db || !ids || ids.length === 0) return;
+            return new Promise((resolve) => {
+                try {
+                    const tx = db.transaction('offline_queue', 'readwrite');
+                    const store = tx.objectStore('offline_queue');
+                    ids.forEach(id => store.delete(id));
+                    tx.oncomplete = () => resolve(true);
+                    tx.onerror = () => resolve(false);
+                } catch (e) {
+                    resolve(false);
+                }
+            });
+        },
+
+        async updateOfflineQueueCount() {
+            const records = await this.getAllOfflineRecords();
+            this.offlineQueueCount = records.length;
+        },
+
+        /* ==================== KONEKSI & SINKRONISASI ==================== */
+        setupConnectivityWatcher() {
+            window.addEventListener('online', () => {
+                console.log('Jaringan terdeteksi Online. Mencoba sinkronisasi...');
+                this.isOnline = true;
+                this.syncOfflineQueue();
+            });
+
+            window.addEventListener('offline', () => {
+                console.warn('Jaringan terputus. Beralih ke Mode Offline (Lokal).');
+                this.isOnline = false;
+            });
+
+            // Heartbeat check berkala setiap 20 detik
+            setInterval(async () => {
+                try {
+                    const res = await fetch("{{ route('absensi.scanner-cache') }}?ping=1", {
+                        method: 'HEAD',
+                        cache: 'no-store'
+                    });
+                    if (res.ok) {
+                        if (!this.isOnline) {
+                            this.isOnline = true;
+                            this.syncOfflineQueue();
+                        }
+                    } else {
+                        this.isOnline = false;
+                    }
+                } catch (err) {
+                    this.isOnline = false;
+                }
+            }, 20000);
+        },
+
+        async refreshStudentCache(force = false) {
+            if (this.isCaching || !this.isOnline) return;
+
+            // Cek apakah sudah pernah cache dalam 6 jam terakhir kecuali di-force
+            if (!force) {
+                const db = await this.getDb();
+                if (db) {
+                    const lastTime = await new Promise((res) => {
+                        try {
+                            const tx = db.transaction('meta', 'readonly');
+                            const req = tx.objectStore('meta').get('last_cache_time');
+                            req.onsuccess = () => res(req.result ? req.result.value : 0);
+                            req.onerror = () => res(0);
+                        } catch(e) { res(0); }
+                    });
+                    const sixHours = 6 * 3600 * 1000;
+                    if (lastTime && (Date.now() - lastTime) < sixHours) {
+                        return; // Cache masih segar
+                    }
+                }
+            }
+
+            this.isCaching = true;
+            try {
+                const response = await fetch("{{ route('absensi.scanner-cache') }}", {
+                    headers: { 'Accept': 'application/json' }
+                });
+                const res = await response.json();
+                if (res.ok && res.data) {
+                    await this.saveStudentCacheToDb(res.data);
+                    console.log(`Cache lokal diperbarui: ${res.count} siswa/pengguna tersimpan.`);
+                }
+            } catch (err) {
+                console.warn('Gagal memuat cache siswa:', err);
+            } finally {
+                this.isCaching = false;
+            }
+        },
+
+        async syncOfflineQueue() {
+            if (this.isSyncing || !this.isOnline) return;
+
+            const records = await this.getAllOfflineRecords();
+            if (!records || records.length === 0) {
+                this.offlineQueueCount = 0;
+                return;
+            }
+
+            this.isSyncing = true;
+            try {
+                const response = await fetch("{{ route('absensi.sync-offline') }}", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-CSRF-TOKEN": document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
+                        "Accept": "application/json"
+                    },
+                    body: JSON.stringify({ scans: records })
+                });
+
+                if (response.status === 419 || response.status === 401) {
+                    this.sessionExpired = true;
+                    console.warn('Sesi login telah kedaluwarsa di server. Antrean offline tetap aman.');
+                    return;
+                }
+
+                const res = await response.json();
+                if (res.ok) {
+                    this.sessionExpired = false;
+                    const idsToDelete = records.map(r => r.id);
+                    await this.deleteOfflineRecords(idsToDelete);
+                    await this.updateOfflineQueueCount();
+                    this.playBeep('ok');
+                    console.log(`Berhasil sinkron ${res.synced_count} data absensi offline.`);
+                } else {
+                    console.warn('Gagal sinkron offline queue:', res.message);
+                }
+            } catch (err) {
+                console.error('Error saat sinkronisasi offline:', err);
+                this.isOnline = false;
+            } finally {
+                this.isSyncing = false;
             }
         },
 
@@ -556,7 +894,6 @@ function usbScannerApp() {
 
                 if (type === 'ok' || type === 'success') {
                     // 🔔 SUARA BERHASIL: Chime Melodis Ceria 2-Nada ("Ting-Tung!" Harmoni Tinggi)
-                    // Nada 1: 784 Hz (G5) - Jernih dan renyah
                     const osc1 = ctx.createOscillator();
                     const gain1 = ctx.createGain();
                     osc1.type = 'sine';
@@ -568,7 +905,6 @@ function usbScannerApp() {
                     osc1.start(now);
                     osc1.stop(now + 0.12);
 
-                    // Nada 2: 1174.66 Hz (D6) - Nada kedua lebih tinggi, ceria & jelas
                     const osc2 = ctx.createOscillator();
                     const gain2 = ctx.createGain();
                     osc2.type = 'sine';
@@ -579,6 +915,21 @@ function usbScannerApp() {
                     gain2.connect(ctx.destination);
                     osc2.start(now + 0.1);
                     osc2.stop(now + 0.38);
+
+                } else if (type === 'offline') {
+                    // 💾 SUARA TERSIMPAN OFFLINE: 2-Nada Melodi Harmonis (523Hz C5 -> 659Hz E5)
+                    [523.25, 659.25].forEach((freq, idx) => {
+                        const osc = ctx.createOscillator();
+                        const gain = ctx.createGain();
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(freq, now + (idx * 0.1));
+                        gain.gain.setValueAtTime(0.3, now + (idx * 0.1));
+                        gain.gain.exponentialRampToValueAtTime(0.001, now + (idx * 0.1) + 0.15);
+                        osc.connect(gain);
+                        gain.connect(ctx.destination);
+                        osc.start(now + (idx * 0.1));
+                        osc.stop(now + (idx * 0.1) + 0.15);
+                    });
 
                 } else if (type === 'warning') {
                     // ⚠️ SUARA PERINGATAN (Sudah Absen / Jam Tutup): Nada Ganda Sedang ("Pip-Pip")
@@ -596,13 +947,13 @@ function usbScannerApp() {
                     });
 
                 } else {
-                    // ❌ SUARA GAGAL / ERROR (Kartu Belum Terdaftar / Ditolak): Double Buzzer Rendah Kasar ("BZZT-BZZT!")
+                    // ❌ SUARA GAGAL / ERROR: Double Buzzer Rendah Kasar ("BZZT-BZZT!")
                     [0, 0.18].forEach((offset) => {
                         const osc = ctx.createOscillator();
                         const gain = ctx.createGain();
-                        osc.type = 'sawtooth'; // Gelombang gergaji kasar
+                        osc.type = 'sawtooth';
                         osc.frequency.setValueAtTime(160, now + offset);
-                        osc.frequency.linearRampToValueAtTime(100, now + offset + 0.14); // Turun ke nada sangat rendah
+                        osc.frequency.linearRampToValueAtTime(100, now + offset + 0.14);
                         gain.gain.setValueAtTime(0.45, now + offset);
                         gain.gain.exponentialRampToValueAtTime(0.01, now + offset + 0.14);
                         osc.connect(gain);
@@ -631,6 +982,76 @@ function usbScannerApp() {
             }, intervalMs);
         },
 
+        async handleOfflineScan(uid) {
+            const nowClock = new Date().toLocaleTimeString('id-ID', { hour12: false });
+            this.lastUpdateTime = nowClock.replace(/:/g, '.');
+
+            // Cari profil pengguna dari IndexedDB
+            const cachedStudent = await this.getStudentFromDb(uid);
+
+            const isPulang = this.scanMode === 'pulang';
+            const nama = cachedStudent ? cachedStudent.nama : ('Kartu RFID: ' + uid);
+            const nis = cachedStudent ? (cachedStudent.nis || '-') : '-';
+            const kelas = cachedStudent ? (cachedStudent.kelas || cachedStudent.role || '-') : 'Offline Cache';
+            const foto = cachedStudent ? cachedStudent.foto : null;
+
+            // Simpan ke antrean offline IndexedDB
+            const record = {
+                uid: uid,
+                mode: this.scanMode,
+                tapped_at: new Date().toISOString(),
+                created_at: Date.now(),
+                nama: nama,
+                nis: nis,
+                kelas: kelas
+            };
+            await this.addOfflineRecord(record);
+            await this.updateOfflineQueueCount();
+
+            // Bunyikan nada offline
+            this.playBeep('offline');
+
+            // Update Spotlight Card
+            this.spotlight = {
+                foto: foto,
+                nama: nama,
+                nis: nis,
+                kelas: kelas,
+                status: 'Tersimpan Offline',
+                statusType: 'warning',
+                waktu: nowClock,
+                jam_masuk: isPulang ? '--:--' : nowClock.substring(0, 5),
+                jam_pulang: isPulang ? nowClock.substring(0, 5) : '--:--',
+                keterangan: 'Tersimpan di memori perangkat. Otomatis sinkron saat internet aktif.'
+            };
+            this.startTimerBar();
+
+            // Tambahkan ke tabel riwayat lokal
+            const newRow = {
+                id: 'off-' + Date.now(),
+                waktu: nowClock,
+                nama: nama,
+                nis: nis,
+                foto: foto,
+                kelas: kelas,
+                masuk: isPulang ? '--:--' : nowClock.substring(0, 5),
+                pulang: isPulang ? nowClock.substring(0, 5) : '--:--',
+                status: 'Offline',
+                statusType: 'warning',
+                keterangan: 'Tersimpan Offline (Menunggu Sinkron)'
+            };
+            this.attendances.unshift(newRow);
+
+            // Update statistik
+            if (isPulang) {
+                this.stats.totalPulang++;
+            } else {
+                this.stats.totalMasuk++;
+                this.stats.totalBelumAbsen = Math.max(0, this.stats.totalSiswa - this.stats.totalMasuk);
+                this.stats.totalTepatWaktu++;
+            }
+        },
+
         async processCardScan(uid) {
             uid = uid.trim();
             if (!uid || this.isLoading) return;
@@ -645,9 +1066,27 @@ function usbScannerApp() {
 
             this.isLoading = true;
 
+            // JIKA SEDANG OFFLINE: langsung simpan ke IndexedDB
+            if (!this.isOnline) {
+                try {
+                    await this.handleOfflineScan(uid);
+                } finally {
+                    this.isLoading = false;
+                    this.uidInput = '';
+                    this.inputBuffer = '';
+                    this.$nextTick(() => this.focusInput());
+                }
+                return;
+            }
+
+            // JIKA ONLINE: coba kirim ke server dengan timeout 6 detik
             try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 6000);
+
                 const response = await fetch("{{ route('absensi.scan-usb') }}", {
                     method: "POST",
+                    signal: controller.signal,
                     headers: {
                         "Content-Type": "application/json",
                         "X-CSRF-TOKEN": document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
@@ -655,6 +1094,11 @@ function usbScannerApp() {
                     },
                     body: JSON.stringify({ uid: uid, mode: this.scanMode })
                 });
+                clearTimeout(timeoutId);
+
+                if (!response.ok && response.status >= 500) {
+                    throw new Error('Server status ' + response.status);
+                }
 
                 const res = await response.json();
                 const nowClock = new Date().toLocaleTimeString('id-ID', { hour12: false });
@@ -701,11 +1145,9 @@ function usbScannerApp() {
                     };
 
                     if (existingIdx !== -1) {
-                        // Perbarui data yang sudah ada dan pindahkan ke paling atas
                         this.attendances.splice(existingIdx, 1);
                         this.attendances.unshift(newRow);
                     } else {
-                        // Masukkan baris baru di paling atas
                         this.attendances.unshift(newRow);
                     }
 
@@ -726,20 +1168,9 @@ function usbScannerApp() {
                 }
 
             } catch (err) {
-                console.error('Scan Error:', err);
-                this.playBeep('error');
-                this.spotlight = {
-                    foto: null,
-                    nama: 'Koneksi Terputus',
-                    nis: '-',
-                    kelas: '-',
-                    status: 'Error Jaringan',
-                    statusType: 'error',
-                    waktu: '--:--:--',
-                    jam_masuk: '--:--',
-                    jam_pulang: '--:--',
-                    keterangan: 'Gagal menghubungi server absensi.'
-                };
+                console.warn('Scan online gagal / jaringan terputus. Mengalihkan ke penyimpanan lokal (Offline):', err);
+                this.isOnline = false;
+                await this.handleOfflineScan(uid);
             } finally {
                 this.isLoading = false;
                 this.uidInput = '';

@@ -81,14 +81,16 @@
         <!-- Controls: Jam, Sound, Fullscreen, Table Link -->
         <div class="flex flex-wrap items-center gap-2">
             <!-- Offline Queue Badge & Manual Sync Button -->
-            <div x-show="offlineQueueCount > 0" x-cloak class="inline-flex items-center gap-2 rounded-xl bg-amber-50 border border-amber-200 px-3 py-1.5 text-xs font-semibold text-amber-800 dark:bg-amber-900/20 dark:border-amber-800/40 dark:text-amber-300 shadow-theme-xs">
-                <i class="fas fa-cloud-upload-alt text-amber-500 animate-bounce"></i>
+            <div x-show="offlineQueueCount > 0" x-cloak 
+                class="inline-flex items-center gap-2.5 rounded-xl border border-amber-300 bg-amber-100/90 dark:bg-amber-950/60 dark:border-amber-700/70 px-3 py-1.5 text-xs font-semibold text-amber-900 dark:text-amber-200 shadow-sm">
+                <i class="fas fa-cloud-upload-alt text-amber-600 text-sm animate-bounce"></i>
                 <span x-text="offlineQueueCount + ' Menunggu Sinkron'"></span>
-                <button type="button" @click="syncOfflineQueue()" :disabled="isSyncing || !isOnline"
-                    :title="!isOnline ? 'Koneksi offline, otomatis sinkron saat server kembali aktif' : 'Klik untuk sinkronisasi antrean ke server sekarang'"
-                    class="rounded-lg bg-amber-600 px-2.5 py-0.5 text-[11px] font-bold text-white hover:bg-amber-700 transition disabled:opacity-50 flex items-center gap-1 shadow-sm">
+                <button type="button" @click="syncOfflineQueue()" :disabled="isSyncing"
+                    style="background-color: #d97706 !important; color: #ffffff !important; border: 1px solid #b45309 !important;"
+                    :title="!isOnline ? 'Koneksi saat ini offline. Klik untuk mencoba sinkron sekarang ke server' : 'Klik untuk sinkronisasi antrean ke server sekarang'"
+                    class="rounded-lg px-2.5 py-1 text-[11px] font-bold shadow hover:brightness-110 active:scale-95 transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50">
                     <i class="fas fa-sync" :class="{'fa-spin': isSyncing}"></i>
-                    <span>Sinkron</span>
+                    <span x-text="isSyncing ? 'Sinkron...' : 'Sinkron'"></span>
                 </button>
             </div>
 
@@ -491,8 +493,12 @@ function usbScannerApp() {
             // Register Service Worker for offline asset caching
             if ('serviceWorker' in navigator) {
                 try {
-                    await navigator.serviceWorker.register('/scanner-sw.js');
-                    console.log('Scanner Service Worker registered successfully.');
+                    const reg = await navigator.serviceWorker.register('/scanner-sw.js');
+                    if (reg.waiting) {
+                        reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+                    }
+                    reg.update();
+                    console.log('Scanner Service Worker registered & active.');
                 } catch (e) {
                     console.warn('Service Worker registration failed:', e);
                 }
@@ -779,7 +785,7 @@ function usbScannerApp() {
         },
 
         async syncOfflineQueue() {
-            if (this.isSyncing || !this.isOnline) return;
+            if (this.isSyncing) return;
 
             const records = await this.getAllOfflineRecords();
             if (!records || records.length === 0) {
@@ -789,8 +795,12 @@ function usbScannerApp() {
 
             this.isSyncing = true;
             try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 8000);
+
                 const response = await fetch("{{ route('absensi.sync-offline') }}", {
                     method: "POST",
+                    signal: controller.signal,
                     headers: {
                         "Content-Type": "application/json",
                         "X-CSRF-TOKEN": document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
@@ -798,6 +808,7 @@ function usbScannerApp() {
                     },
                     body: JSON.stringify({ scans: records })
                 });
+                clearTimeout(timeoutId);
 
                 if (response.status === 419 || response.status === 401) {
                     this.sessionExpired = true;
@@ -807,6 +818,7 @@ function usbScannerApp() {
 
                 const res = await response.json();
                 if (res.ok) {
+                    this.isOnline = true;
                     this.sessionExpired = false;
                     const idsToDelete = records.map(r => r.id);
                     await this.deleteOfflineRecords(idsToDelete);
@@ -817,7 +829,7 @@ function usbScannerApp() {
                     console.warn('Gagal sinkron offline queue:', res.message);
                 }
             } catch (err) {
-                console.error('Error saat sinkronisasi offline:', err);
+                console.warn('Gagal terhubung ke server saat sinkronisasi:', err);
                 this.isOnline = false;
             } finally {
                 this.isSyncing = false;

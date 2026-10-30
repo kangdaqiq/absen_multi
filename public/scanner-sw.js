@@ -1,4 +1,4 @@
-const CACHE_NAME = 'scanner-usb-v3';
+const CACHE_NAME = 'scanner-usb-v4';
 const PRECACHE_ASSETS = [
     '/absensi/scanner-usb',
     '/build/assets/app-sLRerkS1.css',
@@ -10,6 +10,12 @@ const PRECACHE_ASSETS = [
     '/favicon.ico',
     '/scanner-manifest.json'
 ];
+
+self.addEventListener('message', (event) => {
+    if (event.data && event.data.type === 'SKIP_WAITING') {
+        self.skipWaiting();
+    }
+});
 
 self.addEventListener('install', (event) => {
     event.waitUntil(
@@ -46,40 +52,59 @@ self.addEventListener('fetch', (event) => {
 
     const url = new URL(event.request.url);
 
-    // Bypass API and dynamic scanning endpoints (Always Network Only)
+    // Bypass API, auth, and dynamic scanning endpoints (Always Network Only)
     if (
         url.pathname.includes('/absensi/scan-usb') ||
         url.pathname.includes('/absensi/sync-offline') ||
         url.pathname.includes('/absensi/scanner-cache') ||
+        url.pathname.includes('/login') ||
+        url.pathname.includes('/logout') ||
         url.pathname.includes('/api/')
     ) {
         return;
     }
 
-    // 1. Navigation requests (/absensi/scanner-usb or PWA launch):
-    // Fast response: If offline, serve cache instantly. If online, race network with 800ms fallback.
-    if (event.request.mode === 'navigate' || url.pathname === '/absensi/scanner-usb') {
+    // 1. Navigation requests specifically for /absensi/scanner-usb (PWA launch):
+    // Fast response: If offline, serve cache instantly. If online, race network with 1500ms fallback.
+    if (url.pathname === '/absensi/scanner-usb') {
         event.respondWith(
             (async () => {
                 if (!navigator.onLine) {
-                    const cached = await caches.match('/absensi/scanner-usb');
+                    const cached = await caches.match('/absensi/scanner-usb') || await caches.match(event.request);
                     if (cached) return cached;
                 }
 
                 try {
                     const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), 800);
+                    const timeoutId = setTimeout(() => controller.abort(), 1500);
 
-                    const networkResponse = await fetch(event.request, { signal: controller.signal });
+                    const networkResponse = await fetch(event.request, {
+                        signal: controller.signal,
+                        credentials: 'same-origin'
+                    });
                     clearTimeout(timeoutId);
 
-                    if (networkResponse && networkResponse.status === 200) {
+                    // Only cache and serve directly if it's a valid 200 scanner page (not redirected to /login)
+                    const isRedirectedToLogin = networkResponse.redirected || (networkResponse.url && networkResponse.url.includes('/login'));
+                    if (networkResponse && networkResponse.status === 200 && !isRedirectedToLogin) {
                         const copy = networkResponse.clone();
-                        caches.open(CACHE_NAME).then((c) => c.put(event.request, copy));
+                        caches.open(CACHE_NAME).then((c) => {
+                            c.put('/absensi/scanner-usb', copy.clone());
+                            c.put(event.request, copy);
+                        });
+                        return networkResponse;
+                    }
+
+                    // If session expired (redirected to /login), prefer cached scanner UI so PWA can run in offline/re-login mode
+                    if (isRedirectedToLogin) {
+                        const cachedScanner = await caches.match('/absensi/scanner-usb') || await caches.match(event.request);
+                        if (cachedScanner) {
+                            return cachedScanner;
+                        }
                         return networkResponse;
                     }
                 } catch (e) {
-                    // Network failed or timed out after 800ms, use cache
+                    // Network failed or timed out, fallback to cache
                 }
 
                 const cachedResponse = await caches.match('/absensi/scanner-usb') || await caches.match(event.request);

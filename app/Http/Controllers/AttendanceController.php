@@ -1808,9 +1808,21 @@ class AttendanceController extends Controller
         $user = auth()->user();
         $schoolId = $user ? $user->school_id : null;
 
+        if ($request->boolean('ping')) {
+            return response()->json([
+                'ok' => true,
+                'authenticated' => auth()->check(),
+                'csrf_token' => csrf_token(),
+                'school_id' => $schoolId,
+                'timestamp' => now()->toIso8601String(),
+            ])->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+              ->header('Pragma', 'no-cache');
+        }
+
         if (!$schoolId) {
             return response()->json([
                 'ok' => false,
+                'csrf_token' => csrf_token(),
                 'message' => 'Konteks sekolah tidak ditemukan.',
                 'students' => [],
                 'teachers' => [],
@@ -1867,6 +1879,7 @@ class AttendanceController extends Controller
 
         return response()->json([
             'ok' => true,
+            'csrf_token' => csrf_token(),
             'school_id' => $schoolId,
             'timestamp' => now()->toIso8601String(),
             'count' => $allData->count(),
@@ -1874,7 +1887,8 @@ class AttendanceController extends Controller
             'students' => $students,
             'teachers' => $teachers,
             'gate_cards' => $gateCards,
-        ]);
+        ])->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+          ->header('Pragma', 'no-cache');
     }
 
     /**

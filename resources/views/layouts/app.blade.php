@@ -248,6 +248,29 @@
                     });
                 });
             });
+
+            @auth
+            // Broadcast status login aktif & CSRF token baru ke PWA / tab Scanner RFID yang sedang terbuka
+            try {
+                const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+                const token = csrfMeta ? csrfMeta.getAttribute('content') : '';
+                if (token && !window.location.pathname.includes('/absensi/scanner-usb')) {
+                    const payload = {
+                        type: 'AUTH_SUCCESS',
+                        csrf_token: token,
+                        timestamp: Date.now()
+                    };
+                    if ('BroadcastChannel' in window) {
+                        const bc = new BroadcastChannel('rfid_scanner_auth_channel');
+                        bc.postMessage(payload);
+                        setTimeout(() => bc.close(), 1000);
+                    }
+                    localStorage.setItem('rfid_scanner_auth_event', JSON.stringify(payload));
+                }
+            } catch (e) {
+                // Ignore storage/broadcast errors
+            }
+            @endauth
         });
     </script>
 

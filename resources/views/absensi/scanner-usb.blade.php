@@ -159,7 +159,7 @@
                 <i class="fas fa-external-link-alt text-[10px]"></i>
                 <span>Login Ulang di Tab Baru</span>
             </a>
-            <button type="button" @click="syncOfflineQueue()" class="rounded-xl bg-amber-600 hover:bg-amber-700 px-3.5 py-2 font-bold text-white transition text-xs">
+            <button type="button" @click="checkAuthAndSync(false)" class="rounded-xl bg-amber-600 hover:bg-amber-700 px-3.5 py-2 font-bold text-white transition text-xs">
                 Coba Sinkron Lagi
             </button>
         </div>
@@ -457,6 +457,8 @@ function usbScannerApp() {
         isSyncing: false,
         isCaching: false,
         sessionExpired: false,
+        isCheckingAuth: false,
+        csrfToken: document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
         db: null,
 
         // Spotlight State
@@ -711,12 +713,93 @@ function usbScannerApp() {
             this.offlineQueueCount = records.length;
         },
 
-        /* ==================== KONEKSI & SINKRONISASI ==================== */
+        /* ==================== KONEKSI, SESI LOGIN & SINKRONISASI ==================== */
+        getCsrfToken() {
+            const metaToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+            return this.csrfToken || metaToken || '';
+        },
+
+        updateCsrfToken(newToken) {
+            if (!newToken) return;
+            this.csrfToken = newToken;
+            const meta = document.querySelector('meta[name="csrf-token"]');
+            if (meta) {
+                meta.setAttribute('content', newToken);
+            }
+        },
+
+        async checkAuthAndSync(silent = true) {
+            if (this.isCheckingAuth) return !this.sessionExpired;
+            this.isCheckingAuth = true;
+
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+                const res = await fetch("{{ route('absensi.scanner-cache') }}?ping=1&_t=" + Date.now(), {
+                    method: 'GET',
+                    signal: controller.signal,
+                    cache: 'no-store',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                });
+                clearTimeout(timeoutId);
+
+                if (res.status === 401 || res.status === 419 || res.redirected || (res.url && res.url.includes('/login'))) {
+                    this.isOnline = true;
+                    this.sessionExpired = true;
+                    return false;
+                }
+
+                if (res.ok) {
+                    const data = await res.json().catch(() => null);
+                    if (data && data.ok) {
+                        if (data.csrf_token) {
+                            this.updateCsrfToken(data.csrf_token);
+                        }
+
+                        const wasExpired = this.sessionExpired;
+                        const wasOffline = !this.isOnline;
+
+                        this.isOnline = true;
+                        this.sessionExpired = false;
+
+                        if (wasExpired || wasOffline || !silent || this.offlineQueueCount > 0) {
+                            // Lepaskan flag check sebelum memanggil syncOfflineQueue
+                            this.isCheckingAuth = false;
+                            if (this.offlineQueueCount > 0) {
+                                await this.syncOfflineQueue(true);
+                            }
+                            if (wasExpired) {
+                                this.refreshStudentCache(false);
+                            }
+                            return true;
+                        }
+                        return true;
+                    }
+                }
+
+                this.isOnline = false;
+                return false;
+            } catch (err) {
+                this.isOnline = false;
+                return false;
+            } finally {
+                this.isCheckingAuth = false;
+            }
+        },
+
         setupConnectivityWatcher() {
+            // Cek status sesi & segarkan CSRF token saat PWA pertama kali dibuka
+            this.checkAuthAndSync(true);
+
             window.addEventListener('online', () => {
-                console.log('Jaringan terdeteksi Online. Mencoba sinkronisasi...');
+                console.log('Jaringan terdeteksi Online. Memeriksa sesi & mencoba sinkronisasi...');
                 this.isOnline = true;
-                this.syncOfflineQueue();
+                this.checkAuthAndSync(false);
             });
 
             window.addEventListener('offline', () => {
@@ -724,25 +807,63 @@ function usbScannerApp() {
                 this.isOnline = false;
             });
 
-            // Heartbeat check berkala setiap 20 detik
-            setInterval(async () => {
-                try {
-                    const res = await fetch("{{ route('absensi.scanner-cache') }}?ping=1", {
-                        method: 'HEAD',
-                        cache: 'no-store'
-                    });
-                    if (res.ok) {
-                        if (!this.isOnline) {
-                            this.isOnline = true;
-                            this.syncOfflineQueue();
-                        }
-                    } else {
-                        this.isOnline = false;
-                    }
-                } catch (err) {
-                    this.isOnline = false;
+            // 1. Deteksi otomatis saat tab/jendela PWA kembali aktif (setelah user login di tab baru)
+            window.addEventListener('focus', () => {
+                this.checkAuthAndSync(false);
+            });
+
+            document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'visible') {
+                    this.checkAuthAndSync(false);
                 }
-            }, 20000);
+            });
+
+            // 2. Deteksi instan lintas-tab via BroadcastChannel saat login berhasil di tab baru
+            if ('BroadcastChannel' in window) {
+                try {
+                    const authChannel = new BroadcastChannel('rfid_scanner_auth_channel');
+                    authChannel.addEventListener('message', (event) => {
+                        if (event.data && event.data.type === 'AUTH_SUCCESS') {
+                            console.log('Login baru terdeteksi dari tab lain via BroadcastChannel.');
+                            if (event.data.csrf_token) {
+                                this.updateCsrfToken(event.data.csrf_token);
+                            }
+                            this.checkAuthAndSync(false);
+                        }
+                    });
+                } catch (e) {
+                    console.warn('BroadcastChannel error:', e);
+                }
+            }
+
+            // 3. Fallback deteksi lintas-tab via localStorage event
+            window.addEventListener('storage', (event) => {
+                if (event.key === 'rfid_scanner_auth_event' && event.newValue) {
+                    try {
+                        const data = JSON.parse(event.newValue);
+                        if (data && data.type === 'AUTH_SUCCESS') {
+                            console.log('Login baru terdeteksi dari tab lain via Storage Event.');
+                            if (data.csrf_token) {
+                                this.updateCsrfToken(data.csrf_token);
+                            }
+                            this.checkAuthAndSync(false);
+                        }
+                    } catch (e) {
+                        // Ignore parse error
+                    }
+                }
+            });
+
+            // 4. Heartbeat check berkala (lebih cepat setiap 4 detik saat sesi kedaluwarsa, normal 20 detik)
+            let lastCheckTime = Date.now();
+            setInterval(async () => {
+                const now = Date.now();
+                const intervalMs = this.sessionExpired ? 4000 : 20000;
+                if (now - lastCheckTime >= intervalMs) {
+                    lastCheckTime = now;
+                    await this.checkAuthAndSync(true);
+                }
+            }, 4000);
         },
 
         async refreshStudentCache(force = false) {
@@ -770,10 +891,25 @@ function usbScannerApp() {
             this.isCaching = true;
             try {
                 const response = await fetch("{{ route('absensi.scanner-cache') }}", {
-                    headers: { 'Accept': 'application/json' }
+                    cache: 'no-store',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
                 });
+
+                if (response.status === 401 || response.status === 419 || response.redirected) {
+                    this.sessionExpired = true;
+                    return;
+                }
+
                 const res = await response.json();
+                if (res.csrf_token) {
+                    this.updateCsrfToken(res.csrf_token);
+                }
                 if (res.ok && res.data) {
+                    this.sessionExpired = false;
                     await this.saveStudentCacheToDb(res.data);
                     console.log(`Cache lokal diperbarui: ${res.count} siswa/pengguna tersimpan.`);
                 }
@@ -784,31 +920,49 @@ function usbScannerApp() {
             }
         },
 
-        async syncOfflineQueue() {
+        async syncOfflineQueue(skipAuthRetry = false) {
             if (this.isSyncing) return;
 
             const records = await this.getAllOfflineRecords();
             if (!records || records.length === 0) {
                 this.offlineQueueCount = 0;
+                if (this.sessionExpired && !skipAuthRetry) {
+                    await this.checkAuthAndSync(true);
+                }
                 return;
             }
 
             this.isSyncing = true;
             try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 8000);
+                const sendSyncRequest = async () => {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 8000);
 
-                const response = await fetch("{{ route('absensi.sync-offline') }}", {
-                    method: "POST",
-                    signal: controller.signal,
-                    headers: {
-                        "Content-Type": "application/json",
-                        "X-CSRF-TOKEN": document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
-                        "Accept": "application/json"
-                    },
-                    body: JSON.stringify({ scans: records })
-                });
-                clearTimeout(timeoutId);
+                    const resp = await fetch("{{ route('absensi.sync-offline') }}", {
+                        method: "POST",
+                        signal: controller.signal,
+                        credentials: "same-origin",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "X-CSRF-TOKEN": this.getCsrfToken(),
+                            "X-Requested-With": "XMLHttpRequest",
+                            "Accept": "application/json"
+                        },
+                        body: JSON.stringify({ scans: records })
+                    });
+                    clearTimeout(timeoutId);
+                    return resp;
+                };
+
+                let response = await sendSyncRequest();
+
+                // Jika 419 (CSRF lama setelah login ulang di tab baru) atau 401, coba segarkan token lalu ulangi 1x
+                if ((response.status === 419 || response.status === 401) && !skipAuthRetry) {
+                    const restored = await this.checkAuthAndSync(true);
+                    if (restored) {
+                        response = await sendSyncRequest();
+                    }
+                }
 
                 if (response.status === 419 || response.status === 401) {
                     this.sessionExpired = true;
@@ -824,7 +978,7 @@ function usbScannerApp() {
                     await this.deleteOfflineRecords(idsToDelete);
                     await this.updateOfflineQueueCount();
                     this.playBeep('ok');
-                    console.log(`Berhasil sinkron ${res.synced_count} data absensi offline.`);
+                    console.log(`Berhasil sinkron ${res.synced ?? res.synced_count ?? records.length} data absensi offline.`);
                 } else {
                     console.warn('Gagal sinkron offline queue:', res.message);
                 }
@@ -1093,25 +1247,45 @@ function usbScannerApp() {
 
             // JIKA ONLINE: coba kirim ke server dengan timeout 6 detik
             try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 6000);
+                const sendScanRequest = async () => {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 6000);
 
-                const response = await fetch("{{ route('absensi.scan-usb') }}", {
-                    method: "POST",
-                    signal: controller.signal,
-                    headers: {
-                        "Content-Type": "application/json",
-                        "X-CSRF-TOKEN": document.querySelector('meta[name="csrf-token"]').getAttribute('content'),
-                        "Accept": "application/json"
-                    },
-                    body: JSON.stringify({ uid: uid, mode: this.scanMode })
-                });
-                clearTimeout(timeoutId);
+                    const resp = await fetch("{{ route('absensi.scan-usb') }}", {
+                        method: "POST",
+                        signal: controller.signal,
+                        credentials: "same-origin",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "X-CSRF-TOKEN": this.getCsrfToken(),
+                            "X-Requested-With": "XMLHttpRequest",
+                            "Accept": "application/json"
+                        },
+                        body: JSON.stringify({ uid: uid, mode: this.scanMode })
+                    });
+                    clearTimeout(timeoutId);
+                    return resp;
+                };
+
+                let response = await sendScanRequest();
+
+                // Jika token CSRF kedaluwarsa (419) atau sesi habis (401), cek apakah sudah login di tab baru lalu coba ulang 1x
+                if (response.status === 419 || response.status === 401 || response.redirected) {
+                    const restored = await this.checkAuthAndSync(true);
+                    if (restored) {
+                        response = await sendScanRequest();
+                    } else {
+                        this.sessionExpired = true;
+                        await this.handleOfflineScan(uid);
+                        return;
+                    }
+                }
 
                 if (!response.ok && response.status >= 500) {
                     throw new Error('Server status ' + response.status);
                 }
 
+                this.sessionExpired = false;
                 const res = await response.json();
                 const nowClock = new Date().toLocaleTimeString('id-ID', { hour12: false });
                 this.lastUpdateTime = nowClock.replace(/:/g, '.');

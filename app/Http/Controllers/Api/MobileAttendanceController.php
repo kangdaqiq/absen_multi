@@ -3507,10 +3507,10 @@ class MobileAttendanceController extends Controller
         if ($hasNoWa) {
             $rawStr = trim((string) $rawNoWa);
             if ($rawStr !== '') {
-                if (!preg_match('/^(\+?62|08|628)[0-9\-\s]{7,18}$/', $rawStr)) {
+                if (!preg_match('/^(\+?[0-9][0-9\-\s]{7,18})$/', $rawStr)) {
                     return response()->json([
                         'success' => false,
-                        'message' => 'Format nomor WhatsApp siswa tidak valid. Gunakan awalan 08 atau 62 (contoh: 08123456789).'
+                        'message' => 'Format nomor WhatsApp siswa tidak valid (contoh: 08123456789 atau +60123456789).'
                     ], 422);
                 }
                 $cleanNoWa = preg_replace('/[^0-9]/', '', $rawStr);
@@ -3528,10 +3528,10 @@ class MobileAttendanceController extends Controller
         if ($hasWaOrtu) {
             $rawOrtuStr = trim((string) $rawWaOrtu);
             if ($rawOrtuStr !== '') {
-                if (!preg_match('/^(\+?62|08|628)[0-9\-\s]{7,18}$/', $rawOrtuStr)) {
+                if (!preg_match('/^(\+?[0-9][0-9\-\s]{7,18})$/', $rawOrtuStr)) {
                     return response()->json([
                         'success' => false,
-                        'message' => 'Format nomor WhatsApp orang tua tidak valid. Gunakan awalan 08 atau 62 (contoh: 08123456789).'
+                        'message' => 'Format nomor WhatsApp orang tua tidak valid (contoh: 08123456789 atau +60123456789).'
                     ], 422);
                 }
                 $cleanWaOrtu = preg_replace('/[^0-9]/', '', $rawOrtuStr);
@@ -3689,8 +3689,8 @@ class MobileAttendanceController extends Controller
         if ($hasNoWa) {
             $rawStr = trim((string) $rawNoWa);
             if ($rawStr !== '') {
-                if (!preg_match('/^(\+?62|08|628)[0-9\-\s]{7,18}$/', $rawStr)) {
-                    return response()->json(['success' => false, 'message' => 'Format nomor WhatsApp tidak valid. Gunakan awalan 08 atau 62 (contoh: 08123456789).'], 422);
+                if (!preg_match('/^(\+?[0-9][0-9\-\s]{7,18})$/', $rawStr)) {
+                    return response()->json(['success' => false, 'message' => 'Format nomor WhatsApp tidak valid (contoh: 08123456789 atau +60123456789).'], 422);
                 }
                 $cleanNoWa = preg_replace('/[^0-9]/', '', $rawStr);
                 if (strlen($cleanNoWa) < 9 || strlen($cleanNoWa) > 16) {

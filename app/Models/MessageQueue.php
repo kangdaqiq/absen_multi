@@ -153,13 +153,11 @@ class MessageQueue extends Model
         // Standardize Indonesian format: 08xx -> 628xx
         if (str_starts_with($phone, '0')) {
             $phone = '62' . substr($phone, 1);
-        } elseif (!str_starts_with($phone, '62')) {
-            // Assume it is already without prefix if not starting with 62 or 0
+        } elseif (str_starts_with($phone, '8') && strlen($phone) >= 9 && strlen($phone) <= 13) {
+            // Nomor lokal Indonesia tanpa awalan 0 atau 62 (misal 812xxxx)
             $phone = '62' . $phone;
         }
 
-        // Append WhatsApp domain
-        // $this->attributes['phone_number'] = $phone . '@s.whatsapp.net';
         $this->attributes['phone_number'] = $phone;
     }
 }

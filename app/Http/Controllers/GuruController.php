@@ -74,8 +74,8 @@ class GuruController extends Controller
             'no_wa' => [
                 'required',
                 'string',
-                'max:20',
-                'regex:/^(08|628)[0-9]{8,13}$/',
+                'max:25',
+                'regex:/^(\+?[0-9][0-9\-\s]{7,18})$/',
                 Rule::unique('guru')->where(fn($q) => $q->where('school_id', $schoolId))
             ],
             'uid_rfid' => [
@@ -141,8 +141,8 @@ class GuruController extends Controller
             'no_wa' => [
                 'required',
                 'string',
-                'max:20',
-                'regex:/^(08|628)[0-9]{8,13}$/',
+                'max:25',
+                'regex:/^(\+?[0-9][0-9\-\s]{7,18})$/',
                 Rule::unique('guru')->ignore($guruModel->id)->where(fn($q) => $q->where('school_id', $schoolId))
             ],
             'uid_rfid' => [
@@ -893,8 +893,8 @@ class GuruController extends Controller
     {
         if (!$wa)
             return null;
-        $wa = preg_replace('/[^0-9]/', '', $wa);
-        if (strpos($wa, '08') === 0) {
+        $wa = preg_replace('/[^0-9]/', '', (string)$wa);
+        if (str_starts_with($wa, '0')) {
             $wa = '62' . substr($wa, 1);
         }
         return $wa;

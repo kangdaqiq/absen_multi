@@ -89,8 +89,8 @@ class SiswaController extends Controller
             'tgl_lahir' => 'nullable|date',
             'alamat' => 'nullable|string|max:500',
             'kelas_id' => 'required|exists:kelas,id',
-            'no_wa' => ['nullable', 'string', 'max:25', 'regex:/^(\+?62|08|628)[0-9\-\s]{7,18}$/'],
-            'wa_ortu' => ['nullable', 'string', 'max:25', 'regex:/^(\+?62|08|628)[0-9\-\s]{7,18}$/'],
+            'no_wa' => ['nullable', 'string', 'max:25', 'regex:/^(\+?[0-9][0-9\-\s]{7,18})$/'],
+            'wa_ortu' => ['nullable', 'string', 'max:25', 'regex:/^(\+?[0-9][0-9\-\s]{7,18})$/'],
             'telegram_chat_id' => 'nullable|string|max:50',
             'telegram_ortu_chat_id' => 'nullable|string|max:50',
             'foto' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:3072',
@@ -190,8 +190,8 @@ class SiswaController extends Controller
             'tgl_lahir' => 'nullable|date',
             'alamat' => 'nullable|string|max:500',
             'kelas_id' => 'required|exists:kelas,id',
-            'no_wa' => ['nullable', 'string', 'max:25', 'regex:/^(\+?62|08|628)[0-9\-\s]{7,18}$/'],
-            'wa_ortu' => ['nullable', 'string', 'max:25', 'regex:/^(\+?62|08|628)[0-9\-\s]{7,18}$/'],
+            'no_wa' => ['nullable', 'string', 'max:25', 'regex:/^(\+?[0-9][0-9\-\s]{7,18})$/'],
+            'wa_ortu' => ['nullable', 'string', 'max:25', 'regex:/^(\+?[0-9][0-9\-\s]{7,18})$/'],
             'telegram_chat_id' => 'nullable|string|max:50',
             'telegram_ortu_chat_id' => 'nullable|string|max:50',
             'foto' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:3072',
@@ -864,8 +864,8 @@ class SiswaController extends Controller
     {
         if (!$wa)
             return null;
-        $wa = preg_replace('/[^0-9]/', '', $wa);
-        if (strpos($wa, '08') === 0) {
+        $wa = preg_replace('/[^0-9]/', '', (string)$wa);
+        if (str_starts_with($wa, '0')) {
             $wa = '62' . substr($wa, 1);
         }
         return $wa;

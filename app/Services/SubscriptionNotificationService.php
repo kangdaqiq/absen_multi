@@ -331,10 +331,13 @@ class SubscriptionNotificationService
     {
         $phone = preg_replace('/[^0-9]/', '', $phone);
         if (empty($phone)) return null;
-        if (substr($phone, 0, 1) === '0') {
+        if (str_starts_with($phone, '0')) {
             $phone = '62' . substr($phone, 1);
-        } elseif (substr($phone, 0, 2) !== '62') {
+        } elseif (str_starts_with($phone, '8') && strlen($phone) >= 9 && strlen($phone) <= 13) {
             $phone = '62' . $phone;
+        }
+        if (strlen($phone) < 7 || strlen($phone) > 16) {
+            return null;
         }
         return $phone;
     }

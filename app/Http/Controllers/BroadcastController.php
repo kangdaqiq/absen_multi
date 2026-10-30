@@ -276,7 +276,7 @@ class BroadcastController extends Controller
 
         if (str_starts_with($phone, '0')) {
             $phone = '62' . substr($phone, 1);
-        } elseif (!str_starts_with($phone, '62')) {
+        } elseif (str_starts_with($phone, '8') && strlen($phone) >= 9 && strlen($phone) <= 13) {
             $phone = '62' . $phone;
         }
 

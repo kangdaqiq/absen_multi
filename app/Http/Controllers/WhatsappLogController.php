@@ -675,10 +675,10 @@ class WhatsappLogController extends Controller
         if (empty($clean)) return null;
         if (str_starts_with($clean, '0')) {
             return '62' . substr($clean, 1);
-        } elseif (str_starts_with($clean, '62')) {
-            return $clean;
+        } elseif (str_starts_with($clean, '8') && strlen($clean) >= 9 && strlen($clean) <= 13) {
+            return '62' . $clean;
         }
-        return '62' . $clean;
+        return $clean;
     }
 
     /**

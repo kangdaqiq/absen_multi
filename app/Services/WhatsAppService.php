@@ -368,13 +368,22 @@ class WhatsAppService
 
     private function formatPhone($phone)
     {
-        $phone = preg_replace('/[^0-9]/', '', $phone);
+        $phone = preg_replace('/[^0-9]/', '', (string)$phone);
         if (empty($phone))
             return null;
-        if (substr($phone, 0, 1) === '0')
+
+        // Jika nomor berawalan '0' (format lokal Indonesia misal 08xxx), konversi ke '628xxx'
+        if (str_starts_with($phone, '0')) {
             $phone = '62' . substr($phone, 1);
-        elseif (substr($phone, 0, 2) !== '62')
+        } elseif (str_starts_with($phone, '8') && strlen($phone) >= 9 && strlen($phone) <= 13) {
+            // Nomor lokal Indonesia tanpa awalan 0 atau 62 (misal 812xxxx)
             $phone = '62' . $phone;
+        }
+
+        // Validasi panjang digit nomor telepon internasional standar (7 s.d. 16 digit)
+        if (strlen($phone) < 7 || strlen($phone) > 16) {
+            return null;
+        }
 
         return $phone;
     }

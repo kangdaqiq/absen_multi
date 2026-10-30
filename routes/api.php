@@ -11,6 +11,7 @@ Route::get('/user', function (Request $request) {
 
 // --- RFID Endpoints ---
 Route::any('/rfid', [RfidController::class, 'handle']);
+Route::any('/rfid/v2', [RfidController::class, 'handleV2']);
 
 // --- Legacy AS608 Fingerprint Endpoints (200 ID) ---
 Route::any('/fingerprint', [App\Http\Controllers\Api\FingerprintController::class, 'handle']);

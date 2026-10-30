@@ -293,6 +293,48 @@ Firmware mem-parsing properti `ok`, `message`, `nama`, dan `type` untuk menentuk
 
 ---
 
+### 4.4 Backend Cloud REST API V2 (`/api/rfid/v2`) — *Server-Driven LCD & Sound*
+
+Endpoint ini merupakan pembaruan dari `/api/rfid` yang digunakan oleh **Firmware RFIDv2 v4.3.0+**. Pada endpoint ini, teks baris 1, teks baris 2, durasi tampilan, dan jenis bunyi buzzer **dikendalikan secara langsung oleh server melalui objek `display` dan `sound`**, sehingga tidak ada lagi logika *hardcoded* teks di dalam firmware mikrokontroler.
+
+- **URL**: `{apiurl}/api/rfid/v2`
+- **Method**: `POST` (dan `GET ?ping=1` untuk heartbeat check)
+- **Headers**:
+  - `Content-Type: application/json`
+
+#### Schema Response V2 (Server-Driven):
+```json
+{
+  "ok": true,
+  "status": "success",
+  "message": "Selamat Pagi, Ahmad Dani.",
+  "display": {
+    "line1": "ABSEN MASUK",
+    "line2": "Ahmad Dani",
+    "duration_ms": 3000
+  },
+  "sound": "ok",
+  "nama": "Ahmad Dani",
+  "type": "absen_masuk",
+  "timestamp": "2026-10-30 07:15:00"
+}
+```
+
+#### Spesifikasi Nilai `sound`:
+- `"ok"`: Membunyikan buzzer 2x bip pendek (`beepOK()`).
+- `"short"`: Membunyikan buzzer 1x bip pendek (`beepShort()`).
+- `"triple"`: Membunyikan buzzer 3x bip cepat (`beepTriple()`).
+- `"error"`: Membunyikan buzzer 1x bip panjang 600ms (`beepError()`).
+- `"none"`: Tidak membunyikan buzzer.
+
+#### Format Otomatis Baris 2 LCD (Maksimal 16 Karakter):
+- **Tepat Waktu**: Nama user terpotong otomatis maksimal 16 karakter (misal: `"Ahmad Dani"` atau `"Muhammad Riz...""`).
+- **Terlambat**: Format cerdas dengan durasi keterlambatan (misal: `"Dani (+15m)"`).
+- **Pesan Error / Sistem**: Teks pesan error terpotong maksimal 16 karakter (misal: `"KARTU TDK DIKENAL"`, `"DILUAR JAM MASUK"`, `"UID TDK VALID"`).
+
+
+---
+
 ## 5. Mekanisme Offline Queue & Sinkronisasi Data
 
 Firmware dilengkapi sistem antrean offline berbasis flash memory LittleFS untuk menjamin tidak ada data presensi yang hilang saat Wi-Fi atau internet padam.

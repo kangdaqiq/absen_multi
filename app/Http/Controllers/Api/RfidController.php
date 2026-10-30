@@ -30,6 +30,7 @@ class RfidController extends Controller
     protected $wa;
 
     // Logging context
+    protected $apiVersion = 1;
     private $currentApiKey = null;
     private $currentUid = null;
     private $currentSchoolId = null;
@@ -325,11 +326,21 @@ class RfidController extends Controller
         }
     }
 
+    public function handleV2(Request $request)
+    {
+        $this->apiVersion = 2;
+        return $this->handle($request);
+    }
+
     public function handle(Request $request)
     {
         // 0. Quick Ping / Heartbeat Check (Tanpa query DB / Log bloat)
         if ($request->has('ping') || ($request->isMethod('get') && !$request->has('uid'))) {
-            return response()->json(['ok' => true, 'message' => 'pong'], 200);
+            return response()->json([
+                'ok' => true,
+                'message' => 'pong',
+                'version' => $this->apiVersion === 2 ? 'v2' : 'v1'
+            ], 200);
         }
 
         $apiKey = trim($request->input('api_key', ''));
@@ -964,6 +975,21 @@ class RfidController extends Controller
             $this->logRequest($this->currentApiKey, $action, $this->currentUid, $ok, $message);
         }
 
+        if ($this->apiVersion === 2) {
+            $display = $this->formatLcdDisplay($ok, $status, $message, $extra);
+            $v2Sound = $this->determineV2Sound($ok, $sound, $extra['type'] ?? null);
+
+            $resV2 = [
+                'ok' => $ok,
+                'status' => $status,
+                'message' => $message,
+                'display' => $display,
+                'sound' => $v2Sound,
+                'timestamp' => now()->toDateTimeString()
+            ];
+            return response()->json(array_merge($resV2, $extra));
+        }
+
         $res = [
             'ok' => $ok,
             'status' => $status,
@@ -972,6 +998,136 @@ class RfidController extends Controller
             'timestamp' => now()->toDateTimeString()
         ];
         return response()->json(array_merge($res, $extra));
+    }
+
+    private function formatLcdDisplay(bool $ok, string $status, string $message, array $extra = []): array
+    {
+        $type = $extra['type'] ?? '';
+        $nama = $extra['nama'] ?? '';
+
+        // Baris 1: Judul status / aksi (maks 16 karakter)
+        $line1 = 'SUKSES';
+        if ($ok) {
+            switch ($type) {
+                case 'absen_masuk':
+                case 'absen_masuk_guru':
+                    $isLate = ($extra['status'] ?? '') === 'Terlambat' || (!empty($extra['menit_terlambat']) && $extra['menit_terlambat'] > 0);
+                    $line1 = $isLate ? 'MASUK (TELAT)' : 'ABSEN MASUK';
+                    break;
+                case 'absen_pulang':
+                case 'absen_pulang_guru':
+                    $line1 = 'ABSEN PULANG';
+                    break;
+                case 'sudah_absen_masuk':
+                case 'absen_sudah_masuk_guru':
+                    $line1 = 'SUDAH ABSEN';
+                    break;
+                case 'sudah_lengkap':
+                    $line1 = 'ABSEN LENGKAP';
+                    break;
+                case 'absen_kegiatan':
+                    $line1 = 'ABSEN KEGIATAN';
+                    break;
+                case 'enroll_rfid':
+                    $line1 = 'ENROLL SUKSES';
+                    break;
+                case 'gate_opened':
+                    $line1 = 'PULANG DIBUKA';
+                    break;
+                case 'gate_closed':
+                    $line1 = 'PULANG DITUTUP';
+                    break;
+                default:
+                    $line1 = 'BERHASIL';
+                    break;
+            }
+        } else {
+            switch ($type) {
+                case 'unknown_card':
+                    $line1 = 'KARTU TDK DIKENAL';
+                    break;
+                case 'scan_cooldown':
+                    $line1 = 'TUNGGU SEBENTAR';
+                    break;
+                case 'schedule_empty':
+                    $line1 = 'JADWAL LIBUR';
+                    break;
+                case 'class_disabled':
+                    $line1 = 'ABSEN NONAKTIF';
+                    break;
+                case 'no_shift':
+                    $line1 = 'TIDAK ADA SHIFT';
+                    break;
+                case 'outside_checkin_window':
+                    $line1 = 'DILUAR JAM MASUK';
+                    break;
+                case 'outside_checkout_window':
+                    $line1 = 'DILUAR PULANG';
+                    break;
+                case 'rate_limit':
+                    $line1 = 'TERLALU CEPAT';
+                    break;
+                case 'invalid_uid':
+                    $line1 = 'UID TDK VALID';
+                    break;
+                default:
+                    $line1 = 'ABSEN GAGAL!';
+                    break;
+            }
+        }
+
+        // Baris 2: Nama atau rincian (maks 16 karakter)
+        $line2 = '';
+        if (!empty($nama)) {
+            $menitTerlambat = $extra['menit_terlambat'] ?? 0;
+            if ($menitTerlambat > 0) {
+                $suffix = " (+{$menitTerlambat}m)";
+                $maxNamaLen = 16 - strlen($suffix);
+                if (strlen($nama) > $maxNamaLen) {
+                    $nama = substr($nama, 0, $maxNamaLen);
+                }
+                $line2 = $nama . $suffix;
+            } else {
+                $line2 = strlen($nama) > 16 ? substr($nama, 0, 13) . '...' : $nama;
+            }
+        } else {
+            $msg = !empty($message) ? $message : ($ok ? 'Berhasil' : 'Gagal');
+            $line2 = strlen($msg) > 16 ? substr($msg, 0, 13) . '...' : $msg;
+        }
+
+        return [
+            'line1' => substr($line1, 0, 16),
+            'line2' => substr($line2, 0, 16),
+            'duration_ms' => 3000,
+        ];
+    }
+
+    private function determineV2Sound(bool $ok, string $defaultSound = 'ok', ?string $type = null): string
+    {
+        if (!$ok) {
+            if ($type === 'scan_cooldown') {
+                return 'short';
+            }
+            return 'error';
+        }
+
+        switch ($type) {
+            case 'enroll_rfid':
+            case 'gate_opened':
+            case 'gate_closed':
+                return 'triple';
+            case 'sudah_absen_masuk':
+            case 'absen_sudah_masuk_guru':
+            case 'sudah_lengkap':
+                return 'short';
+            case 'absen_masuk':
+            case 'absen_masuk_guru':
+            case 'absen_pulang':
+            case 'absen_pulang_guru':
+            case 'absen_kegiatan':
+            default:
+                return 'ok';
+        }
     }
 
     private function logRequest($apiKey, $action, $uid, $success, $message)

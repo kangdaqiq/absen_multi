@@ -1745,6 +1745,11 @@ class AttendanceController extends Controller
         }
 
         $user = auth()->user();
+        $schoolTz = ($user && $user->school_id)
+            ? Setting::where('school_id', $user->school_id)->where('setting_key', 'timezone')->value('setting_value')
+            : null;
+        $activeTz = $schoolTz ?: config('app.timezone', 'Asia/Jakarta');
+
         $syncedCount = 0;
         $failedCount = 0;
         $results = [];
@@ -1753,9 +1758,9 @@ class AttendanceController extends Controller
             $rawUid = trim($item['uid']);
             $reqMode = $item['mode'] ?? 'auto';
             try {
-                $tappedAt = Carbon::parse($item['tapped_at']);
+                $tappedAt = Carbon::parse($item['tapped_at'], $activeTz)->setTimezone($activeTz);
             } catch (\Exception $e) {
-                $tappedAt = now();
+                $tappedAt = now($activeTz);
             }
 
             try {
@@ -1927,12 +1932,11 @@ class AttendanceController extends Controller
         $schoolTz = Setting::where('school_id', $schoolId)
             ->where('setting_key', 'timezone')
             ->value('setting_value');
-        if ($schoolTz) {
-            date_default_timezone_set($schoolTz);
-            config(['app.timezone' => $schoolTz]);
-        }
+        $activeTz = $schoolTz ?: config('app.timezone', 'Asia/Jakarta');
+        date_default_timezone_set($activeTz);
+        config(['app.timezone' => $activeTz]);
 
-        $now = $customTime ? $customTime->copy() : now();
+        $now = $customTime ? $customTime->copy()->setTimezone($activeTz) : now($activeTz);
         $today = $now->format('Y-m-d');
         $indexHari = (int) $now->format('N'); // 1 (Mon) - 7 (Sun)
 

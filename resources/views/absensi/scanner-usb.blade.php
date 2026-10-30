@@ -1149,8 +1149,13 @@ function usbScannerApp() {
         },
 
         async handleOfflineScan(uid) {
-            const nowClock = new Date().toLocaleTimeString('id-ID', { hour12: false });
+            const nowObj = new Date();
+            const nowClock = nowObj.toLocaleTimeString('id-ID', { hour12: false }).replace(/\./g, ':');
             this.lastUpdateTime = nowClock.replace(/:/g, '.');
+
+            // Format waktu lokal perangkat (YYYY-MM-DD HH:mm:ss) agar tidak bergeser ke UTC (-7 jam)
+            const pad = (n) => String(n).padStart(2, '0');
+            const localTappedAt = `${nowObj.getFullYear()}-${pad(nowObj.getMonth() + 1)}-${pad(nowObj.getDate())} ${pad(nowObj.getHours())}:${pad(nowObj.getMinutes())}:${pad(nowObj.getSeconds())}`;
 
             // Cari profil pengguna dari IndexedDB
             const cachedStudent = await this.getStudentFromDb(uid);
@@ -1165,7 +1170,7 @@ function usbScannerApp() {
             const record = {
                 uid: uid,
                 mode: this.scanMode,
-                tapped_at: new Date().toISOString(),
+                tapped_at: localTappedAt,
                 created_at: Date.now(),
                 nama: nama,
                 nis: nis,

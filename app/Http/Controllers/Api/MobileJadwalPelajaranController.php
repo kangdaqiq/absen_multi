@@ -582,17 +582,17 @@ class MobileJadwalPelajaranController extends Controller
         $hasDokumentasiInput = false;
 
         if ($isDokKbmAllowed) {
-            // 1. Prioritaskan payload array 'dokumentasi' jika dikirim dari Android
-            if ($request->has('dokumentasi') && !empty($request->input('dokumentasi'))) {
+            // 1. Prioritaskan payload array 'dokumentasi' jika dikirim dari PWA / Android
+            if ($request->has('dokumentasi')) {
                 $hasDokumentasiInput = true;
                 $rawDok = $request->input('dokumentasi');
                 if (is_string($rawDok)) {
                     $decoded = json_decode($rawDok, true);
                     $rawDok = is_array($decoded) ? $decoded : [];
                 }
+                $dokumentasiPayload = [];
 
                 if (is_array($rawDok) && !empty($rawDok)) {
-                    $dokumentasiPayload = [];
                     foreach ($rawDok as $item) {
                         if (is_string($item)) {
                             $itemUrl = trim($item);
@@ -1381,6 +1381,110 @@ class MobileJadwalPelajaranController extends Controller
             'message' => 'Upload berhasil dikonfirmasi.',
             'data'    => $file,
         ]);
+    }
+
+    /**
+     * Hapus file storage dari Cloudflare R2 / Server Storage
+     * POST /api/mobile/storage/delete-file
+     * 
+     * Menerima parameter salah satu dari:
+     * - file_id: ID record di tabel storage_files
+     * - path: path file (contoh: kbm/2026/10/foto.jpg)
+     * - url: URL publik file
+     */
+    public function deleteStorageFile(Request $request)
+    {
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated'], 401);
+        }
+
+        $request->validate([
+            'file_id' => 'nullable|integer',
+            'path'    => 'nullable|string',
+            'url'     => 'nullable|string',
+        ]);
+
+        $fileId = $request->input('file_id');
+        $filePath = $request->input('path');
+        $fileUrl = $request->input('url');
+
+        if (!$fileId && !$filePath && !$fileUrl) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Salah satu parameter (file_id, path, atau url) wajib disertakan.'
+            ], 422);
+        }
+
+        $r2Service = app(\App\Services\R2StorageService::class);
+        $schoolId = $user->school_id;
+
+        // 1. Jika menghapus via file_id
+        if ($fileId) {
+            $storageFile = \App\Models\StorageFile::find($fileId);
+            if (!$storageFile) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'File tidak ditemukan di database.'
+                ], 404);
+            }
+
+            // Validasi kepemilikan sekolah (jika bukan super admin)
+            if ($schoolId && $storageFile->school_id && $storageFile->school_id != $schoolId) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Akses ditolak: File bukan milik unit sekolah Anda.'
+                ], 403);
+            }
+
+            $deleted = $r2Service->deleteFileByPath($storageFile->path);
+            return response()->json([
+                'success' => $deleted,
+                'message' => $deleted ? 'File berhasil dihapus dari storage.' : 'Gagal menghapus file dari storage disk.',
+            ]);
+        }
+
+        // 2. Jika menghapus via path
+        if ($filePath) {
+            $cleanPath = ltrim(trim($filePath), '/\\');
+            // Cek jika ada record di database untuk validasi sekolah
+            $storageFile = \App\Models\StorageFile::where('path', $cleanPath)->first();
+            if ($storageFile && $schoolId && $storageFile->school_id && $storageFile->school_id != $schoolId) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Akses ditolak: File bukan milik unit sekolah Anda.'
+                ], 403);
+            }
+
+            $deleted = $r2Service->deleteFileByPath($cleanPath);
+            return response()->json([
+                'success' => $deleted,
+                'message' => $deleted ? 'File berhasil dihapus dari storage.' : 'Gagal menghapus file dari storage disk.',
+            ]);
+        }
+
+        // 3. Jika menghapus via URL
+        if ($fileUrl) {
+            $parsed = parse_url($fileUrl, PHP_URL_PATH);
+            $cleanPath = $parsed ? ltrim($parsed, '/') : '';
+            if ($cleanPath !== '') {
+                $storageFile = \App\Models\StorageFile::where('path', $cleanPath)->first();
+                if ($storageFile && $schoolId && $storageFile->school_id && $storageFile->school_id != $schoolId) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Akses ditolak: File bukan milik unit sekolah Anda.'
+                    ], 403);
+                }
+            }
+
+            $deleted = $r2Service->deleteFileByUrl($fileUrl);
+            return response()->json([
+                'success' => $deleted,
+                'message' => $deleted ? 'File berhasil dihapus dari storage.' : 'Gagal menghapus file dari storage disk.',
+            ]);
+        }
+
+        return response()->json(['success' => false, 'message' => 'Gagal memproses penghapusan file.'], 400);
     }
 }
 

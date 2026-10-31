@@ -87,6 +87,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/mobile/jadwal-pelajaran/upload-dokumentasi', [App\Http\Controllers\Api\MobileJadwalPelajaranController::class, 'uploadDokumentasi']);
     Route::post('/mobile/storage/presigned-url', [App\Http\Controllers\Api\MobileJadwalPelajaranController::class, 'getPresignedUploadUrl']);
     Route::post('/mobile/storage/confirm-upload', [App\Http\Controllers\Api\MobileJadwalPelajaranController::class, 'confirmDirectUpload']);
+    Route::post('/mobile/storage/delete-file', [App\Http\Controllers\Api\MobileJadwalPelajaranController::class, 'deleteStorageFile']);
     Route::post('/mobile/jadwal-pelajaran/presigned-url', [App\Http\Controllers\Api\MobileJadwalPelajaranController::class, 'getPresignedUploadUrl']);
     Route::get('/mobile/mapels', [App\Http\Controllers\Api\MobileJadwalPelajaranController::class, 'getMapels']);
     Route::get('/mobile/jam-pelajaran', [App\Http\Controllers\Api\MobileJadwalPelajaranController::class, 'getJamPelajaran']);

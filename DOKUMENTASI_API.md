@@ -819,7 +819,7 @@ Digunakan oleh aplikasi mobile untuk mengecek apakah pengguna yang sedang login 
   "data": {
     "has_face_registered": true,
     "is_verified": true,
-    "sample_photo_url": "http://absen.jagattech.my.id/storage/faces/sample_123.jpg",
+    "sample_photo_url": null,
     "registered_at": "2026-10-12 08:30:00"
   }
 }
@@ -848,7 +848,7 @@ Mendaftarkan foto wajah asli pengguna sebagai referensi embedding biometrik saat
   "message": "Registrasi wajah master berhasil disimpan.",
   "data": {
     "is_verified": true,
-    "sample_photo_url": "http://absen.jagattech.my.id/storage/faces/abc123xyz.jpg",
+    "sample_photo_url": null,
     "registered_at": "2026-10-12 08:35:12"
   }
 }
@@ -1464,5 +1464,120 @@ Mengambil jadwal pelajaran lengkap selama satu minggu untuk kelas siswa, dikelom
 }
 ```
 
+---
 
+## ☁️ 9. Cloud Storage (Cloudflare R2 / S3) & Dokumen Digital
+
+Endpoint pengelolaan file media (foto/video dokumentasi kegiatan KBM, materi ajar, dan lampiran berkas).
+
+### 9.1 Dapatkan Presigned URL Upload Direct (`POST /api/mobile/storage/presigned-url`)
+Digunakan oleh aplikasi mobile untuk mengunggah file gambar/video langsung ke Cloudflare R2 tanpa membebani bandwidth dan RAM server utama.
+
+- **URL**: `/api/mobile/storage/presigned-url` *(alias: `/api/mobile/jadwal-pelajaran/presigned-url`)*
+- **Method**: `POST`
+- **Auth**: Bearer Token
+- **Body Request**:
+```json
+{
+  "filename": "kbm_dokumentasi.jpg",
+  "content_type": "image/jpeg",
+  "category": "kbm"
+}
+```
+*Parameter:*
+- `filename` (string, required): Nama asli file yang akan diupload.
+- `content_type` (string, required): MIME type berkas (contoh: `image/jpeg`, `image/png`, `video/mp4`).
+- `category` (string, optional): Kategori folder (`kbm`, `tugas`, `materi`, default: `kbm`).
+
+- **Response Success (200 OK)**:
+```json
+{
+  "success": true,
+  "upload_url": "https://<account_id>.r2.cloudflarestorage.com/<bucket>/kbm/2026/10/uuid.jpg?...",
+  "file_url": "https://pub-<hash>.r2.dev/kbm/2026/10/uuid.jpg",
+  "file_id": 42,
+  "path": "kbm/2026/10/uuid.jpg",
+  "expires_in_minutes": 15
+}
+```
+*Alur di Mobile App:*
+1. Panggil endpoint ini untuk mendapatkan `upload_url`.
+2. Lakukan HTTP `PUT` ke `upload_url` dengan body binary file dan header `Content-Type: <content_type>`.
+3. Setelah upload selesai, panggil endpoint konfirmasi (9.2).
+
+---
+
+### 9.2 Konfirmasi Upload Direct Selesai (`POST /api/mobile/storage/confirm-upload`)
+Mengonfirmasi bahwa berkas telah berhasil terunggah ke Cloudflare R2 dan memperbarui ukuran riil berkas di database kuota sekolah.
+
+- **URL**: `/api/mobile/storage/confirm-upload`
+- **Method**: `POST`
+- **Auth**: Bearer Token
+- **Body Request**:
+```json
+{
+  "file_id": 42,
+  "size": 1048576
+}
+```
+*Parameter:*
+- `file_id` (integer, required): ID file dari respon endpoint 9.1.
+- `size` (integer, optional): Ukuran file dalam bytes.
+
+- **Response Success (200 OK)**:
+```json
+{
+  "success": true,
+  "message": "Upload berhasil dikonfirmasi.",
+  "data": {
+    "id": 42,
+    "path": "kbm/2026/10/uuid.jpg",
+    "url": "https://pub-<hash>.r2.dev/kbm/2026/10/uuid.jpg",
+    "size_bytes": 1048576
+  }
+}
+```
+
+---
+
+### 9.3 Hapus Berkas Storage (`POST /api/mobile/storage/delete-file`)
+Menghapus file fisik dari Cloudflare R2 / Server Storage sekaligus membersihkan record dari database kuota sekolah.
+
+- **URL**: `/api/mobile/storage/delete-file`
+- **Method**: `POST`
+- **Auth**: Bearer Token
+- **Body Request (Cukup kirim salah satu parameter)**:
+```json
+{
+  "file_id": 42
+}
+```
+*Atau menggunakan path:*
+```json
+{
+  "path": "kbm/2026/10/uuid.jpg"
+}
+```
+*Atau menggunakan URL publik:*
+```json
+{
+  "url": "https://pub-<hash>.r2.dev/kbm/2026/10/uuid.jpg"
+}
+```
+
+- **Response Success (200 OK)**:
+```json
+{
+  "success": true,
+  "message": "File berhasil dihapus dari storage."
+}
+```
+
+- **Response Error (403 Forbidden - Bukan Milik Sekolah)**:
+```json
+{
+  "success": false,
+  "message": "Akses ditolak: File bukan milik unit sekolah Anda."
+}
+```
 

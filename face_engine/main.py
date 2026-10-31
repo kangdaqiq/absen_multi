@@ -834,7 +834,7 @@ def _sync_identify_face(raw_bytes: bytes, candidates_json: str, active_threshold
                 "similarity": 0.0,
                 "similarity_percent": 0.0,
                 "embedding": query_vec.tolist(),
-                "message": "Belum ada kandidat wajah 512-d terdaftar."
+                "message": "Belum ada face id terdaftar."
             }
 
         scores = np.dot(mat_normed, query_vec)

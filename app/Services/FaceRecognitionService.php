@@ -226,7 +226,7 @@ class FaceRecognitionService
                     'success' => false,
                     'is_match' => false,
                     'similarity' => 0.0,
-                    'message' => 'Vektor wajah 512-d belum tersedia. Silakan daftarkan ulang Face ID Anda.'
+                    'message' => 'Vektor face id belum tersedia. Silakan daftarkan ulang Face ID Anda.'
                 ];
             }
 
@@ -348,7 +348,7 @@ class FaceRecognitionService
                 'engine_offline' => false,
                 'matched_record' => null,
                 'similarity' => 0.0,
-                'message' => 'Belum ada kandidat wajah 512-d terdaftar di sekolah ini.'
+                'message' => 'Belum ada face id terdaftar di sekolah ini.'
             ];
         }
 

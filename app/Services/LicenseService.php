@@ -19,6 +19,7 @@ class LicenseService
      */
     private ?array $memoizedResult = null;
     private ?string $memoizedKey   = null;
+    private ?string $lastServerError = null;
 
     /**
      * Penanda build khusus client self-hosted.
@@ -173,7 +174,8 @@ class LicenseService
             return $this->failResult('Grace period 3 hari telah habis. Hubungi provider untuk reaktivasi.');
         }
 
-        return $this->failResult('Tidak dapat menghubungi server lisensi dan belum ada data aktivasi lokal yang valid.');
+        $detail = $this->lastServerError ? " ({$this->lastServerError})" : '';
+        return $this->failResult("Tidak dapat menghubungi server lisensi{$detail} dan belum ada data aktivasi lokal yang valid.");
     }
 
     // ── Ed25519 Cryptographic Helpers ──────────────────────────────────────
@@ -209,13 +211,20 @@ class LicenseService
         }
 
         $secretKey = base64_decode($privKeyB64, true);
-        if ($secretKey === false || strlen($secretKey) !== \ParagonIE_Sodium_Compat::CRYPTO_SIGN_SECRETKEYBYTES) {
+        if ($secretKey === false || strlen($secretKey) !== 64) {
             Log::error('[LicenseService] Format LICENSE_PRIVATE_KEY tidak valid (harus 64-byte Ed25519 secret key dalam Base64).');
             return null;
         }
 
-        $message   = self::canonicalJson($payload);
-        $signature = \ParagonIE_Sodium_Compat::crypto_sign_detached($message, $secretKey);
+        $message = self::canonicalJson($payload);
+        if (function_exists('sodium_crypto_sign_detached')) {
+            $signature = sodium_crypto_sign_detached($message, $secretKey);
+        } elseif (class_exists('\ParagonIE_Sodium_Compat')) {
+            $signature = \ParagonIE_Sodium_Compat::crypto_sign_detached($message, $secretKey);
+        } else {
+            Log::error('[LicenseService] Ekstensi sodium atau ParagonIE_Sodium_Compat tidak ditemukan di server.');
+            return null;
+        }
 
         return base64_encode($signature);
     }
@@ -236,15 +245,21 @@ class LicenseService
         if (
             $publicKey === false ||
             $signature === false ||
-            strlen($publicKey) !== \ParagonIE_Sodium_Compat::CRYPTO_SIGN_PUBLICKEYBYTES ||
-            strlen($signature) !== \ParagonIE_Sodium_Compat::CRYPTO_SIGN_BYTES
+            strlen($publicKey) !== 32 ||
+            strlen($signature) !== 64
         ) {
             return false;
         }
 
         try {
             $message = self::canonicalJson($payload);
-            return \ParagonIE_Sodium_Compat::crypto_sign_verify_detached($signature, $message, $publicKey);
+            if (function_exists('sodium_crypto_sign_verify_detached')) {
+                return sodium_crypto_sign_verify_detached($signature, $message, $publicKey);
+            }
+            if (class_exists('\ParagonIE_Sodium_Compat')) {
+                return \ParagonIE_Sodium_Compat::crypto_sign_verify_detached($signature, $message, $publicKey);
+            }
+            return false;
         } catch (\Throwable $e) {
             Log::warning('[LicenseService] Verifikasi Ed25519 gagal: ' . $e->getMessage());
             return false;
@@ -255,8 +270,10 @@ class LicenseService
 
     private function fetchFromServer(string $licenseKey): ?array
     {
+        $this->lastServerError = null;
         $serverUrl = rtrim((string) config('app.license_server_url', ''), '/');
         if (empty($serverUrl)) {
+            $this->lastServerError = 'LICENSE_SERVER_URL kosong';
             return null;
         }
 
@@ -271,11 +288,13 @@ class LicenseService
             ]);
 
             if ($response->status() >= 500) {
+                $this->lastServerError = "Server {$serverUrl} mengembalikan HTTP " . $response->status();
                 return null;
             }
 
             $data = $response->json();
             if (!is_array($data)) {
+                $this->lastServerError = "Response dari {$serverUrl} bukan JSON valid (HTTP " . $response->status() . ")";
                 return null;
             }
 
@@ -352,6 +371,7 @@ class LicenseService
 
             return null;
         } catch (\Exception $e) {
+            $this->lastServerError = $e->getMessage();
             Log::warning('[LicenseService] Tidak dapat menghubungi license server: ' . $e->getMessage());
             return null;
         }
@@ -647,12 +667,19 @@ class LicenseService
         }
 
         $secretKey = base64_decode($privKeyB64, true);
-        if ($secretKey === false || strlen($secretKey) !== \ParagonIE_Sodium_Compat::CRYPTO_SIGN_SECRETKEYBYTES) {
+        if ($secretKey === false || strlen($secretKey) !== 64) {
             return false;
         }
 
         try {
-            $derivedPub = \ParagonIE_Sodium_Compat::crypto_sign_publickey_from_secretkey($secretKey);
+            if (function_exists('sodium_crypto_sign_publickey_from_secretkey')) {
+                $derivedPub = sodium_crypto_sign_publickey_from_secretkey($secretKey);
+            } elseif (class_exists('\ParagonIE_Sodium_Compat')) {
+                $derivedPub = \ParagonIE_Sodium_Compat::crypto_sign_publickey_from_secretkey($secretKey);
+            } else {
+                // Dalam Ed25519 (64-byte secret key), 32 byte terakhir adalah public key
+                $derivedPub = substr($secretKey, 32, 32);
+            }
             return hash_equals(self::PUBLIC_KEY, base64_encode($derivedPub));
         } catch (\Throwable) {
             return false;

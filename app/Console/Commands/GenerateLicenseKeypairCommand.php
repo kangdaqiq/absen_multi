@@ -21,9 +21,15 @@ class GenerateLicenseKeypairCommand extends Command
 
         $this->info('Generating Ed25519 keypair...');
 
-        $keypair    = \ParagonIE_Sodium_Compat::crypto_sign_keypair();
-        $secretKey  = \ParagonIE_Sodium_Compat::crypto_sign_secretkey($keypair);
-        $publicKey  = \ParagonIE_Sodium_Compat::crypto_sign_publickey($keypair);
+        if (function_exists('sodium_crypto_sign_keypair')) {
+            $keypair   = sodium_crypto_sign_keypair();
+            $secretKey = sodium_crypto_sign_secretkey($keypair);
+            $publicKey = sodium_crypto_sign_publickey($keypair);
+        } else {
+            $keypair   = \ParagonIE_Sodium_Compat::crypto_sign_keypair();
+            $secretKey = \ParagonIE_Sodium_Compat::crypto_sign_secretkey($keypair);
+            $publicKey = \ParagonIE_Sodium_Compat::crypto_sign_publickey($keypair);
+        }
 
         $privBase64 = base64_encode($secretKey);
         $pubBase64  = base64_encode($publicKey);

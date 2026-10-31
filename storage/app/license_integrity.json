@@ -1,9 +1,9 @@
 {
-    "generated_at": "2026-10-31T14:19:40+07:00",
+    "generated_at": "2026-10-31T15:03:24+07:00",
     "files": {
         "app/Http/Middleware/CheckLicense.php": "e2ec44a9f612e004bb769cb7ced547b55ba86ba70a1c3c557834d3d9da5a112f",
         "app/Http/Middleware/SelfHostedGuard.php": "62d52558cef3a03ed1920557c13fdf0756d27714289b60422e6ccfa1d33b3ade",
-        "app/Services/LicenseService.php": "05cf4e6ce04f23dca4846c0eb6f122e63389bc27a97ddf24c5cc42ccab329e89"
+        "app/Services/LicenseService.php": "2dcb30d07cdcb57804a5b7ff9632790eca94cdd4df42871cd87f46cf71fe1c7a"
     },
-    "_signature": "+7bsCmgw9r7zwEUB0CqsezT5mx2OCHWd5tOS/q6T0dPW6eAad01k2q2/xPuiSe6VAQoVcJ4fwR0VnDtNtkURAQ=="
+    "_signature": "qvs2bmbDx/ObL1mZNzrDzCu7wR+sQZuRXHOqqvtbGtE5n+7rRF86pm9gZ0n7s7eERQXPY86T57wrcpGyawhJBQ=="
 }

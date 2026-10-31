@@ -1326,8 +1326,8 @@ class MobileJadwalPelajaranController extends Controller
         ]);
 
         try {
-            $r2Service = app(\App\Services\R2StorageService::class);
-            $res = $r2Service->createPresignedUpload(
+            $kbmStorage = app(\App\Services\KbmStorageService::class);
+            $res = $kbmStorage->createPresignedUpload(
                 school: $school,
                 originalName: $request->filename,
                 mimeType: $request->mime_type,
@@ -1354,7 +1354,7 @@ class MobileJadwalPelajaranController extends Controller
                 ],
             ], 413);
         } catch (\Throwable $e) {
-            Log::error('[DirectR2] Presigned URL error: ' . $e->getMessage());
+            Log::error('[Storage] Presigned URL error: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
                 'message' => 'Gagal membuat URL upload: ' . $e->getMessage()
@@ -1373,14 +1373,41 @@ class MobileJadwalPelajaranController extends Controller
             'size'    => 'nullable|integer|min:0',
         ]);
 
-        $r2Service = app(\App\Services\R2StorageService::class);
-        $file = $r2Service->confirmUpload((int)$request->file_id, $request->size ? (int)$request->size : null);
+        $kbmStorage = app(\App\Services\KbmStorageService::class);
+        $file = $kbmStorage->confirmUpload((int)$request->file_id, $request->size ? (int)$request->size : null);
 
         return response()->json([
             'success' => true,
             'message' => 'Upload berhasil dikonfirmasi.',
             'data'    => $file,
         ]);
+    }
+
+    /**
+     * Handle HTTP PUT upload dari browser/PWA untuk storage internal
+     * PUT /api/mobile/storage/direct-put/{token}
+     */
+    public function directPutUpload(string $token, Request $request)
+    {
+        $rawBody = $request->getContent();
+        if (empty($rawBody)) {
+            $rawBody = file_get_contents('php://input');
+        }
+
+        if (empty($rawBody)) {
+            return response()->json(['success' => false, 'message' => 'Payload berkas kosong.'], 400);
+        }
+
+        try {
+            $kbmStorage = app(\App\Services\KbmStorageService::class);
+            $kbmStorage->saveDirectPutFile($token, $rawBody);
+            return response('', 200, ['Content-Type' => 'text/plain']);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 404);
+        } catch (\Throwable $e) {
+            Log::error('[DirectPut] Upload error: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Gagal menyimpan file upload: ' . $e->getMessage()], 500);
+        }
     }
 
     /**

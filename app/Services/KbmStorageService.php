@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\School;
 use App\Models\StorageFile;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -292,4 +293,245 @@ class KbmStorageService
             return false;
         }
     }
+
+    /**
+     * Presigned Upload kompatibel dengan PWA / Mobile Apps untuk seluruh driver:
+     * - internal: URL direct-put lokal pada server self-hosted
+     * - cloud_relay: URL presigned Cloudflare R2 yang di-generate via server utama
+     * - r2_direct: URL presigned Cloudflare R2 langsung dari server cloud
+     */
+    public function createPresignedUpload(
+        School|int|null $school = null,
+        string $originalName = 'file.jpg',
+        string $mimeType = 'image/jpeg',
+        int $sizeBytes = 0,
+        string $category = 'kbm',
+        ?int $uploaderId = null
+    ): array {
+        $driver = self::getDriver();
+
+        if ($driver === 'cloud_relay') {
+            return $this->createPresignedUploadViaCloudRelay($school, $originalName, $mimeType, $sizeBytes, $category, $uploaderId);
+        }
+
+        if ($driver === 'r2_direct') {
+            return app(R2StorageService::class)->createPresignedUpload(
+                school: $school,
+                originalName: $originalName,
+                mimeType: $mimeType,
+                sizeBytes: $sizeBytes,
+                category: $category,
+                uploaderId: $uploaderId
+            );
+        }
+
+        // Default: Internal Storage presigned upload (local direct-put)
+        return $this->createPresignedUploadInternal($school, $originalName, $mimeType, $sizeBytes, $category, $uploaderId);
+    }
+
+    /**
+     * Presigned Upload internal: Mengembalikan URL HTTP PUT lokal ke endpoint /api/mobile/storage/direct-put/{token}
+     */
+    protected function createPresignedUploadInternal(
+        School|int|null $school = null,
+        string $originalName = 'file.jpg',
+        string $mimeType = 'image/jpeg',
+        int $sizeBytes = 0,
+        string $category = 'kbm',
+        ?int $uploaderId = null
+    ): array {
+        $schoolModel = is_int($school) ? School::find($school) : $school;
+        $schoolId = $schoolModel?->id;
+
+        $extension = strtolower(pathinfo($originalName, PATHINFO_EXTENSION) ?: 'bin');
+        $randomName = Str::random(24) . '_' . time() . '.' . $extension;
+        $dateFolder = date('Y/m');
+        $subFolder = "kbm/" . ($schoolId ? "sch_{$schoolId}/" : "") . $dateFolder;
+        $relativePath = trim($subFolder, '/') . '/' . $randomName;
+        $publicUrl = asset('storage/' . $relativePath);
+
+        // Catat ke tabel storage_files dengan size estimasi
+        $storageFile = StorageFile::create([
+            'school_id'     => $schoolId,
+            'disk'          => 'public',
+            'path'          => $relativePath,
+            'url'           => $publicUrl,
+            'original_name' => $originalName,
+            'size_bytes'    => $sizeBytes,
+            'mime_type'     => $mimeType,
+            'category'      => $category,
+            'uploader_id'   => $uploaderId,
+        ]);
+
+        $token = Str::random(40);
+        Cache::put("storage_direct_put_{$token}", [
+            'file_id'   => $storageFile->id,
+            'path'      => $relativePath,
+            'mime_type' => $mimeType,
+        ], now()->addHours(2));
+
+        $isVideo = str_starts_with($mimeType, 'video/') || in_array($extension, ['mp4', 'mov', 'avi', 'mkv', '3gp', 'webm']);
+
+        return [
+            'upload_url'   => url("/api/mobile/storage/direct-put/{$token}"),
+            'method'       => 'PUT',
+            'headers'      => [
+                'Content-Type' => $mimeType,
+            ],
+            'file_id'      => $storageFile->id,
+            'data'         => [
+                'id'            => $storageFile->id,
+                'disk'          => 'public',
+                'path'          => $relativePath,
+                'url'           => $publicUrl,
+                'view_url'      => $publicUrl,
+                'download_url'  => $publicUrl,
+                'thumbnail_url' => $isVideo ? null : $publicUrl,
+                'type'          => $isVideo ? 'video' : 'image',
+                'name'          => $originalName,
+                'size'          => $sizeBytes,
+                'size_human'    => R2StorageService::formatBytes($sizeBytes),
+                'mime_type'     => $mimeType,
+            ],
+        ];
+    }
+
+    /**
+     * Presigned Upload relay: Meminta tiket upload Cloudflare R2 ke server utama
+     */
+    protected function createPresignedUploadViaCloudRelay(
+        School|int|null $school = null,
+        string $originalName = 'file.jpg',
+        string $mimeType = 'image/jpeg',
+        int $sizeBytes = 0,
+        string $category = 'kbm',
+        ?int $uploaderId = null
+    ): array {
+        $licenseServerUrl = rtrim(env('LICENSE_SERVER_URL', 'https://absen.kangdaqiq.com'), '/');
+        $licenseKey = trim(env('LICENSE_KEY', ''));
+
+        if (empty($licenseKey)) {
+            throw new \RuntimeException('LICENSE_KEY belum dikonfigurasi di file .env.');
+        }
+
+        $endpoint = "{$licenseServerUrl}/api/license/storage/presigned-url";
+        $res = Http::timeout(20)->withHeaders([
+            'X-License-Key' => $licenseKey,
+        ])->post($endpoint, [
+            'filename'  => $originalName,
+            'mime_type' => $mimeType,
+            'size'      => $sizeBytes,
+            'category'  => $category,
+        ]);
+
+        if (!$res->successful()) {
+            $msg = $res->json('message') ?? ('HTTP ' . $res->status());
+            throw new \RuntimeException("Gagal mendapatkan tiket upload dari cloud server: {$msg}");
+        }
+
+        $remoteData = $res->json();
+        $schoolModel = is_int($school) ? School::find($school) : $school;
+        $remoteFile = $remoteData['data'] ?? [];
+
+        // Buat record lokal agar sinkron di database client
+        $storageFile = StorageFile::create([
+            'school_id'     => $schoolModel?->id,
+            'disk'          => 'cloud_relay',
+            'path'          => $remoteFile['path'] ?? ('relay/' . $originalName),
+            'url'           => $remoteFile['url'] ?? '',
+            'original_name' => $originalName,
+            'size_bytes'    => $sizeBytes,
+            'mime_type'     => $mimeType,
+            'category'      => $category,
+            'uploader_id'   => $uploaderId,
+        ]);
+
+        if (!empty($remoteData['file_id'])) {
+            Cache::put("relay_remote_file_{$storageFile->id}", $remoteData['file_id'], now()->addHours(2));
+        }
+
+        $remoteData['file_id'] = $storageFile->id;
+        if (isset($remoteData['data'])) {
+            $remoteData['data']['id'] = $storageFile->id;
+        }
+
+        return $remoteData;
+    }
+
+    /**
+     * Simpan file hasil direct-PUT lokal dari PWA / Mobile
+     */
+    public function saveDirectPutFile(string $token, string $rawBytes): bool
+    {
+        $cacheKey = "storage_direct_put_{$token}";
+        $info = Cache::get($cacheKey);
+        if (!$info) {
+            throw new \InvalidArgumentException('Token upload tidak valid atau telah kedaluwarsa.');
+        }
+
+        $customLocalPath = env('KBM_STORAGE_LOCAL_PATH');
+        $relativePath = $info['path'];
+
+        if (!empty($customLocalPath)) {
+            $targetPath = rtrim($customLocalPath, '/\\') . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $relativePath);
+            $targetDir = dirname($targetPath);
+            if (!file_exists($targetDir)) {
+                @mkdir($targetDir, 0755, true);
+            }
+            file_put_contents($targetPath, $rawBytes);
+        } else {
+            Storage::disk('public')->put($relativePath, $rawBytes);
+        }
+
+        // Perbarui ukuran aktual di tabel storage_files
+        StorageFile::where('id', $info['file_id'])->update([
+            'size_bytes' => strlen($rawBytes),
+        ]);
+
+        Cache::forget($cacheKey);
+
+        return true;
+    }
+
+    /**
+     * Konfirmasi upload direct selesai
+     */
+    public function confirmUpload(int $fileId, ?int $actualSizeBytes = null): ?StorageFile
+    {
+        $driver = self::getDriver();
+
+        if ($driver === 'r2_direct') {
+            return app(R2StorageService::class)->confirmUpload($fileId, $actualSizeBytes);
+        }
+
+        $file = StorageFile::find($fileId);
+        if (!$file) {
+            return null;
+        }
+
+        if ($actualSizeBytes && $actualSizeBytes > 0) {
+            $file->update(['size_bytes' => $actualSizeBytes]);
+        }
+
+        if ($driver === 'cloud_relay') {
+            $remoteFileId = Cache::get("relay_remote_file_{$fileId}");
+            if ($remoteFileId) {
+                try {
+                    $licenseServerUrl = rtrim(env('LICENSE_SERVER_URL', 'https://absen.kangdaqiq.com'), '/');
+                    $licenseKey = trim(env('LICENSE_KEY', ''));
+                    Http::timeout(10)->withHeaders([
+                        'X-License-Key' => $licenseKey,
+                    ])->post("{$licenseServerUrl}/api/license/storage/confirm-upload", [
+                        'file_id' => $remoteFileId,
+                        'size'    => $actualSizeBytes,
+                    ]);
+                } catch (\Throwable $e) {
+                    Log::warning("[KbmStorageService] Gagal relay confirm upload ke server utama: " . $e->getMessage());
+                }
+            }
+        }
+
+        return $file;
+    }
 }
+

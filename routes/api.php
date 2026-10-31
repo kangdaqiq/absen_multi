@@ -29,6 +29,11 @@ Route::post('/license/validate', [App\Http\Controllers\Api\LicenseValidateContro
 Route::post('/license/backup/upload', [App\Http\Controllers\Api\ClientBackupController::class, 'upload']);
 Route::post('/license/storage/upload', [App\Http\Controllers\Api\ClientStorageController::class, 'upload']);
 Route::post('/license/storage/delete', [App\Http\Controllers\Api\ClientStorageController::class, 'delete']);
+Route::post('/license/storage/presigned-url', [App\Http\Controllers\Api\ClientStorageController::class, 'presignedUrl']);
+Route::post('/license/storage/confirm-upload', [App\Http\Controllers\Api\ClientStorageController::class, 'confirmUpload']);
+
+// Mobile Storage Direct PUT upload (single-use presigned token authenticated, for internal storage driver)
+Route::put('/mobile/storage/direct-put/{token}', [App\Http\Controllers\Api\MobileJadwalPelajaranController::class, 'directPutUpload']);
 
 // Qiospay QRIS Callback Endpoint (POST /api/callback/accept/{secret_key})
 Route::any('/callback/accept/{key?}', [App\Http\Controllers\Api\QrisCallbackController::class, 'accept']);

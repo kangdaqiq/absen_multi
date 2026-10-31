@@ -333,17 +333,17 @@ class AttendanceController extends Controller
                 $engineOffline = !empty($identifyRes['engine_offline']);
                 $simPct = $identifyRes['similarity_percent'] ?? 0;
                 if ($engineOffline) {
-                    $serverErrorMsg = $identifyRes['message'] ?? 'Layanan AI Face Recognition (Python 512-d) sedang tidak aktif/offline.';
+                    $serverErrorMsg = $identifyRes['message'] ?? 'Layanan AI Face Recognition sedang tidak aktif/offline.';
                 } elseif ($simPct > 0) {
-                    $serverErrorMsg = "Wajah tidak cocok (Kemiripan AI 512-d: {$simPct}%, minimal " . round(\App\Services\FaceRecognitionService::getThreshold() * 100) . "%).";
+                    $serverErrorMsg = "Wajah tidak cocok (Kemiripan: {$simPct}%, minimal " . round(\App\Services\FaceRecognitionService::getThreshold() * 100) . "%).";
                 } elseif (!empty($identifyRes['message'])) {
                     $serverErrorMsg = $identifyRes['message'];
                 }
             }
         } catch (\Throwable $e) {
-            Log::error('Server 512-d recognition error: ' . $e->getMessage());
+            Log::error('Server recognition error: ' . $e->getMessage());
             $engineOffline = true;
-            $serverErrorMsg = 'Gagal terhubung ke layanan AI Face Recognition (512-d): ' . $e->getMessage();
+            $serverErrorMsg = 'Gagal terhubung ke layanan AI Face Recognition: ' . $e->getMessage();
         } finally {
             if ($tempPath && file_exists($tempPath)) {
                 @unlink($tempPath);
@@ -1327,7 +1327,7 @@ class AttendanceController extends Controller
                     $statusCode = !empty($extract512['engine_offline']) ? 503 : 422;
                     return response()->json([
                         'ok' => false,
-                        'message' => $extract512['message'] ?? 'Gagal mengekstrak vektor wajah 512-d. Pastikan Python Face Engine aktif.'
+                        'message' => $extract512['message'] ?? 'Gagal memproses data wajah. Pastikan Face Engine aktif.'
                     ], $statusCode);
                 }
 
@@ -1368,8 +1368,8 @@ class AttendanceController extends Controller
                 return response()->json([
                     'ok' => true,
                     'message' => $isMultiShot
-                        ? "Sampel wajah tambahan {$siswa->nama} berhasil digabungkan (Multi-Template Centroid 512-d)!"
-                        : "Face ID siswa {$siswa->nama} berhasil didaftarkan (512-d)!",
+                        ? "Sampel wajah tambahan {$siswa->nama} berhasil digabungkan!"
+                        : "Face ID siswa {$siswa->nama} berhasil didaftarkan!",
                     'descriptor' => [
                         'id' => $siswa->id,
                         'type' => 'siswa',
@@ -1392,7 +1392,7 @@ class AttendanceController extends Controller
                     $statusCode = !empty($extract512['engine_offline']) ? 503 : 422;
                     return response()->json([
                         'ok' => false,
-                        'message' => $extract512['message'] ?? 'Gagal mengekstrak vektor wajah 512-d. Pastikan Python Face Engine aktif.'
+                        'message' => $extract512['message'] ?? 'Gagal memproses data wajah. Pastikan Face Engine aktif.'
                     ], $statusCode);
                 }
 
@@ -1433,8 +1433,8 @@ class AttendanceController extends Controller
                 return response()->json([
                     'ok' => true,
                     'message' => $isMultiShot
-                        ? "Sampel wajah tambahan {$guru->nama} berhasil digabungkan (Multi-Template Centroid 512-d)!"
-                        : "Face ID guru {$guru->nama} berhasil didaftarkan (512-d)!",
+                        ? "Sampel wajah tambahan {$guru->nama} berhasil digabungkan!"
+                        : "Face ID guru {$guru->nama} berhasil didaftarkan!",
                     'descriptor' => [
                         'id' => $guru->id,
                         'type' => 'guru',

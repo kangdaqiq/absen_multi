@@ -298,21 +298,29 @@ class AttendanceController extends Controller
             'person_id' => 'nullable',
             'type' => 'nullable|string|in:siswa,guru',
             'similarity' => 'nullable|numeric',
+            'fallback_person_id' => 'nullable',
+            'fallback_type' => 'nullable|string|in:siswa,guru',
+            'fallback_similarity' => 'nullable|numeric',
             'mode' => 'nullable|string|in:auto,masuk,pulang',
             'photo_snapshot' => 'nullable|string',
         ]);
 
-        $personId = $request->input('person_id');
-        $type = $request->input('type', 'siswa');
-        $similarity = (float) $request->input('similarity', 0.85);
+        $fallbackId = $request->input('fallback_person_id') ?: $request->input('person_id');
+        $fallbackType = $request->input('fallback_type') ?: $request->input('type', 'siswa');
+        $fallbackSim = (float) ($request->input('fallback_similarity') ?? $request->input('similarity', 0.85));
+
+        $personId = null;
+        $type = 'siswa';
+        $similarity = 0.85;
         $reqMode = $request->input('mode', 'auto');
         $photoSnapshot = $request->input('photo_snapshot');
 
         $schoolId = auth()->user()?->school_id;
 
-        // Jika person_id kosong, lakukan identifikasi 1:N server-side via NumPy Matrix (512-dimensi InsightFace)
-        if (empty($personId) && !empty($photoSnapshot)) {
+        // UTAMA: Identifikasi 1:N server-side via Python NumPy Matrix (512-dimensi InsightFace + CLAHE)
+        if (!empty($photoSnapshot)) {
             $serverErrorMsg = null;
+            $tempPath = null;
             try {
                 $imageParts = explode(';base64,', $photoSnapshot);
                 $imgData = base64_decode($imageParts[1] ?? $photoSnapshot);
@@ -330,18 +338,71 @@ class AttendanceController extends Controller
                     ->get();
 
                 $identifyRes = \App\Services\FaceRecognitionService::identifyFace($tempPath, $candidates);
-                @unlink($tempPath);
 
                 if (!empty($identifyRes['is_match']) && !empty($identifyRes['matched_record'])) {
                     $matchedRecord = $identifyRes['matched_record'];
                     $personId = $matchedRecord->siswa_id ?: $matchedRecord->guru_id;
                     $type = $matchedRecord->siswa_id ? 'siswa' : 'guru';
                     $similarity = (float) ($identifyRes['similarity'] ?? 0.85);
-                } elseif (!empty($identifyRes['message'])) {
-                    $serverErrorMsg = $identifyRes['message'];
+                } else {
+                    $engineOffline = !empty($identifyRes['engine_offline']);
+
+                    // Fallback ke hasil 128-d Browser HANYA jika:
+                    // 1) Service Python 512-d sedang mati/offline, ATAU
+                    // 2) Kandidat hasil 128-d merupakan data lama yang belum punya vektor 512-d sama sekali
+                    if (!empty($fallbackId)) {
+                        $fallbackRecord = $candidates->first(function ($c) use ($fallbackId, $fallbackType) {
+                            return $fallbackType === 'guru'
+                                ? (string) $c->guru_id === (string) $fallbackId
+                                : (string) $c->siswa_id === (string) $fallbackId;
+                        });
+
+                        $has512 = false;
+                        $unpackedFallback = ['v512' => null, 'v128' => null];
+                        if ($fallbackRecord) {
+                            $unpackedFallback = \App\Services\FaceRecognitionService::unpackEmbedding($fallbackRecord->face_embedding);
+                            $has512 = !empty($unpackedFallback['v512']);
+                        }
+
+                        if ($engineOffline || !$has512) {
+                            $personId = $fallbackId;
+                            $type = $fallbackType;
+                            $similarity = $fallbackSim;
+
+                            // Auto-migrasi: jika Python aktif tapi user ini baru punya 128-d, ekstrak & simpan 512-d sekarang!
+                            if (!$engineOffline && $fallbackRecord && !$has512) {
+                                $ext = \App\Services\FaceRecognitionService::extractVector($tempPath);
+                                if (!empty($ext['success']) && !empty($ext['embedding'])) {
+                                    $fallbackRecord->face_embedding = \App\Services\FaceRecognitionService::packEmbedding(
+                                        $ext['embedding'],
+                                        $unpackedFallback['v128']
+                                    );
+                                    $fallbackRecord->save();
+                                }
+                            }
+                        }
+                    }
+
+                    if (empty($personId)) {
+                        $simPct = $identifyRes['similarity_percent'] ?? 0;
+                        if ($simPct > 0) {
+                            $serverErrorMsg = "Wajah tidak cocok (Kemiripan AI 512-d: {$simPct}%, minimal " . round(\App\Services\FaceRecognitionService::getThreshold() * 100) . "%).";
+                        } elseif (!empty($identifyRes['message'])) {
+                            $serverErrorMsg = $identifyRes['message'];
+                        }
+                    }
                 }
             } catch (\Throwable $e) {
                 Log::error('Server 512-d recognition error: ' . $e->getMessage());
+                if (!empty($fallbackId)) {
+                    $personId = $fallbackId;
+                    $type = $fallbackType;
+                    $similarity = $fallbackSim;
+                }
+            } finally {
+                if ($tempPath && file_exists($tempPath)) {
+                    @unlink($tempPath);
+                }
             }
 
             if (empty($personId)) {
@@ -352,6 +413,10 @@ class AttendanceController extends Controller
                     'message' => $serverErrorMsg ?: 'Wajah tidak dikenali dalam database sistem.',
                 ], 404);
             }
+        } elseif (!empty($fallbackId)) {
+            $personId = $fallbackId;
+            $type = $fallbackType;
+            $similarity = $fallbackSim;
         }
 
         if (empty($personId)) {

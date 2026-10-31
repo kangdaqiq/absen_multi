@@ -377,6 +377,8 @@ class FaceRecognitionService
             return [
                 'success' => false,
                 'is_match' => false,
+                'no_512_candidates' => true,
+                'engine_offline' => false,
                 'matched_record' => null,
                 'similarity' => 0.0,
                 'message' => 'Belum ada kandidat wajah 512-d terdaftar di sekolah ini.'
@@ -386,7 +388,7 @@ class FaceRecognitionService
         $url = self::getBaseUrl() . '/identify-face';
 
         try {
-            $req = Http::timeout(30);
+            $req = Http::connectTimeout(2)->timeout(12);
             if ($photo instanceof UploadedFile) {
                 $req = $req->attach('photo', file_get_contents($photo->getRealPath()), $photo->getClientOriginalName());
             } elseif (is_string($photo) && file_exists($photo)) {
@@ -395,6 +397,7 @@ class FaceRecognitionService
                 return [
                     'success' => false,
                     'is_match' => false,
+                    'engine_offline' => false,
                     'matched_record' => null,
                     'similarity' => 0.0,
                     'message' => 'File foto tidak valid.'
@@ -431,6 +434,7 @@ class FaceRecognitionService
                 return [
                     'success' => (bool) ($data['success'] ?? false),
                     'is_match' => $isMatch && $matchedRecord !== null,
+                    'engine_offline' => false,
                     'matched_record' => $matchedRecord,
                     'similarity' => $similarity,
                     'similarity_percent' => (float) ($data['similarity_percent'] ?? round($similarity * 100, 2)),
@@ -445,6 +449,7 @@ class FaceRecognitionService
                     return [
                         'success' => false,
                         'is_match' => false,
+                        'engine_offline' => false,
                         'matched_record' => null,
                         'similarity' => 0.0,
                         'message' => $ext['message'] ?? 'Wajah tidak terdeteksi.'
@@ -464,6 +469,7 @@ class FaceRecognitionService
                 return [
                     'success' => true,
                     'is_match' => $isMatch,
+                    'engine_offline' => false,
                     'matched_record' => $isMatch ? $bestRecord : null,
                     'similarity' => round($bestScore, 4),
                     'similarity_percent' => round($bestScore * 100, 2),
@@ -474,6 +480,7 @@ class FaceRecognitionService
             return [
                 'success' => false,
                 'is_match' => false,
+                'engine_offline' => in_array($response->status(), [502, 503, 504], true),
                 'matched_record' => null,
                 'similarity' => 0.0,
                 'message' => 'Layanan identifikasi wajah merespons galat (HTTP ' . $response->status() . ').'
@@ -483,6 +490,7 @@ class FaceRecognitionService
             return [
                 'success' => false,
                 'is_match' => false,
+                'engine_offline' => true,
                 'matched_record' => null,
                 'similarity' => 0.0,
                 'message' => 'Gagal menghubungi Face Engine: ' . $e->getMessage()

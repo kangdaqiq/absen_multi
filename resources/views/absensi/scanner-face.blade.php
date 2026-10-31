@@ -866,6 +866,7 @@ function faceScannerApp() {
 
         // Data & Embeddings
         descriptors: [], // Master face embeddings list
+        server512Count: 0, // Count of 512-d vectors on server
         allStudents: [], // For enrollment selection
         searchQuery: '',
         enrollSearch: '',
@@ -957,9 +958,10 @@ function faceScannerApp() {
                 const data = await res.json();
                 if (data.ok) {
                     this.descriptors = data.descriptors || [];
+                    this.server512Count = data.server_512_count || 0;
                     this.allStudents = data.students || [];
-                    console.log('Loaded Face Descriptors:', this.descriptors.length);
-                    if (this.descriptors.length === 0) {
+                    console.log('Loaded Face Descriptors:', this.descriptors.length, '| 512-d Server:', this.server512Count);
+                    if (this.descriptors.length === 0 && this.server512Count === 0) {
                         this.statusText = '0 Face ID terdaftar';
                     }
                 }
@@ -1088,7 +1090,7 @@ function faceScannerApp() {
                             // Only proceed to match if face is stable for 2 frames
                             if (stableCount >= 2 && !this.isProcessing && Date.now() > this.holdMessageUntil) {
                                 this.detectionMessage = 'Wajah terdeteksi! Memverifikasi...';
-                                await this.matchAndAttend(detection.descriptor);
+                                await this.matchAndAttend(detection.descriptor, detection.detection ? detection.detection.box : null);
                                 stableCount = 0;
                             }
                         } else {
@@ -1115,20 +1117,20 @@ function faceScannerApp() {
             requestAnimationFrame(loop);
         },
 
-        // CLIENT-SIDE 1:N MATCHING (Takes < 5ms in JavaScript!)
-        async matchAndAttend(descriptor) {
+        // CLIENT-SIDE 1:N MATCHING (Takes < 5ms in JavaScript!) + SERVER 512-D MATRIX FALLBACK
+        async matchAndAttend(descriptor, faceBox = null) {
             try {
-                if (this.descriptors.length === 0) {
+                if (this.descriptors.length === 0 && this.server512Count === 0) {
                     this.lastScanError = true;
                     this.detectionMessage = 'Belum ada Face ID terdaftar di sistem';
                     this.holdMessageUntil = Date.now() + 3000;
                     return;
                 }
 
-                // Pisahkan descriptor berdasarkan dimensi (128-d Kiosk vs 512-d Mobile Engine)
+                // Pisahkan descriptor berdasarkan dimensi (128-d Kiosk vs 512-d Server NumPy Engine)
                 const targetDim = descriptor.length; // 128
                 const descriptors128 = [];
-                const descriptors512 = [];
+                let server512Available = this.server512Count;
 
                 for (const item of this.descriptors) {
                     let emb = item.embedding;
@@ -1139,8 +1141,11 @@ function faceScannerApp() {
                         if (emb.length === targetDim) {
                             descriptors128.push({ ...item, embedding: emb });
                         } else if (emb.length === 512) {
-                            descriptors512.push({ ...item, embedding: emb });
+                            server512Available++;
                         }
+                    }
+                    if (item.has_512 && server512Available === 0) {
+                        server512Available++;
                     }
                 }
 
@@ -1180,7 +1185,7 @@ function faceScannerApp() {
                     this.recentScans[bestMatch.id] = nowTime;
                     this.detectionMessage = 'Kecocokan: ' + bestMatch.nama + ' (Mengirim data...)';
 
-                    const snapshot = this.captureFrameSnapshot();
+                    const snapshot = this.captureFrameSnapshot(faceBox);
                     const similarityScore = Math.max(0, 1 - minDistance);
 
                     try {
@@ -1229,13 +1234,13 @@ function faceScannerApp() {
                 }
 
                 // 3. Jika tidak cocok 128-d TETAPI ada data 512-d di server:
-                // Kirim snapshot ke server untuk diverifikasi langsung oleh Face Engine 512-d!
-                if (descriptors512.length > 0) {
+                // Kirim Smart Face-Crop Snapshot ke server untuk diverifikasi oleh NumPy Matrix 512-d!
+                if (server512Available > 0) {
                     this.isProcessing = true;
                     this.detectionMessage = 'Wajah terdeteksi! Memverifikasi ke server...';
-                    this.debugInfo = 'Verifikasi ' + descriptors512.length + ' wajah via Server Engine...';
+                    this.debugInfo = 'Verifikasi ' + server512Available + ' wajah via Server NumPy Engine...';
 
-                    const snapshot = this.captureFrameSnapshot();
+                    const snapshot = this.captureFrameSnapshot(faceBox);
 
                     try {
                         const response = await fetch('{{ route('absensi.scan-face', [], false) }}', {
@@ -1291,15 +1296,35 @@ function faceScannerApp() {
             }
         },
 
-        captureFrameSnapshot() {
+        // Smart High-Clarity Face Snapshot (fokus pada ROI wajah dengan margin 45% agar tajam di 512-d InsightFace)
+        captureFrameSnapshot(faceBox = null) {
             try {
                 const video = this.$refs.webcam;
+                const vw = video.videoWidth || 640;
+                const vh = video.videoHeight || 480;
                 const canvas = document.createElement('canvas');
-                canvas.width = 320;
-                canvas.height = 240;
                 const ctx = canvas.getContext('2d');
+
+                if (faceBox && faceBox.width > 30 && faceBox.height > 30) {
+                    const padX = faceBox.width * 0.45;
+                    const padY = faceBox.height * 0.45;
+                    const sx = Math.max(0, Math.floor(faceBox.x - padX));
+                    const sy = Math.max(0, Math.floor(faceBox.y - padY));
+                    const sw = Math.min(vw - sx, Math.ceil(faceBox.width + padX * 2));
+                    const sh = Math.min(vh - sy, Math.ceil(faceBox.height + padY * 2));
+
+                    const maxOut = 440;
+                    const scale = Math.min(1, maxOut / Math.max(sw, sh));
+                    canvas.width = Math.max(160, Math.round(sw * scale));
+                    canvas.height = Math.max(160, Math.round(sh * scale));
+                    ctx.drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+                    return canvas.toDataURL('image/jpeg', 0.85);
+                }
+
+                canvas.width = Math.min(640, vw);
+                canvas.height = Math.min(480, vh);
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                return canvas.toDataURL('image/jpeg', 0.6);
+                return canvas.toDataURL('image/jpeg', 0.82);
             } catch (e) {
                 return null;
             }
@@ -1378,7 +1403,7 @@ function faceScannerApp() {
                 }
 
                 const descriptorArray = Array.from(detection.descriptor);
-                const snapshot = this.captureFrameSnapshot();
+                const snapshot = this.captureFrameSnapshot(detection.detection ? detection.detection.box : null);
 
                 const response = await fetch('{{ route('absensi.register-face-kiosk', [], false) }}', {
                     method: 'POST',
@@ -1397,8 +1422,20 @@ function faceScannerApp() {
                 const res = await response.json();
                 if (res.ok) {
                     this.playTone('ok');
-                    // Add directly to local memory
-                    this.descriptors.push(res.descriptor);
+                    // Update or insert in local memory (prevent duplicates on multi-shot centroid enrollment)
+                    const existingIdx = this.descriptors.findIndex(
+                        d => d.id === res.descriptor.id && (d.type || 'siswa') === (res.descriptor.type || 'siswa')
+                    );
+                    if (existingIdx >= 0) {
+                        this.descriptors[existingIdx] = res.descriptor;
+                    } else {
+                        this.descriptors.push(res.descriptor);
+                    }
+                    if (res.descriptor.has_512) {
+                        this.server512Count = Math.max(1, this.server512Count);
+                    }
+                    const stu = this.allStudents.find(s => s.id === this.selectedEnrollStudent.id);
+                    if (stu) stu.has_face = true;
                     alert(res.message);
                     this.showEnrollModal = false;
                 } else {

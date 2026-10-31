@@ -772,7 +772,7 @@ class MobileAttendanceController extends Controller
                 ], 422);
             }
 
-            $compareResult = FaceRecognitionService::compareFace($faceData->face_embedding, $request->file('photo'));
+            $compareResult = FaceRecognitionService::compareFace($faceData->face_embedding, $request->file('photo'), $faceData);
 
             if (!$compareResult['success']) {
                 ApiLog::create([
@@ -1185,7 +1185,7 @@ class MobileAttendanceController extends Controller
                 ], 422);
             }
 
-            $compareResult = FaceRecognitionService::compareFace($faceData->face_embedding, $request->file('photo'));
+            $compareResult = FaceRecognitionService::compareFace($faceData->face_embedding, $request->file('photo'), $faceData);
 
             if (!$compareResult['success']) {
                 ApiLog::create([
@@ -2445,18 +2445,7 @@ class MobileAttendanceController extends Controller
         }
         $nowTime = $now->format('H:i:s');
 
-        // 2. Ekstraksi Vektor Wajah via Python Face Engine
-        $extractResult = FaceRecognitionService::extractVector($request->file('photo'));
-        if (empty($extractResult['success']) || empty($extractResult['embedding'])) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Wajah siswa tidak terdaftar atau tidak cocok dalam database',
-                'data' => null
-            ], 404);
-        }
-        $snapVector = $extractResult['embedding'];
-
-        // 3. Pencarian 1:N Master Face ID Siswa di Sekolah Tersebut
+        // 2. Pencarian 1:N Master Face ID Siswa via NumPy Matrix (Python Face Engine)
         $candidates = UserFaceData::whereNotNull('face_embedding')
             ->whereNotNull('siswa_id')
             ->when($schoolId, function ($q) use ($schoolId) {
@@ -2465,30 +2454,14 @@ class MobileAttendanceController extends Controller
             ->with(['siswa.kelas', 'siswa.school'])
             ->get();
 
-        $threshold = FaceRecognitionService::getThreshold(); // Default 0.75 (75%)
-        $bestScore = 0.0;
-        $matchedRecord = null;
+        $identifyResult = FaceRecognitionService::identifyFace($request->file('photo'), $candidates);
+        $matchedRecord = $identifyResult['matched_record'] ?? null;
+        $bestScore = (float) ($identifyResult['similarity'] ?? 0.0);
 
-        foreach ($candidates as $cand) {
-            $candEmb = json_decode($cand->face_embedding, true);
-            if (is_string($candEmb)) {
-                $candEmb = json_decode($candEmb, true);
-            }
-            if (!is_array($candEmb) || count($candEmb) !== 512) {
-                continue;
-            }
-
-            $sim = FaceRecognitionService::cosineSimilarity($snapVector, $candEmb);
-            if ($sim > $bestScore) {
-                $bestScore = $sim;
-                $matchedRecord = $cand;
-            }
-        }
-
-        if (!$matchedRecord || !$matchedRecord->siswa || $bestScore < $threshold) {
+        if (empty($identifyResult['is_match']) || !$matchedRecord || !$matchedRecord->siswa) {
             return response()->json([
                 'success' => false,
-                'message' => 'Wajah siswa tidak terdaftar atau tidak cocok dalam database',
+                'message' => $identifyResult['message'] ?? 'Wajah siswa tidak terdaftar atau tidak cocok dalam database',
                 'data' => null
             ], 404);
         }

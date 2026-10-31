@@ -216,16 +216,23 @@ class AttendanceController extends Controller
             ->get();
 
         $descriptors = [];
+        $registeredSiswaMap = [];
+        $server512Count = 0;
+
         foreach ($faceRecords as $fr) {
-            $embedding = json_decode($fr->face_embedding);
-            if (is_string($embedding)) {
-                $embedding = json_decode($embedding);
-            }
-            if (!$embedding || !is_array($embedding)) {
+            $unpacked = \App\Services\FaceRecognitionService::unpackEmbedding($fr->face_embedding);
+            $v128 = $unpacked['v128'];
+            $v512 = $unpacked['v512'];
+
+            if (empty($v128) && empty($v512)) {
                 continue;
+            }
+            if (!empty($v512)) {
+                $server512Count++;
             }
 
             if ($fr->siswa) {
+                $registeredSiswaMap[$fr->siswa->id] = true;
                 $descriptors[] = [
                     'id' => $fr->siswa->id,
                     'type' => 'siswa',
@@ -233,7 +240,8 @@ class AttendanceController extends Controller
                     'nis' => $fr->siswa->nis ?? '-',
                     'kelas' => $fr->siswa->kelas->nama_kelas ?? '-',
                     'foto' => $fr->siswa->foto_url ?? null,
-                    'embedding' => $embedding,
+                    'embedding' => $v128,
+                    'has_512' => !empty($v512),
                 ];
             } elseif ($fr->guru) {
                 $descriptors[] = [
@@ -243,12 +251,13 @@ class AttendanceController extends Controller
                     'nis' => $fr->guru->nip ?? '-',
                     'kelas' => 'Guru / Pegawai',
                     'foto' => $fr->guru->foto_url ?? null,
-                    'embedding' => $embedding,
+                    'embedding' => $v128,
+                    'has_512' => !empty($v512),
                 ];
             }
         }
 
-        // Return candidate students list for quick search & enrollment in kiosk
+        // Return candidate students list for quick search & enrollment in kiosk (O(1) lookup, bebas N+1 query)
         $studentsList = Siswa::select('id', 'nama', 'nis', 'kelas_id', 'foto')
             ->with('kelas:id,nama_kelas')
             ->when($schoolId, fn($q) => $q->where('school_id', $schoolId))
@@ -260,12 +269,13 @@ class AttendanceController extends Controller
                 'nis' => $s->nis ?? '-',
                 'kelas' => $s->kelas->nama_kelas ?? '-',
                 'foto' => $s->foto_url ?? null,
-                'has_face' => UserFaceData::where('siswa_id', $s->id)->whereNotNull('face_embedding')->exists()
+                'has_face' => isset($registeredSiswaMap[$s->id]),
             ]);
 
         return response()->json([
             'ok' => true,
             'count' => count($descriptors),
+            'server_512_count' => $server512Count,
             'descriptors' => $descriptors,
             'students' => $studentsList,
         ])->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
@@ -300,52 +310,47 @@ class AttendanceController extends Controller
 
         $schoolId = auth()->user()?->school_id;
 
-        // Jika person_id kosong, coba identifikasi server-side (512-dimensi InsightFace)
+        // Jika person_id kosong, lakukan identifikasi 1:N server-side via NumPy Matrix (512-dimensi InsightFace)
         if (empty($personId) && !empty($photoSnapshot)) {
+            $serverErrorMsg = null;
             try {
                 $imageParts = explode(';base64,', $photoSnapshot);
                 $imgData = base64_decode($imageParts[1] ?? $photoSnapshot);
                 $tempPath = sys_get_temp_dir() . '/kiosk_scan_' . uniqid() . '.jpg';
                 file_put_contents($tempPath, $imgData);
 
-                $extractRes = \App\Services\FaceRecognitionService::extractVector($tempPath);
+                $candidates = UserFaceData::whereNotNull('face_embedding')
+                    ->with(['siswa', 'guru'])
+                    ->when($schoolId, function ($q) use ($schoolId) {
+                        $q->where(function ($sub) use ($schoolId) {
+                            $sub->whereHas('siswa', fn($s) => $s->where('school_id', $schoolId))
+                                ->orWhereHas('guru', fn($g) => $g->where('school_id', $schoolId));
+                        });
+                    })
+                    ->get();
+
+                $identifyRes = \App\Services\FaceRecognitionService::identifyFace($tempPath, $candidates);
                 @unlink($tempPath);
 
-                if (!empty($extractRes['success']) && !empty($extractRes['embedding'])) {
-                    $snapVector = $extractRes['embedding'];
-                    $bestScore = 0.0;
-                    $matchedRecord = null;
-
-                    $candidates = UserFaceData::whereNotNull('face_embedding')
-                        ->with(['siswa', 'guru'])
-                        ->when($schoolId, function ($q) use ($schoolId) {
-                            $q->where(function ($sub) use ($schoolId) {
-                                $sub->whereHas('siswa', fn($s) => $s->where('school_id', $schoolId))
-                                    ->orWhereHas('guru', fn($g) => $g->where('school_id', $schoolId));
-                            });
-                        })
-                        ->get();
-
-                    foreach ($candidates as $cand) {
-                        $candEmb = json_decode($cand->face_embedding);
-                        if (is_string($candEmb)) $candEmb = json_decode($candEmb);
-                        if (!is_array($candEmb) || count($candEmb) !== 512) continue;
-
-                        $sim = $this->calculateCosineSimilarity($snapVector, $candEmb);
-                        if ($sim > $bestScore && $sim >= 0.70) {
-                            $bestScore = $sim;
-                            $matchedRecord = $cand;
-                        }
-                    }
-
-                    if ($matchedRecord) {
-                        $personId = $matchedRecord->siswa_id ?: $matchedRecord->guru_id;
-                        $type = $matchedRecord->siswa_id ? 'siswa' : 'guru';
-                        $similarity = (float) $bestScore;
-                    }
+                if (!empty($identifyRes['is_match']) && !empty($identifyRes['matched_record'])) {
+                    $matchedRecord = $identifyRes['matched_record'];
+                    $personId = $matchedRecord->siswa_id ?: $matchedRecord->guru_id;
+                    $type = $matchedRecord->siswa_id ? 'siswa' : 'guru';
+                    $similarity = (float) ($identifyRes['similarity'] ?? 0.85);
+                } elseif (!empty($identifyRes['message'])) {
+                    $serverErrorMsg = $identifyRes['message'];
                 }
             } catch (\Throwable $e) {
                 Log::error('Server 512-d recognition error: ' . $e->getMessage());
+            }
+
+            if (empty($personId)) {
+                return response()->json([
+                    'ok' => false,
+                    'status' => 'warning',
+                    'sound' => 'warning',
+                    'message' => $serverErrorMsg ?: 'Wajah tidak dikenali dalam database sistem.',
+                ], 404);
             }
         }
 
@@ -1362,19 +1367,41 @@ class AttendanceController extends Controller
             }
             $siswa->save();
 
+            $existingFace = UserFaceData::where('siswa_id', $siswa->id)->first();
+            $oldUnpacked = $existingFace ? \App\Services\FaceRecognitionService::unpackEmbedding($existingFace->face_embedding) : ['v512' => null, 'v128' => null];
+
+            // Multi-Template Centroid untuk 128-d (Browser Kiosk)
+            $vec128 = (is_array($embedding) && count($embedding) === 128)
+                ? \App\Services\FaceRecognitionService::blendCentroid($oldUnpacked['v128'], $embedding, 0.5)
+                : $oldUnpacked['v128'];
+
+            // Ekstrak & gabungkan Centroid 512-d (InsightFace Server/Mobile) dari foto snapshot
+            $vec512 = $oldUnpacked['v512'];
+            $fullPhotoPath = storage_path('app/public/' . $savedPath);
+            if (file_exists($fullPhotoPath)) {
+                $extract512 = \App\Services\FaceRecognitionService::extractVector($fullPhotoPath, $existingFace?->face_embedding, 0.5);
+                if (!empty($extract512['success']) && !empty($extract512['embedding'])) {
+                    $vec512 = $extract512['embedding'];
+                }
+            }
+
             UserFaceData::updateOrCreate(
                 ['siswa_id' => $siswa->id],
                 [
                     'user_id' => $targetUser->id,
-                    'face_embedding' => json_encode($embedding),
+                    'face_embedding' => \App\Services\FaceRecognitionService::packEmbedding($vec512, $vec128),
                     'sample_photo_path' => $savedPath,
                     'is_verified' => true,
                 ]
             );
 
+            $isMultiShot = !empty($oldUnpacked['v128']) || !empty($oldUnpacked['v512']);
+
             return response()->json([
                 'ok' => true,
-                'message' => "Face ID siswa {$siswa->nama} berhasil didaftarkan!",
+                'message' => $isMultiShot
+                    ? "Sampel wajah tambahan {$siswa->nama} berhasil digabungkan (Multi-Template Centroid)!"
+                    : "Face ID siswa {$siswa->nama} berhasil didaftarkan (128-d & 512-d)!",
                 'descriptor' => [
                     'id' => $siswa->id,
                     'type' => 'siswa',
@@ -1382,7 +1409,8 @@ class AttendanceController extends Controller
                     'nis' => $siswa->nis ?? '-',
                     'kelas' => $siswa->kelas->nama_kelas ?? '-',
                     'foto' => $siswa->foto_url ?? null,
-                    'embedding' => $embedding,
+                    'embedding' => $vec128,
+                    'has_512' => !empty($vec512),
                 ]
             ]);
         } else {
@@ -1412,19 +1440,39 @@ class AttendanceController extends Controller
             }
             $guru->save();
 
+            $existingFace = UserFaceData::where('guru_id', $guru->id)->first();
+            $oldUnpacked = $existingFace ? \App\Services\FaceRecognitionService::unpackEmbedding($existingFace->face_embedding) : ['v512' => null, 'v128' => null];
+
+            $vec128 = (is_array($embedding) && count($embedding) === 128)
+                ? \App\Services\FaceRecognitionService::blendCentroid($oldUnpacked['v128'], $embedding, 0.5)
+                : $oldUnpacked['v128'];
+
+            $vec512 = $oldUnpacked['v512'];
+            $fullPhotoPath = storage_path('app/public/' . $savedPath);
+            if (file_exists($fullPhotoPath)) {
+                $extract512 = \App\Services\FaceRecognitionService::extractVector($fullPhotoPath, $existingFace?->face_embedding, 0.5);
+                if (!empty($extract512['success']) && !empty($extract512['embedding'])) {
+                    $vec512 = $extract512['embedding'];
+                }
+            }
+
             UserFaceData::updateOrCreate(
                 ['guru_id' => $guru->id],
                 [
                     'user_id' => $targetUser->id,
-                    'face_embedding' => json_encode($embedding),
+                    'face_embedding' => \App\Services\FaceRecognitionService::packEmbedding($vec512, $vec128),
                     'sample_photo_path' => $savedPath,
                     'is_verified' => true,
                 ]
             );
 
+            $isMultiShot = !empty($oldUnpacked['v128']) || !empty($oldUnpacked['v512']);
+
             return response()->json([
                 'ok' => true,
-                'message' => "Face ID guru {$guru->nama} berhasil didaftarkan!",
+                'message' => $isMultiShot
+                    ? "Sampel wajah tambahan {$guru->nama} berhasil digabungkan (Multi-Template Centroid)!"
+                    : "Face ID guru {$guru->nama} berhasil didaftarkan (128-d & 512-d)!",
                 'descriptor' => [
                     'id' => $guru->id,
                     'type' => 'guru',
@@ -1432,7 +1480,8 @@ class AttendanceController extends Controller
                     'nis' => $guru->nip ?? '-',
                     'kelas' => 'Dewan Guru',
                     'foto' => $guru->foto_url ?? null,
-                    'embedding' => $embedding,
+                    'embedding' => $vec128,
+                    'has_512' => !empty($vec512),
                 ]
             ]);
         }

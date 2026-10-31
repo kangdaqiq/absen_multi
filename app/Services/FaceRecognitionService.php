@@ -80,21 +80,13 @@ class FaceRecognitionService
     }
 
     /**
-     * Pack 512-d and/or 128-d vectors into a JSON string for storage in user_face_data.face_embedding.
+     * Pack 512-d vector into a JSON string for storage in user_face_data.face_embedding.
      */
     public static function packEmbedding(?array $v512, ?array $v128 = null): string
     {
         $clean512 = (is_array($v512) && count($v512) === 512) ? self::normalizeVector($v512) : null;
-        $clean128 = (is_array($v128) && count($v128) === 128) ? array_values(array_map('floatval', $v128)) : null;
-
-        if ($clean512 && $clean128) {
-            return json_encode(['v512' => $clean512, 'v128' => $clean128]);
-        }
         if ($clean512) {
             return json_encode($clean512);
-        }
-        if ($clean128) {
-            return json_encode($clean128);
         }
         return json_encode([]);
     }
@@ -229,19 +221,6 @@ class FaceRecognitionService
             $unpacked = self::unpackEmbedding($masterEmbedding);
             $vec512 = $unpacked['v512'];
 
-            // Lazy auto-upgrade: if user only had a 128-d kiosk vector but has sample_photo_path on disk, extract 512-d now
-            if (empty($vec512) && $faceRecord && !empty($faceRecord->sample_photo_path)) {
-                $sampleFullPath = storage_path('app/public/' . ltrim($faceRecord->sample_photo_path, '/'));
-                if (file_exists($sampleFullPath)) {
-                    $lazyExtract = self::extractVector($sampleFullPath);
-                    if (!empty($lazyExtract['success']) && !empty($lazyExtract['embedding'])) {
-                        $vec512 = $lazyExtract['embedding'];
-                        $faceRecord->face_embedding = self::packEmbedding($vec512, $unpacked['v128']);
-                        $faceRecord->save();
-                    }
-                }
-            }
-
             if (empty($vec512)) {
                 return [
                     'success' => false,
@@ -339,21 +318,6 @@ class FaceRecognitionService
             $unpacked = self::unpackEmbedding($cand->face_embedding);
             $vec512 = $unpacked['v512'];
 
-            // Lazy upgrade if a kiosk-registered record only has 128-d but has sample photo on disk
-            if (empty($vec512) && !empty($cand->sample_photo_path) && !$engineOfflineDetected) {
-                $sampleFullPath = storage_path('app/public/' . ltrim($cand->sample_photo_path, '/'));
-                if (file_exists($sampleFullPath)) {
-                    $lazyExtract = self::extractVector($sampleFullPath);
-                    if (!empty($lazyExtract['engine_offline'])) {
-                        $engineOfflineDetected = true;
-                    } elseif (!empty($lazyExtract['success']) && !empty($lazyExtract['embedding'])) {
-                        $vec512 = $lazyExtract['embedding'];
-                        $cand->face_embedding = self::packEmbedding($vec512, $unpacked['v128']);
-                        $cand->save();
-                    }
-                }
-            }
-
             if (empty($vec512) || count($vec512) !== 512) {
                 continue;
             }
@@ -372,7 +336,6 @@ class FaceRecognitionService
             ];
             $recordMap[$cand->id] = [
                 'record' => $cand,
-                'v128' => $unpacked['v128'],
                 'v512' => $vec512,
             ];
         }
@@ -382,12 +345,10 @@ class FaceRecognitionService
                 'success' => false,
                 'is_match' => false,
                 'no_512_candidates' => true,
-                'engine_offline' => $engineOfflineDetected,
+                'engine_offline' => false,
                 'matched_record' => null,
                 'similarity' => 0.0,
-                'message' => $engineOfflineDetected
-                    ? 'Layanan Python Face Engine (:8000) belum aktif.'
-                    : 'Belum ada kandidat wajah 512-d terdaftar di sekolah ini.'
+                'message' => 'Belum ada kandidat wajah 512-d terdaftar di sekolah ini.'
             ];
         }
 

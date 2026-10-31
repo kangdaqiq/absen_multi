@@ -542,11 +542,11 @@
                         <span class="inline-block w-2 h-2 rounded-full bg-emerald-400 shrink-0"></span>
                         <span class="text-[11px] font-mono text-gray-400 truncate max-w-[320px] sm:max-w-[450px]" x-text="debugInfo">Memulai Kiosk...</span>
                     </div>
-                    <button type="button" @click="openEnrollModal()"
+                    <button type="button" @click="showEnrollModal ? (showEnrollModal = false) : openEnrollModal()"
                         class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-white font-semibold transition active:scale-95 shadow-sm"
-                        style="background-color: #4f6bed;">
-                        <i class="fas fa-user-plus text-[10px]"></i>
-                        <span>Daftarkan Wajah Baru</span>
+                        :style="showEnrollModal ? 'background-color: #64748b;' : 'background-color: #4f6bed;'">
+                        <i class="fas text-[10px]" :class="showEnrollModal ? 'fa-times' : 'fa-user-plus'"></i>
+                        <span x-text="showEnrollModal ? 'Tutup Form Daftar' : 'Daftarkan Wajah Baru'">Daftarkan Wajah Baru</span>
                     </button>
                 </div>
             </div>
@@ -571,8 +571,11 @@
 
         </div>
 
-        <!-- ==================== KOLOM KANAN: SPOTLIGHT CARD, 3 COUNTER, & TABEL LOG ==================== -->
-        <div class="space-y-4">
+        <!-- ==================== KOLOM KANAN: SPOTLIGHT CARD, 3 COUNTER, & TABEL LOG / FORM ENROLL ==================== -->
+        <div>
+
+            <!-- TAMPILAN NORMAL: SPOTLIGHT + COUNTER + TABEL -->
+            <div x-show="!showEnrollModal" class="space-y-4">
 
             <!-- 1. SPOTLIGHT CARD (HASIL PRESENSI TERAKHIR) -->
             <div class="relative overflow-hidden rounded-3xl border border-gray-200 bg-white p-5 shadow-theme-sm dark:border-gray-800 dark:bg-gray-dark transition-all duration-300">
@@ -769,75 +772,76 @@
                 </div>
             </div>
 
-        </div>
-    </div>
+            </div><!-- End x-show="!showEnrollModal" -->
 
-    <!-- ==================== MODAL QUICK ENROLLMENT FACE ID ==================== -->
-    <div x-show="showEnrollModal" style="display: none;"
-        class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-        @keydown.escape.window="showEnrollModal = false">
-        
-        <div class="relative w-full max-w-md bg-white dark:bg-gray-dark rounded-3xl p-6 shadow-2xl border border-gray-200 dark:border-gray-800"
-            style="max-height: calc(100vh - 3rem); overflow-y: auto;"
-            @click.away="showEnrollModal = false">
-            
-            <div class="flex items-center justify-between pb-3 mb-4 border-b border-gray-100 dark:border-gray-800">
-                <div class="flex items-center gap-2">
-                    <div class="flex h-8 w-8 items-center justify-center rounded-xl text-white" style="background-color: #4f6bed;">
-                        <i class="fas fa-user-plus text-xs"></i>
+            <!-- TAMPILAN ENROLLMENT: SEJAJAR DI KOLOM KANAN (TIDAK MENUTUPI KAMERA KIRI & TIDAK TUMPUK) -->
+            <div x-show="showEnrollModal" style="display: none;"
+                class="rounded-3xl border border-gray-200 bg-white p-6 shadow-theme-sm dark:border-gray-800 dark:bg-gray-dark"
+                @keydown.escape.window="showEnrollModal = false">
+                
+                <div class="flex items-center justify-between pb-4 mb-4 border-b border-gray-100 dark:border-gray-800">
+                    <div class="flex items-center gap-2.5">
+                        <div class="flex h-9 w-9 items-center justify-center rounded-xl text-white" style="background-color: #4f6bed;">
+                            <i class="fas fa-user-plus text-xs"></i>
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-sm sm:text-base text-gray-800 dark:text-white">Daftarkan Face ID</h4>
+                            <p class="text-[11px] text-gray-400">Lihat kamera di sebelah kiri, pilih siswa, lalu klik Daftarkan Wajah</p>
+                        </div>
                     </div>
-                    <h4 class="font-bold text-gray-800 dark:text-white">Daftarkan Face ID</h4>
-                </div>
-                <button type="button" @click="showEnrollModal = false" class="text-gray-400 hover:text-gray-600 text-sm">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-
-            <div class="space-y-4 text-xs">
-                <p class="text-gray-500 dark:text-gray-400">
-                    Pilih siswa di bawah ini, lalu klik tombol <b>Daftarkan Wajah</b> untuk menyimpan Face ID.
-                </p>
-
-                <!-- Siswa Selector with search -->
-                <div>
-                    <label class="block font-semibold text-gray-700 dark:text-gray-300 mb-1">Cari & Pilih Siswa:</label>
-                    <input type="text" x-model="enrollSearch" placeholder="Ketik nama atau NIS..."
-                        class="w-full px-3 py-2 rounded-xl border border-gray-200 bg-gray-50 text-xs text-gray-800 outline-none focus:border-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 mb-2">
-                    
-                    <div class="enroll-scroll-list border border-gray-200 dark:border-gray-800 rounded-xl divide-y divide-gray-100 dark:divide-gray-800">
-                        <template x-for="s in candidateStudents" :key="s.id">
-                            <div @click="selectedEnrollStudent = s"
-                                :class="selectedEnrollStudent && selectedEnrollStudent.id === s.id ? 'font-bold' : 'hover:bg-gray-50 dark:hover:bg-gray-800'"
-                                :style="selectedEnrollStudent && selectedEnrollStudent.id === s.id ? 'background-color: #eaedff;' : ''"
-                                class="p-2 cursor-pointer flex items-center justify-between">
-                                <div>
-                                    <p class="text-gray-800 dark:text-white" x-text="s.nama"></p>
-                                    <p class="text-[10px] text-gray-400" x-text="s.nis + ' (' + s.kelas + ')'"></p>
-                                </div>
-                                <span x-show="s.has_face" class="text-[10px] text-emerald-600 font-semibold">Sudah Ada</span>
-                            </div>
-                        </template>
-                    </div>
-                </div>
-
-                <div x-show="selectedEnrollStudent" class="p-3 rounded-xl" style="background-color: #f4f6ff; border: 1px solid #d5dcff;">
-                    <p class="font-bold" style="color: #3d57d6;" x-text="'Target: ' + (selectedEnrollStudent ? selectedEnrollStudent.nama : '')"></p>
-                    <p class="text-[11px] text-gray-500" x-text="'NIS: ' + (selectedEnrollStudent ? selectedEnrollStudent.nis : '') + ' | ' + (selectedEnrollStudent ? selectedEnrollStudent.kelas : '')"></p>
-                </div>
-
-                <div class="pt-2 flex items-center justify-end gap-2">
                     <button type="button" @click="showEnrollModal = false"
-                        class="px-4 py-2 rounded-xl border border-gray-200 dark:border-gray-700 font-semibold text-gray-600 dark:text-gray-400 hover:bg-gray-50 transition">
-                        Batal
-                    </button>
-                    <button type="button" @click="executeEnrollment()" :disabled="!selectedEnrollStudent || isEnrolling"
-                        class="px-4 py-2 rounded-xl text-white font-bold transition disabled:opacity-50 disabled:cursor-not-allowed"
-                        style="background-color: #4f6bed;">
-                        <span x-show="!isEnrolling">Daftarkan Wajah</span>
-                        <span x-show="isEnrolling">Memproses...</span>
+                        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gray-200 dark:border-gray-700 text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition">
+                        <i class="fas fa-arrow-left text-[10px]"></i>
+                        <span>Kembali</span>
                     </button>
                 </div>
+
+                <div class="space-y-4 text-xs">
+                    <!-- Siswa Selector with search -->
+                    <div>
+                        <label class="block font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Cari & Pilih Siswa:</label>
+                        <input type="text" x-model="enrollSearch" placeholder="Ketik nama atau NIS siswa..."
+                            class="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 bg-gray-50 text-xs text-gray-800 outline-none focus:border-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 mb-2.5">
+                        
+                        <div class="border border-gray-200 dark:border-gray-800 rounded-xl divide-y divide-gray-100 dark:divide-gray-800 overflow-y-auto" style="max-height: 280px;">
+                            <template x-for="s in candidateStudents" :key="s.id">
+                                <div @click="selectedEnrollStudent = s"
+                                    :class="selectedEnrollStudent && selectedEnrollStudent.id === s.id ? 'font-bold' : 'hover:bg-gray-50 dark:hover:bg-gray-800'"
+                                    :style="selectedEnrollStudent && selectedEnrollStudent.id === s.id ? 'background-color: #eaedff;' : ''"
+                                    class="p-2.5 cursor-pointer flex items-center justify-between transition">
+                                    <div>
+                                        <p class="text-gray-800 dark:text-white" x-text="s.nama"></p>
+                                        <p class="text-[10px] text-gray-400" x-text="s.nis + ' (' + s.kelas + ')'"></p>
+                                    </div>
+                                    <span x-show="s.has_face" class="px-2 py-0.5 rounded-full bg-emerald-50 text-[10px] text-emerald-600 font-semibold">Sudah Ada</span>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+
+                    <div x-show="selectedEnrollStudent" class="p-3.5 rounded-xl flex items-center justify-between" style="background-color: #f4f6ff; border: 1px solid #d5dcff;">
+                        <div>
+                            <p class="font-bold text-xs" style="color: #3d57d6;" x-text="'Target: ' + (selectedEnrollStudent ? selectedEnrollStudent.nama : '')"></p>
+                            <p class="text-[11px] text-gray-500" x-text="'NIS: ' + (selectedEnrollStudent ? selectedEnrollStudent.nis : '') + ' | Kelas: ' + (selectedEnrollStudent ? selectedEnrollStudent.kelas : '')"></p>
+                        </div>
+                        <i class="fas fa-check-circle text-base" style="color: #4f6bed;"></i>
+                    </div>
+
+                    <div class="pt-2 flex items-center justify-end gap-2">
+                        <button type="button" @click="showEnrollModal = false"
+                            class="px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 font-semibold text-gray-600 dark:text-gray-400 hover:bg-gray-50 transition">
+                            Batal
+                        </button>
+                        <button type="button" @click="executeEnrollment()" :disabled="!selectedEnrollStudent || isEnrolling"
+                            class="px-5 py-2.5 rounded-xl text-white font-bold transition disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                            style="background-color: #4f6bed;">
+                            <span x-show="!isEnrolling"><i class="fas fa-camera mr-1"></i> Daftarkan Wajah</span>
+                            <span x-show="isEnrolling">Memproses...</span>
+                        </button>
+                    </div>
+                </div>
             </div>
+
         </div>
     </div>
 
@@ -972,24 +976,20 @@ function faceScannerApp() {
         },
 
         async initFaceApi() {
-            this.statusText = 'Memuat Model AI Neural Network...';
+            this.statusText = 'Memuat Detektor Wajah...';
             try {
-                // Models hosted via CDN
+                // Hanya muat tinyFaceDetector (~190 KB) untuk mendeteksi posisi kotak wajah di kamera.
+                // Pencocokan & ekstraksi vektor 100% menggunakan AI 512-d Python di server.
                 const modelUrl = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/model/';
-                
-                await Promise.all([
-                    faceapi.nets.tinyFaceDetector.loadFromUri(modelUrl),
-                    faceapi.nets.faceLandmark68Net.loadFromUri(modelUrl),
-                    faceapi.nets.faceRecognitionNet.loadFromUri(modelUrl),
-                ]);
+                await faceapi.nets.tinyFaceDetector.loadFromUri(modelUrl);
 
                 this.modelLoading = false;
-                this.statusText = 'Model AI Siap, Membuka Kamera...';
+                this.statusText = 'Detektor Siap, Membuka Kamera...';
 
                 await this.initCamera();
             } catch (err) {
                 console.error('Model load failed:', err);
-                this.statusText = 'Gagal memuat model: ' + err.message;
+                this.statusText = 'Gagal memuat detektor wajah: ' + err.message;
             }
         },
 
@@ -1089,9 +1089,10 @@ function faceScannerApp() {
                             }
 
                             const rawBox = detection.box || (detection.detection ? detection.detection.box : null);
-                            // Proceed to Python 512-d recognition once face is stable for 2 frames
-                            if (stableCount >= 2 && !this.isProcessing && Date.now() > this.holdMessageUntil) {
-                                this.detectionMessage = 'Wajah terdeteksi! Memverifikasi AI 512-d...';
+                            if (this.showEnrollModal) {
+                                this.detectionMessage = 'Mode Daftar: Posisikan wajah lurus di tengah lalu klik Daftarkan Wajah';
+                            } else if (stableCount >= 2 && !this.isProcessing && Date.now() > this.holdMessageUntil) {
+                                this.detectionMessage = 'Wajah terdeteksi! Memverifikasi...';
                                 await this.matchAndAttend(rawBox);
                                 stableCount = 0;
                             }
@@ -1119,7 +1120,7 @@ function faceScannerApp() {
             requestAnimationFrame(loop);
         },
 
-        // PYTHON 512-D INSIGHTFACE + CLAHE + NUMPY MATRIX (PRIMARY) + 128-D BROWSER (FALLBACK)
+        // PYTHON 512-D INSIGHTFACE + CLAHE + NUMPY MATRIX (100% SERVER-SIDE)
         async matchAndAttend(faceBox = null) {
             try {
                 if (this.descriptors.length === 0 && this.server512Count === 0) {
@@ -1132,53 +1133,9 @@ function faceScannerApp() {
                 this.isProcessing = true;
                 const snapshot = this.captureFrameSnapshot(faceBox);
 
-                // Siapkan fallback 128-d HANYA jika ada data 128-d yang belum punya 512-d atau untuk cadangan offline
-                let bestFallbackMatch = null;
-                let fallbackSimScore = null;
-
-                const descriptors128 = [];
-                let hasLegacy128Only = false;
-                for (const item of this.descriptors) {
-                    let emb = item.embedding;
-                    if (typeof emb === 'string') {
-                        try { emb = JSON.parse(emb); } catch (e) {}
-                    }
-                    if (Array.isArray(emb) && emb.length === 128) {
-                        descriptors128.push({ ...item, embedding: emb });
-                        if (!item.has_512) hasLegacy128Only = true;
-                    }
-                }
-
-                // Ekstrak 128-d on-demand hanya bila ada user lama yang belum punya 512-d atau server512Count == 0
-                if (descriptors128.length > 0 && (hasLegacy128Only || this.server512Count === 0)) {
-                    try {
-                        const video = this.$refs.webcam;
-                        const fullDet = await faceapi.detectSingleFace(
-                            video,
-                            new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.45 })
-                        ).withFaceLandmarks().withFaceDescriptor();
-
-                        if (fullDet && fullDet.descriptor) {
-                            let minDistance = 0.55;
-                            for (const item of descriptors128) {
-                                const distance = faceapi.euclideanDistance(fullDet.descriptor, item.embedding);
-                                if (distance < minDistance) {
-                                    minDistance = distance;
-                                    bestFallbackMatch = item;
-                                }
-                            }
-                            if (bestFallbackMatch) {
-                                fallbackSimScore = Math.max(0, 1 - minDistance);
-                            }
-                        }
-                    } catch (e) {
-                        // abaikan jika ekstraksi fallback gagal
-                    }
-                }
-
-                // Kirim ke Server: Python 512-d NumPy Matrix akan menjadi penentu utama
-                this.detectionMessage = 'Memverifikasi wajah (AI 512-d Server)...';
-                this.debugInfo = 'Identifikasi 1:N via Python InsightFace 512-d + CLAHE...';
+                // Kirim ke Server: Python 512-d NumPy Matrix
+                this.detectionMessage = 'Memverifikasi wajah...';
+                this.debugInfo = 'Identifikasi...';
 
                 try {
                     const response = await fetch('{{ route('absensi.scan-face', [], false) }}', {
@@ -1190,27 +1147,24 @@ function faceScannerApp() {
                         },
                         body: JSON.stringify({
                             mode: this.scanMode,
-                            photo_snapshot: snapshot,
-                            fallback_person_id: bestFallbackMatch ? bestFallbackMatch.id : null,
-                            fallback_type: bestFallbackMatch ? (bestFallbackMatch.type || 'siswa') : 'siswa',
-                            fallback_similarity: fallbackSimScore
+                            photo_snapshot: snapshot
                         })
                     });
 
                     const res = await response.json().catch(() => ({}));
                     if (response.ok && res.ok) {
                         this.lastScanError = false;
-                        this.handleScanResponse(res, bestFallbackMatch || res.data || {}, fallbackSimScore || 0.88);
+                        this.handleScanResponse(res, res.data || {}, 0.88);
                         this.holdMessageUntil = Date.now() + 3800;
                     } else {
                         this.lastScanError = true;
                         const msg = res.message || ('Wajah tidak dikenali (HTTP ' + response.status + ')');
                         this.detectionMessage = msg;
                         this.holdMessageUntil = Date.now() + 2800;
-                        this.playTone('warning');
+                        this.playTone(response.status === 503 ? 'error' : 'warning');
                     }
                 } catch (err) {
-                    console.error('512-d server scan error:', err);
+                    console.error('server scan error:', err);
                     this.lastScanError = true;
                     this.detectionMessage = 'Gagal koneksi ke server: ' + (err.message || 'Koneksi terputus');
                     this.holdMessageUntil = Date.now() + 3500;
@@ -1230,8 +1184,8 @@ function faceScannerApp() {
             }
         },
 
-        // Smart High-Clarity Face Snapshot (fokus pada ROI wajah dengan margin 45% agar tajam di 512-d InsightFace)
-        captureFrameSnapshot(faceBox = null) {
+        // Smart High-Clarity Face Snapshot (margin 80% agar konteks kepala & bahu utuh untuk presisi 5-keypoint alignment 512-d InsightFace)
+        captureFrameSnapshot(faceBox = null, isEnroll = false) {
             try {
                 const video = this.$refs.webcam;
                 const vw = video.videoWidth || 640;
@@ -1240,25 +1194,26 @@ function faceScannerApp() {
                 const ctx = canvas.getContext('2d');
 
                 if (faceBox && faceBox.width > 30 && faceBox.height > 30) {
-                    const padX = faceBox.width * 0.45;
-                    const padY = faceBox.height * 0.45;
+                    const padRatio = isEnroll ? 0.85 : 0.75;
+                    const padX = faceBox.width * padRatio;
+                    const padY = faceBox.height * padRatio;
                     const sx = Math.max(0, Math.floor(faceBox.x - padX));
                     const sy = Math.max(0, Math.floor(faceBox.y - padY));
                     const sw = Math.min(vw - sx, Math.ceil(faceBox.width + padX * 2));
                     const sh = Math.min(vh - sy, Math.ceil(faceBox.height + padY * 2));
 
-                    const maxOut = 440;
+                    const maxOut = isEnroll ? 600 : 500;
                     const scale = Math.min(1, maxOut / Math.max(sw, sh));
-                    canvas.width = Math.max(160, Math.round(sw * scale));
-                    canvas.height = Math.max(160, Math.round(sh * scale));
+                    canvas.width = Math.max(200, Math.round(sw * scale));
+                    canvas.height = Math.max(200, Math.round(sh * scale));
                     ctx.drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
-                    return canvas.toDataURL('image/jpeg', 0.85);
+                    return canvas.toDataURL('image/jpeg', isEnroll ? 0.93 : 0.88);
                 }
 
                 canvas.width = Math.min(640, vw);
                 canvas.height = Math.min(480, vh);
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                return canvas.toDataURL('image/jpeg', 0.82);
+                return canvas.toDataURL('image/jpeg', isEnroll ? 0.93 : 0.88);
             } catch (e) {
                 return null;
             }
@@ -1324,20 +1279,53 @@ function faceScannerApp() {
 
             this.isEnrolling = true;
             try {
-                // Detect face in current video frame
-                const detection = await faceapi.detectSingleFace(
+                // Standar Ketat Enrollment di Kamera: deteksi seluruh wajah dengan threshold tinggi (0.65)
+                const detections = await faceapi.detectAllFaces(
                     video, 
-                    new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.5 })
-                ).withFaceLandmarks().withFaceDescriptor();
+                    new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.65 })
+                );
 
-                if (!detection) {
-                    alert('Wajah tidak terdeteksi di kamera! Pastikan wajah terlihat jelas di depan layar.');
+                if (!detections || detections.length === 0) {
+                    alert('Wajah tidak terdeteksi dengan jelas! Pastikan pencahayaan terang, tidak memakai masker, dan menghadap lurus ke kamera.');
                     this.isEnrolling = false;
                     return;
                 }
 
-                const descriptorArray = Array.from(detection.descriptor);
-                const snapshot = this.captureFrameSnapshot(detection.detection ? detection.detection.box : null);
+                if (detections.length > 1) {
+                    alert('Terdeteksi lebih dari 1 wajah di kamera! Pastikan hanya siswa yang didaftarkan yang berada di depan kamera.');
+                    this.isEnrolling = false;
+                    return;
+                }
+
+                const detection = detections[0];
+                const rawBox = detection.box || (detection.detection ? detection.detection.box : null);
+                const vw = video.videoWidth || 640;
+                const vh = video.videoHeight || 480;
+
+                if (rawBox) {
+                    // 1. Cek ukuran minimal wajah (tidak boleh terlalu jauh)
+                    if (rawBox.width < 110 || rawBox.height < 110) {
+                        alert('Jarak wajah terlalu jauh dari kamera! Harap maju lebih dekat ke layar.');
+                        this.isEnrolling = false;
+                        return;
+                    }
+
+                    // 2. Cek posisi wajah agar berada di tengah & tidak terpotong tepi kamera
+                    const marginX = vw * 0.08;
+                    const marginY = vh * 0.08;
+                    if (
+                        rawBox.x < marginX ||
+                        rawBox.y < marginY ||
+                        (rawBox.x + rawBox.width) > (vw - marginX) ||
+                        (rawBox.y + rawBox.height) > (vh - marginY)
+                    ) {
+                        alert('Posisi wajah terlalu di pinggir layar! Harap posisikan wajah tepat di tengah bingkai oval.');
+                        this.isEnrolling = false;
+                        return;
+                    }
+                }
+
+                const snapshot = this.captureFrameSnapshot(rawBox, true);
 
                 const response = await fetch('{{ route('absensi.register-face-kiosk', [], false) }}', {
                     method: 'POST',
@@ -1348,15 +1336,13 @@ function faceScannerApp() {
                     body: JSON.stringify({
                         person_id: this.selectedEnrollStudent.id,
                         type: 'siswa',
-                        embedding: descriptorArray,
                         photo: snapshot
                     })
                 });
 
                 const res = await response.json();
-                if (res.ok) {
+                if (response.ok && res.ok) {
                     this.playTone('ok');
-                    // Update or insert in local memory (prevent duplicates on multi-shot centroid enrollment)
                     const existingIdx = this.descriptors.findIndex(
                         d => d.id === res.descriptor.id && (d.type || 'siswa') === (res.descriptor.type || 'siswa')
                     );
@@ -1365,15 +1351,14 @@ function faceScannerApp() {
                     } else {
                         this.descriptors.push(res.descriptor);
                     }
-                    if (res.descriptor.has_512) {
-                        this.server512Count = Math.max(1, this.server512Count);
-                    }
+                    this.server512Count = Math.max(1, this.server512Count);
                     const stu = this.allStudents.find(s => s.id === this.selectedEnrollStudent.id);
                     if (stu) stu.has_face = true;
                     alert(res.message);
                     this.showEnrollModal = false;
                 } else {
-                    alert('Gagal: ' + res.message);
+                    this.playTone('error');
+                    alert('Gagal: ' + (res.message || 'Layanan AI Face ID tidak merespons.'));
                 }
             } catch (err) {
                 alert('Galat saat mendaftarkan wajah: ' + err.message);

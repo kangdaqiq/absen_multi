@@ -221,15 +221,12 @@ class AttendanceController extends Controller
 
         foreach ($faceRecords as $fr) {
             $unpacked = \App\Services\FaceRecognitionService::unpackEmbedding($fr->face_embedding);
-            $v128 = $unpacked['v128'];
             $v512 = $unpacked['v512'];
 
-            if (empty($v128) && empty($v512)) {
+            if (empty($v512)) {
                 continue;
             }
-            if (!empty($v512)) {
-                $server512Count++;
-            }
+            $server512Count++;
 
             if ($fr->siswa) {
                 $registeredSiswaMap[$fr->siswa->id] = true;
@@ -240,8 +237,7 @@ class AttendanceController extends Controller
                     'nis' => $fr->siswa->nis ?? '-',
                     'kelas' => $fr->siswa->kelas->nama_kelas ?? '-',
                     'foto' => $fr->siswa->foto_url ?? null,
-                    'embedding' => $v128,
-                    'has_512' => !empty($v512),
+                    'has_512' => true,
                 ];
             } elseif ($fr->guru) {
                 $descriptors[] = [
@@ -251,8 +247,7 @@ class AttendanceController extends Controller
                     'nis' => $fr->guru->nip ?? '-',
                     'kelas' => 'Guru / Pegawai',
                     'foto' => $fr->guru->foto_url ?? null,
-                    'embedding' => $v128,
-                    'has_512' => !empty($v512),
+                    'has_512' => true,
                 ];
             }
         }
@@ -295,19 +290,9 @@ class AttendanceController extends Controller
         }
 
         $request->validate([
-            'person_id' => 'nullable',
-            'type' => 'nullable|string|in:siswa,guru',
-            'similarity' => 'nullable|numeric',
-            'fallback_person_id' => 'nullable',
-            'fallback_type' => 'nullable|string|in:siswa,guru',
-            'fallback_similarity' => 'nullable|numeric',
             'mode' => 'nullable|string|in:auto,masuk,pulang',
-            'photo_snapshot' => 'nullable|string',
+            'photo_snapshot' => 'required|string',
         ]);
-
-        $fallbackId = $request->input('fallback_person_id') ?: $request->input('person_id');
-        $fallbackType = $request->input('fallback_type') ?: $request->input('type', 'siswa');
-        $fallbackSim = (float) ($request->input('fallback_similarity') ?? $request->input('similarity', 0.85));
 
         $personId = null;
         $type = 'siswa';
@@ -317,115 +302,61 @@ class AttendanceController extends Controller
 
         $schoolId = auth()->user()?->school_id;
 
-        // UTAMA: Identifikasi 1:N server-side via Python NumPy Matrix (512-dimensi InsightFace + CLAHE)
-        if (!empty($photoSnapshot)) {
-            $serverErrorMsg = null;
-            $tempPath = null;
-            try {
-                $imageParts = explode(';base64,', $photoSnapshot);
-                $imgData = base64_decode($imageParts[1] ?? $photoSnapshot);
-                $tempPath = sys_get_temp_dir() . '/kiosk_scan_' . uniqid() . '.jpg';
-                file_put_contents($tempPath, $imgData);
+        // Identifikasi 1:N server-side murni via Python NumPy Matrix (512-dimensi InsightFace + CLAHE)
+        $serverErrorMsg = null;
+        $engineOffline = false;
+        $tempPath = null;
+        try {
+            $imageParts = explode(';base64,', $photoSnapshot);
+            $imgData = base64_decode($imageParts[1] ?? $photoSnapshot);
+            $tempPath = sys_get_temp_dir() . '/kiosk_scan_' . uniqid() . '.jpg';
+            file_put_contents($tempPath, $imgData);
 
-                $candidates = UserFaceData::whereNotNull('face_embedding')
-                    ->with(['siswa', 'guru'])
-                    ->when($schoolId, function ($q) use ($schoolId) {
-                        $q->where(function ($sub) use ($schoolId) {
-                            $sub->whereHas('siswa', fn($s) => $s->where('school_id', $schoolId))
-                                ->orWhereHas('guru', fn($g) => $g->where('school_id', $schoolId));
-                        });
-                    })
-                    ->get();
+            $candidates = UserFaceData::whereNotNull('face_embedding')
+                ->with(['siswa', 'guru'])
+                ->when($schoolId, function ($q) use ($schoolId) {
+                    $q->where(function ($sub) use ($schoolId) {
+                        $sub->whereHas('siswa', fn($s) => $s->where('school_id', $schoolId))
+                            ->orWhereHas('guru', fn($g) => $g->where('school_id', $schoolId));
+                    });
+                })
+                ->get();
 
-                $identifyRes = \App\Services\FaceRecognitionService::identifyFace($tempPath, $candidates);
+            $identifyRes = \App\Services\FaceRecognitionService::identifyFace($tempPath, $candidates);
 
-                if (!empty($identifyRes['is_match']) && !empty($identifyRes['matched_record'])) {
-                    $matchedRecord = $identifyRes['matched_record'];
-                    $personId = $matchedRecord->siswa_id ?: $matchedRecord->guru_id;
-                    $type = $matchedRecord->siswa_id ? 'siswa' : 'guru';
-                    $similarity = (float) ($identifyRes['similarity'] ?? 0.85);
-                } else {
-                    $engineOffline = !empty($identifyRes['engine_offline']);
-
-                    // Fallback ke hasil 128-d Browser HANYA jika:
-                    // 1) Service Python 512-d sedang mati/offline, ATAU
-                    // 2) Kandidat hasil 128-d merupakan data lama yang belum punya vektor 512-d sama sekali
-                    if (!empty($fallbackId)) {
-                        $fallbackRecord = $candidates->first(function ($c) use ($fallbackId, $fallbackType) {
-                            return $fallbackType === 'guru'
-                                ? (string) $c->guru_id === (string) $fallbackId
-                                : (string) $c->siswa_id === (string) $fallbackId;
-                        });
-
-                        $has512 = false;
-                        $unpackedFallback = ['v512' => null, 'v128' => null];
-                        if ($fallbackRecord) {
-                            $unpackedFallback = \App\Services\FaceRecognitionService::unpackEmbedding($fallbackRecord->face_embedding);
-                            $has512 = !empty($unpackedFallback['v512']);
-                        }
-
-                        if ($engineOffline || !$has512) {
-                            $personId = $fallbackId;
-                            $type = $fallbackType;
-                            $similarity = $fallbackSim;
-
-                            // Auto-migrasi: jika Python aktif tapi user ini baru punya 128-d, ekstrak & simpan 512-d sekarang!
-                            if (!$engineOffline && $fallbackRecord && !$has512) {
-                                $ext = \App\Services\FaceRecognitionService::extractVector($tempPath);
-                                if (!empty($ext['success']) && !empty($ext['embedding'])) {
-                                    $fallbackRecord->face_embedding = \App\Services\FaceRecognitionService::packEmbedding(
-                                        $ext['embedding'],
-                                        $unpackedFallback['v128']
-                                    );
-                                    $fallbackRecord->save();
-                                }
-                            }
-                        }
-                    }
-
-                    if (empty($personId)) {
-                        $simPct = $identifyRes['similarity_percent'] ?? 0;
-                        if ($simPct > 0) {
-                            $serverErrorMsg = "Wajah tidak cocok (Kemiripan AI 512-d: {$simPct}%, minimal " . round(\App\Services\FaceRecognitionService::getThreshold() * 100) . "%).";
-                        } elseif (!empty($identifyRes['message'])) {
-                            $serverErrorMsg = $identifyRes['message'];
-                        }
-                    }
-                }
-            } catch (\Throwable $e) {
-                Log::error('Server 512-d recognition error: ' . $e->getMessage());
-                if (!empty($fallbackId)) {
-                    $personId = $fallbackId;
-                    $type = $fallbackType;
-                    $similarity = $fallbackSim;
-                }
-            } finally {
-                if ($tempPath && file_exists($tempPath)) {
-                    @unlink($tempPath);
+            if (!empty($identifyRes['is_match']) && !empty($identifyRes['matched_record'])) {
+                $matchedRecord = $identifyRes['matched_record'];
+                $personId = $matchedRecord->siswa_id ?: $matchedRecord->guru_id;
+                $type = $matchedRecord->siswa_id ? 'siswa' : 'guru';
+                $similarity = (float) ($identifyRes['similarity'] ?? 0.85);
+            } else {
+                $engineOffline = !empty($identifyRes['engine_offline']);
+                $simPct = $identifyRes['similarity_percent'] ?? 0;
+                if ($engineOffline) {
+                    $serverErrorMsg = $identifyRes['message'] ?? 'Layanan AI Face Recognition (Python 512-d) sedang tidak aktif/offline.';
+                } elseif ($simPct > 0) {
+                    $serverErrorMsg = "Wajah tidak cocok (Kemiripan AI 512-d: {$simPct}%, minimal " . round(\App\Services\FaceRecognitionService::getThreshold() * 100) . "%).";
+                } elseif (!empty($identifyRes['message'])) {
+                    $serverErrorMsg = $identifyRes['message'];
                 }
             }
-
-            if (empty($personId)) {
-                return response()->json([
-                    'ok' => false,
-                    'status' => 'warning',
-                    'sound' => 'warning',
-                    'message' => $serverErrorMsg ?: 'Wajah tidak dikenali dalam database sistem.',
-                ], 404);
+        } catch (\Throwable $e) {
+            Log::error('Server 512-d recognition error: ' . $e->getMessage());
+            $engineOffline = true;
+            $serverErrorMsg = 'Gagal terhubung ke layanan AI Face Recognition (512-d): ' . $e->getMessage();
+        } finally {
+            if ($tempPath && file_exists($tempPath)) {
+                @unlink($tempPath);
             }
-        } elseif (!empty($fallbackId)) {
-            $personId = $fallbackId;
-            $type = $fallbackType;
-            $similarity = $fallbackSim;
         }
 
         if (empty($personId)) {
             return response()->json([
                 'ok' => false,
-                'status' => 'warning',
-                'sound' => 'warning',
-                'message' => 'Wajah tidak dikenali dalam database sistem.',
-            ], 404);
+                'status' => $engineOffline ? 'error' : 'warning',
+                'sound' => $engineOffline ? 'error' : 'warning',
+                'message' => $serverErrorMsg ?: 'Wajah tidak dikenali dalam database sistem.',
+            ], $engineOffline ? 503 : 404);
         }
 
         $schoolId = auth()->user()?->school_id;
@@ -433,25 +364,8 @@ class AttendanceController extends Controller
         $now = Carbon::now($schoolTz);
         $today = $now->format('Y-m-d');
 
-        // Optional: Save face snapshot image for audit proof
+        // Tidak menyimpan file snapshot foto absen ke disk (cukup gunakan untuk matching saja agar hemat storage)
         $savedSnapshotPath = null;
-        if (!empty($photoSnapshot) && str_starts_with($photoSnapshot, 'data:image')) {
-            try {
-                $imageParts = explode(';base64,', $photoSnapshot);
-                if (count($imageParts) === 2) {
-                    $imageData = base64_decode($imageParts[1]);
-                    $dir = 'attendance_photos/' . $today;
-                    if (!Storage::disk('public')->exists($dir)) {
-                        Storage::disk('public')->makeDirectory($dir);
-                    }
-                    $fileName = $dir . '/' . $type . '_' . $personId . '_' . time() . '.jpg';
-                    Storage::disk('public')->put($fileName, $imageData);
-                    $savedSnapshotPath = $fileName;
-                }
-            } catch (\Throwable $e) {
-                Log::warning('Gagal menyimpan foto snapshot face kiosk: ' . $e->getMessage());
-            }
-        }
 
         // --- 1. PROSES ABSENSI SISWA ---
         if ($type === 'siswa') {
@@ -1386,169 +1300,156 @@ class AttendanceController extends Controller
         $request->validate([
             'person_id' => 'required',
             'type' => 'required|in:siswa,guru',
-            'embedding' => 'required|array',
             'photo' => 'required|string', // base64
         ]);
 
         $personId = $request->person_id;
         $type = $request->type;
-        $embedding = $request->embedding;
         $photoBase64 = $request->photo;
 
-        // Decode & store photo
-        $savedPath = 'photos/' . $type . '/' . $type . '_' . $personId . '_' . time() . '.jpg';
+        // Decode photo ke file temporary (tidak disimpan ke disk permanen untuk hemat storage)
+        $tempPath = sys_get_temp_dir() . '/kiosk_enroll_' . uniqid() . '.jpg';
         try {
             $imageParts = explode(';base64,', $photoBase64);
             $imageData = base64_decode($imageParts[1] ?? $photoBase64);
-            Storage::disk('public')->put($savedPath, $imageData);
-        } catch (\Throwable $e) {
-            return response()->json(['ok' => false, 'message' => 'Gagal menyimpan file foto: ' . $e->getMessage()], 500);
-        }
+            file_put_contents($tempPath, $imageData);
 
-        if ($type === 'siswa') {
-            $siswa = Siswa::find($personId);
-            if (!$siswa) return response()->json(['ok' => false, 'message' => 'Siswa tidak ditemukan'], 404);
+            if ($type === 'siswa') {
+                $siswa = Siswa::find($personId);
+                if (!$siswa) return response()->json(['ok' => false, 'message' => 'Siswa tidak ditemukan'], 404);
 
-            $targetUser = $siswa->user;
-            if (!$targetUser) {
-                $targetUser = User::where('username', 'siswa_' . $siswa->nis)->orWhere('username', $siswa->nis)->first();
-            }
-            if (!$targetUser) {
-                $targetUser = User::create([
-                    'full_name' => $siswa->nama,
-                    'username' => 'siswa_' . ($siswa->nis ?: $siswa->id),
-                    'email' => ($siswa->nis ?: $siswa->id) . '@siswa.local',
-                    'password_hash' => Hash::make('123456'),
-                    'role' => 'student',
-                    'school_id' => $siswa->school_id,
+                $existingFace = UserFaceData::where('siswa_id', $siswa->id)->first();
+                $oldUnpacked = $existingFace ? \App\Services\FaceRecognitionService::unpackEmbedding($existingFace->face_embedding) : ['v512' => null];
+
+                // Ekstrak & gabungkan Centroid 512-d (InsightFace Python Server)
+                $extract512 = \App\Services\FaceRecognitionService::extractVector($tempPath, $existingFace?->face_embedding, 0.5);
+                if (empty($extract512['success']) || empty($extract512['embedding'])) {
+                    $statusCode = !empty($extract512['engine_offline']) ? 503 : 422;
+                    return response()->json([
+                        'ok' => false,
+                        'message' => $extract512['message'] ?? 'Gagal mengekstrak vektor wajah 512-d. Pastikan Python Face Engine aktif.'
+                    ], $statusCode);
+                }
+
+                $vec512 = $extract512['embedding'];
+
+                $targetUser = $siswa->user;
+                if (!$targetUser) {
+                    $targetUser = User::where('username', 'siswa_' . $siswa->nis)->orWhere('username', $siswa->nis)->first();
+                }
+                if (!$targetUser) {
+                    $targetUser = User::create([
+                        'full_name' => $siswa->nama,
+                        'username' => 'siswa_' . ($siswa->nis ?: $siswa->id),
+                        'email' => ($siswa->nis ?: $siswa->id) . '@siswa.local',
+                        'password_hash' => Hash::make('123456'),
+                        'role' => 'student',
+                        'school_id' => $siswa->school_id,
+                    ]);
+                }
+
+                if ($siswa->user_id !== $targetUser->id) {
+                    $siswa->user_id = $targetUser->id;
+                    $siswa->save();
+                }
+
+                UserFaceData::updateOrCreate(
+                    ['siswa_id' => $siswa->id],
+                    [
+                        'user_id' => $targetUser->id,
+                        'face_embedding' => \App\Services\FaceRecognitionService::packEmbedding($vec512),
+                        'sample_photo_path' => null,
+                        'is_verified' => true,
+                    ]
+                );
+
+                $isMultiShot = !empty($oldUnpacked['v512']);
+
+                return response()->json([
+                    'ok' => true,
+                    'message' => $isMultiShot
+                        ? "Sampel wajah tambahan {$siswa->nama} berhasil digabungkan (Multi-Template Centroid 512-d)!"
+                        : "Face ID siswa {$siswa->nama} berhasil didaftarkan (512-d)!",
+                    'descriptor' => [
+                        'id' => $siswa->id,
+                        'type' => 'siswa',
+                        'nama' => $siswa->nama,
+                        'nis' => $siswa->nis ?? '-',
+                        'kelas' => $siswa->kelas->nama_kelas ?? '-',
+                        'foto' => $siswa->foto_url ?? null,
+                        'has_512' => true,
+                    ]
+                ]);
+            } else {
+                $guru = Guru::find($personId);
+                if (!$guru) return response()->json(['ok' => false, 'message' => 'Guru tidak ditemukan'], 404);
+
+                $existingFace = UserFaceData::where('guru_id', $guru->id)->first();
+                $oldUnpacked = $existingFace ? \App\Services\FaceRecognitionService::unpackEmbedding($existingFace->face_embedding) : ['v512' => null];
+
+                $extract512 = \App\Services\FaceRecognitionService::extractVector($tempPath, $existingFace?->face_embedding, 0.5);
+                if (empty($extract512['success']) || empty($extract512['embedding'])) {
+                    $statusCode = !empty($extract512['engine_offline']) ? 503 : 422;
+                    return response()->json([
+                        'ok' => false,
+                        'message' => $extract512['message'] ?? 'Gagal mengekstrak vektor wajah 512-d. Pastikan Python Face Engine aktif.'
+                    ], $statusCode);
+                }
+
+                $vec512 = $extract512['embedding'];
+
+                $targetUser = $guru->user;
+                if (!$targetUser) {
+                    $targetUser = User::where('username', $guru->nip)->first();
+                }
+                if (!$targetUser) {
+                    $targetUser = User::create([
+                        'full_name' => $guru->nama,
+                        'username' => $guru->nip ?: 'guru_' . $guru->id,
+                        'email' => ($guru->nip ?: 'guru_' . $guru->id) . '@guru.local',
+                        'password_hash' => Hash::make('123456'),
+                        'role' => 'teacher',
+                        'school_id' => $guru->school_id,
+                    ]);
+                }
+
+                if ($guru->user_id !== $targetUser->id) {
+                    $guru->user_id = $targetUser->id;
+                    $guru->save();
+                }
+
+                UserFaceData::updateOrCreate(
+                    ['guru_id' => $guru->id],
+                    [
+                        'user_id' => $targetUser->id,
+                        'face_embedding' => \App\Services\FaceRecognitionService::packEmbedding($vec512),
+                        'sample_photo_path' => null,
+                        'is_verified' => true,
+                    ]
+                );
+
+                $isMultiShot = !empty($oldUnpacked['v512']);
+
+                return response()->json([
+                    'ok' => true,
+                    'message' => $isMultiShot
+                        ? "Sampel wajah tambahan {$guru->nama} berhasil digabungkan (Multi-Template Centroid 512-d)!"
+                        : "Face ID guru {$guru->nama} berhasil didaftarkan (512-d)!",
+                    'descriptor' => [
+                        'id' => $guru->id,
+                        'type' => 'guru',
+                        'nama' => $guru->nama,
+                        'nis' => $guru->nip ?? '-',
+                        'kelas' => 'Dewan Guru',
+                        'foto' => $guru->foto_url ?? null,
+                        'has_512' => true,
+                    ]
                 ]);
             }
-
-            if ($siswa->user_id !== $targetUser->id) {
-                $siswa->user_id = $targetUser->id;
+        } finally {
+            if ($tempPath && file_exists($tempPath)) {
+                @unlink($tempPath);
             }
-            if (empty($siswa->foto)) {
-                $siswa->foto = $savedPath;
-            }
-            $siswa->save();
-
-            $existingFace = UserFaceData::where('siswa_id', $siswa->id)->first();
-            $oldUnpacked = $existingFace ? \App\Services\FaceRecognitionService::unpackEmbedding($existingFace->face_embedding) : ['v512' => null, 'v128' => null];
-
-            // Multi-Template Centroid untuk 128-d (Browser Kiosk)
-            $vec128 = (is_array($embedding) && count($embedding) === 128)
-                ? \App\Services\FaceRecognitionService::blendCentroid($oldUnpacked['v128'], $embedding, 0.5)
-                : $oldUnpacked['v128'];
-
-            // Ekstrak & gabungkan Centroid 512-d (InsightFace Server/Mobile) dari foto snapshot
-            $vec512 = $oldUnpacked['v512'];
-            $fullPhotoPath = storage_path('app/public/' . $savedPath);
-            if (file_exists($fullPhotoPath)) {
-                $extract512 = \App\Services\FaceRecognitionService::extractVector($fullPhotoPath, $existingFace?->face_embedding, 0.5);
-                if (!empty($extract512['success']) && !empty($extract512['embedding'])) {
-                    $vec512 = $extract512['embedding'];
-                }
-            }
-
-            UserFaceData::updateOrCreate(
-                ['siswa_id' => $siswa->id],
-                [
-                    'user_id' => $targetUser->id,
-                    'face_embedding' => \App\Services\FaceRecognitionService::packEmbedding($vec512, $vec128),
-                    'sample_photo_path' => $savedPath,
-                    'is_verified' => true,
-                ]
-            );
-
-            $isMultiShot = !empty($oldUnpacked['v128']) || !empty($oldUnpacked['v512']);
-
-            return response()->json([
-                'ok' => true,
-                'message' => $isMultiShot
-                    ? "Sampel wajah tambahan {$siswa->nama} berhasil digabungkan (Multi-Template Centroid)!"
-                    : "Face ID siswa {$siswa->nama} berhasil didaftarkan (128-d & 512-d)!",
-                'descriptor' => [
-                    'id' => $siswa->id,
-                    'type' => 'siswa',
-                    'nama' => $siswa->nama,
-                    'nis' => $siswa->nis ?? '-',
-                    'kelas' => $siswa->kelas->nama_kelas ?? '-',
-                    'foto' => $siswa->foto_url ?? null,
-                    'embedding' => $vec128,
-                    'has_512' => !empty($vec512),
-                ]
-            ]);
-        } else {
-            $guru = Guru::find($personId);
-            if (!$guru) return response()->json(['ok' => false, 'message' => 'Guru tidak ditemukan'], 404);
-
-            $targetUser = $guru->user;
-            if (!$targetUser) {
-                $targetUser = User::where('username', $guru->nip)->first();
-            }
-            if (!$targetUser) {
-                $targetUser = User::create([
-                    'full_name' => $guru->nama,
-                    'username' => $guru->nip ?: 'guru_' . $guru->id,
-                    'email' => ($guru->nip ?: 'guru_' . $guru->id) . '@guru.local',
-                    'password_hash' => Hash::make('123456'),
-                    'role' => 'teacher',
-                    'school_id' => $guru->school_id,
-                ]);
-            }
-
-            if ($guru->user_id !== $targetUser->id) {
-                $guru->user_id = $targetUser->id;
-            }
-            if (empty($guru->foto)) {
-                $guru->foto = $savedPath;
-            }
-            $guru->save();
-
-            $existingFace = UserFaceData::where('guru_id', $guru->id)->first();
-            $oldUnpacked = $existingFace ? \App\Services\FaceRecognitionService::unpackEmbedding($existingFace->face_embedding) : ['v512' => null, 'v128' => null];
-
-            $vec128 = (is_array($embedding) && count($embedding) === 128)
-                ? \App\Services\FaceRecognitionService::blendCentroid($oldUnpacked['v128'], $embedding, 0.5)
-                : $oldUnpacked['v128'];
-
-            $vec512 = $oldUnpacked['v512'];
-            $fullPhotoPath = storage_path('app/public/' . $savedPath);
-            if (file_exists($fullPhotoPath)) {
-                $extract512 = \App\Services\FaceRecognitionService::extractVector($fullPhotoPath, $existingFace?->face_embedding, 0.5);
-                if (!empty($extract512['success']) && !empty($extract512['embedding'])) {
-                    $vec512 = $extract512['embedding'];
-                }
-            }
-
-            UserFaceData::updateOrCreate(
-                ['guru_id' => $guru->id],
-                [
-                    'user_id' => $targetUser->id,
-                    'face_embedding' => \App\Services\FaceRecognitionService::packEmbedding($vec512, $vec128),
-                    'sample_photo_path' => $savedPath,
-                    'is_verified' => true,
-                ]
-            );
-
-            $isMultiShot = !empty($oldUnpacked['v128']) || !empty($oldUnpacked['v512']);
-
-            return response()->json([
-                'ok' => true,
-                'message' => $isMultiShot
-                    ? "Sampel wajah tambahan {$guru->nama} berhasil digabungkan (Multi-Template Centroid)!"
-                    : "Face ID guru {$guru->nama} berhasil didaftarkan (128-d & 512-d)!",
-                'descriptor' => [
-                    'id' => $guru->id,
-                    'type' => 'guru',
-                    'nama' => $guru->nama,
-                    'nis' => $guru->nip ?? '-',
-                    'kelas' => 'Dewan Guru',
-                    'foto' => $guru->foto_url ?? null,
-                    'embedding' => $vec128,
-                    'has_512' => !empty($vec512),
-                ]
-            ]);
         }
     }
 

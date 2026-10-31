@@ -167,11 +167,20 @@ CTX_ID = int(os.getenv("FACE_CTX_ID", "-1"))  # -1 for CPU, 0 for CUDA GPU
 # Threshold Kemiripan Cosine Similarity (Tersinkronisasi 0.68)
 THRESHOLD = float(os.getenv("FACE_THRESHOLD", "0.68"))
 
-# Konfigurasi Quality Check: Blur, Pose, & Batas Ukuran Gambar
+# Konfigurasi Quality Check: Blur, Pose, & Batas Ukuran Gambar (Mode Absen Harian)
 MIN_BLUR_SCORE = float(os.getenv("FACE_MIN_BLUR", "45.0"))
 MAX_YAW = float(os.getenv("FACE_MAX_YAW", "28.0"))
 MAX_PITCH = float(os.getenv("FACE_MAX_PITCH", "25.0"))
 MAX_ROLL = float(os.getenv("FACE_MAX_ROLL", "30.0"))
+
+# Standar Ketat Khusus Pendaftaran Master Face ID (Enrollment)
+ENROLL_MIN_BLUR_SCORE = float(os.getenv("FACE_ENROLL_MIN_BLUR", "68.0"))
+ENROLL_MAX_YAW = float(os.getenv("FACE_ENROLL_MAX_YAW", "14.0"))
+ENROLL_MAX_PITCH = float(os.getenv("FACE_ENROLL_MAX_PITCH", "14.0"))
+ENROLL_MAX_ROLL = float(os.getenv("FACE_ENROLL_MAX_ROLL", "15.0"))
+ENROLL_MIN_DET_SCORE = float(os.getenv("FACE_ENROLL_MIN_DET_SCORE", "0.75"))
+ENROLL_MIN_FACE_SIZE = int(os.getenv("FACE_ENROLL_MIN_FACE_SIZE", "96"))
+ENROLL_MIN_EYE_DIST = float(os.getenv("FACE_ENROLL_MIN_EYE_DIST", "30.0"))
 DEFAULT_MAX_DIM = 800 if LOW_SPEC_MODE else 1280
 MAX_IMAGE_DIM = int(os.getenv("FACE_MAX_IMAGE_DIM", str(DEFAULT_MAX_DIM)))
 MAX_UPLOAD_BYTES = int(os.getenv("FACE_MAX_UPLOAD_MB", "8")) * 1024 * 1024
@@ -363,10 +372,11 @@ def detect_faces_robust(img: np.ndarray) -> tuple[list, np.ndarray, bool]:
     return faces, img, clahe_applied
 
 
-def check_face_blur(img: np.ndarray, bbox=None) -> tuple[float, bool]:
+def check_face_blur(img: np.ndarray, bbox=None, min_score: Optional[float] = None) -> tuple[float, bool]:
     """
     Menghitung skor ketajaman foto menggunakan Laplacian Variance pada ROI wajah yang dinormalisasi ukurannya.
     """
+    threshold = float(min_score) if min_score is not None else MIN_BLUR_SCORE
     try:
         if bbox is not None:
             h, w = img.shape[:2]
@@ -388,17 +398,27 @@ def check_face_blur(img: np.ndarray, bbox=None) -> tuple[float, bool]:
 
         gray_norm = cv2.resize(gray, (160, 160), interpolation=cv2.INTER_LINEAR)
         variance = float(cv2.Laplacian(gray_norm, cv2.CV_64F).var())
-        is_clear = variance >= MIN_BLUR_SCORE
+        is_clear = variance >= threshold
         return round(variance, 2), is_clear
     except Exception:
         return 999.0, True
 
 
-def check_face_pose(face) -> tuple[bool, str, dict]:
+def check_face_pose(
+    face,
+    max_yaw: Optional[float] = None,
+    max_pitch: Optional[float] = None,
+    max_roll: Optional[float] = None,
+    min_eye_dist: float = 10.0
+) -> tuple[bool, str, dict]:
     """
     Memeriksa orientasi wajah (yaw, pitch, roll).
     Mendukung perhitungan cepat berbasis 5 keypoints (tanpa perlu model 3D landmark 68 titik yang berat).
     """
+    limit_yaw = float(max_yaw) if max_yaw is not None else MAX_YAW
+    limit_pitch = float(max_pitch) if max_pitch is not None else MAX_PITCH
+    limit_roll = float(max_roll) if max_roll is not None else MAX_ROLL
+
     pose = getattr(face, 'pose', None)
     if pose is None and isinstance(face, dict):
         pose = face.get('pose')
@@ -416,16 +436,16 @@ def check_face_pose(face) -> tuple[bool, str, dict]:
                 "roll": round(roll, 2)
             }
 
-            if abs(yaw) > MAX_YAW:
+            if abs(yaw) > limit_yaw:
                 arah = "kanan" if yaw > 0 else "kiri"
-                return False, f"Wajah terlalu menoleh ke {arah}. Harap posisikan wajah lurus menghadap kamera.", pose_dict
+                return False, f"Wajah terlalu menoleh ke {arah} ({abs(yaw):.0f}°). Harap posisikan wajah lurus menghadap kamera.", pose_dict
 
-            if abs(pitch) > MAX_PITCH:
+            if abs(pitch) > limit_pitch:
                 arah = "atas" if pitch > 0 else "bawah"
-                return False, f"Wajah terlalu miring ke {arah}. Harap tatap kamera secara lurus.", pose_dict
+                return False, f"Wajah terlalu miring ke {arah} ({abs(pitch):.0f}°). Harap tatap kamera secara lurus.", pose_dict
 
-            if abs(roll) > MAX_ROLL:
-                return False, "Wajah terlalu miring menyamping. Harap tegakkan posisi kepala Anda.", pose_dict
+            if abs(roll) > limit_roll:
+                return False, f"Kepala terlalu miring menyamping ({abs(roll):.0f}°). Harap tegakkan posisi kepala Anda.", pose_dict
 
             return True, "", pose_dict
         except Exception:
@@ -444,6 +464,9 @@ def check_face_pose(face) -> tuple[bool, str, dict]:
             dy = float(right_eye[1] - left_eye[1])
             eye_dist = float(np.hypot(dx, dy))
 
+            if eye_dist < min_eye_dist:
+                return False, "Jarak wajah terlalu jauh dari kamera. Harap mendekat sedikit ke kamera.", pose_dict
+
             if eye_dist > 10.0:
                 roll_deg = float(np.degrees(np.arctan2(dy, dx)))
                 eye_mid_x = (left_eye[0] + right_eye[0]) / 2.0
@@ -459,19 +482,20 @@ def check_face_pose(face) -> tuple[bool, str, dict]:
                 pose_dict = {
                     "pitch": round(pitch_deg, 2),
                     "yaw": round(yaw_deg, 2),
-                    "roll": round(roll_deg, 2)
+                    "roll": round(roll_deg, 2),
+                    "eye_dist": round(eye_dist, 1)
                 }
 
-                if abs(yaw_deg) > MAX_YAW:
+                if abs(yaw_deg) > limit_yaw:
                     arah = "kanan" if yaw_deg > 0 else "kiri"
-                    return False, f"Wajah terlalu menoleh ke {arah}. Harap hadap lurus ke kamera.", pose_dict
+                    return False, f"Wajah terlalu menoleh ke {arah} ({abs(yaw_deg):.0f}°). Harap hadap lurus ke kamera.", pose_dict
 
-                if abs(pitch_deg) > MAX_PITCH:
+                if abs(pitch_deg) > limit_pitch:
                     arah = "atas" if pitch_deg > 0 else "bawah"
-                    return False, f"Wajah terlalu miring ke {arah}. Harap tatap kamera secara lurus.", pose_dict
+                    return False, f"Wajah terlalu miring ke {arah} ({abs(pitch_deg):.0f}°). Harap tatap kamera secara lurus.", pose_dict
 
-                if abs(roll_deg) > MAX_ROLL:
-                    return False, "Wajah terlalu miring menyamping. Harap tegakkan posisi kepala Anda.", pose_dict
+                if abs(roll_deg) > limit_roll:
+                    return False, f"Kepala terlalu miring menyamping ({abs(roll_deg):.0f}°). Harap tegakkan posisi kepala Anda.", pose_dict
         except Exception:
             pass
 
@@ -552,16 +576,82 @@ def _sync_extract_vector(raw_bytes: bytes, existing_embedding_json: Optional[str
             }
 
         target_face = faces[0]
+        x1, y1, x2, y2 = [float(v) for v in target_face.bbox]
+        face_w = x2 - x1
+        face_h = y2 - y1
+        face_area = max(1.0, face_w * face_h)
 
-        blur_score, is_clear = check_face_blur(proc_img, target_face.bbox)
+        # 1. Validasi Wajah Tunggal: Tolak jika ada wajah orang lain yang ikut masuk cukup besar di kamera
+        if len(faces) > 1:
+            second_face = faces[1]
+            sx1, sy1, sx2, sy2 = [float(v) for v in second_face.bbox]
+            second_area = max(0.0, (sx2 - sx1) * (sy2 - sy1))
+            if (second_area / face_area) >= 0.22:
+                return {
+                    "success": False,
+                    "message": "Terdeteksi lebih dari 1 wajah di kamera. Pastikan hanya wajah pendaftar yang berada di depan kamera."
+                }
+
+        # 2. Validasi Skor Deteksi Wajah (Tidak boleh tertutup masker / tangan / objek)
+        det_score = float(getattr(target_face, "det_score", 1.0))
+        if det_score < ENROLL_MIN_DET_SCORE:
+            return {
+                "success": False,
+                "message": f"Wajah kurang jelas atau tertutup objek (keyakinan deteksi: {round(det_score * 100)}%). Lepaskan masker/penutup wajah dan pastikan pencahayaan cukup."
+            }
+
+        # 3. Validasi Ukuran Minimal Wajah & Tidak Terpotong di Tepi Frame
+        img_h, img_w = img.shape[:2]
+        if face_w < ENROLL_MIN_FACE_SIZE or face_h < ENROLL_MIN_FACE_SIZE:
+            return {
+                "success": False,
+                "message": f"Wajah terlalu jauh/kecil ({int(face_w)}x{int(face_h)} px). Harap mendekat ke kamera saat mendaftarkan Face ID."
+            }
+
+        edge_margin_x = max(4.0, img_w * 0.02)
+        edge_margin_y = max(4.0, img_h * 0.02)
+        if x1 < edge_margin_x or y1 < edge_margin_y or x2 > (img_w - edge_margin_x) or y2 > (img_h - edge_margin_y):
+            return {
+                "success": False,
+                "message": "Posisi wajah terlalu mepet ke tepi layar/terpotong. Posisikan wajah tepat di tengah bingkai kamera."
+            }
+
+        # 4. Validasi Pencahayaan Asli Wajah (Tolak jika gelap gulita / siluet atau terlalu silau)
+        try:
+            rx1, ry1, rx2, ry2 = max(0, int(x1)), max(0, int(y1)), min(img_w, int(x2)), min(img_h, int(y2))
+            if (rx2 - rx1) >= 20 and (ry2 - ry1) >= 20:
+                raw_roi_gray = cv2.cvtColor(img[ry1:ry2, rx1:rx2], cv2.COLOR_BGR2GRAY)
+                mean_luma = float(np.mean(raw_roi_gray))
+                if mean_luma < 42.0:
+                    return {
+                        "success": False,
+                        "message": "Pencahayaan wajah terlalu gelap. Harap menghadap sumber cahaya yang cukup saat mendaftarkan Face ID."
+                    }
+                if mean_luma > 235.0:
+                    return {
+                        "success": False,
+                        "message": "Wajah terlalu silau (overexposed). Hindari sorotan lampu/matahari langsung yang berlebihan."
+                    }
+        except Exception:
+            pass
+
+        # 5. Validasi Ketajaman Ketat Khusus Enrollment (ENROLL_MIN_BLUR_SCORE = 68.0)
+        blur_score, is_clear = check_face_blur(proc_img, target_face.bbox, min_score=ENROLL_MIN_BLUR_SCORE)
         if not is_clear:
             return {
                 "success": False,
-                "message": f"Foto wajah terlalu buram/goyang (skor: {blur_score}). Harap ambil foto ulang dengan pencahayaan cukup dan kamera stabil.",
+                "message": f"Foto pendaftaran kurang tajam/goyang (skor: {blur_score}, minimal: {ENROLL_MIN_BLUR_SCORE:.0f}). Tahan posisi kepala tetap tenang dan pastikan fokus kamera bersih.",
                 "blur_score": blur_score
             }
 
-        is_pose_valid, pose_error, pose_info = check_face_pose(target_face)
+        # 6. Validasi Pose Ketat Khusus Enrollment (Wajib menghadap lurus: yaw <= 14°, pitch <= 14°, roll <= 15°)
+        is_pose_valid, pose_error, pose_info = check_face_pose(
+            target_face,
+            max_yaw=ENROLL_MAX_YAW,
+            max_pitch=ENROLL_MAX_PITCH,
+            max_roll=ENROLL_MAX_ROLL,
+            min_eye_dist=ENROLL_MIN_EYE_DIST
+        )
         if not is_pose_valid:
             return {
                 "success": False,
@@ -587,6 +677,7 @@ def _sync_extract_vector(raw_bytes: bytes, existing_embedding_json: Optional[str
             "success": True,
             "embedding": normed_vec.tolist(),
             "face_count": len(faces),
+            "det_score": round(det_score, 4),
             "blur_score": blur_score,
             "pose": pose_info,
             "clahe_enhanced": clahe_used,

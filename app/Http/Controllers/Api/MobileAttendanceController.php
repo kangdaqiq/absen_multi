@@ -817,10 +817,8 @@ class MobileAttendanceController extends Controller
             }
         }
 
+        // Tidak menyimpan file foto selfie absen ke disk (cukup gunakan untuk face matching saja agar hemat storage)
         $photoPath = null;
-        if ($request->hasFile('photo')) {
-            $photoPath = $request->file('photo')->store('absensi_photos', 'public');
-        }
 
         // Case 1: Guru / Admin / Wali Kelas / Waka
         $teacher = $user?->guru ?? Guru::where('user_id', $user?->id)
@@ -1230,10 +1228,8 @@ class MobileAttendanceController extends Controller
             }
         }
 
+        // Tidak menyimpan file foto selfie absen ke disk (cukup gunakan untuk face matching saja agar hemat storage)
         $photoPath = null;
-        if ($request->hasFile('photo')) {
-            $photoPath = $request->file('photo')->store('absensi_photos', 'public');
-        }
 
         // Case 1: Guru / Admin / Wali Kelas / Waka
         $teacher = $user?->guru ?? Guru::where('user_id', $user?->id)
@@ -2302,27 +2298,25 @@ class MobileAttendanceController extends Controller
             ], 422);
         }
 
-        // 1. Ekstraksi vektor wajah via Python Service
+        // 1. Ekstraksi vektor wajah 512-d via Python Service
         $extractResult = FaceRecognitionService::extractVector($request->file('photo'));
 
         if (!$extractResult['success'] || empty($extractResult['embedding'])) {
+            $statusCode = !empty($extractResult['engine_offline']) ? 503 : 400;
             return response()->json([
                 'success' => false,
                 'message' => $extractResult['message'] ?? 'Wajah tidak terdeteksi pada foto. Pastikan wajah terlihat jelas menghadap kamera.'
-            ], 400);
+            ], $statusCode);
         }
 
-        // 2. Simpan file foto di storage/app/public/faces/
-        $storedPath = $request->file('photo')->store('faces', 'public');
-
-        // 3. Simpan data embedding ke user_face_data
+        // 2. Simpan hanya data embedding 512-d ke user_face_data (tanpa simpan file foto master ke disk)
         $faceData = UserFaceData::updateOrCreate(
             ['user_id' => $user->id],
             [
                 'siswa_id' => $student?->id,
                 'guru_id' => $teacher?->id,
                 'face_embedding' => json_encode($extractResult['embedding']),
-                'sample_photo_path' => $storedPath,
+                'sample_photo_path' => null,
                 'is_verified' => true,
             ]
         );
@@ -2344,7 +2338,7 @@ class MobileAttendanceController extends Controller
             'message' => 'Registrasi wajah master berhasil disimpan.',
             'data' => [
                 'is_verified' => true,
-                'sample_photo_url' => asset('storage/' . $storedPath),
+                'sample_photo_url' => null,
                 'registered_at' => $faceData->updated_at?->format('Y-m-d H:i:s'),
             ]
         ]);
@@ -2996,7 +2990,7 @@ class MobileAttendanceController extends Controller
                         [
                             'siswa_id' => $siswa->id,
                             'face_embedding' => json_encode($extractResult['embedding']),
-                            'sample_photo_path' => $newPhotoPath,
+                            'sample_photo_path' => null,
                             'is_verified' => true,
                         ]
                     );
@@ -3189,7 +3183,7 @@ class MobileAttendanceController extends Controller
                             [
                                 'guru_id' => $guru->id,
                                 'face_embedding' => json_encode($extractResult['embedding']),
-                                'sample_photo_path' => $newPhotoPath,
+                                'sample_photo_path' => null,
                                 'is_verified' => true,
                             ]
                         );

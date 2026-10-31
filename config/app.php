@@ -138,7 +138,7 @@ return [
 
     'mode'                => env('APP_MODE', 'hosted'),
     'license_key'         => env('LICENSE_KEY', ''),
-    'license_server_url'  => env('LICENSE_SERVER_URL', ''),
+    'license_server_url'  => env('LICENSE_SERVER_URL', 'https://absen.jagattech.my.id'),
     'license_private_key' => env('LICENSE_PRIVATE_KEY', ''),
     'license_public_key'  => env('LICENSE_PUBLIC_KEY', ''),
     'client_name'         => env('CLIENT_NAME', ''),

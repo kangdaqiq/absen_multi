@@ -280,15 +280,24 @@ class LicenseService
             }
 
             // Server mengirimkan signed payload (format Ed25519 baru)
-            if (isset($data['payload']) && is_array($data['payload']) && isset($data['_signature'])) {
+            if (isset($data['payload']) && is_array($data['payload'])) {
                 $payload   = $data['payload'];
-                $signature = (string) $data['_signature'];
+                $signature = (string) ($data['_signature'] ?? '');
+
+                if (empty($signature)) {
+                    Log::error('[LicenseService] Server lisensi pusat merespons tanpa _signature (LICENSE_PRIVATE_KEY belum dipasang di .env server pusat).');
+                    return [
+                        'result'           => $this->failResult('Server lisensi pusat belum mengaktifkan LICENSE_PRIVATE_KEY (signature kosong).'),
+                        'signed_payload'   => null,
+                        'server_signature' => null,
+                    ];
+                }
 
                 // 1. Verifikasi Ed25519 Signature dengan PUBLIC_KEY
                 if (!self::verifyPayload($payload, $signature)) {
-                    Log::error('[LicenseService] Signature Ed25519 dari server lisensi TIDAK VALID! Kemungkinan percobaan spoofing LICENSE_SERVER_URL.');
+                    Log::error('[LicenseService] Signature Ed25519 dari server lisensi TIDAK VALID! Pastikan PUBLIC_KEY di client sama dengan pasangan LICENSE_PRIVATE_KEY di server pusat.');
                     return [
-                        'result'           => $this->failResult('Signature kriptografi server lisensi tidak valid.'),
+                        'result'           => $this->failResult('Signature kriptografi server lisensi tidak cocok dengan PUBLIC_KEY client.'),
                         'signed_payload'   => null,
                         'server_signature' => null,
                     ];
@@ -327,6 +336,15 @@ class LicenseService
             if (isset($data['valid']) && $data['valid'] === false) {
                 return [
                     'result'           => $this->failResult($data['message'] ?? 'Lisensi tidak valid.'),
+                    'signed_payload'   => null,
+                    'server_signature' => null,
+                ];
+            }
+
+            // Jika server pusat merespons valid=true tapi belum ada field 'payload' (berarti server pusat belum git pull kode Ed25519)
+            if (isset($data['valid']) && $data['valid'] === true) {
+                return [
+                    'result'           => $this->failResult('Server lisensi pusat (' . $serverUrl . ') belum diperbarui ke versi Ed25519.'),
                     'signed_payload'   => null,
                     'server_signature' => null,
                 ];

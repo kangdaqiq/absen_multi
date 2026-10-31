@@ -32,6 +32,11 @@ $excludes = [
     'tests',
     'release-client',
     'release_client',
+    'release-client.zip',
+    'jagat_super_app',
+    'face_engine/venv',
+    'face_engine/.venv',
+    'face_engine/__pycache__',
     'dist',
     '.env',
     '.env.backup',
@@ -199,16 +204,25 @@ if (class_exists('ZipArchive')) {
     addDirToZip($zip, $releaseDir, 'release-client');
     $zip->close();
 } else {
-    echo "      ℹ ZipArchive tidak aktif. Menggunakan tar/Compress-Archive...\n";
-    // Gunakan tar.exe bawaan Windows 10/11 (jauh lebih cepat dari Compress-Archive)
-    $cmd = 'tar -a -c -f "' . $zipFile . '" -C "' . $srcDir . '" release-client 2>&1';
-    shell_exec($cmd);
-    if (!file_exists($zipFile)) {
-        $psCmd = 'powershell -Command "Compress-Archive -Path release-client -DestinationPath release-client.zip -Force"';
-        shell_exec($psCmd);
+    echo "      ℹ ZipArchive tidak aktif. Menggunakan zip / python3 / tar...\n";
+    if (PHP_OS_FAMILY !== 'Windows') {
+        $cmd = 'cd "' . $srcDir . '" && zip -rq "' . $zipFile . '" release-client 2>&1';
+        shell_exec($cmd);
+        if (!file_exists($zipFile)) {
+            $pyCmd = 'python3 -m zipfile -c "' . $zipFile . '" "' . $releaseDir . '" 2>&1';
+            shell_exec($pyCmd);
+        }
+    } else {
+        // Gunakan tar.exe bawaan Windows 10/11 (jauh lebih cepat dari Compress-Archive)
+        $cmd = 'tar -a -c -f "' . $zipFile . '" -C "' . $srcDir . '" release-client 2>&1';
+        shell_exec($cmd);
+        if (!file_exists($zipFile)) {
+            $psCmd = 'powershell -Command "Compress-Archive -Path release-client -DestinationPath release-client.zip -Force"';
+            shell_exec($psCmd);
+        }
     }
     if (!file_exists($zipFile)) {
-        die("❌ ERROR: Gagal membuat ZIP file.\n");
+        die("❌ ERROR: Gagal membuat ZIP file. Pastikan ekstensi php-zip atau paket zip terinstall.\n");
     }
 }
 

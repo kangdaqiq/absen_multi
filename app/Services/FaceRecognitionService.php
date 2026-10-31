@@ -207,6 +207,7 @@ class FaceRecognitionService
             Log::error("Face Engine connection error: " . $e->getMessage());
             return [
                 'success' => false,
+                'engine_offline' => true,
                 'message' => 'Tidak dapat terhubung ke Face Recognition Engine (Python Service). Pastikan microservice aktif di ' . self::getBaseUrl()
             ];
         }
@@ -329,6 +330,7 @@ class FaceRecognitionService
         $activeThreshold = $threshold ?? self::getThreshold();
         $payloadCandidates = [];
         $recordMap = [];
+        $engineOfflineDetected = false;
 
         foreach ($candidates as $cand) {
             if (!($cand instanceof UserFaceData)) {
@@ -338,11 +340,13 @@ class FaceRecognitionService
             $vec512 = $unpacked['v512'];
 
             // Lazy upgrade if a kiosk-registered record only has 128-d but has sample photo on disk
-            if (empty($vec512) && !empty($cand->sample_photo_path)) {
+            if (empty($vec512) && !empty($cand->sample_photo_path) && !$engineOfflineDetected) {
                 $sampleFullPath = storage_path('app/public/' . ltrim($cand->sample_photo_path, '/'));
                 if (file_exists($sampleFullPath)) {
                     $lazyExtract = self::extractVector($sampleFullPath);
-                    if (!empty($lazyExtract['success']) && !empty($lazyExtract['embedding'])) {
+                    if (!empty($lazyExtract['engine_offline'])) {
+                        $engineOfflineDetected = true;
+                    } elseif (!empty($lazyExtract['success']) && !empty($lazyExtract['embedding'])) {
                         $vec512 = $lazyExtract['embedding'];
                         $cand->face_embedding = self::packEmbedding($vec512, $unpacked['v128']);
                         $cand->save();
@@ -378,10 +382,12 @@ class FaceRecognitionService
                 'success' => false,
                 'is_match' => false,
                 'no_512_candidates' => true,
-                'engine_offline' => false,
+                'engine_offline' => $engineOfflineDetected,
                 'matched_record' => null,
                 'similarity' => 0.0,
-                'message' => 'Belum ada kandidat wajah 512-d terdaftar di sekolah ini.'
+                'message' => $engineOfflineDetected
+                    ? 'Layanan Python Face Engine (:8000) belum aktif.'
+                    : 'Belum ada kandidat wajah 512-d terdaftar di sekolah ini.'
             ];
         }
 

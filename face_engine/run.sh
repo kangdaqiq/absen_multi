@@ -10,7 +10,7 @@ fi
 # Optimasi allocator glibc Linux agar tidak menahan banyak memory arena (sangat krusial untuk STB 1GB/2GB RAM)
 export MALLOC_ARENA_MAX="${MALLOC_ARENA_MAX:-2}"
 export FACE_PROFILE="${FACE_PROFILE:-auto}"
-export FACE_MODEL_NAME="${FACE_MODEL_NAME:-buffalo_l}"
+export FACE_MODEL_NAME="${FACE_MODEL_NAME:-buffalo_sc}"
 
 # Run uvicorn on port 8000 (single worker process + internal bounded async threadpool)
 exec uvicorn main:app --host 127.0.0.1 --port 8000 --workers 1 --limit-concurrency 16 --timeout-keep-alive 5

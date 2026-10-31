@@ -36,6 +36,7 @@ $excludes = [
     'jagat_super_app',
     'face_engine/venv',
     'face_engine/.venv',
+    'face_engine/.insightface',
     'face_engine/__pycache__',
     'dist',
     '.env',

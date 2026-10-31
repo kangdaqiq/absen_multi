@@ -158,7 +158,8 @@ app.add_middleware(
 )
 
 # Konfigurasi Model & Resolusi Deteksi sesuai Profil Perangkat
-MODEL_NAME = os.getenv("FACE_MODEL_NAME", "buffalo_l")
+DEFAULT_MODEL_NAME = "buffalo_sc" if LOW_SPEC_MODE else "buffalo_l"
+MODEL_NAME = os.getenv("FACE_MODEL_NAME", DEFAULT_MODEL_NAME)
 DEFAULT_DET_SIZE = 480 if LOW_SPEC_MODE else 640
 DET_SIZE = int(os.getenv("FACE_DET_SIZE", str(DEFAULT_DET_SIZE)))
 CTX_ID = int(os.getenv("FACE_CTX_ID", "-1"))  # -1 for CPU, 0 for CUDA GPU
@@ -194,17 +195,30 @@ matrix_cache_lock = threading.Lock()
 # Hanya muat modul 'detection' dan 'recognition' (hemat ~180MB RAM karena tidak memuat 3D/2D landmarks & genderage)
 ALLOWED_MODULES = ["detection", "recognition"]
 
+# Tentukan direktori penyimpanan model InsightFace yang pasti writable (hindari PermissionError /var/www/.insightface saat jalan sebagai www-data)
+_default_model_root = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".insightface")
+try:
+    os.makedirs(_default_model_root, exist_ok=True)
+    if not os.access(_default_model_root, os.W_OK):
+        _default_model_root = "/tmp/.insightface"
+        os.makedirs(_default_model_root, exist_ok=True)
+except Exception:
+    _default_model_root = "/tmp/.insightface"
+    os.makedirs(_default_model_root, exist_ok=True)
+
+MODEL_ROOT = os.getenv("FACE_MODEL_ROOT", _default_model_root)
+
 logger.info(
     f"Hardware Profile: arch={CPU_ARCH}, cores={CPU_CORES}, ram={TOTAL_RAM_MB}MB | "
-    f"LOW_SPEC_MODE={LOW_SPEC_MODE}, ort_threads={ORT_THREADS}, det_size={DET_SIZE}, max_dim={MAX_IMAGE_DIM}"
+    f"LOW_SPEC_MODE={LOW_SPEC_MODE}, ort_threads={ORT_THREADS}, det_size={DET_SIZE}, max_dim={MAX_IMAGE_DIM}, root={MODEL_ROOT}"
 )
-print(f"Loading InsightFace model '{MODEL_NAME}' (modules={ALLOWED_MODULES}) on ctx_id={CTX_ID}...")
+print(f"Loading InsightFace model '{MODEL_NAME}' (modules={ALLOWED_MODULES}) at '{MODEL_ROOT}' on ctx_id={CTX_ID}...")
 try:
-    face_app = FaceAnalysis(name=MODEL_NAME, allowed_modules=ALLOWED_MODULES)
+    face_app = FaceAnalysis(name=MODEL_NAME, root=MODEL_ROOT, allowed_modules=ALLOWED_MODULES)
     face_app.prepare(ctx_id=CTX_ID, det_size=(DET_SIZE, DET_SIZE))
 except Exception as e:
-    print(f"Warning: Failed to load '{MODEL_NAME}' ({e}). Falling back to 'buffalo_s'...")
-    face_app = FaceAnalysis(name="buffalo_s", allowed_modules=ALLOWED_MODULES)
+    print(f"Warning: Failed to load '{MODEL_NAME}' ({e}). Falling back to 'buffalo_sc'...")
+    face_app = FaceAnalysis(name="buffalo_sc", root=MODEL_ROOT, allowed_modules=ALLOWED_MODULES)
     face_app.prepare(ctx_id=-1, det_size=(DET_SIZE, DET_SIZE))
 
 release_unused_memory()

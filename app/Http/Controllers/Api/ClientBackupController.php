@@ -73,8 +73,9 @@ class ClientBackupController extends Controller
                 $schoolSlug = 'client_' . $license->id;
             }
 
-            // Ekstensi file
-            $extension = $uploadedFile->getClientOriginalExtension() ?: 'sql';
+            // Ekstensi file (hanya izinkan sql, gz, atau zip untuk keamanan)
+            $rawExt = strtolower((string) $uploadedFile->getClientOriginalExtension());
+            $extension = in_array($rawExt, ['sql', 'gz', 'zip'], true) ? $rawExt : 'sql';
 
             // Format nama backup: nama_sekolah_tgl (contoh: smpn_1_jakarta_15-10-2026_163000.sql)
             $tgl = now()->format('d-m-Y_His');

@@ -4,11 +4,11 @@
  * ============================================================
  * Build Release Client Script
  * ============================================================
- * Membuat folder release-client/ siap kirim ke client.
+ * Membuat folder release-client/ dan release-client.zip siap kirim ke client.
  *
  * Cara pakai:
  *   php build_release.php [versi]
- *   php build_release.php v2.4.0
+ *   php build_release.php v2.5.0
  *
  * Output:
  *   release-client/        ← folder siap kirim
@@ -16,21 +16,26 @@
  * ============================================================
  */
 
-$version    = $argv[1] ?? 'latest';
+$version    = $argv[1] ?? 'v2.5.0';
 $srcDir     = __DIR__;
 $releaseDir = $srcDir . '/release-client';
 $zipFile    = $srcDir . '/release-client.zip';
 
-// ── File/folder yang TIDAK disertakan dalam release ──────────────────────────
+// ── Path relatif dari root project yang TIDAK disertakan dalam release ──────
 $excludes = [
     '.git',
     '.github',
+    '.vscode',
+    '.idea',
     'node_modules',
+    'vendor',
     'tests',
     'release-client',
     'release_client',
     'dist',
     '.env',
+    '.env.backup',
+    '.env.production',
     'build_release.php',
     'phpunit.xml',
     'vite.config.js',
@@ -44,21 +49,31 @@ $excludes = [
     'legacy_src',
     'esp8266_code',
     'docs',
-    // Storage dirs yang tidak perlu
+    'public/storage',
+    'public/hot',
+    // Storage dirs & files yang tidak perlu dibawa ke client
     'storage/logs',
     'storage/framework/cache',
     'storage/framework/sessions',
     'storage/framework/views',
+    'storage/app/public',
+    'storage/app/private',
+    'storage/app/backups',
     'storage/app/license_cache.json',
+    'storage/app/license_integrity.json',
+    // Command internal developer/server lisensi (tidak boleh ada di client)
+    'app/Console/Commands/RehashLicenseCommand.php',
+    'app/Console/Commands/GenerateLicenseKeypairCommand.php',
 ];
 
-// ── Storage items yang WAJIB ada tapi bisa dikosongkan ───────────────────────
+// ── Storage items yang WAJIB ada tapi dikosongkan ───────────────────────────
 $emptyDirs = [
     'storage/logs',
     'storage/framework/cache/data',
     'storage/framework/sessions',
     'storage/framework/views',
     'storage/app/public',
+    'storage/app/private',
     'bootstrap/cache',
 ];
 
@@ -75,18 +90,8 @@ if (!is_dir($srcDir . '/public/build')) {
 }
 echo "      ✓ public/build ada.\n\n";
 
-// ── Step 2: Generate integrity hash ──────────────────────────────────────────
-echo "[2/5] Generating integrity hash (license:rehash)...\n";
-$output = shell_exec('php ' . $srcDir . '/artisan license:rehash 2>&1');
-echo $output . "\n";
-
-if (!file_exists($srcDir . '/storage/app/license_integrity.json')) {
-    die("❌ ERROR: license_integrity.json tidak terbuat. Pastikan artisan bisa dijalankan.\n\n");
-}
-echo "      ✓ Integrity hash siap.\n\n";
-
-// ── Step 3: Bersihkan dan buat folder release-client ─────────────────────────
-echo "[3/5] Menyiapkan folder release-client...\n";
+// ── Step 2: Bersihkan dan buat folder release-client ─────────────────────────
+echo "[2/5] Menyiapkan folder release-client...\n";
 if (is_dir($releaseDir)) {
     echo "      Menghapus folder lama...\n";
     deleteDir($releaseDir);
@@ -94,8 +99,31 @@ if (is_dir($releaseDir)) {
 mkdir($releaseDir, 0755, true);
 
 // Copy semua file kecuali yang di-exclude
-copyDir($srcDir, $releaseDir, $excludes);
-echo "      ✓ File disalin.\n\n";
+copyDir($srcDir, $releaseDir, $srcDir, $excludes);
+echo "      ✓ File disalin (termasuk resources/views, app, config, routes, public/build).\n\n";
+
+// Set IS_CLIENT_BUILD = true pada release-client/app/Services/LicenseService.php
+$clientLicenseService = $releaseDir . '/app/Services/LicenseService.php';
+if (file_exists($clientLicenseService)) {
+    $code = file_get_contents($clientLicenseService);
+    $code = str_replace(
+        'private const IS_CLIENT_BUILD = false;',
+        'private const IS_CLIENT_BUILD = true;',
+        $code
+    );
+    file_put_contents($clientLicenseService, $code);
+    echo "      ✓ Flag IS_CLIENT_BUILD=true diaktifkan pada paket client.\n\n";
+}
+
+// ── Step 3: Generate integrity hash + Ed25519 signature untuk release-client ─
+echo "[3/5] Generating integrity hash + Ed25519 signature (license:rehash)...\n";
+$output = shell_exec('php "' . $srcDir . '/artisan" license:rehash --path="' . $releaseDir . '" 2>&1');
+echo $output . "\n";
+
+if (!file_exists($releaseDir . '/storage/app/license_integrity.json')) {
+    die("❌ ERROR: license_integrity.json tidak terbuat di release-client. Pastikan LICENSE_PRIVATE_KEY sudah ada (php artisan license:keygen).\n\n");
+}
+echo "      ✓ Integrity hash + Ed25519 signature siap.\n\n";
 
 // Buat empty dirs yang dibutuhkan Laravel
 echo "[3b] Membuat direktori kosong yang dibutuhkan...\n";
@@ -104,7 +132,6 @@ foreach ($emptyDirs as $dir) {
     if (!is_dir($fullPath)) {
         mkdir($fullPath, 0755, true);
     }
-    // Tambahkan .gitkeep
     file_put_contents($fullPath . '/.gitkeep', '');
 }
 echo "      ✓ Direktori kosong dibuat.\n\n";
@@ -122,11 +149,9 @@ CLIENT_NAME=                           # ← nama client/sekolah (opsional, otom
 
 # ── License ───────────────────────────────────────────────────────────────────
 LICENSE_KEY=XXXX-XXXX-XXXX-XXXX        # ← isi dengan license key dari provider
-LICENSE_SERVER_URL=https://absen.kangdaqiq.com
+LICENSE_SERVER_URL=https://absen.jagattech.my.id
 
 # ── Cloudflare R2 (Auto Backup Database) ──────────────────────────────────────
-# Backup otomatis akan diunggah ke Cloudflare R2 di folder Client/
-# Nama file: client-name_tgl-bckup (disimpan selama 2 hari)
 CLOUDFLARE_R2_ACCESS_KEY_ID=
 CLOUDFLARE_R2_SECRET_ACCESS_KEY=
 CLOUDFLARE_R2_BUCKET=
@@ -137,7 +162,7 @@ CLOUDFLARE_R2_USE_PATH_STYLE_ENDPOINT=true
 DB_CONNECTION=mysql
 DB_HOST=127.0.0.1
 DB_PORT=3306
-DB_DATABASE=absen_sell
+DB_DATABASE=absen_jagat
 DB_USERNAME=absen_user
 DB_PASSWORD=                            # ← isi password database
 
@@ -148,9 +173,9 @@ CACHE_STORE=database
 QUEUE_CONNECTION=database
 
 # ── WhatsApp API (GOWA) ───────────────────────────────────────────────────────
-WA_API_BASE_URL=http://localhost:3000
-WA_API_USER=admin
-WA_API_PASS=changeme
+GOWA_API_BASE_URL=http://localhost:3000
+GOWA_API_USER=admin
+GOWA_API_PASS=changeme
 
 # ── Mail (opsional) ───────────────────────────────────────────────────────────
 MAIL_MAILER=log
@@ -174,35 +199,41 @@ if (class_exists('ZipArchive')) {
     addDirToZip($zip, $releaseDir, 'release-client');
     $zip->close();
 } else {
-    echo "      ℹ ZipArchive tidak aktif. Menggunakan PowerShell Compress-Archive...\n";
-    $cmd = 'powershell -Command "Compress-Archive -Path release-client -DestinationPath release-client.zip -Force"';
+    echo "      ℹ ZipArchive tidak aktif. Menggunakan tar/Compress-Archive...\n";
+    // Gunakan tar.exe bawaan Windows 10/11 (jauh lebih cepat dari Compress-Archive)
+    $cmd = 'tar -a -c -f "' . $zipFile . '" -C "' . $srcDir . '" release-client 2>&1';
     shell_exec($cmd);
     if (!file_exists($zipFile)) {
-        die("❌ ERROR: Gagal membuat ZIP file via PowerShell.\n");
+        $psCmd = 'powershell -Command "Compress-Archive -Path release-client -DestinationPath release-client.zip -Force"';
+        shell_exec($psCmd);
+    }
+    if (!file_exists($zipFile)) {
+        die("❌ ERROR: Gagal membuat ZIP file.\n");
     }
 }
 
-$sizeMb = round(filesize($zipFile) / 1024 / 1024, 1);
+$sizeMb = round(filesize($zipFile) / 1024 / 1024, 2);
 echo "      ✓ ZIP dibuat: release-client.zip ({$sizeMb} MB)\n\n";
 
-// ── Selesai ───────────────────────────────────────────────────────────────────
 echo "╔══════════════════════════════════════════════════════╗\n";
 echo "║  ✅ Build selesai!                                   ║\n";
 echo "╚══════════════════════════════════════════════════════╝\n\n";
-echo "Output:\n";
-echo "  📁 release-client/          ← folder siap kirim\n";
-echo "  📦 release-client.zip       ← ZIP siap kirim\n\n";
-echo "Checklist sebelum kirim ke client:\n";
-echo "  [ ] .env.example sudah ada dan APP_KEY kosong\n";
-echo "  [ ] LICENSE_KEY sudah dibuat di panel Super Admin\n";
-echo "  [ ] INSTALL.md sudah ada di dalam release-client/\n";
-echo "  [ ] storage/app/license_integrity.json ada di dalam release-client/\n\n";
-echo "Verifikasi integrity:\n";
-echo "  php " . $srcDir . "/artisan license:rehash\n\n";
 
 // ── Helper Functions ──────────────────────────────────────────────────────────
 
-function copyDir(string $src, string $dst, array $excludes): void
+function isExcluded(string $relPath, array $excludes): bool
+{
+    $relPath = str_replace('\\', '/', $relPath);
+    foreach ($excludes as $ex) {
+        $ex = str_replace('\\', '/', trim($ex, '/'));
+        if ($relPath === $ex || str_starts_with($relPath, $ex . '/')) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function copyDir(string $src, string $dst, string $rootSrc, array $excludes): void
 {
     if (!is_dir($src)) return;
 
@@ -210,27 +241,23 @@ function copyDir(string $src, string $dst, array $excludes): void
     foreach ($items as $item) {
         if ($item === '.' || $item === '..') continue;
 
-        // Cek exclude (nama file/folder)
-        foreach ($excludes as $ex) {
-            $exBase = basename($ex);
-            if ($item === $exBase || $item === $ex) {
-                continue 2;
-            }
-        }
-
         $srcPath = $src . '/' . $item;
         $dstPath = $dst . '/' . $item;
+        $relPath = ltrim(str_replace('\\', '/', substr($srcPath, strlen($rootSrc))), '/');
+
+        if (isExcluded($relPath, $excludes)) {
+            continue;
+        }
+
+        if (is_link($srcPath)) {
+            continue;
+        }
 
         if (is_dir($srcPath)) {
-            // Cek apakah path relatif dari src dir di-exclude
-            $relPath = ltrim(str_replace(__DIR__, '', $srcPath), '/\\');
-            foreach ($excludes as $ex) {
-                if ($relPath === $ex || str_starts_with($relPath, $ex . '/') || str_starts_with($relPath, $ex . '\\')) {
-                    continue 2;
-                }
+            if (!is_dir($dstPath)) {
+                mkdir($dstPath, 0755, true);
             }
-            mkdir($dstPath, 0755, true);
-            copyDir($srcPath, $dstPath, $excludes);
+            copyDir($srcPath, $dstPath, $rootSrc, $excludes);
         } else {
             copy($srcPath, $dstPath);
         }
@@ -244,13 +271,16 @@ function deleteDir(string $dir): void
     foreach ($items as $item) {
         if ($item === '.' || $item === '..') continue;
         $path = $dir . '/' . $item;
-        if (is_dir($path)) {
+        if (is_link($path)) {
+            @unlink($path);
+            @rmdir($path);
+        } elseif (is_dir($path)) {
             deleteDir($path);
         } else {
-            unlink($path);
+            @unlink($path);
         }
     }
-    rmdir($dir);
+    @rmdir($dir);
 }
 
 function addDirToZip(ZipArchive $zip, string $dir, string $zipPath): void

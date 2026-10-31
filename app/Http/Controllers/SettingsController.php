@@ -71,10 +71,11 @@ class SettingsController extends Controller
         }
 
         // Handle License Key for self_hosted mode
-        if (config('app.mode') === 'self_hosted' && (auth()->user()->isSuperAdmin() || auth()->user()->isAdmin()) && $request->has('license_key')) {
-            $key = trim($request->input('license_key'));
+        $licenseService = app(\App\Services\LicenseService::class);
+        if ($licenseService->isSelfHosted() && (auth()->user()->isSuperAdmin() || auth()->user()->isAdmin()) && $request->has('license_key')) {
+            $key = preg_replace('/[^A-Za-z0-9\-]/', '', trim((string) $request->input('license_key')));
             $path = base_path('.env');
-            if (file_exists($path)) {
+            if ($key && file_exists($path)) {
                 $env = file_get_contents($path);
                 if (str_contains($env, 'LICENSE_KEY=')) {
                     $env = preg_replace('/^LICENSE_KEY=.*$/m', 'LICENSE_KEY=' . $key, $env);
@@ -84,7 +85,7 @@ class SettingsController extends Controller
                 file_put_contents($path, $env);
             }
             \Illuminate\Support\Facades\Artisan::call('config:clear');
-            app(\App\Services\LicenseService::class)->clearCache();
+            $licenseService->clearCache();
         }
 
         // Handle kop surat upload

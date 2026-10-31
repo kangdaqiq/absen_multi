@@ -13,8 +13,9 @@ use App\Http\Controllers\DeviceController;
 // ── License Pages (no auth, no license check — must be first) ────────────
 Route::get('/license/invalid', fn () => view('license.invalid'))->name('license.invalid');
 Route::post('/license/update-key', function (\Illuminate\Http\Request $request) {
-    if (config('app.mode') !== 'self_hosted') abort(403);
-    $key = trim($request->input('license_key'));
+    $licenseService = app(\App\Services\LicenseService::class);
+    if (!$licenseService->isSelfHosted()) abort(403);
+    $key = preg_replace('/[^A-Za-z0-9\-]/', '', trim((string) $request->input('license_key')));
     if ($key) {
         $path = base_path('.env');
         if (file_exists($path)) {
@@ -27,7 +28,7 @@ Route::post('/license/update-key', function (\Illuminate\Http\Request $request) 
             file_put_contents($path, $env);
         }
         \Illuminate\Support\Facades\Artisan::call('config:clear');
-        app(\App\Services\LicenseService::class)->clearCache();
+        $licenseService->clearCache();
     }
     return redirect('/');
 })->name('license.update-key');

@@ -16,7 +16,7 @@ class ValidateLicenseCommand extends Command
 
     public function handle(): int
     {
-        if (config('app.mode', 'hosted') !== 'self_hosted') {
+        if (!$this->licenseService->isSelfHosted()) {
             $this->info('Mode: hosted — license validation tidak diperlukan.');
             return 0;
         }

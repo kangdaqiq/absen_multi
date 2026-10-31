@@ -1239,8 +1239,8 @@ class MobileJadwalPelajaranController extends Controller
         $schoolForUpload = $school;
 
         try {
-            $r2Service = app(\App\Services\R2StorageService::class);
-            $docItem = $r2Service->uploadFile($file, $schoolForUpload, 'kbm', null, $user->id);
+            $storageService = app(\App\Services\KbmStorageService::class);
+            $docItem = $storageService->uploadFile($file, $schoolForUpload, 'kbm', null, $user->id);
 
             // Jika jadwal_pelajaran_id & tanggal disertakan, langsung lampirkan ke jurnal KBM
             if ($request->filled('jadwal_pelajaran_id') && $request->filled('tanggal')) {
@@ -1416,7 +1416,7 @@ class MobileJadwalPelajaranController extends Controller
             ], 422);
         }
 
-        $r2Service = app(\App\Services\R2StorageService::class);
+        $storageService = app(\App\Services\KbmStorageService::class);
         $schoolId = $user->school_id;
 
         // 1. Jika menghapus via file_id
@@ -1437,7 +1437,7 @@ class MobileJadwalPelajaranController extends Controller
                 ], 403);
             }
 
-            $deleted = $r2Service->deleteFileByPath($storageFile->path);
+            $deleted = $storageService->deleteFileByPath($storageFile->path);
             return response()->json([
                 'success' => $deleted,
                 'message' => $deleted ? 'File berhasil dihapus dari storage.' : 'Gagal menghapus file dari storage disk.',
@@ -1456,7 +1456,7 @@ class MobileJadwalPelajaranController extends Controller
                 ], 403);
             }
 
-            $deleted = $r2Service->deleteFileByPath($cleanPath);
+            $deleted = $storageService->deleteFileByPath($cleanPath);
             return response()->json([
                 'success' => $deleted,
                 'message' => $deleted ? 'File berhasil dihapus dari storage.' : 'Gagal menghapus file dari storage disk.',
@@ -1477,7 +1477,7 @@ class MobileJadwalPelajaranController extends Controller
                 }
             }
 
-            $deleted = $r2Service->deleteFileByUrl($fileUrl);
+            $deleted = $storageService->deleteFileByUrl($fileUrl);
             return response()->json([
                 'success' => $deleted,
                 'message' => $deleted ? 'File berhasil dihapus dari storage.' : 'Gagal menghapus file dari storage disk.',

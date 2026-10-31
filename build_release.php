@@ -157,6 +157,13 @@ CLIENT_NAME=                           # ← nama client/sekolah (opsional, otom
 LICENSE_KEY=XXXX-XXXX-XXXX-XXXX        # ← isi dengan license key dari provider
 LICENSE_SERVER_URL=https://absen.jagattech.my.id
 
+# ── Cloud Storage & Dokumentasi KBM ───────────────────────────────────────────
+# Opsi KBM_STORAGE_DRIVER:
+#   'internal'    -> Simpan ke disk lokal server / harddisk eksternal (storage/app/public/kbm)
+#   'cloud_relay' -> Upload ke Cloudflare R2 lewat Server Utama (aman untuk mini server eMMC 8GB)
+KBM_STORAGE_DRIVER=internal
+KBM_STORAGE_LOCAL_PATH=                 # Opsional: path folder eksternal (misal: /mnt/usb/kbm)
+
 # ── Cloudflare R2 (Auto Backup Database) ──────────────────────────────────────
 CLOUDFLARE_R2_ACCESS_KEY_ID=
 CLOUDFLARE_R2_SECRET_ACCESS_KEY=

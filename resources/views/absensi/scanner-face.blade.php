@@ -421,11 +421,11 @@
                         <span x-text="statusText">Memuat Model AI...</span>
                     </span>
 
-                    <!-- Face ID Count Pill -->
+                    <!-- Face ID Count Pill (Dihitung langsung dari Server Database) -->
                     <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold border transition"
-                        :class="descriptors.length > 0 ? 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-900/20 dark:text-indigo-300 dark:border-indigo-800/40' : 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-900/20 dark:text-rose-300 dark:border-rose-800/40'">
-                        <i class="fas fa-users text-[10px]"></i>
-                        <span x-text="descriptors.length + ' Face ID Siap'">Memuat Data...</span>
+                        :class="faceCount > 0 ? 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-900/20 dark:text-indigo-300 dark:border-indigo-800/40' : 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-900/20 dark:text-rose-300 dark:border-rose-800/40'">
+                        <i class="fas fa-server text-[10px]"></i>
+                        <span x-text="faceCount + ' Face ID Siap'">{{ (int) $registeredFaceCount }} Face ID Siap</span>
                     </span>
                 </div>
                 <p class="text-xs text-gray-500 dark:text-gray-400">
@@ -531,7 +531,7 @@
                     <!-- Camera Loading Overlay -->
                     <div x-show="!cameraReady || modelLoading" class="absolute inset-0 bg-gray-950 flex flex-col items-center justify-center p-6 text-center text-white z-10">
                         <div class="w-12 h-12 rounded-full border-4 border-purple-500/20 border-t-purple-500 animate-spin mb-3"></div>
-                        <p class="font-bold text-sm" x-text="statusText">Menyiapkan Kamera & Model AI...</p>
+                        <p class="font-bold text-sm" x-text="statusText">Menyiapkan Kamera Scanner...</p>
                         <button type="button" @click="startCamera()" x-show="!cameraReady && !modelLoading"
                             class="mt-3 px-4 py-1.5 rounded-xl bg-purple-600 text-xs font-semibold hover:bg-purple-700 transition">
                             Izinkan Akses Kamera
@@ -878,7 +878,7 @@ function faceScannerApp() {
     return {
         // App State
         currentTime: '--:--:--',
-        statusText: 'Memuat Model AI...',
+        statusText: 'Menyiapkan Kamera...',
         detectionMessage: 'Menyiapkan kamera...',
         modelLoading: true,
         cameraReady: false,
@@ -888,6 +888,9 @@ function faceScannerApp() {
         scanMode: 'auto', // 'auto', 'masuk', 'pulang'
         soundEnabled: true,
         isFullscreen: false,
+
+        // Server Face Count (dari database server, 0 payload download ke browser)
+        faceCount: {{ (int) $registeredFaceCount }},
 
         // Head Pose Alignment & Warning State
         hasLandmarkNet: false,
@@ -899,10 +902,9 @@ function faceScannerApp() {
         availableCameras: [],
         selectedCameraId: '',
 
-        // Data & Embeddings
-        descriptors: [], // Master face embeddings list
-        server512Count: 0, // Count of 512-d vectors on server
-        allStudents: [], // For enrollment selection
+        // Data Pendaftaran (Lazy-load hanya saat modal 'Daftarkan Wajah' dibuka)
+        allStudents: [],
+        isLoadingStudents: false,
         searchQuery: '',
         enrollSearch: '',
         showEnrollModal: false,
@@ -933,7 +935,7 @@ function faceScannerApp() {
         recentScans: {},
         holdMessageUntil: 0,
         lastScanError: false,
-        debugInfo: 'Kiosk Siap & Memuat Data...',
+        debugInfo: 'Kiosk Siap & Matching Server Aktif',
         audioCtx: null,
 
         async init() {
@@ -948,10 +950,7 @@ function faceScannerApp() {
                 return;
             }
 
-            // 1. Load Face Descriptors from Server
-            await this.loadDescriptors();
-
-            // 2. Initialize Models & Camera
+            // Inisialisasi kamera & detektor pose lokal tanpa download vektor wajah
             await this.initFaceApi();
         },
 
@@ -979,35 +978,8 @@ function faceScannerApp() {
             );
         },
 
-        async loadDescriptors() {
-            try {
-                const res = await fetch('{{ route('absensi.face-descriptors', [], false) }}', { 
-                    headers: { 'Accept': 'application/json' },
-                    cache: 'no-store' 
-                });
-                if (!res.ok) {
-                    console.error('Failed to load descriptors HTTP', res.status);
-                    this.statusText = 'Gagal memuat Face ID (HTTP ' + res.status + ')';
-                    return;
-                }
-                const data = await res.json();
-                if (data.ok) {
-                    this.descriptors = data.descriptors || [];
-                    this.server512Count = data.server_512_count || 0;
-                    this.allStudents = data.students || [];
-                    console.log('Loaded Face Descriptors:', this.descriptors.length, '| 512-d Server:', this.server512Count);
-                    if (this.descriptors.length === 0 && this.server512Count === 0) {
-                        this.statusText = '0 Face ID terdaftar';
-                    }
-                }
-            } catch (err) {
-                console.error('Failed to load descriptors:', err);
-                this.statusText = 'Gagal koneksi Face ID: ' + (err.message || 'Error');
-            }
-        },
-
         async initFaceApi() {
-            this.statusText = 'Memuat Detektor Wajah & Landmark Pose...';
+            this.statusText = 'Menyiapkan Kamera...';
             try {
                 // Memuat tinyFaceDetector & faceLandmark68TinyNet (~350 KB) untuk estimasi Head Pose (Yaw/Pitch/Roll)
                 const modelUrl = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/model/';
@@ -1023,12 +995,12 @@ function faceScannerApp() {
                 }
 
                 this.modelLoading = false;
-                this.statusText = 'Detektor Siap, Membuka Kamera...';
+                this.statusText = 'Kamera Aktif & Siap Scan';
 
                 await this.initCamera();
             } catch (err) {
                 console.error('Model load failed:', err);
-                this.statusText = 'Gagal memuat detektor wajah: ' + err.message;
+                this.statusText = 'Gagal memuat kamera: ' + err.message;
             }
         },
 
@@ -1336,7 +1308,7 @@ function faceScannerApp() {
         // PYTHON 512-D INSIGHTFACE + CLAHE + NUMPY MATRIX (100% SERVER-SIDE)
         async matchAndAttend(faceBox = null) {
             try {
-                if (this.descriptors.length === 0 && this.server512Count === 0) {
+                if (this.faceCount === 0) {
                     this.lastScanError = true;
                     this.detectionMessage = 'Belum ada Face ID terdaftar di sistem';
                     this.holdMessageUntil = Date.now() + 3000;
@@ -1478,11 +1450,29 @@ function faceScannerApp() {
             }
         },
 
-        // Quick In-Kiosk Face Enrollment
-        openEnrollModal() {
+        // Quick In-Kiosk Face Enrollment (Lazy-load daftar siswa hanya saat modal dibuka)
+        async openEnrollModal() {
             this.showEnrollModal = true;
             this.enrollSearch = '';
             this.selectedEnrollStudent = null;
+
+            if (this.allStudents.length === 0) {
+                this.isLoadingStudents = true;
+                try {
+                    const res = await fetch('{{ route('absensi.face-descriptors', [], false) }}', {
+                        headers: { 'Accept': 'application/json' },
+                        cache: 'no-store'
+                    });
+                    const data = await res.json();
+                    if (data.ok) {
+                        this.allStudents = data.students || [];
+                    }
+                } catch (err) {
+                    console.error('Failed to load students for enrollment:', err);
+                } finally {
+                    this.isLoadingStudents = false;
+                }
+            }
         },
 
         async executeEnrollment() {
@@ -1562,15 +1552,7 @@ function faceScannerApp() {
                 const res = await response.json();
                 if (response.ok && res.ok) {
                     this.playTone('ok');
-                    const existingIdx = this.descriptors.findIndex(
-                        d => d.id === res.descriptor.id && (d.type || 'siswa') === (res.descriptor.type || 'siswa')
-                    );
-                    if (existingIdx >= 0) {
-                        this.descriptors[existingIdx] = res.descriptor;
-                    } else {
-                        this.descriptors.push(res.descriptor);
-                    }
-                    this.server512Count = Math.max(1, this.server512Count);
+                    this.faceCount++;
                     const stu = this.allStudents.find(s => s.id === this.selectedEnrollStudent.id);
                     if (stu) stu.has_face = true;
                     alert(res.message);

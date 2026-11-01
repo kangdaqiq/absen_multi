@@ -289,6 +289,10 @@ function copyDir(string $src, string $dst, string $rootSrc, array $excludes): vo
 function deleteDir(string $dir): void
 {
     if (!is_dir($dir)) return;
+    if (PHP_OS_FAMILY === 'Windows') {
+        exec('cmd /c "rmdir /s /q ' . escapeshellarg($dir) . '"');
+        if (!is_dir($dir)) return;
+    }
     $items = scandir($dir);
     foreach ($items as $item) {
         if ($item === '.' || $item === '..') continue;

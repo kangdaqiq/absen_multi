@@ -258,7 +258,7 @@ class FaceRecognitionService
                 // Adaptive Multi-Template Centroid Update (max once every 12 hours when match confidence >= 82%)
                 if ($isMatch && $similarity >= 0.82 && $faceRecord && !empty($data['updated_embedding']) && is_array($data['updated_embedding'])) {
                     if (!$faceRecord->updated_at || $faceRecord->updated_at->diffInHours(now()) >= 12) {
-                        $faceRecord->face_embedding = self::packEmbedding($data['updated_embedding'], $unpacked['v128']);
+                        $faceRecord->face_embedding = self::packEmbedding($data['updated_embedding'], $unpacked['v128'] ?? null);
                         $faceRecord->save();
                     }
                 }
@@ -337,6 +337,7 @@ class FaceRecognitionService
             $recordMap[$cand->id] = [
                 'record' => $cand,
                 'v512' => $vec512,
+                'v128' => $unpacked['v128'] ?? null,
             ];
         }
 
@@ -391,7 +392,7 @@ class FaceRecognitionService
                         if (!$matchedRecord->updated_at || $matchedRecord->updated_at->diffInHours(now()) >= 12) {
                             $matchedRecord->face_embedding = self::packEmbedding(
                                 $data['updated_embedding'],
-                                $recordMap[$matchedFaceId]['v128']
+                                $recordMap[$matchedFaceId]['v128'] ?? null
                             );
                             $matchedRecord->save();
                         }

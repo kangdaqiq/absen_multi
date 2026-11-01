@@ -1108,6 +1108,8 @@ class MobileJadwalPelajaranController extends Controller
                 'guru_id'             => $j->guru_id,
                 'guru_nama'           => $j->guru?->nama ?? '-',
                 'nama_guru'           => $j->guru?->nama ?? '-',
+                'guru_foto'           => $j->guru?->foto_url ?? null,
+                'guru_foto_url'       => $j->guru?->foto_url ?? null,
                 'guru'                => [
                     'id'       => $j->guru_id,
                     'nama'     => $j->guru?->nama ?? '-',
@@ -1305,6 +1307,20 @@ class MobileJadwalPelajaranController extends Controller
                 $query->whereBetween('tanggal', [$sFormatted, $eFormatted]);
             } catch (\Exception $e) {
                 $query->whereBetween('tanggal', [$startDate, $endDate]);
+            }
+        } elseif ($startDate) {
+            try {
+                $sFormatted = Carbon::parse($startDate)->format('Y-m-d');
+                $query->where('tanggal', '>=', $sFormatted);
+            } catch (\Exception $e) {
+                $query->where('tanggal', '>=', $startDate);
+            }
+        } elseif ($endDate) {
+            try {
+                $eFormatted = Carbon::parse($endDate)->format('Y-m-d');
+                $query->where('tanggal', '<=', $eFormatted);
+            } catch (\Exception $e) {
+                $query->where('tanggal', '<=', $endDate);
             }
         }
 

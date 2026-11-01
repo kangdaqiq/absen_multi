@@ -31,6 +31,7 @@ Route::post('/license/storage/upload', [App\Http\Controllers\Api\ClientStorageCo
 Route::post('/license/storage/delete', [App\Http\Controllers\Api\ClientStorageController::class, 'delete']);
 Route::post('/license/storage/presigned-url', [App\Http\Controllers\Api\ClientStorageController::class, 'presignedUrl']);
 Route::post('/license/storage/confirm-upload', [App\Http\Controllers\Api\ClientStorageController::class, 'confirmUpload']);
+Route::post('/license/storage/sync', [App\Http\Controllers\Api\ClientStorageController::class, 'sync']);
 
 // Mobile Storage Direct PUT upload (single-use presigned token authenticated, for internal storage driver)
 Route::put('/mobile/storage/direct-put/{token}', [App\Http\Controllers\Api\MobileJadwalPelajaranController::class, 'directPutUpload']);

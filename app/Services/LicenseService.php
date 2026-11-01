@@ -280,11 +280,22 @@ class LicenseService
         try {
             $nonce = bin2hex(random_bytes(16));
 
+            $storageUsedBytes = 0;
+            $storageFilesCount = 0;
+            try {
+                if (\Illuminate\Support\Facades\Schema::hasTable('storage_files')) {
+                    $storageUsedBytes = (int) \App\Models\StorageFile::sum('size_bytes');
+                    $storageFilesCount = (int) \App\Models\StorageFile::count();
+                }
+            } catch (\Throwable $e) {}
+
             $response = Http::connectTimeout(3)->timeout(5)->post("{$serverUrl}/api/license/validate", [
-                'license_key' => $licenseKey,
-                'hostname'    => gethostname() ?: 'localhost',
-                'app_url'     => config('app.url', 'http://localhost'),
-                'nonce'       => $nonce,
+                'license_key'         => $licenseKey,
+                'hostname'            => gethostname() ?: 'localhost',
+                'app_url'             => config('app.url', 'http://localhost'),
+                'nonce'               => $nonce,
+                'storage_used_bytes'  => $storageUsedBytes,
+                'storage_files_count' => $storageFilesCount,
             ]);
 
             if ($response->status() >= 500) {

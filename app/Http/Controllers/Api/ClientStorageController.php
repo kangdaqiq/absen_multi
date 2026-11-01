@@ -75,12 +75,19 @@ class ClientStorageController extends Controller
                 school: $school,
                 category: $category,
                 customFolder: null,
-                uploaderId: null
+                uploaderId: null,
+                licenseId: $license->id
             );
 
             if (!empty($docItem['id'])) {
                 \App\Models\StorageFile::where('id', $docItem['id'])->update(['license_id' => $license->id]);
             }
+
+            // Update metrik pemakaian kuota pada record lisensi
+            $newSize = (int) ($docItem['size'] ?? 0);
+            $license->increment('storage_used_bytes', $newSize);
+            $license->increment('storage_files_count', 1);
+            $license->update(['last_ping_at' => now()]);
 
             Log::info("[ClientStorageRelay] Berhasil relay upload file untuk lisensi '{$license->client_name}': {$docItem['path']}");
 
@@ -143,7 +150,28 @@ class ClientStorageController extends Controller
 
         try {
             $r2Service = app(R2StorageService::class);
+
+            // Cari berkas untuk mencatat pengurangan ukuran
+            $existing = null;
+            if ($path) {
+                $existing = \App\Models\StorageFile::where('path', $path)
+                    ->orWhere('path', ltrim($path, '/'))
+                    ->first();
+            }
+            if (!$existing && $url) {
+                $existing = \App\Models\StorageFile::where('url', $url)->first();
+            }
+
             $deleted = $path ? $r2Service->deleteFileByPath($path) : $r2Service->deleteFileByUrl($url);
+
+            if ($deleted && $existing) {
+                $fileBytes = (int) ($existing->size_bytes ?? 0);
+                $license->update([
+                    'storage_used_bytes'  => max(0, (int) $license->storage_used_bytes - $fileBytes),
+                    'storage_files_count' => max(0, (int) $license->storage_files_count - 1),
+                    'last_ping_at'        => now(),
+                ]);
+            }
 
             return response()->json([
                 'success' => $deleted,
@@ -198,7 +226,8 @@ class ClientStorageController extends Controller
                 mimeType: $request->mime_type,
                 sizeBytes: (int) ($request->size ?? 0),
                 category: $request->category ?? 'kbm',
-                uploaderId: null
+                uploaderId: null,
+                licenseId: $license->id
             );
 
             if (!empty($res['file_id'])) {
@@ -261,6 +290,14 @@ class ClientStorageController extends Controller
             $r2Service = app(R2StorageService::class);
             $file = $r2Service->confirmUpload($fileId, $size);
 
+            if ($file) {
+                $file->update(['license_id' => $license->id]);
+                $fileSize = (int) ($file->size_bytes ?? 0);
+                $license->increment('storage_used_bytes', $fileSize);
+                $license->increment('storage_files_count', 1);
+                $license->update(['last_ping_at' => now()]);
+            }
+
             return response()->json([
                 'success' => true,
                 'message' => 'Upload berhasil dikonfirmasi.',
@@ -273,6 +310,51 @@ class ClientStorageController extends Controller
                 'message' => 'Gagal konfirmasi upload: ' . $e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * Endpoint sinkronisasi metrik penyimpanan dari client self-hosted
+     * POST /api/license/storage/sync
+     */
+    public function sync(Request $request): JsonResponse
+    {
+        $licenseKey = trim($request->header('X-License-Key') ?: $request->input('license_key', ''));
+
+        if (empty($licenseKey)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'license_key wajib disertakan pada parameter atau header X-License-Key.',
+            ], 400);
+        }
+
+        $license = License::where('license_key', $licenseKey)->first();
+        if (!$license) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Lisensi tidak ditemukan.',
+            ], 404);
+        }
+
+        $usedBytes  = max(0, (int) $request->input('used_bytes', 0));
+        $filesCount = max(0, (int) $request->input('files_count', 0));
+
+        $license->update([
+            'storage_used_bytes'  => $usedBytes,
+            'storage_files_count' => $filesCount,
+            'last_ping_at'        => now(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Metrik kuota penyimpanan lisensi berhasil disinkronkan.',
+            'data'    => [
+                'license_key'         => $license->license_key,
+                'client_name'         => $license->client_name,
+                'storage_quota_mb'    => (int) ($license->storage_quota_mb ?? 1000),
+                'storage_used_bytes'  => $license->storage_used_bytes,
+                'storage_files_count' => $license->storage_files_count,
+            ],
+        ]);
     }
 }
 

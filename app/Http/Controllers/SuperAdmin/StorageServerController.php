@@ -81,8 +81,12 @@ class StorageServerController extends Controller
                 if (!$agg && $license->school_id) {
                     $agg = $schoolFilesAgg->get($license->school_id);
                 }
-                $usedBytes = (int) ($agg->total_bytes ?? 0);
-                $totalFiles = (int) ($agg->total_files ?? 0);
+                $r2Bytes = (int) ($agg->total_bytes ?? 0);
+                $r2Files = (int) ($agg->total_files ?? 0);
+
+                // Gunakan nilai terbesar antara file R2 terdata di server pusat dan statistik pemakaian dari client
+                $usedBytes = max($r2Bytes, (int) ($license->storage_used_bytes ?? 0));
+                $totalFiles = max($r2Files, (int) ($license->storage_files_count ?? 0));
 
                 $quotaMb = (int) ($license->storage_quota_mb ?? 1000);
                 $quotaBytes = ($quotaMb > 0) ? ($quotaMb * 1024 * 1024) : 0;

@@ -76,8 +76,15 @@ class LicenseValidateController extends Controller
             }
         }
 
-        // Update last ping
-        $license->update(['last_ping_at' => now()]);
+        // Update last ping & statistik kuota storage jika dikirimkan oleh client self-hosted
+        $pingData = ['last_ping_at' => now()];
+        if ($request->has('storage_used_bytes')) {
+            $pingData['storage_used_bytes'] = max(0, (int) $request->input('storage_used_bytes'));
+        }
+        if ($request->has('storage_files_count')) {
+            $pingData['storage_files_count'] = max(0, (int) $request->input('storage_files_count'));
+        }
+        $license->update($pingData);
 
         // Check expiry
         if ($license->isExpired()) {

@@ -63,7 +63,86 @@ class R2StorageService
      */
     public function getLicenseUsedBytes(int $licenseId): int
     {
-        return (int) StorageFile::where('license_id', $licenseId)->sum('size_bytes');
+        $r2Bytes = (int) StorageFile::where('license_id', $licenseId)->sum('size_bytes');
+        $license = License::find($licenseId);
+        if ($license && !empty($license->storage_used_bytes) && $license->storage_used_bytes > $r2Bytes) {
+            return (int) $license->storage_used_bytes;
+        }
+        return $r2Bytes;
+    }
+
+    /**
+     * Informasi lengkap kuota & pemakaian per lisensi (client self-hosted)
+     */
+    public function getLicenseStorageStats(License|int $license): array
+    {
+        if (is_int($license)) {
+            $license = License::find($license);
+        }
+
+        if (!$license) {
+            return [
+                'used_bytes'   => 0,
+                'quota_bytes'  => 0,
+                'quota_mb'     => 0,
+                'used_human'   => '0 B',
+                'quota_human'  => '0 MB',
+                'free_human'   => '0 B',
+                'percent'      => 0,
+                'total_files'  => 0,
+                'is_full'      => false,
+                'is_warning'   => false,
+                'is_critical'  => false,
+            ];
+        }
+
+        $r2Bytes = (int) StorageFile::where('license_id', $license->id)->sum('size_bytes');
+        $r2Files = StorageFile::where('license_id', $license->id)->count();
+
+        $usedBytes = max($r2Bytes, (int) ($license->storage_used_bytes ?? 0));
+        $totalFiles = max($r2Files, (int) ($license->storage_files_count ?? 0));
+
+        $quotaMb = (int) ($license->storage_quota_mb ?? 1000);
+        $quotaBytes = ($quotaMb > 0) ? ($quotaMb * 1024 * 1024) : 0;
+
+        $percent = ($quotaBytes > 0) ? min(100, round(($usedBytes / $quotaBytes) * 100, 1)) : 0;
+        $freeBytes = ($quotaBytes > 0) ? max(0, $quotaBytes - $usedBytes) : PHP_INT_MAX;
+
+        return [
+            'used_bytes'   => $usedBytes,
+            'quota_bytes'  => $quotaBytes,
+            'quota_mb'     => $quotaMb,
+            'used_human'   => self::formatBytes($usedBytes),
+            'quota_human'  => ($quotaBytes > 0) ? self::formatBytes($quotaBytes) : 'Unlimited',
+            'free_human'   => ($quotaBytes > 0) ? self::formatBytes($freeBytes) : 'Unlimited',
+            'percent'      => $percent,
+            'total_files'  => $totalFiles,
+            'is_full'      => ($quotaBytes > 0 && $usedBytes >= $quotaBytes),
+            'is_critical'  => $percent >= 90,
+            'is_warning'   => $percent >= 70 && $percent < 90,
+        ];
+    }
+
+    /**
+     * Cek apakah lisensi memiliki sisa kuota yang cukup untuk file baru
+     */
+    public function checkLicenseQuota(License|int $license, int $incomingBytes): bool
+    {
+        if (is_int($license)) {
+            $license = License::find($license);
+        }
+
+        if (!$license) {
+            return false;
+        }
+
+        $quotaMb = (int) ($license->storage_quota_mb ?? 1000);
+        if ($quotaMb <= 0) {
+            return true;
+        }
+
+        $usedBytes = $this->getLicenseUsedBytes($license->id);
+        return ($usedBytes + $incomingBytes) <= ($quotaMb * 1024 * 1024);
     }
 
     /**
@@ -154,7 +233,8 @@ class R2StorageService
         School|int|null $school = null,
         string $category = 'kbm',
         ?string $customFolder = null,
-        ?int $uploaderId = null
+        ?int $uploaderId = null,
+        ?int $licenseId = null
     ): array {
         $schoolModel = is_int($school) ? School::find($school) : $school;
         $schoolId = $schoolModel?->id;
@@ -177,8 +257,17 @@ class R2StorageService
             $realPath = $file;
         }
 
-        // 1. Validasi kuota jika sekolah memiliki batasan kuota
-        if ($schoolModel && !$this->checkSchoolQuota($schoolModel, $size)) {
+        // 1. Validasi kuota jika sekolah atau lisensi memiliki batasan kuota
+        if ($licenseId && !$this->checkLicenseQuota($licenseId, $size)) {
+            $license = License::find($licenseId);
+            $stats = $this->getLicenseStorageStats($license);
+            throw new StorageQuotaExceededException(
+                "Kapasitas cloud storage lisensi '{$license->client_name}' telah penuh ({$stats['used_human']} dari {$stats['quota_human']}). Silakan hubungi Super Admin untuk menambah kuota.",
+                $stats['used_bytes'],
+                $stats['quota_bytes'],
+                $size
+            );
+        } elseif ($schoolModel && !$this->checkSchoolQuota($schoolModel, $size)) {
             $stats = $this->getSchoolStorageStats($schoolModel);
             throw new StorageQuotaExceededException(
                 "Kapasitas penyimpanan sekolah '{$schoolModel->name}' telah penuh ({$stats['used_human']} dari {$stats['quota_human']}). Silakan hubungi Super Admin untuk menambah kuota.",
@@ -190,11 +279,11 @@ class R2StorageService
 
         // 2. Tentukan struktur path di bucket R2
         $folderPrefix = $customFolder ?: match ($category) {
-            'kbm'        => 'kbm/' . ($schoolId ? "sch_{$schoolId}" : 'general') . '/' . date('Y/m'),
-            'face'       => 'faces/' . ($schoolId ? "sch_{$schoolId}" : 'general'),
-            'siswa'      => 'siswa/' . ($schoolId ? "sch_{$schoolId}" : 'general'),
-            'guru'       => 'guru/' . ($schoolId ? "sch_{$schoolId}" : 'general'),
-            'attendance' => 'attendance/' . ($schoolId ? "sch_{$schoolId}" : 'general') . '/' . date('Y/m'),
+            'kbm'        => 'kbm/' . ($schoolId ? "sch_{$schoolId}" : ($licenseId ? "lic_{$licenseId}" : 'general')) . '/' . date('Y/m'),
+            'face'       => 'faces/' . ($schoolId ? "sch_{$schoolId}" : ($licenseId ? "lic_{$licenseId}" : 'general')),
+            'siswa'      => 'siswa/' . ($schoolId ? "sch_{$schoolId}" : ($licenseId ? "lic_{$licenseId}" : 'general')),
+            'guru'       => 'guru/' . ($schoolId ? "sch_{$schoolId}" : ($licenseId ? "lic_{$licenseId}" : 'general')),
+            'attendance' => 'attendance/' . ($schoolId ? "sch_{$schoolId}" : ($licenseId ? "lic_{$licenseId}" : 'general')) . '/' . date('Y/m'),
             'logo'       => 'schools/logos',
             default      => 'uploads/' . date('Y/m'),
         };
@@ -223,6 +312,7 @@ class R2StorageService
         // 5. Simpan catatan ke tabel storage_files
         $storageFile = StorageFile::create([
             'school_id'     => $schoolId,
+            'license_id'    => $licenseId,
             'disk'          => $this->disk,
             'path'          => $cloudPath,
             'url'           => $publicUrl,
@@ -271,13 +361,23 @@ class R2StorageService
         int $sizeBytes = 0,
         string $category = 'kbm',
         ?string $customFolder = null,
-        ?int $uploaderId = null
+        ?int $uploaderId = null,
+        ?int $licenseId = null
     ): array {
         $schoolModel = is_int($school) ? School::find($school) : $school;
         $schoolId = $schoolModel?->id;
 
         // 1. Validasi kuota jika ada estimasi ukuran berkas
-        if ($schoolModel && $sizeBytes > 0 && !$this->checkSchoolQuota($schoolModel, $sizeBytes)) {
+        if ($licenseId && $sizeBytes > 0 && !$this->checkLicenseQuota($licenseId, $sizeBytes)) {
+            $license = License::find($licenseId);
+            $stats = $this->getLicenseStorageStats($license);
+            throw new StorageQuotaExceededException(
+                "Kapasitas cloud storage lisensi '{$license->client_name}' telah penuh ({$stats['used_human']} dari {$stats['quota_human']}). Silakan hubungi Super Admin untuk menambah kuota.",
+                $stats['used_bytes'],
+                $stats['quota_bytes'],
+                $sizeBytes
+            );
+        } elseif ($schoolModel && $sizeBytes > 0 && !$this->checkSchoolQuota($schoolModel, $sizeBytes)) {
             $stats = $this->getSchoolStorageStats($schoolModel);
             throw new StorageQuotaExceededException(
                 "Kapasitas penyimpanan sekolah '{$schoolModel->name}' telah penuh ({$stats['used_human']} dari {$stats['quota_human']}). Silakan hubungi Super Admin untuk menambah kuota.",
@@ -290,11 +390,11 @@ class R2StorageService
         // 2. Tentukan path unik di Cloudflare R2
         $extension = strtolower(pathinfo($originalName, PATHINFO_EXTENSION) ?: 'bin');
         $folderPrefix = $customFolder ?: match ($category) {
-            'kbm'        => 'kbm/' . ($schoolId ? "sch_{$schoolId}" : 'general') . '/' . date('Y/m'),
-            'face'       => 'faces/' . ($schoolId ? "sch_{$schoolId}" : 'general'),
-            'siswa'      => 'siswa/' . ($schoolId ? "sch_{$schoolId}" : 'general'),
-            'guru'       => 'guru/' . ($schoolId ? "sch_{$schoolId}" : 'general'),
-            'attendance' => 'attendance/' . ($schoolId ? "sch_{$schoolId}" : 'general') . '/' . date('Y/m'),
+            'kbm'        => 'kbm/' . ($schoolId ? "sch_{$schoolId}" : ($licenseId ? "lic_{$licenseId}" : 'general')) . '/' . date('Y/m'),
+            'face'       => 'faces/' . ($schoolId ? "sch_{$schoolId}" : ($licenseId ? "lic_{$licenseId}" : 'general')),
+            'siswa'      => 'siswa/' . ($schoolId ? "sch_{$schoolId}" : ($licenseId ? "lic_{$licenseId}" : 'general')),
+            'guru'       => 'guru/' . ($schoolId ? "sch_{$schoolId}" : ($licenseId ? "lic_{$licenseId}" : 'general')),
+            'attendance' => 'attendance/' . ($schoolId ? "sch_{$schoolId}" : ($licenseId ? "lic_{$licenseId}" : 'general')) . '/' . date('Y/m'),
             'logo'       => 'schools/logos',
             default      => 'uploads/' . date('Y/m'),
         };
@@ -316,6 +416,7 @@ class R2StorageService
         $publicUrl = $this->baseUrl . '/' . ltrim($cloudPath, '/');
         $storageFile = StorageFile::create([
             'school_id'     => $schoolId,
+            'license_id'    => $licenseId,
             'disk'          => $this->disk,
             'path'          => $cloudPath,
             'url'           => $publicUrl,

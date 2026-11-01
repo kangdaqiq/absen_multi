@@ -202,6 +202,10 @@ class KbmStorageService
         ]);
 
         $data['id'] = $storageFile->id;
+
+        // Sinkronkan pemakaian storage ke server lisensi
+        self::syncStorageMetricsToServer();
+
         return $data;
     }
 
@@ -286,6 +290,8 @@ class KbmStorageService
             if ($url) {
                 StorageFile::where('url', $url)->delete();
             }
+
+            self::syncStorageMetricsToServer();
 
             return $res->successful() && !empty($res->json('success'));
         } catch (\Throwable $e) {
@@ -531,7 +537,40 @@ class KbmStorageService
             }
         }
 
+        self::syncStorageMetricsToServer();
+
         return $file;
+    }
+
+    /**
+     * Sinkronisasi total pemakaian penyimpanan lokal ke server lisensi pusat
+     */
+    public static function syncStorageMetricsToServer(): void
+    {
+        try {
+            $licenseServerUrl = rtrim(env('LICENSE_SERVER_URL', 'https://absen.kangdaqiq.com'), '/');
+            $licenseKey = trim(env('LICENSE_KEY', ''));
+
+            if (empty($licenseKey) || empty($licenseServerUrl)) {
+                return;
+            }
+
+            $usedBytes = 0;
+            $filesCount = 0;
+            if (\Illuminate\Support\Facades\Schema::hasTable('storage_files')) {
+                $usedBytes = (int) StorageFile::sum('size_bytes');
+                $filesCount = (int) StorageFile::count();
+            }
+
+            Http::timeout(5)->withHeaders([
+                'X-License-Key' => $licenseKey,
+            ])->post("{$licenseServerUrl}/api/license/storage/sync", [
+                'used_bytes'  => $usedBytes,
+                'files_count' => $filesCount,
+            ]);
+        } catch (\Throwable $e) {
+            Log::debug("[KbmStorageService] Sinkronisasi kuota storage ke server lisensi dilewati: " . $e->getMessage());
+        }
     }
 }
 

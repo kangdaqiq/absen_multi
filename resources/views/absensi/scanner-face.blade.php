@@ -573,7 +573,7 @@
             <div class="tips-card-box">
                 <div class="tips-card-title">
                     <i class="fas fa-lightbulb"></i>
-                    <span>Tips Absensi:
+                    <span>Tips Absensi:</span>
                 </div>
                 <div class="tips-items-list">
                     <div class="tips-item-row">
@@ -823,7 +823,7 @@
                         
                         <div class="border border-gray-200 dark:border-gray-800 rounded-xl divide-y divide-gray-100 dark:divide-gray-800 overflow-y-auto" style="max-height: 280px;">
                             <template x-for="s in candidateStudents" :key="s.id">
-                                <div @click="selectedEnrollStudent = s"
+                                <div @click="selectedEnrollStudent = s; clearEnrollAlert()"
                                     :class="selectedEnrollStudent && selectedEnrollStudent.id === s.id ? 'font-bold' : 'hover:bg-gray-50 dark:hover:bg-gray-800'"
                                     :style="selectedEnrollStudent && selectedEnrollStudent.id === s.id ? 'background-color: #eaedff;' : ''"
                                     class="p-2.5 cursor-pointer flex items-center justify-between transition">
@@ -868,6 +868,42 @@
                                     <p class="text-[10px] text-gray-500 dark:text-gray-400">Hapus template lama & daftarkan ulang dari awal</p>
                                 </div>
                             </label>
+                        </div>
+                    </div>
+
+                    <!-- Inline Alert Banner di dalam Form (Bebas dari pop-up alert browser standar) -->
+                    <div x-show="enrollAlert" x-transition class="rounded-xl p-3 text-xs border"
+                        :class="{
+                            'bg-rose-50 border-rose-300 text-rose-900 dark:bg-rose-950/40 dark:border-rose-800 dark:text-rose-200': enrollAlert && enrollAlert.type === 'error',
+                            'bg-amber-50 border-amber-300 text-amber-900 dark:bg-amber-950/40 dark:border-amber-800 dark:text-amber-200': enrollAlert && (enrollAlert.type === 'warning' || enrollAlert.type === 'confirm_replace'),
+                            'bg-emerald-50 border-emerald-300 text-emerald-900 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-200': enrollAlert && enrollAlert.type === 'success'
+                        }">
+                        <div class="flex items-start gap-2.5">
+                            <i class="fas text-sm mt-0.5 shrink-0"
+                                :class="{
+                                    'fa-times-circle text-rose-600 dark:text-rose-400': enrollAlert && enrollAlert.type === 'error',
+                                    'fa-exclamation-triangle text-amber-600 dark:text-amber-400': enrollAlert && (enrollAlert.type === 'warning' || enrollAlert.type === 'confirm_replace'),
+                                    'fa-check-circle text-emerald-600 dark:text-emerald-400': enrollAlert && enrollAlert.type === 'success'
+                                }"></i>
+                            <div class="flex-1 min-w-0">
+                                <p class="font-bold text-[11px]" x-text="enrollAlert ? enrollAlert.message : ''"></p>
+                                <p x-show="enrollAlert && enrollAlert.details" class="text-[10px] mt-0.5 opacity-90 leading-relaxed" x-text="enrollAlert ? enrollAlert.details : ''"></p>
+
+                                <!-- Tombol Aksi Langsung jika mode perlu diganti ke Ganti Total -->
+                                <div x-show="enrollAlert && enrollAlert.type === 'confirm_replace'" class="mt-2.5 flex items-center gap-2">
+                                    <button type="button" @click="enrollMode = 'replace'; executeEnrollment()"
+                                        class="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold text-[10px] shadow-sm transition">
+                                        <i class="fas fa-sync-alt mr-1"></i> Ganti Total Face ID Sekarang
+                                    </button>
+                                    <button type="button" @click="clearEnrollAlert()"
+                                        class="px-2.5 py-1.5 rounded-lg bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 font-semibold text-[10px] transition">
+                                        Batal
+                                    </button>
+                                </div>
+                            </div>
+                            <button type="button" @click="clearEnrollAlert()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xs ml-1">
+                                <i class="fas fa-times"></i>
+                            </button>
                         </div>
                     </div>
 
@@ -929,7 +965,16 @@ function faceScannerApp() {
         showEnrollModal: false,
         selectedEnrollStudent: null,
         enrollMode: 'append', // 'append' (tambah variasi) atau 'replace' (ganti total)
+        enrollAlert: null,    // { type: 'error'|'warning'|'success'|'confirm_replace', message: '', details: '' }
         cooldownMs: 25000,    // Cooldown 25 detik untuk orang yang sama agar tidak spam scan/duplikat baris
+
+        setEnrollAlert(type, message, details = '') {
+            this.enrollAlert = { type, message, details };
+        },
+
+        clearEnrollAlert() {
+            this.enrollAlert = null;
+        },
 
         // Realtime stats & attendees
         stats: {
@@ -1359,22 +1404,6 @@ function faceScannerApp() {
 
                     const res = await response.json().catch(() => ({}));
                     if (response.ok && res.ok) {
-                        const personKey = (res.person && res.person.key) || (res.data && res.data.nis ? ('siswa:' + res.data.nis) : null);
-                        const now = Date.now();
-
-                        // Cegah scan berulang orang yang sama dalam periode cooldown
-                        if (personKey && this.recentScans[personKey] && (now - this.recentScans[personKey]) < this.cooldownMs) {
-                            this.lastScanError = false;
-                            this.detectionMessage = `${res.data?.nama || 'Pengguna'} sudah tercatat barusan. Silakan lanjut.`;
-                            this.holdMessageUntil = now + 3200;
-                            this.updateSpotlightOnly(res, res.data || {});
-                            return;
-                        }
-
-                        if (personKey) {
-                            this.recentScans[personKey] = now;
-                        }
-
                         this.lastScanError = false;
                         const simScore = res.data && res.data.similarity ? (parseFloat(res.data.similarity) / 100) : 0.88;
                         this.handleScanResponse(res, res.data || {}, simScore);
@@ -1482,22 +1511,25 @@ function faceScannerApp() {
                 const timeDisplay = (res.type === 'absen_pulang' ? (data.jam_pulang || data.jam) : (data.jam_masuk || data.jam)) || this.currentTime;
 
                 if (existingIdx !== -1) {
-                    // Baris sudah ada di tabel: perbarui nilainya & pindahkan ke baris teratas (khusus pulang)
-                    const existing = this.attendances[existingIdx];
+                    // Baris sudah ada di tabel: perbarui datanya & NAIKKAN ke baris teratas (tidak perlu buat baris baru)
+                    const existing = this.attendances.splice(existingIdx, 1)[0];
+
                     if (res.type === 'absen_pulang') {
                         existing.pulang = data.jam_pulang || data.jam || this.currentTime;
                         existing.status = data.status || 'Pulang';
                         existing.statusType = 'pulang';
-                        existing.waktu = timeDisplay;
-                        if (data.foto) existing.foto = data.foto;
-                        // Pindahkan ke paling atas
-                        this.attendances.splice(existingIdx, 1);
-                        this.attendances.unshift(existing);
-                    } else {
-                        existing.status = data.status || existing.status;
-                        existing.statusType = (data.status === 'Terlambat') ? 'warning' : existing.statusType;
-                        if (data.foto) existing.foto = data.foto;
+                    } else if (data.status) {
+                        existing.status = data.status;
+                        existing.statusType = (data.status === 'Terlambat') ? 'warning' : (data.status === 'Pulang' ? 'pulang' : 'success');
                     }
+
+                    existing.waktu = timeDisplay;
+                    if (data.foto) existing.foto = data.foto;
+                    if (data.kelas) existing.kelas = data.kelas;
+                    if (personKey) existing.personKey = personKey;
+
+                    // Naikkan ke urutan teratas tabel
+                    this.attendances.unshift(existing);
                 } else {
                     // Belum ada di tabel: tambahkan baris baru
                     this.attendances.unshift({
@@ -1534,6 +1566,7 @@ function faceScannerApp() {
             this.enrollSearch = '';
             this.selectedEnrollStudent = null;
             this.enrollMode = 'append';
+            this.clearEnrollAlert();
 
             if (this.allStudents.length === 0) {
                 this.isLoadingStudents = true;
@@ -1559,6 +1592,7 @@ function faceScannerApp() {
             const video = this.$refs.webcam;
             if (!video) return;
 
+            this.clearEnrollAlert();
             this.isEnrolling = true;
             try {
                 // Standar Ketat Enrollment di Kamera: deteksi seluruh wajah dengan threshold tinggi (0.65)
@@ -1568,19 +1602,22 @@ function faceScannerApp() {
                 );
 
                 if (!detections || detections.length === 0) {
-                    alert('Wajah tidak terdeteksi dengan jelas! Pastikan pencahayaan terang, tidak memakai masker, dan menghadap lurus ke kamera.');
+                    this.playTone('warning');
+                    this.setEnrollAlert('warning', 'Wajah tidak terdeteksi dengan jelas!', 'Pastikan pencahayaan terang, tidak memakai masker, dan menghadap lurus ke kamera.');
                     this.isEnrolling = false;
                     return;
                 }
 
                 if (detections.length > 1) {
-                    alert('Terdeteksi lebih dari 1 wajah di kamera! Pastikan hanya siswa yang didaftarkan yang berada di depan kamera.');
+                    this.playTone('warning');
+                    this.setEnrollAlert('warning', 'Terdeteksi lebih dari 1 wajah di kamera!', 'Pastikan hanya siswa yang didaftarkan yang berada di depan kamera.');
                     this.isEnrolling = false;
                     return;
                 }
 
                 if (!this.isPoseValid && this.poseWarning) {
-                    alert(this.poseWarning + '. Pastikan posisi wajah tegak dan menghadap lurus ke depan.');
+                    this.playTone('warning');
+                    this.setEnrollAlert('warning', this.poseWarning, 'Pastikan posisi kepala tegak dan menghadap lurus ke depan.');
                     this.isEnrolling = false;
                     return;
                 }
@@ -1593,7 +1630,8 @@ function faceScannerApp() {
                 if (rawBox) {
                     // 1. Cek ukuran minimal wajah (tidak boleh terlalu jauh)
                     if (rawBox.width < 110 || rawBox.height < 110) {
-                        alert('Jarak wajah terlalu jauh dari kamera! Harap maju lebih dekat ke layar.');
+                        this.playTone('warning');
+                        this.setEnrollAlert('warning', 'Jarak wajah terlalu jauh dari kamera!', 'Harap maju sedikit lebih dekat ke arah kamera.');
                         this.isEnrolling = false;
                         return;
                     }
@@ -1607,7 +1645,8 @@ function faceScannerApp() {
                         (rawBox.x + rawBox.width) > (vw - marginX) ||
                         (rawBox.y + rawBox.height) > (vh - marginY)
                     ) {
-                        alert('Posisi wajah terlalu di pinggir layar! Harap posisikan wajah tepat di tengah bingkai oval.');
+                        this.playTone('warning');
+                        this.setEnrollAlert('warning', 'Posisi wajah terlalu di pinggir layar!', 'Posisikan wajah tepat di tengah bingkai oval panduan.');
                         this.isEnrolling = false;
                         return;
                     }
@@ -1636,24 +1675,24 @@ function faceScannerApp() {
                     this.faceCount++;
                     const stu = this.allStudents.find(s => s.id === this.selectedEnrollStudent.id);
                     if (stu) stu.has_face = true;
-                    alert(res.message);
-                    this.showEnrollModal = false;
+                    this.setEnrollAlert('success', res.message || 'Face ID siswa berhasil didaftarkan!');
+                    setTimeout(() => {
+                        this.showEnrollModal = false;
+                        this.clearEnrollAlert();
+                    }, 1800);
                 } else if (response.status === 409 && res.code === 'requires_replace') {
                     this.playTone('warning');
-                    if (confirm(res.message + "\n\nApakah Anda ingin mengganti total Face ID dengan wajah ini sekarang?")) {
-                        this.enrollMode = 'replace';
-                        // Re-trigger dengan mode replace
-                        await this.executeEnrollment();
-                    }
+                    this.setEnrollAlert('confirm_replace', res.message, 'Klik tombol "Ganti Total Face ID Sekarang" di bawah untuk menimpa template lama.');
                 } else if (response.status === 409 && res.code === 'duplicate_face') {
                     this.playTone('error');
-                    alert(res.message);
+                    this.setEnrollAlert('error', 'Wajah Sudah Terdaftar Atas Nama Siswa Lain!', res.message);
                 } else {
                     this.playTone('error');
-                    alert('Gagal: ' + (res.message || 'Layanan AI Face ID tidak merespons.'));
+                    this.setEnrollAlert('error', 'Gagal Mendaftarkan Wajah', res.message || 'Layanan AI Face ID tidak merespons.');
                 }
             } catch (err) {
-                alert('Galat saat mendaftarkan wajah: ' + err.message);
+                this.playTone('error');
+                this.setEnrollAlert('error', 'Galat saat mendaftarkan wajah: ' + err.message);
             } finally {
                 this.isEnrolling = false;
             }

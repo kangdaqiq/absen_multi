@@ -1514,9 +1514,25 @@ class AttendanceController extends Controller
     }
 
     /**
+     * Generate password default dari tanggal lahir dengan format ddmmyyyy (contoh: 17082005).
+     * Jika tanggal lahir kosong, gunakan fallback NIS/NIP atau 01012000.
+     */
+    private function generateDefaultBirthDatePassword($person, ?string $fallback = null): string
+    {
+        if (!empty($person->tgl_lahir)) {
+            try {
+                return Carbon::parse($person->tgl_lahir)->format('dmY');
+            } catch (\Throwable $e) {
+                // Ignore parse error, use fallback
+            }
+        }
+
+        return $fallback ?: '01012000';
+    }
+
+    /**
      * Cari / buat akun User pemilik data wajah (kolom user_id pada user_face_data wajib terisi).
-     * Akun baru dibuat dengan password acak (bukan default yang mudah ditebak);
-     * admin dapat mereset password melalui menu manajemen user bila akun perlu dipakai login.
+     * Akun baru dibuat dengan password default dari tanggal lahir format ddmmyyyy.
      */
     private function resolveFaceOwnerUser($person, string $type): User
     {
@@ -1529,11 +1545,13 @@ class AttendanceController extends Controller
                     ->first();
             }
             if (!$targetUser) {
+                $defaultPass = $this->generateDefaultBirthDatePassword($person, (string) ($person->nis ?: '01012000'));
                 $targetUser = User::create([
                     'full_name' => $person->nama,
                     'username' => 'siswa_' . ($person->nis ?: $person->id),
                     'email' => ($person->nis ?: $person->id) . '@siswa.local',
-                    'password_hash' => Hash::make(\Illuminate\Support\Str::random(32)),
+                    'password_hash' => Hash::make($defaultPass),
+                    'plain_password' => $defaultPass,
                     'role' => 'student',
                     'school_id' => $person->school_id,
                 ]);
@@ -1545,11 +1563,13 @@ class AttendanceController extends Controller
             $targetUser = User::where('username', $person->nip)->first();
         }
         if (!$targetUser) {
+            $defaultPass = $this->generateDefaultBirthDatePassword($person, (string) ($person->nip ?: '01012000'));
             $targetUser = User::create([
                 'full_name' => $person->nama,
                 'username' => $person->nip ?: 'guru_' . $person->id,
                 'email' => ($person->nip ?: 'guru_' . $person->id) . '@guru.local',
-                'password_hash' => Hash::make(\Illuminate\Support\Str::random(32)),
+                'password_hash' => Hash::make($defaultPass),
+                'plain_password' => $defaultPass,
                 'role' => 'teacher',
                 'school_id' => $person->school_id,
             ]);

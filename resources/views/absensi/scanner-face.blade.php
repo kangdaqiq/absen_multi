@@ -208,14 +208,20 @@
         pointer-events: none;
     }
 
-    /* Face Guide Oval */
+    /* Face Guide Oval (Pusat presisi di tengah viewport kamera) */
     .face-guide-oval {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
         width: 180px;
         height: 240px;
         border-radius: 46%;
         border: 2px dashed rgba(168, 85, 247, 0.6);
         box-shadow: 0 0 25px rgba(168, 85, 247, 0.25), inset 0 0 25px rgba(168, 85, 247, 0.15);
-        transition: all 0.3s ease;
+        transition: border 0.3s ease, box-shadow 0.3s ease;
+        z-index: 10;
+        pointer-events: none;
     }
     @media (max-width: 640px) {
         .face-guide-oval {
@@ -1340,17 +1346,24 @@ function faceScannerApp() {
             const badgeX = box.x + box.width / 2;
             const badgeY = Math.max(16, box.y - 14);
 
+            // Un-mirror teks: karena elemen <canvas> dipasang CSS 'transform: scaleX(-1)' (mirror mode selfie),
+            // kita lakukan scale(-1, 1) di titik tengah badge agar tulisan terbaca normal dari kiri ke kanan.
+            ctx.save();
+            ctx.translate(badgeX, badgeY);
+            ctx.scale(-1, 1);
+
             ctx.fillStyle = isOk ? 'rgba(16, 185, 129, 0.95)' : 'rgba(245, 158, 11, 0.95)';
             if (ctx.roundRect) {
                 ctx.beginPath();
-                ctx.roundRect(badgeX - badgeW / 2, badgeY - badgeH / 2, badgeW, badgeH, 6);
+                ctx.roundRect(-badgeW / 2, -badgeH / 2, badgeW, badgeH, 6);
                 ctx.fill();
             } else {
-                ctx.fillRect(badgeX - badgeW / 2, badgeY - badgeH / 2, badgeW, badgeH);
+                ctx.fillRect(-badgeW / 2, -badgeH / 2, badgeW, badgeH);
             }
 
             ctx.fillStyle = '#ffffff';
-            ctx.fillText(badgeText, badgeX, badgeY);
+            ctx.fillText(badgeText, 0, 0);
+            ctx.restore();
         },
 
         drawCornerBrackets(ctx, x, y, w, h, color) {

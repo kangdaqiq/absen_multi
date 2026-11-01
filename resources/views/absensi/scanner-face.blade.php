@@ -418,14 +418,7 @@
                         }">
                         <span class="h-1.5 w-1.5 rounded-full"
                             :class="cameraReady && !modelLoading ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500 animate-ping'"></span>
-                        <span x-text="statusText">Memuat Model AI...</span>
-                    </span>
-
-                    <!-- Face ID Count Pill (Dihitung langsung dari Server Database) -->
-                    <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold border transition"
-                        :class="faceCount > 0 ? 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-900/20 dark:text-indigo-300 dark:border-indigo-800/40' : 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-900/20 dark:text-rose-300 dark:border-rose-800/40'">
-                        <i class="fas fa-server text-[10px]"></i>
-                        <span x-text="faceCount + ' Face ID Siap'">{{ (int) $registeredFaceCount }} Face ID Siap</span>
+                        <span x-text="statusText">Menyiapkan Kamera...</span>
                     </span>
                 </div>
                 <p class="text-xs text-gray-500 dark:text-gray-400">

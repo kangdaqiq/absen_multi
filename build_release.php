@@ -288,12 +288,16 @@ function copyDir(string $src, string $dst, string $rootSrc, array $excludes): vo
 
 function deleteDir(string $dir): void
 {
+    clearstatcache(true, $dir);
     if (!is_dir($dir)) return;
     if (PHP_OS_FAMILY === 'Windows') {
-        exec('cmd /c "rmdir /s /q ' . escapeshellarg($dir) . '"');
+        $winDir = str_replace('/', '\\', $dir);
+        exec('cmd /c "rmdir /s /q \"' . $winDir . '\""');
+        clearstatcache(true, $dir);
         if (!is_dir($dir)) return;
     }
-    $items = scandir($dir);
+    $items = @scandir($dir);
+    if ($items === false) return;
     foreach ($items as $item) {
         if ($item === '.' || $item === '..') continue;
         $path = $dir . '/' . $item;

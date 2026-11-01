@@ -228,10 +228,15 @@
         border-style: solid;
         box-shadow: 0 0 35px rgba(16, 185, 129, 0.6), inset 0 0 30px rgba(16, 185, 129, 0.3);
     }
-    .face-guide-oval.verifying {
+    .face-guide-oval.warning {
         border-color: #f59e0b;
+        border-style: dashed;
+        box-shadow: 0 0 35px rgba(245, 158, 11, 0.55), inset 0 0 25px rgba(245, 158, 11, 0.25);
+    }
+    .face-guide-oval.verifying {
+        border-color: #3b82f6;
         border-style: solid;
-        box-shadow: 0 0 35px rgba(245, 158, 11, 0.6), inset 0 0 30px rgba(245, 158, 11, 0.3);
+        box-shadow: 0 0 35px rgba(59, 130, 246, 0.6), inset 0 0 30px rgba(59, 130, 246, 0.3);
     }
 
     /* Verified Badge in Spotlight Card (Fix Screenshot 2: White-on-white invisible badge) */
@@ -502,14 +507,19 @@
                     <!-- Target Oval Guide in Center -->
                     <div class="absolute face-guide-oval flex items-center justify-center pointer-events-none"
                         :class="{
-                            'detected': faceDetected && !isProcessing,
+                            'detected': faceDetected && isPoseValid && !isProcessing,
+                            'warning': faceDetected && !isPoseValid && !isProcessing,
                             'verifying': isProcessing
                         }">
                         <!-- Corner Crosshairs / Accents -->
-                        <div class="absolute -top-2 left-1/2 -translate-x-1/2 w-6 h-0.5 bg-purple-400"></div>
-                        <div class="absolute -bottom-2 left-1/2 -translate-x-1/2 w-6 h-0.5 bg-purple-400"></div>
-                        <div class="absolute -left-2 top-1/2 -translate-y-1/2 h-6 w-0.5 bg-purple-400"></div>
-                        <div class="absolute -right-2 top-1/2 -translate-y-1/2 h-6 w-0.5 bg-purple-400"></div>
+                        <div class="absolute -top-2 left-1/2 -translate-x-1/2 w-6 h-0.5"
+                            :class="faceDetected && !isPoseValid ? 'bg-amber-400' : (faceDetected ? 'bg-emerald-400' : 'bg-purple-400')"></div>
+                        <div class="absolute -bottom-2 left-1/2 -translate-x-1/2 w-6 h-0.5"
+                            :class="faceDetected && !isPoseValid ? 'bg-amber-400' : (faceDetected ? 'bg-emerald-400' : 'bg-purple-400')"></div>
+                        <div class="absolute -left-2 top-1/2 -translate-y-1/2 h-6 w-0.5"
+                            :class="faceDetected && !isPoseValid ? 'bg-amber-400' : (faceDetected ? 'bg-emerald-400' : 'bg-purple-400')"></div>
+                        <div class="absolute -right-2 top-1/2 -translate-y-1/2 h-6 w-0.5"
+                            :class="faceDetected && !isPoseValid ? 'bg-amber-400' : (faceDetected ? 'bg-emerald-400' : 'bg-purple-400')"></div>
                     </div>
 
                     <!-- Camera Loading Overlay -->
@@ -524,13 +534,22 @@
 
                     <!-- Live HUD Detection Feedback Label -->
                     <div class="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 pointer-events-none max-w-[90%] text-center">
-                        <div class="px-4 py-1.5 rounded-full text-xs font-bold tracking-wide backdrop-blur-md border shadow-lg transition-all"
+                        <div class="px-4 py-1.5 rounded-full text-xs font-bold tracking-wide backdrop-blur-md border shadow-lg transition-all flex items-center justify-center gap-1.5"
                             :class="{
-                                'bg-black/60 text-white border-white/20': !faceDetected && !isProcessing,
-                                'bg-emerald-600/90 text-white border-emerald-400': faceDetected && !isProcessing && !lastScanError,
+                                'bg-black/60 text-white border-white/20': !faceDetected && !isProcessing && !lastScanError,
+                                'bg-amber-500/95 text-white border-amber-300 shadow-amber-500/30': faceDetected && !isPoseValid && !isProcessing && !lastScanError,
+                                'bg-emerald-600/90 text-white border-emerald-400 shadow-emerald-500/30': faceDetected && isPoseValid && !isProcessing && !lastScanError,
                                 'bg-rose-600/95 text-white border-rose-400': lastScanError,
-                                'bg-amber-500/90 text-white border-amber-300 animate-pulse': isProcessing
+                                'bg-blue-600/90 text-white border-blue-400 animate-pulse': isProcessing
                             }">
+                            <i class="fas text-[11px]"
+                                :class="{
+                                    'fa-expand': !faceDetected && !isProcessing && !lastScanError,
+                                    'fa-exclamation-triangle text-amber-100': faceDetected && !isPoseValid && !isProcessing && !lastScanError,
+                                    'fa-check-circle text-emerald-100': faceDetected && isPoseValid && !isProcessing && !lastScanError,
+                                    'fa-times-circle': lastScanError,
+                                    'fa-spinner fa-spin': isProcessing
+                                }"></i>
                             <span x-text="detectionMessage">Posisikan wajah di dalam bingkai oval</span>
                         </div>
                     </div>
@@ -864,6 +883,12 @@ function faceScannerApp() {
         soundEnabled: true,
         isFullscreen: false,
 
+        // Head Pose Alignment & Warning State
+        hasLandmarkNet: false,
+        isPoseValid: false,
+        poseWarning: null,
+        currentPose: { roll: 0, yaw: 0, pitchRatio: 1.0 },
+
         // Cameras
         availableCameras: [],
         selectedCameraId: '',
@@ -976,12 +1001,20 @@ function faceScannerApp() {
         },
 
         async initFaceApi() {
-            this.statusText = 'Memuat Detektor Wajah...';
+            this.statusText = 'Memuat Detektor Wajah & Landmark Pose...';
             try {
-                // Hanya muat tinyFaceDetector (~190 KB) untuk mendeteksi posisi kotak wajah di kamera.
-                // Pencocokan & ekstraksi vektor 100% menggunakan AI 512-d Python di server.
+                // Memuat tinyFaceDetector & faceLandmark68TinyNet (~350 KB) untuk estimasi Head Pose (Yaw/Pitch/Roll)
                 const modelUrl = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/model/';
                 await faceapi.nets.tinyFaceDetector.loadFromUri(modelUrl);
+
+                try {
+                    await faceapi.nets.faceLandmark68TinyNet.loadFromUri(modelUrl);
+                    this.hasLandmarkNet = true;
+                    console.log('✓ Model landmark pose 68-tiny aktif untuk deteksi kemiringan wajah');
+                } catch (landErr) {
+                    console.warn('Landmark 68-tiny load error, fallback ke basic detector:', landErr);
+                    this.hasLandmarkNet = false;
+                }
 
                 this.modelLoading = false;
                 this.statusText = 'Detektor Siap, Membuka Kamera...';
@@ -1046,7 +1079,7 @@ function faceScannerApp() {
             await this.startCamera();
         },
 
-        // CORE CLIENT-SIDE LOOP: LIGHTWEIGHT FACE DETECTION -> PYTHON 512-D PRIMARY RECOGNITION
+        // CORE CLIENT-SIDE LOOP: LIGHTWEIGHT FACE DETECTION & HEAD POSE -> PYTHON 512-D PRIMARY RECOGNITION
         startDetectionLoop() {
             const video = this.$refs.webcam;
             const canvas = this.$refs.canvasOverlay;
@@ -1063,17 +1096,32 @@ function faceScannerApp() {
                 if (!isRunning) {
                     isRunning = true;
                     try {
-                        // Ultra-lightweight bounding-box detection (tanpa 128-d di tiap frame agar tablet/HP Kiosk dingin & 60 FPS)
-                        const detection = await faceapi.detectSingleFace(
-                            video,
-                            new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.5 })
-                        );
+                        const detOptions = new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.5 });
+                        let detection = null;
+
+                        // Gunakan landmark jika model tersedia, fallback ke deteksi dasar jika tidak
+                        if (this.hasLandmarkNet) {
+                            try {
+                                detection = await faceapi.detectSingleFace(video, detOptions).withFaceLandmarks(true);
+                            } catch (e) {
+                                detection = await faceapi.detectSingleFace(video, detOptions);
+                            }
+                        } else {
+                            detection = await faceapi.detectSingleFace(video, detOptions);
+                        }
 
                         if (detection) {
                             this.faceDetected = true;
-                            stableCount++;
+                            const landmarks = detection.landmarks || null;
+                            const rawBox = detection.box || (detection.detection ? detection.detection.box : null);
 
-                            // Draw face bounding box on overlay canvas
+                            // 1. Analisis Kemiringan Pose Kepala (Head Pose: Roll, Yaw, Pitch)
+                            const pose = this.analyzeHeadPose(landmarks, rawBox, video.videoWidth, video.videoHeight);
+                            this.isPoseValid = pose.isValid;
+                            this.poseWarning = pose.warning;
+                            this.currentPose = { roll: pose.roll, yaw: pose.yaw, pitchRatio: pose.pitchRatio };
+
+                            // 2. Render Visual HUD & Alignment Guides pada Canvas Overlay
                             if (canvas) {
                                 const dims = { width: video.videoWidth, height: video.videoHeight };
                                 faceapi.matchDimensions(canvas, dims);
@@ -1082,22 +1130,37 @@ function faceScannerApp() {
                                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                                 const box = resized.box || (resized.detection ? resized.detection.box : null);
                                 if (box) {
-                                    ctx.strokeStyle = 'rgba(16, 185, 129, 0.75)';
-                                    ctx.lineWidth = 2;
-                                    ctx.strokeRect(box.x, box.y, box.width, box.height);
+                                    this.drawFacePoseHUD(ctx, box, resized.landmarks, pose);
                                 }
                             }
 
-                            const rawBox = detection.box || (detection.detection ? detection.detection.box : null);
+                            // 3. Logika Verifikasi berdasarkan Pose Wajah
                             if (this.showEnrollModal) {
-                                this.detectionMessage = 'Mode Daftar: Posisikan wajah lurus di tengah lalu klik Daftarkan Wajah';
-                            } else if (stableCount >= 2 && !this.isProcessing && Date.now() > this.holdMessageUntil) {
-                                this.detectionMessage = 'Wajah terdeteksi! Memverifikasi...';
-                                await this.matchAndAttend(rawBox);
+                                if (!pose.isValid) {
+                                    this.detectionMessage = pose.warning;
+                                } else {
+                                    this.detectionMessage = 'Mode Daftar: Wajah lurus & siap. Klik Daftarkan Wajah';
+                                }
+                            } else if (pose.isValid) {
+                                stableCount++;
+                                if (stableCount >= 2 && !this.isProcessing && Date.now() > this.holdMessageUntil) {
+                                    this.detectionMessage = 'Posisi wajah pas! Memverifikasi...';
+                                    await this.matchAndAttend(rawBox);
+                                    stableCount = 0;
+                                } else if (Date.now() > this.holdMessageUntil) {
+                                    this.detectionMessage = 'Wajah lurus & pas. Tahan sebentar...';
+                                }
+                            } else {
+                                // Pose wajah masih miring/menoleh/menunduk -> Tahan verifikasi & beri instruksi ramah
                                 stableCount = 0;
+                                if (Date.now() > this.holdMessageUntil) {
+                                    this.detectionMessage = pose.warning || 'Posisikan wajah lurus menghadap kamera';
+                                }
                             }
                         } else {
                             this.faceDetected = false;
+                            this.isPoseValid = false;
+                            this.poseWarning = null;
                             stableCount = 0;
                             if (Date.now() > this.holdMessageUntil) {
                                 this.detectionMessage = 'Posisikan wajah di dalam bingkai oval';
@@ -1118,6 +1181,192 @@ function faceScannerApp() {
             };
 
             requestAnimationFrame(loop);
+        },
+
+        // ALGORITMA ESTIMASI HEAD POSE (YAW, PITCH, ROLL & DISTANCE)
+        analyzeHeadPose(landmarks, box, vw, vh) {
+            if (!landmarks) {
+                return { isValid: true, warning: null, poseType: 'normal', roll: 0, yaw: 0, pitchRatio: 1.0 };
+            }
+
+            try {
+                const leftEye = landmarks.getLeftEye();
+                const rightEye = landmarks.getRightEye();
+                const nose = landmarks.getNose();
+                const mouth = landmarks.getMouth();
+
+                if (!leftEye || !rightEye || !nose || !mouth || leftEye.length === 0 || rightEye.length === 0) {
+                    return { isValid: true, warning: null, poseType: 'normal', roll: 0, yaw: 0, pitchRatio: 1.0 };
+                }
+
+                const lx = leftEye.reduce((s, p) => s + p.x, 0) / leftEye.length;
+                const ly = leftEye.reduce((s, p) => s + p.y, 0) / leftEye.length;
+                const rx = rightEye.reduce((s, p) => s + p.x, 0) / rightEye.length;
+                const ry = rightEye.reduce((s, p) => s + p.y, 0) / rightEye.length;
+
+                // Ujung hidung (titik apex)
+                const noseTip = nose[3] || nose[Math.floor(nose.length / 2)] || nose[0];
+                const mouthY = mouth.reduce((s, p) => s + p.y, 0) / mouth.length;
+
+                const dx = rx - lx;
+                const dy = ry - ly;
+                const eyeDist = Math.hypot(dx, dy);
+
+                // 1. Roll: Derajat kemiringan kepala menyamping (tilt)
+                const roll = Math.atan2(dy, dx) * (180 / Math.PI);
+
+                // 2. Yaw: Posisi ujung hidung relatif terhadap garis tengah kedua mata (menoleh)
+                const eyeMidX = (lx + rx) / 2;
+                const noseRelX = (noseTip.x - eyeMidX) / (eyeDist || 1);
+                const yaw = noseRelX * 62.0;
+
+                // 3. Pitch: Rasio jarak vertikal mata-ke-hidung vs hidung-ke-mulut
+                const eyeMidY = (ly + ry) / 2;
+                const eyeToNose = Math.max(1, noseTip.y - eyeMidY);
+                const noseToMouth = Math.max(1, mouthY - noseTip.y);
+                const pitchRatio = eyeToNose / noseToMouth;
+
+                let warning = null;
+                let poseType = 'normal';
+
+                // Toleransi Roll (Miring samping): batas 13°
+                if (Math.abs(roll) > 13) {
+                    warning = 'Kepala miring! Harap tegakkan posisi kepala Anda';
+                    poseType = 'roll';
+                }
+                // Toleransi Yaw (Menoleh kiri/kanan): batas 16°
+                else if (Math.abs(yaw) > 16) {
+                    warning = 'Wajah menoleh! Harap hadap lurus ke kamera';
+                    poseType = 'yaw';
+                }
+                // Toleransi Pitch (Mendongak / Menunduk)
+                else if (pitchRatio < 0.55) {
+                    warning = 'Kepala mendongak! Turunkan sedikit dagu Anda';
+                    poseType = 'pitch_up';
+                } else if (pitchRatio > 2.1) {
+                    warning = 'Kepala terlalu menunduk! Angkat sedikit pandangan Anda';
+                    poseType = 'pitch_down';
+                }
+
+                // Cek jarak wajah (terlalu jauh / terlalu dekat)
+                if (!warning && box) {
+                    if (box.width < 90 || eyeDist < 26) {
+                        warning = 'Dekatkan wajah Anda sedikit ke kamera';
+                        poseType = 'distance_far';
+                    } else if (box.width > (vw * 0.78)) {
+                        warning = 'Mundurkan sedikit wajah Anda dari kamera';
+                        poseType = 'distance_near';
+                    }
+                }
+
+                return {
+                    isValid: !warning,
+                    warning: warning,
+                    poseType: poseType,
+                    roll: Math.round(roll),
+                    yaw: Math.round(yaw),
+                    pitchRatio: Math.round(pitchRatio * 100) / 100,
+                    eyeCoords: { lx, ly, rx, ry }
+                };
+            } catch (err) {
+                return { isValid: true, warning: null, poseType: 'normal', roll: 0, yaw: 0, pitchRatio: 1.0 };
+            }
+        },
+
+        // VISUALISASI CANVAS HUD (CORNER BRACKETS, GARIS HORIZON MATA & BADGE KEMIRINGAN)
+        drawFacePoseHUD(ctx, box, landmarks, pose) {
+            const isOk = pose.isValid;
+            const strokeColor = isOk ? 'rgba(16, 185, 129, 0.9)' : 'rgba(245, 158, 11, 0.9)';
+
+            // 1. Gambar Corner Brackets Modern
+            this.drawCornerBrackets(ctx, box.x, box.y, box.width, box.height, strokeColor);
+
+            // 2. Garis Horizon Mata & Titik Landmark Mata
+            if (landmarks) {
+                const leftEye = landmarks.getLeftEye();
+                const rightEye = landmarks.getRightEye();
+                if (leftEye && rightEye && leftEye.length && rightEye.length) {
+                    const lx = leftEye.reduce((s, p) => s + p.x, 0) / leftEye.length;
+                    const ly = leftEye.reduce((s, p) => s + p.y, 0) / leftEye.length;
+                    const rx = rightEye.reduce((s, p) => s + p.x, 0) / rightEye.length;
+                    const ry = rightEye.reduce((s, p) => s + p.y, 0) / rightEye.length;
+
+                    // Garis horizontal penjajaran kedua mata
+                    ctx.beginPath();
+                    ctx.moveTo(lx, ly);
+                    ctx.lineTo(rx, ry);
+                    ctx.strokeStyle = isOk ? 'rgba(52, 211, 153, 0.65)' : 'rgba(251, 191, 36, 0.75)';
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([4, 4]);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+
+                    // Titik pupil kedua mata
+                    ctx.fillStyle = isOk ? '#10b981' : '#f59e0b';
+                    ctx.beginPath();
+                    ctx.arc(lx, ly, 3.5, 0, 2 * Math.PI);
+                    ctx.arc(rx, ry, 3.5, 0, 2 * Math.PI);
+                    ctx.fill();
+                }
+            }
+
+            // 3. Status Tag / Badge di atas kotak wajah
+            ctx.font = 'bold 11px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            let badgeText = '✓ LURUS & SEJAJAR';
+            if (!isOk) {
+                if (pose.poseType === 'roll') {
+                    badgeText = `⚠️ MIRING ${Math.abs(pose.roll)}°`;
+                } else if (pose.poseType === 'yaw') {
+                    badgeText = `⚠️ MENOLEH ${Math.abs(pose.yaw)}°`;
+                } else if (pose.poseType === 'pitch_up') {
+                    badgeText = '⚠️ MENDONGAK';
+                } else if (pose.poseType === 'pitch_down') {
+                    badgeText = '⚠️ MENUNDUK';
+                } else if (pose.poseType === 'distance_far') {
+                    badgeText = '⚠️ DEKATKAN';
+                } else if (pose.poseType === 'distance_near') {
+                    badgeText = '⚠️ MUNDUR SEDIKIT';
+                } else {
+                    badgeText = '⚠️ ATUR POSISI';
+                }
+            }
+
+            const textMetrics = ctx.measureText(badgeText);
+            const badgeW = textMetrics.width + 16;
+            const badgeH = 20;
+            const badgeX = box.x + box.width / 2;
+            const badgeY = Math.max(16, box.y - 14);
+
+            ctx.fillStyle = isOk ? 'rgba(16, 185, 129, 0.95)' : 'rgba(245, 158, 11, 0.95)';
+            if (ctx.roundRect) {
+                ctx.beginPath();
+                ctx.roundRect(badgeX - badgeW / 2, badgeY - badgeH / 2, badgeW, badgeH, 6);
+                ctx.fill();
+            } else {
+                ctx.fillRect(badgeX - badgeW / 2, badgeY - badgeH / 2, badgeW, badgeH);
+            }
+
+            ctx.fillStyle = '#ffffff';
+            ctx.fillText(badgeText, badgeX, badgeY);
+        },
+
+        drawCornerBrackets(ctx, x, y, w, h, color) {
+            const len = Math.min(22, w * 0.2, h * 0.2);
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            // Top-left
+            ctx.moveTo(x, y + len); ctx.lineTo(x, y); ctx.lineTo(x + len, y);
+            // Top-right
+            ctx.moveTo(x + w - len, y); ctx.lineTo(x + w, y); ctx.lineTo(x + w, y + len);
+            // Bottom-right
+            ctx.moveTo(x + w, y + h - len); ctx.lineTo(x + w, y + h); ctx.lineTo(x + w - len, y + h);
+            // Bottom-left
+            ctx.moveTo(x + len, y + h); ctx.lineTo(x, y + h); ctx.lineTo(x, y + h - len);
+            ctx.stroke();
         },
 
         // PYTHON 512-D INSIGHTFACE + CLAHE + NUMPY MATRIX (100% SERVER-SIDE)
@@ -1293,6 +1542,12 @@ function faceScannerApp() {
 
                 if (detections.length > 1) {
                     alert('Terdeteksi lebih dari 1 wajah di kamera! Pastikan hanya siswa yang didaftarkan yang berada di depan kamera.');
+                    this.isEnrolling = false;
+                    return;
+                }
+
+                if (!this.isPoseValid && this.poseWarning) {
+                    alert(this.poseWarning + '. Pastikan posisi wajah tegak dan menghadap lurus ke depan.');
                     this.isEnrolling = false;
                     return;
                 }

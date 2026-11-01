@@ -89,6 +89,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/mobile/student/jadwal-pelajaran/mingguan', [App\Http\Controllers\Api\MobileJadwalPelajaranController::class, 'getStudentMingguan']);
     Route::get('/mobile/siswa/jadwal-pelajaran/hari-ini', [App\Http\Controllers\Api\MobileJadwalPelajaranController::class, 'getStudentHariIni']);
     Route::get('/mobile/siswa/jadwal-pelajaran/mingguan', [App\Http\Controllers\Api\MobileJadwalPelajaranController::class, 'getStudentMingguan']);
+    Route::get('/mobile/student/kbm-history', [App\Http\Controllers\Api\MobileJadwalPelajaranController::class, 'getStudentKbmHistory']);
+    Route::get('/mobile/siswa/kbm-history', [App\Http\Controllers\Api\MobileJadwalPelajaranController::class, 'getStudentKbmHistory']);
+    Route::get('/mobile/student/riwayat-mapel', [App\Http\Controllers\Api\MobileJadwalPelajaranController::class, 'getStudentKbmHistory']);
+    Route::get('/mobile/siswa/riwayat-mapel', [App\Http\Controllers\Api\MobileJadwalPelajaranController::class, 'getStudentKbmHistory']);
     Route::get('/mobile/jadwal-pelajaran/{id}/presensi', [App\Http\Controllers\Api\MobileJadwalPelajaranController::class, 'getPresensiDetail']);
     Route::post('/mobile/jadwal-pelajaran/{id}/presensi', [App\Http\Controllers\Api\MobileJadwalPelajaranController::class, 'submitPresensi']);
     Route::post('/mobile/jadwal-pelajaran/{id}/presensi-single', [App\Http\Controllers\Api\MobileJadwalPelajaranController::class, 'updateSinglePresensi']);

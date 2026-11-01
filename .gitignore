@@ -35,9 +35,15 @@ Thumbs.db
 # Abaikan kode perangkat keras (ESP)
 /esp8266_code/
 
-# Python cache & virtual environment
+# Python cache, virtual environment & face engine artifacts
 __pycache__/
 *.py[cod]
+venv/
+.venv/
+face_engine/venv/
+face_engine/.insightface/
+face_engine/*.zip
+*.onnx
 
 # Jagat Super App workspace junction
 /jagat_super_app

@@ -7,6 +7,7 @@ use App\Models\AbsensiPelajaran;
 use App\Models\JadwalPelajaran;
 use App\Models\JurnalPelajaran;
 use App\Models\Siswa;
+use App\Models\ApiLog;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -127,9 +128,7 @@ class MobileJadwalPelajaranController extends Controller
             $isMulti = $parallels->count() > 1;
             $parallelIds = $parallels->pluck('id')->all();
             $parallelKelasIds = $parallels->pluck('kelas_id')->filter()->unique()->values()->all();
-            $parallelKelasIds = $parallels->pluck('kelas_id')->filter()->unique()->values()->all();
-                $parallelKelasNames = $parallels->map(fn($p) => $p->kelas?->nama_kelas)->filter()->unique()->values()->all();
-                $totalSiswaKelas = collect($parallelKelasIds)->sum(fn($cid) => $studentCountsMingguan[$cid] ?? 0);
+            $parallelKelasNames = $parallels->map(fn($p) => $p->kelas?->nama_kelas)->filter()->unique()->values()->all();
             $totalSiswaKelas = collect($parallelKelasIds)->sum(fn($cid) => $studentCountsByKelas[$cid] ?? 0);
 
             // Ambil jurnal KBM jika ada yang terisi di antara jadwal paralel
@@ -313,6 +312,7 @@ class MobileJadwalPelajaranController extends Controller
                 }
 
                 $isMulti = $parallels->count() > 1;
+                $parallelIds = $parallels->pluck('id')->all();
                 $parallelKelasIds = $parallels->pluck('kelas_id')->filter()->unique()->values()->all();
                 $parallelKelasNames = $parallels->map(fn($p) => $p->kelas?->nama_kelas)->filter()->unique()->values()->all();
                 $totalSiswaKelas = collect($parallelKelasIds)->sum(fn($cid) => $studentCountsMingguan[$cid] ?? 0);
@@ -560,7 +560,7 @@ class MobileJadwalPelajaranController extends Controller
 
         $request->validate([
             'tanggal'                  => 'required|date',
-            'materi'                   => 'required|string|max:1000',
+            'materi'                   => 'nullable|string|max:1000',
             'catatan'                  => 'nullable|string|max:1000',
             'foto_dokumentasi'         => 'nullable|string|max:1000',
             'dokumentasi'              => 'nullable',
@@ -725,11 +725,15 @@ class MobileJadwalPelajaranController extends Controller
             // 1. Sinkronkan Jurnal KBM ke semua jadwal paralel
             $jurnalMap = [];
             foreach ($parallels as $pJadwal) {
+                $existingJurnal = JurnalPelajaran::where('jadwal_pelajaran_id', $pJadwal->id)
+                    ->where('tanggal', $tanggal)
+                    ->first();
+
                 $jurnalData = [
                     'school_id'    => $schoolId,
                     'guru_id'      => $operatorGuruId,
                     'jam_ke'       => $pJadwal->jam_ke,
-                    'materi'       => trim($request->materi),
+                    'materi'       => $request->has('materi') && $request->materi !== null ? trim($request->materi) : ($existingJurnal?->materi ?? ''),
                     'catatan'      => $request->catatan ? trim($request->catatan) : null,
                     'jam_mulai'    => $pJadwal->jam_mulai,
                     'jam_selesai'  => $pJadwal->jam_selesai,
@@ -777,6 +781,25 @@ class MobileJadwalPelajaranController extends Controller
             }
         });
 
+        try {
+            $mapelName = $jadwal->mapel->nama_mapel ?? 'Mata Pelajaran';
+            $kelasName = $jadwal->kelas->nama_kelas ?? ($jadwal->kelas->nama ?? '-');
+            $count = count($request->input('attendances', []));
+            ApiLog::create([
+                'school_id' => $schoolId,
+                'api_key' => 'MOBILE_APP',
+                'action' => 'mobile_kbm_attendance',
+                'uid' => $user->username ?? $user->email,
+                'success' => true,
+                'message' => "Guru {$user->full_name} menyimpan presensi KBM {$mapelName} ({$kelasName}) untuk {$count} siswa tanggal {$tanggal}",
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent() ?? 'Android Mobile App',
+                'created_at' => now(),
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning("ApiLog KBM error: " . $e->getMessage());
+        }
+
         return response()->json([
             'success' => true,
             'message' => 'Presensi dan Jurnal KBM berhasil disimpan.'
@@ -795,6 +818,20 @@ class MobileJadwalPelajaranController extends Controller
         $jadwal = JadwalPelajaran::where('school_id', $schoolId)->findOrFail($jadwalId);
 
         if ($guru && $jadwal->guru_id !== $guru->id && !in_array($user->role, ['admin', 'super_admin', 'waka_kurikulum'])) {
+            try {
+                ApiLog::create([
+                    'school_id' => $schoolId,
+                    'api_key' => 'MOBILE_APP',
+                    'action' => 'mobile_kbm_single_attendance_forbidden',
+                    'uid' => $user->username ?? $user->email,
+                    'success' => false,
+                    'message' => "Akses presensi KBM ditolak: {$user->full_name} mencoba update jadwal ID {$jadwalId}",
+                    'ip_address' => $request->ip(),
+                    'user_agent' => $request->userAgent() ?? 'Android Mobile App',
+                    'created_at' => now(),
+                ]);
+            } catch (\Throwable $e) {}
+
             return response()->json([
                 'success' => false,
                 'message' => 'Akses ditolak.'
@@ -847,6 +884,20 @@ class MobileJadwalPelajaranController extends Controller
                 'keterangan'          => $request->keterangan ? trim($request->keterangan) : null,
             ]
         );
+
+        try {
+            ApiLog::create([
+                'school_id' => $schoolId,
+                'api_key' => 'MOBILE_APP',
+                'action' => 'mobile_kbm_single_attendance',
+                'uid' => $user->username ?? $user->email,
+                'success' => true,
+                'message' => "Update presensi KBM siswa ID {$request->student_id} ({$request->status}) tanggal {$tanggal} oleh {$user->full_name}",
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent() ?? 'Android Mobile App',
+                'created_at' => now(),
+            ]);
+        } catch (\Throwable $e) {}
 
         return response()->json([
             'success' => true,
@@ -1186,6 +1237,283 @@ class MobileJadwalPelajaranController extends Controller
                     'kelas_nama' => $student->kelas ? ($student->kelas->nama_kelas ?? $student->kelas->nama) : null,
                 ],
                 'jadwals' => $grouped,
+            ]
+        ]);
+    }
+
+    /**
+     * Dapatkan rekap riwayat kehadiran siswa per mata pelajaran & riwayat sesi pertemuan KBM
+     * GET /api/mobile/student/kbm-history atau /api/mobile/siswa/kbm-history
+     */
+    public function getStudentKbmHistory(Request $request)
+    {
+        $user = $request->user();
+        $student = $this->resolveStudent($request, $user);
+
+        if (!$student) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Data profil siswa tidak ditemukan untuk akun ini.'
+            ], 404);
+        }
+
+        $schoolId = $student->school_id ?: ($user->school_id ?? 0);
+        $schoolTz = \App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'timezone')->value('setting_value') ?: config('app.timezone', 'Asia/Jakarta');
+
+        $mapelIdFilter = $request->query('mapel_id');
+        $startDate = $request->query('start_date');
+        $endDate = $request->query('end_date');
+        $limit = max(1, min(100, (int) $request->query('limit', 50)));
+
+        // 1. Ambil seluruh mata pelajaran kelas siswa
+        $classJadwals = JadwalPelajaran::where('school_id', $schoolId)
+            ->where('kelas_id', $student->kelas_id)
+            ->with(['mapel', 'guru'])
+            ->get();
+
+        $mapelMap = [];
+        foreach ($classJadwals as $cj) {
+            if ($cj->mapel_id && !isset($mapelMap[$cj->mapel_id])) {
+                $mapelMap[$cj->mapel_id] = [
+                    'mapel_id'      => $cj->mapel_id,
+                    'nama_mapel'    => $cj->mapel?->nama_mapel ?? ('Mata Pelajaran #' . $cj->mapel_id),
+                    'guru_pengampu' => $cj->guru?->nama ?? '-',
+                    'guru_nip'      => $cj->guru?->nip ?? '-',
+                    'guru_foto'     => $cj->guru?->foto_url ?? null,
+                ];
+            }
+        }
+
+        // 2. Query data riwayat absensi KBM siswa
+        $query = AbsensiPelajaran::where('school_id', $schoolId)
+            ->where('student_id', $student->id)
+            ->with([
+                'jadwal.mapel',
+                'jadwal.guru',
+                'guru',
+                'jurnal'
+            ]);
+
+        if ($mapelIdFilter) {
+            $query->whereHas('jadwal', fn($q) => $q->where('mapel_id', $mapelIdFilter));
+        }
+
+        if ($startDate && $endDate) {
+            try {
+                $sFormatted = Carbon::parse($startDate)->format('Y-m-d');
+                $eFormatted = Carbon::parse($endDate)->format('Y-m-d');
+                $query->whereBetween('tanggal', [$sFormatted, $eFormatted]);
+            } catch (\Exception $e) {
+                $query->whereBetween('tanggal', [$startDate, $endDate]);
+            }
+        }
+
+        // Ambil semua records untuk kalkulasi rekap statistik
+        $allRecords = (clone $query)->orderBy('tanggal', 'desc')->get();
+
+        // 3. Hitung ringkasan statistik per Mapel
+        $statsByMapel = [];
+        $totalAllSesi = $allRecords->count();
+        $overallStats = [
+            'total_sesi' => $totalAllSesi,
+            'hadir'      => 0,
+            'sakit'      => 0,
+            'izin'       => 0,
+            'alpha'      => 0,
+            'telat'      => 0,
+            'dispensasi' => 0,
+            'persentase' => '0%',
+            'persentase_numeric' => 0,
+        ];
+
+        foreach ($allRecords as $rec) {
+            $mId = $rec->jadwal?->mapel_id;
+            if (!$mId) continue;
+
+            if (!isset($statsByMapel[$mId])) {
+                $mInfo = $mapelMap[$mId] ?? [
+                    'mapel_id'      => $mId,
+                    'nama_mapel'    => $rec->jadwal?->mapel?->nama_mapel ?? ('Mapel #' . $mId),
+                    'guru_pengampu' => $rec->jadwal?->guru?->nama ?? ($rec->guru?->nama ?? '-'),
+                    'guru_nip'      => $rec->jadwal?->guru?->nip ?? ($rec->guru?->nip ?? '-'),
+                    'guru_foto'     => $rec->jadwal?->guru?->foto_url ?? ($rec->guru?->foto_url ?? null),
+                ];
+                $statsByMapel[$mId] = array_merge($mInfo, [
+                    'total_pertemuan'    => 0,
+                    'hadir'              => 0,
+                    'sakit'              => 0,
+                    'izin'               => 0,
+                    'alpha'              => 0,
+                    'telat'              => 0,
+                    'dispensasi'         => 0,
+                    'persentase'         => '0%',
+                    'persentase_numeric' => 0,
+                ]);
+            }
+
+            $st = strtoupper(trim($rec->status));
+            $statsByMapel[$mId]['total_pertemuan']++;
+
+            if ($st === 'H') {
+                $statsByMapel[$mId]['hadir']++;
+                $overallStats['hadir']++;
+            } elseif ($st === 'S') {
+                $statsByMapel[$mId]['sakit']++;
+                $overallStats['sakit']++;
+            } elseif ($st === 'I') {
+                $statsByMapel[$mId]['izin']++;
+                $overallStats['izin']++;
+            } elseif ($st === 'A') {
+                $statsByMapel[$mId]['alpha']++;
+                $overallStats['alpha']++;
+            } elseif ($st === 'T') {
+                $statsByMapel[$mId]['telat']++;
+                $overallStats['telat']++;
+            } elseif ($st === 'D') {
+                $statsByMapel[$mId]['dispensasi']++;
+                $overallStats['dispensasi']++;
+            }
+        }
+
+        // Hitung persentase kehadiran per mapel
+        foreach ($statsByMapel as $mId => &$stat) {
+            $tot = $stat['total_pertemuan'];
+            if ($tot > 0) {
+                // Kehadiran dihitung dari Hadir + Telat
+                $effectiveHadir = $stat['hadir'] + $stat['telat'];
+                $stat['persentase'] = round(($effectiveHadir / $tot) * 100, 1) . '%';
+                $stat['persentase_numeric'] = round(($effectiveHadir / $tot) * 100, 1);
+            } else {
+                $stat['persentase'] = '0%';
+                $stat['persentase_numeric'] = 0;
+            }
+        }
+        unset($stat);
+
+        // Jika filter mapel tidak diset, sertakan juga mapel kelas yang belum pernah diabsen
+        if (!$mapelIdFilter) {
+            foreach ($mapelMap as $mId => $mInfo) {
+                if (!isset($statsByMapel[$mId])) {
+                    $statsByMapel[$mId] = array_merge($mInfo, [
+                        'total_pertemuan'    => 0,
+                        'hadir'              => 0,
+                        'sakit'              => 0,
+                        'izin'               => 0,
+                        'alpha'              => 0,
+                        'telat'              => 0,
+                        'dispensasi'         => 0,
+                        'persentase'         => '0%',
+                        'persentase_numeric' => 0,
+                    ]);
+                }
+            }
+        }
+
+        if ($overallStats['total_sesi'] > 0) {
+            $effectiveOverall = $overallStats['hadir'] + $overallStats['telat'];
+            $overallStats['persentase'] = round(($effectiveOverall / $overallStats['total_sesi']) * 100, 1) . '%';
+            $overallStats['persentase_numeric'] = round(($effectiveOverall / $overallStats['total_sesi']) * 100, 1);
+        } else {
+            $overallStats['persentase'] = '0%';
+            $overallStats['persentase_numeric'] = 0;
+        }
+
+        // 4. Format riwayat pertemuan lampau (list sesi log kronologis)
+        $paginatedRecords = (clone $query)->orderBy('tanggal', 'desc')
+            ->orderBy('created_at', 'desc')
+            ->limit($limit)
+            ->get();
+
+        $hariIndonesia = [
+            1 => 'Senin',
+            2 => 'Selasa',
+            3 => 'Rabu',
+            4 => 'Kamis',
+            5 => 'Jumat',
+            6 => 'Sabtu',
+            7 => 'Minggu',
+        ];
+
+        $riwayatSesi = $paginatedRecords->map(function ($rec) use ($hariIndonesia) {
+            $j = $rec->jadwal;
+            $jurnal = $rec->jurnal;
+            $guruName = $rec->guru?->nama ?? ($j?->guru?->nama ?? '-');
+            $guruNip = $rec->guru?->nip ?? ($j?->guru?->nip ?? '-');
+            $mapelName = $j?->mapel?->nama_mapel ?? '-';
+
+            $tglCarbon = $rec->tanggal ? Carbon::parse($rec->tanggal) : $rec->created_at;
+            $namaHari = $tglCarbon ? ($hariIndonesia[$tglCarbon->dayOfWeekIso] ?? $tglCarbon->format('l')) : '-';
+
+            return [
+                'id'                  => $rec->id,
+                'jadwal_pelajaran_id' => $rec->jadwal_pelajaran_id,
+                'jurnal_pelajaran_id' => $rec->jurnal_pelajaran_id,
+                'tanggal'             => $tglCarbon ? $tglCarbon->format('Y-m-d') : null,
+                'tanggal_format'      => $tglCarbon ? $tglCarbon->translatedFormat('d F Y') : null,
+                'hari'                => $namaHari,
+                'jam_ke'              => $j?->jam_ke ?? ($jurnal?->jam_ke ?? '-'),
+                'jam_mulai'           => $j?->jam_mulai ? substr($j->jam_mulai, 0, 5) : ($jurnal?->jam_mulai ? substr($jurnal->jam_mulai, 0, 5) : null),
+                'jam_selesai'         => $j?->jam_selesai ? substr($j->jam_selesai, 0, 5) : ($jurnal?->jam_selesai ? substr($jurnal->jam_selesai, 0, 5) : null),
+                'ruangan'             => $j?->ruangan ?? '-',
+                'mapel_id'            => $j?->mapel_id,
+                'mapel_nama'          => $mapelName,
+                'guru'                => [
+                    'id'       => $rec->guru_id ?? $j?->guru_id,
+                    'nama'     => $guruName,
+                    'nip'      => $guruNip,
+                    'foto_url' => $rec->guru?->foto_url ?? ($j?->guru?->foto_url ?? null),
+                ],
+                'status'              => $rec->status,
+                'status_label'        => $rec->status_label,
+                'status_badge'        => $rec->status_badge,
+                'keterangan'          => $rec->keterangan ?? '',
+                'jurnal'              => $jurnal ? [
+                    'id'               => $jurnal->id,
+                    'materi'           => $jurnal->materi,
+                    'catatan'          => $jurnal->catatan,
+                    'has_dokumentasi'  => !empty($jurnal->dokumentasi),
+                ] : null,
+                'waktu_absen'         => $rec->created_at ? $rec->created_at->format('Y-m-d H:i:s') : null,
+            ];
+        });
+
+        // 5. Catat Log API
+        try {
+            ApiLog::create([
+                'school_id' => $schoolId,
+                'api_key' => 'MOBILE_APP',
+                'action' => 'mobile_student_kbm_history',
+                'uid' => $student->nis ?? ($user->username ?? $user->email),
+                'success' => true,
+                'message' => "Siswa {$student->nama} (NIS: {$student->nis}) melihat riwayat absensi mapel KBM",
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent() ?? 'Android Mobile App',
+                'created_at' => now(),
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning("ApiLog error: " . $e->getMessage());
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Riwayat absensi mata pelajaran berhasil diambil.',
+            'data'    => [
+                'student' => [
+                    'id'         => $student->id,
+                    'nama'       => $student->nama,
+                    'nis'        => $student->nis,
+                    'kelas_id'   => $student->kelas_id,
+                    'kelas_nama' => $student->kelas ? ($student->kelas->nama_kelas ?? $student->kelas->nama) : null,
+                    'foto_url'   => $student->foto_url,
+                ],
+                'filter' => [
+                    'mapel_id'   => $mapelIdFilter ? (int) $mapelIdFilter : null,
+                    'start_date' => $startDate,
+                    'end_date'   => $endDate,
+                ],
+                'statistik_keseluruhan' => $overallStats,
+                'rekap_per_mapel'       => array_values($statsByMapel),
+                'riwayat_pertemuan'     => $riwayatSesi,
             ]
         ]);
     }

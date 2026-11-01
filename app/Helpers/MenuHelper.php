@@ -233,6 +233,7 @@ class MenuHelper
             $monitoringSubItems = [
                 ['name' => 'Live Presensi Siswa', 'path' => route('live.boxes', [], false)],
                 ['name' => 'Live Log Sistem', 'path' => route('live.index', [], false)],
+                ['name' => 'Live Request Inspector', 'path' => route('public-logs.index', [], false)],
             ];
 
             $kehadiranItems = [

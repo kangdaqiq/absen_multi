@@ -138,12 +138,39 @@ Digunakan untuk autentikasi awal pegawai, guru, wali kelas, maupun **siswa**.
 ```
 
 - **Response Error (401 Unauthorized)**:
-```json
-{
-  "success": false,
-  "message": "NISN/Email atau Password/Tanggal Lahir salah."
-}
-```
+  - *Kondisi 1: Username, NIS, atau NISN Tidak Terdaftar*:
+    ```json
+    {
+      "success": false,
+      "message": "Username, NIS, atau NISN tidak terdaftar di sistem."
+    }
+    ```
+  - *Kondisi 2: Akun Siswa Sudah Kustom Password, namun mencoba login menggunakan Tanggal Lahir*:
+    ```json
+    {
+      "success": false,
+      "message": "Password tanggal lahir sudah tidak berlaku karena akun Anda telah menggunakan password kustom. Silakan gunakan password baru Anda."
+    }
+    ```
+  - *Kondisi 3: Password Akun Salah*:
+    ```json
+    {
+      "success": false,
+      "message": "Password akun yang Anda masukkan salah."
+    }
+    ```
+  - *Kondisi 4: Akun Siswa Masih Default (belum ganti password), namun tanggal lahir salah*:
+    ```json
+    {
+      "success": false,
+      "message": "Password / Tanggal Lahir (format: ddmmyyyy) yang Anda masukkan salah."
+    }
+    ```
+
+> 📌 **Aturan Password Siswa**:
+> 1. Akun siswa baru secara default menggunakan Tanggal Lahir siswa (format fleksibel: `ddmmyyyy`, `yyyy-mm-dd`, `d/m/Y`, dll).
+> 2. Begitu siswa mengubah password melalui endpoint `/api/mobile/change-password`, **password tanggal lahir otomatis tidak berlaku lagi**. Siswa wajib menggunakan password kustom barunya.
+> 3. Login siswa tidak akan pernah menimpa atau mereset password kustom siswa kembali ke tanggal lahir.
 
 ---
 
@@ -1465,6 +1492,138 @@ Mengambil jadwal pelajaran lengkap selama satu minggu untuk kelas siswa, dikelom
 ```
 
 ---
+
+### 8.10 Riwayat Absensi Mapel & Rekap Kehadiran KBM Siswa (`GET /api/mobile/student/kbm-history`)
+Digunakan oleh aplikasi mobile untuk menampilkan rekap akumulasi kehadiran siswa per mata pelajaran (Total Sesi, Hadir, Sakit, Izin, Alpha, Telat, Dispensasi, dan % Kehadiran) serta log kronologis riwayat sesi pertemuan KBM yang telah dijalani siswa (lengkap dengan materi jurnal yang diajarkan dan catatan guru).
+
+- **URL**: `/api/mobile/student/kbm-history` *(alias: `/api/mobile/siswa/kbm-history` atau `/api/mobile/student/riwayat-mapel`)*
+- **Method**: `GET`
+- **Auth**: Bearer Token (Siswa)
+- **Query Parameters**:
+  - `mapel_id` *(integer, optional)*: Filter hanya untuk mata pelajaran tertentu.
+  - `start_date` *(date YYYY-MM-DD, optional)*: Tanggal awal rentang riwayat.
+  - `end_date` *(date YYYY-MM-DD, optional)*: Tanggal akhir rentang riwayat.
+  - `limit` *(integer, optional, default: 50)*: Batas jumlah log riwayat pertemuan.
+
+- **Response Success (200 OK)**:
+```json
+{
+  "success": true,
+  "message": "Riwayat absensi mata pelajaran berhasil diambil.",
+  "data": {
+    "student": {
+      "id": 2201,
+      "nama": "Aditya Rusliano Akbar",
+      "nis": "0101",
+      "kelas_id": 163,
+      "kelas_nama": "XI TBSM",
+      "foto_url": "https://ui-avatars.com/api/?name=Aditya+Rusliano+Akbar"
+    },
+    "filter": {
+      "mapel_id": null,
+      "start_date": null,
+      "end_date": null
+    },
+    "statistik_keseluruhan": {
+      "total_sesi": 4,
+      "hadir": 3,
+      "sakit": 0,
+      "izin": 0,
+      "alpha": 1,
+      "telat": 0,
+      "dispensasi": 0,
+      "persentase": "75%",
+      "persentase_numeric": 75.0
+    },
+    "rekap_per_mapel": [
+      {
+        "mapel_id": 36,
+        "nama_mapel": "Teknologi Injeksi",
+        "guru_pengampu": "Walito, S.Pd",
+        "guru_nip": "-",
+        "guru_foto": null,
+        "total_pertemuan": 1,
+        "hadir": 1,
+        "sakit": 0,
+        "izin": 0,
+        "alpha": 0,
+        "telat": 0,
+        "dispensasi": 0,
+        "persentase": "100%",
+        "persentase_numeric": 100.0
+      },
+      {
+        "mapel_id": 31,
+        "nama_mapel": "Pemeliharaan Chasis Sepeda Motor",
+        "guru_pengampu": "Walito, S.Pd",
+        "guru_nip": "-",
+        "guru_foto": null,
+        "total_pertemuan": 2,
+        "hadir": 2,
+        "sakit": 0,
+        "izin": 0,
+        "alpha": 0,
+        "telat": 0,
+        "dispensasi": 0,
+        "persentase": "100%",
+        "persentase_numeric": 100.0
+      },
+      {
+        "mapel_id": 27,
+        "nama_mapel": "Pemeliharaan Kelistrikan Sepeda Motor",
+        "guru_pengampu": "Ahmad Daqiqi Syahrulloh, S.H.",
+        "guru_nip": "-",
+        "guru_foto": null,
+        "total_pertemuan": 1,
+        "hadir": 0,
+        "sakit": 0,
+        "izin": 0,
+        "alpha": 1,
+        "telat": 0,
+        "dispensasi": 0,
+        "persentase": "0%",
+        "persentase_numeric": 0.0
+      }
+    ],
+    "riwayat_pertemuan": [
+      {
+        "id": 1042,
+        "jadwal_pelajaran_id": 588,
+        "jurnal_pelajaran_id": 32,
+        "tanggal": "2026-10-24",
+        "tanggal_format": "24 Oktober 2026",
+        "hari": "Sabtu",
+        "jam_ke": "1 - 2",
+        "jam_mulai": "08:00",
+        "jam_selesai": "09:00",
+        "ruangan": "-",
+        "mapel_id": 36,
+        "mapel_nama": "Teknologi Injeksi",
+        "guru": {
+          "id": 241,
+          "nama": "Walito, S.Pd",
+          "nip": "-",
+          "foto_url": null
+        },
+        "status": "H",
+        "status_label": "Hadir",
+        "status_badge": "bg-success-50 text-success-700 dark:bg-success-500/15 dark:text-success-400 border border-success-200 dark:border-success-500/20",
+        "keterangan": "",
+        "jurnal": {
+          "id": 32,
+          "materi": "Materi pembahasan injeksi",
+          "catatan": null,
+          "has_dokumentasi": false
+        },
+        "waktu_absen": "2026-10-24 08:35:10"
+      }
+    ]
+  }
+}
+```
+
+---
+
 
 ## ☁️ 9. Cloud Storage (Cloudflare R2 / S3) & Dokumen Digital
 

@@ -18,10 +18,46 @@ use App\Models\Jadwal;
 use App\Models\UserFaceData;
 use App\Services\FcmNotificationService;
 use App\Services\FaceRecognitionService;
+use App\Services\AttendanceCoreService;
 use Carbon\Carbon;
 
 class MobileAttendanceController extends Controller
 {
+    protected AttendanceCoreService $attendanceCore;
+
+    public function __construct(AttendanceCoreService $attendanceCore)
+    {
+        $this->attendanceCore = $attendanceCore;
+    }
+
+    /**
+     * Helper seragam untuk mencatat audit log API Mobile ke api_logs
+     */
+    private function logMobile(
+        ?int $schoolId,
+        string $action,
+        ?string $uid,
+        bool $success,
+        string $message,
+        ?Request $request = null
+    ): void {
+        try {
+            $req = $request ?: request();
+            ApiLog::create([
+                'school_id' => $schoolId,
+                'api_key' => 'MOBILE_APP',
+                'action' => $action,
+                'uid' => $uid,
+                'success' => $success,
+                'message' => $message,
+                'ip_address' => $req?->ip() ?? '127.0.0.1',
+                'user_agent' => $req?->userAgent() ?? 'Android Mobile App',
+                'created_at' => now(),
+            ]);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning("ApiLog error: " . $e->getMessage());
+        }
+    }
     public function login(Request $request)
     {
         $request->validate([
@@ -32,14 +68,79 @@ class MobileAttendanceController extends Controller
         $loginInput = trim($request->email);
         $passwordInput = trim($request->password);
 
-        // 1. Cek User tabel terlebih dahulu (Guru, Wali Kelas, Admin)
+        // 1. Cek User tabel terlebih dahulu (Guru, Wali Kelas, Admin, atau NIP)
         $user = User::where('email', $loginInput)
             ->orWhere('username', $loginInput)
             ->first();
 
-        // Jika user ditemukan dan password hash cocok (Guru/Admin)
+        if (!$user) {
+            $guruByNip = Guru::where('nip', $loginInput)->first();
+            if ($guruByNip && $guruByNip->user_id) {
+                $user = User::find($guruByNip->user_id);
+            }
+        }
+
+        // Jika user ditemukan dan password hash cocok (Guru/Admin/Siswa)
         if ($user && Hash::check($passwordInput, $user->password_hash ?? $user->password)) {
-            // Generate Sanctum Token
+            // Jika user adalah akun Siswa
+            if ($user->role === 'student' || $user->role === 'siswa' || $user->student) {
+                $siswa = $user->student ?? Siswa::with(['kelas', 'school'])->where('user_id', $user->id)->first();
+                if (!$siswa) {
+                    $cleanNis = str_replace('siswa_', '', $user->username);
+                    $siswa = Siswa::with(['kelas', 'school'])->where('nis', $cleanNis)->first();
+                }
+
+                if ($siswa) {
+                    if ($request->filled('fcm_token')) {
+                        $this->assignFcmToken($request->fcm_token, $user, $siswa);
+                    }
+
+                    $token = $user->createToken('android-app-siswa')->plainTextToken;
+
+                    $this->logMobile(
+                        $siswa->school_id,
+                        'mobile_login_student',
+                        $siswa->nis,
+                        true,
+                        "Login siswa berhasil: {$siswa->nama} (NIS: {$siswa->nis})",
+                        $request
+                    );
+
+                    return response()->json([
+                        'success' => true,
+                        'message' => 'Login siswa berhasil',
+                        'token' => $token,
+                        'user' => [
+                            'id' => $user->id,
+                            'full_name' => $siswa->nama,
+                            'username' => $siswa->nis,
+                            'email' => $user->email,
+                            'role' => 'student',
+                            'nis' => $siswa->nis,
+                            'tgl_lahir' => $siswa->tgl_lahir ? Carbon::parse($siswa->tgl_lahir)->format('Y-m-d') : null,
+                            'no_wa' => $siswa->no_wa,
+                            'no_wa_ortu' => $siswa->wa_ortu,
+                            'wa_ortu' => $siswa->wa_ortu,
+                            'school_id' => $siswa->school_id,
+                            'student' => [
+                                'id' => $siswa->id,
+                                'nama' => $siswa->nama,
+                                'nis' => $siswa->nis,
+                                'tgl_lahir' => $siswa->tgl_lahir ? Carbon::parse($siswa->tgl_lahir)->format('Y-m-d') : null,
+                                'no_wa' => $siswa->no_wa,
+                                'no_wa_ortu' => $siswa->wa_ortu,
+                                'wa_ortu' => $siswa->wa_ortu,
+                                'foto_url' => $siswa->foto_url,
+                                'kelas_id' => $siswa->kelas_id,
+                                'kelas_name' => $siswa->kelas ? ($siswa->kelas->nama_kelas ?? $siswa->kelas->nama) : null,
+                            ]
+                        ],
+                        'school' => $this->formatSchoolResponse($siswa->school, $siswa->school_id)
+                    ]);
+                }
+            }
+
+            // Generate Sanctum Token untuk Guru / Pegawai / Admin
             $token = $user->createToken('android-app')->plainTextToken;
 
             $isWaliKelas = false;
@@ -124,7 +225,7 @@ class MobileAttendanceController extends Controller
             ]);
         }
 
-        // 2. Cek apakah login sebagai Siswa (NIS/NISN sebagai username, Tanggal Lahir sebagai password)
+        // 2. Cek apakah login sebagai Siswa (NIS/NISN sebagai username, Password Kustom atau Tanggal Lahir sebagai password)
         try {
             $siswa = Siswa::with(['kelas', 'school'])
                 ->where(function ($q) use ($loginInput) {
@@ -135,40 +236,74 @@ class MobileAttendanceController extends Controller
                 })
                 ->first();
 
-            if ($siswa && !empty($siswa->tgl_lahir)) {
-                $isBirthDateValid = false;
-                try {
-                    $birthDate = Carbon::parse($siswa->tgl_lahir);
-                    $cleanInputPass = preg_replace('/[^0-9]/', '', $passwordInput);
-
-                    $validFormats = [
-                        $birthDate->format('Y-m-d'),   // 2008-05-15
-                        $birthDate->format('d-m-Y'),   // 15-05-2008
-                        $birthDate->format('Y/m/d'),   // 2008/05/15
-                        $birthDate->format('d/m/Y'),   // 15/05/2008
-                        $birthDate->format('Ymd'),     // 20080515
-                        $birthDate->format('dmY'),     // 15052008
-                    ];
-
-                    $isBirthDateValid = in_array($passwordInput, $validFormats) ||
-                                        in_array($cleanInputPass, [$birthDate->format('Ymd'), $birthDate->format('dmY')]);
-                } catch (\Exception $e) {
-                    $isBirthDateValid = false;
+            if ($siswa) {
+                // Temukan atau buatkan shadow User untuk siswa agar memiliki token Sanctum
+                $user = null;
+                if (\Illuminate\Support\Facades\Schema::hasColumn('siswa', 'user_id') && $siswa->user_id) {
+                    $user = User::find($siswa->user_id);
                 }
 
-                if ($isBirthDateValid) {
-                    // Temukan atau buatkan shadow User untuk siswa agar memiliki token Sanctum
-                    $user = null;
-                    if (\Illuminate\Support\Facades\Schema::hasColumn('siswa', 'user_id') && $siswa->user_id) {
-                        $user = User::find($siswa->user_id);
-                    }
+                if (!$user) {
+                    $user = User::where('username', 'siswa_' . $siswa->nis)
+                        ->orWhere('username', $siswa->nis)
+                        ->orWhere('email', $siswa->nis . '@siswa.local')
+                        ->first();
+                }
 
-                    if (!$user) {
-                        $user = User::where('username', 'siswa_' . $siswa->nis)
-                            ->orWhere('username', $siswa->nis)
-                            ->first();
-                    }
+                $isPasswordValid = false;
 
+                // A. Format valid tanggal lahir default siswa
+                $validFormats = [];
+                $cleanInputPass = preg_replace('/[^0-9]/', '', $passwordInput);
+                $birthDateObj = null;
+                if (!empty($siswa->tgl_lahir)) {
+                    try {
+                        $birthDateObj = Carbon::parse($siswa->tgl_lahir);
+                        $validFormats = [
+                            $birthDateObj->format('Y-m-d'),   // 2008-05-15
+                            $birthDateObj->format('d-m-Y'),   // 15-05-2008
+                            $birthDateObj->format('Y/m/d'),   // 2008/05/15
+                            $birthDateObj->format('d/m/Y'),   // 15/05/2008
+                            $birthDateObj->format('Ymd'),     // 20080515
+                            $birthDateObj->format('dmY'),     // 15052008
+                        ];
+                    } catch (\Exception $e) {
+                        $validFormats = [];
+                    }
+                }
+
+                // B. Cek apakah user sudah memiliki password kustom
+                // Akun dianggap memiliki password kustom jika password_hash terisi dan TIDAK cocok dengan tanggal lahir
+                $hasCustomPassword = false;
+                if ($user && !empty($user->password_hash ?? $user->password)) {
+                    $matchesBirthdate = false;
+                    foreach ($validFormats as $fmt) {
+                        if (Hash::check($fmt, $user->password_hash ?? $user->password)) {
+                            $matchesBirthdate = true;
+                            break;
+                        }
+                    }
+                    if (!$matchesBirthdate) {
+                        $hasCustomPassword = true;
+                    }
+                }
+
+                // C. Verifikasi login:
+                if ($hasCustomPassword) {
+                    // JIKA PASSWORD SUDAH CUSTOM, TANGGAL LAHIR TIDAK BERLAKU LAGI
+                    if ($user && Hash::check($passwordInput, $user->password_hash ?? $user->password)) {
+                        $isPasswordValid = true;
+                    }
+                } else {
+                    // JIKA BELUM CUSTOM (MASIH DEFAULT), HANYA TANGGAL LAHIR DEFAULT YANG BERLAKU
+                    if (!empty($validFormats) && $birthDateObj) {
+                        if (in_array($passwordInput, $validFormats) || in_array($cleanInputPass, [$birthDateObj->format('Ymd'), $birthDateObj->format('dmY')])) {
+                            $isPasswordValid = true;
+                        }
+                    }
+                }
+
+                if ($isPasswordValid) {
                     if (!$user) {
                         $user = User::create([
                             'full_name' => $siswa->nama,
@@ -181,7 +316,10 @@ class MobileAttendanceController extends Controller
                     } else {
                         $user->role = 'student';
                         $user->school_id = $siswa->school_id;
-                        $user->password_hash = Hash::make($passwordInput);
+                        // JANGAN menimpa password kustom jika user login pakai password tanggal lahir
+                        if (empty($user->password_hash) && empty($user->password)) {
+                            $user->password_hash = Hash::make($passwordInput);
+                        }
                         $user->save();
                     }
 
@@ -199,17 +337,14 @@ class MobileAttendanceController extends Controller
 
                     $token = $user->createToken('android-app-siswa')->plainTextToken;
 
-                    ApiLog::create([
-                        'school_id' => $siswa->school_id,
-                        'api_key' => 'MOBILE_APP',
-                        'action' => 'mobile_login_student',
-                        'uid' => $siswa->nis,
-                        'success' => true,
-                        'message' => "Login siswa berhasil: {$siswa->nama} (NIS: {$siswa->nis})",
-                        'ip_address' => $request->ip(),
-                        'user_agent' => $request->userAgent() ?? 'Android Mobile App',
-                        'created_at' => now(),
-                    ]);
+                    $this->logMobile(
+                        $siswa->school_id,
+                        'mobile_login_student',
+                        $siswa->nis,
+                        true,
+                        "Login siswa berhasil: {$siswa->nama} (NIS: {$siswa->nis})",
+                        $request
+                    );
 
                     return response()->json([
                         'success' => true,
@@ -249,13 +384,36 @@ class MobileAttendanceController extends Controller
         }
 
         // 3. Jika gagal autentikasi
+        $isIdentityFound = !empty($user) || !empty($siswa);
+        $failAction = 'mobile_login_failed';
+
+        if (!$isIdentityFound) {
+            $failAction = 'mobile_login_not_found';
+            $failMessage = 'Username, NIS, atau NISN tidak terdaftar di sistem.';
+        } elseif (!empty($siswa)) {
+            if (!empty($hasCustomPassword) && $hasCustomPassword) {
+                $isTryingBirthdate = (!empty($validFormats) && in_array($passwordInput, $validFormats))
+                    || (!empty($birthDateObj) && in_array($cleanInputPass, [$birthDateObj->format('Ymd'), $birthDateObj->format('dmY')]));
+                if ($isTryingBirthdate) {
+                    $failMessage = 'Password tanggal lahir sudah tidak berlaku karena akun Anda telah menggunakan password kustom. Silakan gunakan password baru Anda.';
+                } else {
+                    $failMessage = 'Password akun yang Anda masukkan salah.';
+                }
+            } else {
+                $failMessage = 'Password / Tanggal Lahir (format: ddmmyyyy) yang Anda masukkan salah.';
+            }
+        } else {
+            // Akun Guru / Pegawai / Admin ditemukan tapi password salah
+            $failMessage = 'Password yang Anda masukkan salah.';
+        }
+
         ApiLog::create([
             'school_id' => $user?->school_id ?? $siswa?->school_id,
             'api_key' => 'MOBILE_APP',
-            'action' => 'mobile_login_failed',
+            'action' => $failAction,
             'uid' => $loginInput,
             'success' => false,
-            'message' => 'Login gagal: NISN/Email atau Password/Tgl Lahir salah',
+            'message' => "Login gagal: {$failMessage} ({$loginInput})",
             'ip_address' => $request->ip(),
             'user_agent' => $request->userAgent() ?? 'Android Mobile App',
             'created_at' => now(),
@@ -263,7 +421,7 @@ class MobileAttendanceController extends Controller
 
         return response()->json([
             'success' => false,
-            'message' => 'NISN/Email atau Password/Tanggal Lahir salah.'
+            'message' => $failMessage
         ], 401);
     }
 
@@ -766,6 +924,8 @@ class MobileAttendanceController extends Controller
 
         if ($faceData && $isFaceEnabled) {
             if (!$request->hasFile('photo')) {
+                $this->logMobile($schoolId, 'mobile_checkin_face_rejected', $user?->username ?? $user?->email, false, 'Absen Masuk Ditolak: Foto selfie verifikasi wajah wajib disertakan saat absen masuk.', $request);
+
                 return response()->json([
                     'success' => false,
                     'message' => 'Absen ditolak: Foto selfie verifikasi wajah wajib disertakan saat absen masuk.'
@@ -775,17 +935,7 @@ class MobileAttendanceController extends Controller
             $compareResult = FaceRecognitionService::compareFace($faceData->face_embedding, $request->file('photo'), $faceData);
 
             if (!$compareResult['success']) {
-                ApiLog::create([
-                    'school_id' => $schoolId,
-                    'api_key' => 'MOBILE_APP',
-                    'action' => 'mobile_checkin_face_failed',
-                    'uid' => $user?->username ?? $user?->email,
-                    'success' => false,
-                    'message' => "Verifikasi Wajah Gagal: " . ($compareResult['message'] ?? 'Wajah tidak terdeteksi'),
-                    'ip_address' => $request->ip(),
-                    'user_agent' => $request->userAgent() ?? 'Android Mobile App',
-                    'created_at' => now(),
-                ]);
+                $this->logMobile($schoolId, 'mobile_checkin_face_failed', $user?->username ?? $user?->email, false, "Verifikasi Wajah Gagal: " . ($compareResult['message'] ?? 'Wajah tidak terdeteksi'), $request);
 
                 return response()->json([
                     'success' => false,
@@ -798,17 +948,7 @@ class MobileAttendanceController extends Controller
             $simPercent = (float) ($compareResult['similarity_percent'] ?? round($faceSimilarity * 100, 1));
 
             if (!$isFaceMatched) {
-                ApiLog::create([
-                    'school_id' => $schoolId,
-                    'api_key' => 'MOBILE_APP',
-                    'action' => 'mobile_checkin_face_mismatch',
-                    'uid' => $user?->username ?? $user?->email,
-                    'success' => false,
-                    'message' => "Wajah Tidak Cocok: {$user?->full_name} (Kemiripan: {$simPercent}%)",
-                    'ip_address' => $request->ip(),
-                    'user_agent' => $request->userAgent() ?? 'Android Mobile App',
-                    'created_at' => now(),
-                ]);
+                $this->logMobile($schoolId, 'mobile_checkin_face_mismatch', $user?->username ?? $user?->email, false, "Wajah Tidak Cocok: {$user?->full_name} (Kemiripan: {$simPercent}%)", $request);
 
                 return response()->json([
                     'success' => false,
@@ -837,282 +977,168 @@ class MobileAttendanceController extends Controller
                 $teacher->update(['user_id' => $user->id]);
             }
 
-            // CEK SHIFT GURU
-            $shift = $teacher->getShiftForDate($now);
-            if (!$shift) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Tidak ada jadwal shift kerja aktif untuk Anda hari ini.'
-                ], 422);
+            $coreResult = $this->attendanceCore->recordTeacherAttendance($teacher, [
+                'school_id' => $schoolId,
+                'now' => $now,
+                'mode' => 'masuk',
+                'channel' => 'mobile',
+                'similarity' => $faceSimilarity,
+                'uid' => $teacher->nip ?? ($user->username ?? $user->email),
+            ]);
+
+            $absen = $coreResult['absensi_guru'] ?? null;
+            if (!$absen) {
+                $absen = AbsensiGuru::where('guru_id', $teacher->id)
+                    ->where('tanggal', $today)
+                    ->whereNull('jadwal_pelajaran_id')
+                    ->first();
             }
-
-            // CEK RENTANG JAM SCAN MASUK SHIFT
-            if (!$shift->isInCheckInWindow($nowTime)) {
-                $windowStr = ($shift->awal_absen_masuk && $shift->akhir_absen_masuk)
-                    ? Carbon::parse($shift->awal_absen_masuk)->format('H:i') . ' - ' . Carbon::parse($shift->akhir_absen_masuk)->format('H:i')
-                    : '-';
-
-                $msg = $nowTime < $shift->awal_absen_masuk
-                    ? "Absen masuk belum dibuka (Jadwal masuk: {$windowStr})"
-                    : "Batas waktu absen masuk sudah ditutup (Jadwal masuk: {$windowStr})";
-
-                return response()->json([
-                    'success' => false,
-                    'message' => $msg,
-                    'window' => $windowStr
-                ], 422);
+            if ($absen) {
+                $absen->loadMissing('shift');
             }
+            $shift = $absen?->shift ?? $teacher->getShiftForDate($now);
 
-            // Cek apakah sudah absen masuk hari ini
-            $existingAbsen = AbsensiGuru::where('guru_id', $teacher->id)
-                ->where('tanggal', $today)
-                ->whereNull('jadwal_pelajaran_id')
-                ->first();
+            if ($coreResult['ok']) {
+                $faceNote = (isset($faceSimilarity) && $faceSimilarity !== null) ? " [Wajah Cocok: {$simPercent}%]" : "";
 
-            if ($existingAbsen && $existingAbsen->jam_masuk) {
-                $existingAbsen->loadMissing('shift');
+                if (in_array($coreResult['type'] ?? '', ['sudah_absen_masuk', 'sudah_lengkap', 'absen_sudah_masuk_guru'])) {
+                    $this->logMobile($schoolId, 'mobile_checkin_warning', $teacher->nip ?? ($user->username ?? $user->email), true, "Sudah absen masuk sebelumnya: {$user->full_name}", $request);
+
+                    return response()->json([
+                        'success' => true,
+                        'message' => 'Anda sudah melakukan absen masuk hari ini',
+                        'data' => [
+                            'tanggal' => $today,
+                            'jam_masuk' => $absen?->jam_masuk,
+                            'jam_pulang' => $absen?->jam_pulang,
+                            'status_kehadiran' => $absen?->status_kehadiran,
+                            'shift' => $absen?->shift ?? $shift,
+                            'shift_name' => $absen?->shift?->nama_shift ?? $shift?->nama_shift,
+                            'is_checked_in' => true,
+                            'is_checked_out' => !empty($absen?->jam_pulang)
+                        ]
+                    ]);
+                }
+
+                $status = $absen?->status ?? 'Hadir';
+                $statusKehadiran = $absen?->status_kehadiran ?? 'tepat_waktu';
+                $menitTerlambat = $absen?->menit_terlambat ?? 0;
+
+                $this->logMobile($schoolId, 'mobile_checkin', $teacher->nip ?? ($user->username ?? $user->email), true, "Absen Masuk: {$user->full_name} (" . ($shift?->nama_shift ?? 'Shift') . " - {$status}){$faceNote}", $request);
+
                 return response()->json([
                     'success' => true,
-                    'message' => 'Anda sudah melakukan absen masuk hari ini',
+                    'message' => "Absen masuk berhasil dicatat ({$status})",
                     'data' => [
                         'tanggal' => $today,
-                        'jam_masuk' => $existingAbsen->jam_masuk,
-                        'jam_pulang' => $existingAbsen->jam_pulang,
-                        'status_kehadiran' => $existingAbsen->status_kehadiran,
-                        'shift' => $existingAbsen->shift ?? $shift,
-                        'shift_name' => $existingAbsen->shift?->nama_shift ?? $shift?->nama_shift,
+                        'jam_masuk' => $absen?->jam_masuk,
+                        'jam_pulang' => $absen?->jam_pulang,
+                        'status' => $status,
+                        'status_kehadiran' => $statusKehadiran,
+                        'menit_terlambat' => $menitTerlambat,
+                        'shift' => $absen?->shift ?? $shift,
+                        'shift_name' => $shift?->nama_shift,
+                        'face_similarity_score' => $faceSimilarity,
+                        'is_face_matched' => $isFaceMatched,
+                        'photo_checkin_url' => null,
                         'is_checked_in' => true,
-                        'is_checked_out' => !empty($existingAbsen->jam_pulang)
+                        'is_checked_out' => !empty($absen?->jam_pulang)
                     ]
                 ]);
             }
 
-            // Hitung Keterlambatan
-            $isLate = $shift->isLate($nowTime);
-            $menitTerlambat = $isLate ? $shift->calculateLateMinutes($nowTime) : 0;
-            $status = $isLate ? 'Terlambat' : 'Hadir';
-            $statusKehadiran = $isLate ? 'terlambat' : 'tepat_waktu';
-            $keterangan = $isLate
-                ? "Terlambat {$menitTerlambat} m ({$shift->nama_shift}) - Mobile App"
-                : "Tepat Waktu ({$shift->nama_shift}) - Mobile App";
+            // Gagal absen masuk
+            $this->logMobile($schoolId, 'mobile_checkin_rejected', $teacher->nip ?? ($user->username ?? $user->email), false, "Absen Masuk Ditolak: {$coreResult['message']} ({$user->full_name})", $request);
 
-            $absen = AbsensiGuru::updateOrCreate(
-                [
-                    'guru_id' => $teacher->id,
-                    'tanggal' => $today,
-                    'jadwal_pelajaran_id' => null,
-                ],
-                [
-                    'school_id' => $schoolId,
-                    'shift_id' => $shift->id,
-                    'waktu_hadir' => $now,
-                    'jam_masuk' => $nowTime,
-                    'menit_terlambat' => $menitTerlambat,
-                    'status_kehadiran' => $statusKehadiran,
-                    'status' => $status,
-                    'keterangan' => $keterangan,
-                    'photo_checkin_path' => $photoPath,
-                    'face_similarity_score' => $faceSimilarity,
-                    'is_face_matched' => $isFaceMatched,
-                    'created_at' => $now
-                ]
-            );
-
-            // Send FCM Push Notification (Pop-up banner)
-            try {
-                FcmNotificationService::sendToGuru($teacher, "Presensi Masuk Tercatat", "Halo {$teacher->nama}, absensi masuk Anda berhasil dicatat pukul {$now->format('H:i')} (Status: {$status}).", [
-                    'type' => 'checkin_guru',
-                    'status' => $status,
-                    'jam' => $now->format('H:i'),
-                ]);
-            } catch (\Throwable $e) {
-                // Ignore FCM failure
-            }
-
-            $faceNote = (isset($faceSimilarity) && $faceSimilarity !== null) ? " [Wajah Cocok: {$simPercent}%]" : "";
-            ApiLog::create([
-                'school_id' => $schoolId,
-                'api_key' => 'MOBILE_APP',
-                'action' => 'mobile_checkin',
-                'uid' => $teacher->nip ?? ($user->username ?? $user->email),
-                'success' => true,
-                'message' => "Absen Masuk: {$user->full_name} ({$shift->nama_shift} - {$status}){$faceNote}",
-                'ip_address' => $request->ip(),
-                'user_agent' => $request->userAgent() ?? 'Android Mobile App',
-                'created_at' => now(),
-            ]);
-
-            $absen->loadMissing('shift');
+            $windowStr = ($shift && $shift->awal_absen_masuk && $shift->akhir_absen_masuk)
+                ? Carbon::parse($shift->awal_absen_masuk)->format('H:i') . ' - ' . Carbon::parse($shift->akhir_absen_masuk)->format('H:i')
+                : '-';
 
             return response()->json([
-                'success' => true,
-                'message' => "Absen masuk berhasil dicatat ({$status})",
-                'data' => [
-                    'tanggal' => $today,
-                    'jam_masuk' => $absen->jam_masuk,
-                    'jam_pulang' => $absen->jam_pulang,
-                    'status' => $status,
-                    'status_kehadiran' => $statusKehadiran,
-                    'menit_terlambat' => $menitTerlambat,
-                    'shift' => $absen->shift ?? $shift,
-                    'shift_name' => $shift->nama_shift,
-                    'face_similarity_score' => $faceSimilarity,
-                    'is_face_matched' => $isFaceMatched,
-                    'photo_checkin_url' => $photoPath ? asset('storage/' . $photoPath) : null,
-                    'is_checked_in' => true,
-                    'is_checked_out' => !empty($absen->jam_pulang)
-                ]
-            ]);
+                'success' => false,
+                'message' => $coreResult['message'] ?? 'Absen masuk ditolak',
+                'window' => $windowStr
+            ], 422);
         }
 
         // Case 2: Siswa (Student)
         if ($user && ($user->student || in_array($user->role, ['student', 'siswa']))) {
             $student = $user->student ?? Siswa::where('user_id', $user->id)->orWhere('nis', str_replace('siswa_', '', $user->username))->first();
             if ($student) {
-                // CHECK: Kelas Aktif
-                if ($student->kelas && !$student->kelas->is_active_attendance) {
-                    return response()->json(['success' => false, 'message' => 'Absensi dinonaktifkan untuk kelas Anda.'], 422);
+                $coreResult = $this->attendanceCore->recordStudentAttendance($student, [
+                    'school_id' => $schoolId,
+                    'now' => $now,
+                    'mode' => 'masuk',
+                    'channel' => 'mobile',
+                    'similarity' => $faceSimilarity,
+                    'uid' => $student->nis,
+                ]);
+
+                $att = $coreResult['attendance'] ?? null;
+                if (!$att) {
+                    $att = Attendance::where('student_id', $student->id)->where('tanggal', $today)->first();
                 }
 
-                // CHECK: Jadwal Harian Sekolah
-                $indexHari = (int) $now->format('N'); // 1 (Senin) - 7 (Minggu)
-                $jadwal = Jadwal::where('index_hari', $indexHari)
-                    ->where('is_active', 1)
-                    ->where('school_id', $schoolId)
-                    ->first();
+                if ($coreResult['ok']) {
+                    $faceNoteSiswa = (isset($faceSimilarity) && $faceSimilarity !== null) ? " [Wajah Cocok: {$simPercent}%]" : "";
 
-                if (!$jadwal) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'Hari ini adalah hari libur sekolah (tidak ada jadwal aktif).'
-                    ], 422);
-                }
+                    if (in_array($coreResult['type'] ?? '', ['sudah_absen_masuk', 'sudah_lengkap'])) {
+                        $this->logMobile($schoolId, 'mobile_checkin_student_warning', $student->nis, true, "Siswa sudah absen masuk sebelumnya: {$student->nama}", $request);
 
-                // Cek Rentang Jam Masuk
-                $awalAbsenMasuk = $jadwal->awal_absen_masuk;
-                $akhirAbsenMasuk = $jadwal->akhir_absen_masuk;
-                $jamMasuk = $jadwal->jam_masuk;
+                        return response()->json([
+                            'success' => true,
+                            'message' => 'Anda sudah melakukan absen masuk hari ini',
+                            'data' => [
+                                'tanggal' => $today,
+                                'jam_masuk' => $att?->jam_masuk,
+                                'jam_pulang' => $att?->jam_pulang,
+                                'status_kehadiran' => $att?->status,
+                                'shift' => null,
+                                'shift_name' => null,
+                                'is_checked_in' => true,
+                                'is_checked_out' => !empty($att?->jam_pulang)
+                            ]
+                        ]);
+                    }
 
-                if ($nowTime < $awalAbsenMasuk) {
-                    $jamBuka = Carbon::parse($awalAbsenMasuk)->format('H:i');
-                    return response()->json([
-                        'success' => false,
-                        'message' => "Absen masuk belum dibuka (Dibuka pukul {$jamBuka})"
-                    ], 422);
-                }
+                    $status = $att?->status ?? 'H';
+                    $readableStatus = $status === 'T' ? 'Terlambat' : 'Hadir';
+                    $statusKehadiran = $status === 'T' ? 'terlambat' : 'hadir';
 
-                if ($nowTime > $akhirAbsenMasuk) {
-                    $jamTutup = Carbon::parse($akhirAbsenMasuk)->format('H:i');
-                    return response()->json([
-                        'success' => false,
-                        'message' => "Batas waktu absen masuk sudah ditutup (Pukul {$jamTutup})"
-                    ], 422);
-                }
+                    $this->logMobile($schoolId, 'mobile_checkin_student', $student->nis, true, "Absen Masuk Siswa: {$student->nama} ({$status} - {$att?->keterangan}){$faceNoteSiswa}", $request);
 
-                $att = Attendance::where('student_id', $student->id)->where('tanggal', $today)->first();
-                if ($att && $att->jam_masuk) {
                     return response()->json([
                         'success' => true,
-                        'message' => 'Anda sudah melakukan absen masuk hari ini',
+                        'message' => "Absen masuk berhasil dicatat ({$readableStatus})",
                         'data' => [
                             'tanggal' => $today,
-                            'jam_masuk' => $att->jam_masuk,
-                            'jam_pulang' => $att->jam_pulang,
-                            'status_kehadiran' => $att->status,
+                            'jam_masuk' => $att?->jam_masuk,
+                            'jam_pulang' => $att?->jam_pulang,
+                            'status' => $status,
+                            'status_kehadiran' => $statusKehadiran,
+                            'keterangan' => $att?->keterangan,
                             'shift' => null,
                             'shift_name' => null,
+                            'face_similarity_score' => $faceSimilarity,
+                            'is_face_matched' => $isFaceMatched,
+                            'photo_checkin_url' => null,
                             'is_checked_in' => true,
-                            'is_checked_out' => !empty($att->jam_pulang)
+                            'is_checked_out' => !empty($att?->jam_pulang)
                         ]
                     ]);
                 }
 
-                // Hitung Terlambat
-                $status = 'H';
-                $keterangan = "Tepat Waktu - Mobile App";
-                if ($nowTime > $jamMasuk) {
-                    $status = 'T';
-                    $diffSeconds = Carbon::parse($today . ' ' . $nowTime)->diffInSeconds(Carbon::parse($today . ' ' . $jamMasuk));
-                    $jam = floor($diffSeconds / 3600);
-                    $menit = floor(($diffSeconds % 3600) / 60);
-                    $durasi = $jam > 0 ? "{$jam} jam {$menit} menit" : "{$menit} menit";
-                    $keterangan = "Telat {$durasi} - Mobile App";
-                }
-
-                $att = Attendance::updateOrCreate(
-                    [
-                        'student_id' => $student->id,
-                        'tanggal' => $today,
-                    ],
-                    [
-                        'jam_masuk' => $nowTime,
-                        'status' => $status,
-                        'keterangan' => $keterangan,
-                        'photo_checkin_path' => $photoPath,
-                        'face_similarity_score' => $faceSimilarity,
-                        'is_face_matched' => $isFaceMatched,
-                        'created_at' => $now
-                    ]
-                );
-
-                // Send FCM Push Notification (Pop-up banner)
-                try {
-                    $readableStatus = $status === 'T' ? 'Terlambat' : 'Hadir';
-                    FcmNotificationService::sendToSiswa($student, "Presensi Masuk Tercatat", "Halo {$student->nama}, absensi masuk Anda berhasil dicatat pukul {$now->format('H:i')} (Status: {$readableStatus}).", [
-                        'type' => 'checkin_siswa',
-                        'status' => $readableStatus,
-                        'jam' => $now->format('H:i'),
-                    ]);
-                } catch (\Throwable $e) {
-                    // Ignore FCM failure
-                }
-
-                $faceNoteSiswa = (isset($faceSimilarity) && $faceSimilarity !== null) ? " [Wajah Cocok: {$simPercent}%]" : "";
-                ApiLog::create([
-                    'school_id' => $schoolId,
-                    'api_key' => 'MOBILE_APP',
-                    'action' => 'mobile_checkin_student',
-                    'uid' => $student->nis,
-                    'success' => true,
-                    'message' => "Absen Masuk Siswa: {$student->nama} ({$status} - {$keterangan}){$faceNoteSiswa}",
-                    'ip_address' => $request->ip(),
-                    'user_agent' => $request->userAgent() ?? 'Android Mobile App',
-                    'created_at' => now(),
-                ]);
+                // Gagal absen siswa
+                $this->logMobile($schoolId, 'mobile_checkin_student_rejected', $student->nis, false, "Absen Masuk Siswa Ditolak: {$coreResult['message']} ({$student->nama})", $request);
 
                 return response()->json([
-                    'success' => true,
-                    'message' => "Absen masuk berhasil dicatat (" . ($status === 'T' ? 'Terlambat' : 'Hadir') . ")",
-                    'data' => [
-                        'tanggal' => $today,
-                        'jam_masuk' => $att->jam_masuk,
-                        'jam_pulang' => $att->jam_pulang,
-                        'status' => $status,
-                        'status_kehadiran' => $status === 'T' ? 'terlambat' : 'hadir',
-                        'keterangan' => $keterangan,
-                        'shift' => null,
-                        'shift_name' => null,
-                        'face_similarity_score' => $faceSimilarity,
-                        'is_face_matched' => $isFaceMatched,
-                        'photo_checkin_url' => $photoPath ? asset('storage/' . $photoPath) : null,
-                        'is_checked_in' => true,
-                        'is_checked_out' => !empty($att->jam_pulang)
-                    ]
-                ]);
+                    'success' => false,
+                    'message' => $coreResult['message'] ?? 'Absen masuk siswa ditolak'
+                ], 422);
             }
         }
 
-        ApiLog::create([
-            'school_id' => $schoolId,
-            'api_key' => 'MOBILE_APP',
-            'action' => 'mobile_checkin_failed',
-            'uid' => $user?->username ?? $user?->email,
-            'success' => false,
-            'message' => 'Absen Masuk Gagal: Role tidak didukung untuk absen',
-            'ip_address' => $request->ip(),
-            'user_agent' => $request->userAgent() ?? 'Android Mobile App',
-            'created_at' => now(),
-        ]);
+        $this->logMobile($schoolId, 'mobile_checkin_failed', $user?->username ?? $user?->email, false, 'Absen Masuk Gagal: Role tidak didukung untuk absen', $request);
 
         return response()->json(['success' => false, 'message' => 'Role tidak didukung untuk absen'], 400);
     }
@@ -1177,6 +1203,8 @@ class MobileAttendanceController extends Controller
 
         if ($faceData && $isFaceEnabled) {
             if (!$request->hasFile('photo')) {
+                $this->logMobile($schoolId, 'mobile_checkout_face_rejected', $user?->username ?? $user?->email, false, 'Absen pulang ditolak: Foto selfie verifikasi wajah wajib disertakan saat absen pulang.', $request);
+
                 return response()->json([
                     'success' => false,
                     'message' => 'Absen pulang ditolak: Foto selfie verifikasi wajah wajib disertakan saat absen pulang.'
@@ -1186,17 +1214,7 @@ class MobileAttendanceController extends Controller
             $compareResult = FaceRecognitionService::compareFace($faceData->face_embedding, $request->file('photo'), $faceData);
 
             if (!$compareResult['success']) {
-                ApiLog::create([
-                    'school_id' => $schoolId,
-                    'api_key' => 'MOBILE_APP',
-                    'action' => 'mobile_checkout_face_failed',
-                    'uid' => $user?->username ?? $user?->email,
-                    'success' => false,
-                    'message' => "Verifikasi Wajah Pulang Gagal: " . ($compareResult['message'] ?? 'Wajah tidak terdeteksi'),
-                    'ip_address' => $request->ip(),
-                    'user_agent' => $request->userAgent() ?? 'Android Mobile App',
-                    'created_at' => now(),
-                ]);
+                $this->logMobile($schoolId, 'mobile_checkout_face_failed', $user?->username ?? $user?->email, false, "Verifikasi Wajah Pulang Gagal: " . ($compareResult['message'] ?? 'Wajah tidak terdeteksi'), $request);
 
                 return response()->json([
                     'success' => false,
@@ -1209,17 +1227,7 @@ class MobileAttendanceController extends Controller
             $simPercent = (float) ($compareResult['similarity_percent'] ?? round($faceSimilarity * 100, 1));
 
             if (!$isFaceMatched) {
-                ApiLog::create([
-                    'school_id' => $schoolId,
-                    'api_key' => 'MOBILE_APP',
-                    'action' => 'mobile_checkout_face_mismatch',
-                    'uid' => $user?->username ?? $user?->email,
-                    'success' => false,
-                    'message' => "Wajah Pulang Tidak Cocok: {$user?->full_name} (Kemiripan: {$simPercent}%)",
-                    'ip_address' => $request->ip(),
-                    'user_agent' => $request->userAgent() ?? 'Android Mobile App',
-                    'created_at' => now(),
-                ]);
+                $this->logMobile($schoolId, 'mobile_checkout_face_mismatch', $user?->username ?? $user?->email, false, "Wajah Pulang Tidak Cocok: {$user?->full_name} (Kemiripan: {$simPercent}%)", $request);
 
                 return response()->json([
                     'success' => false,
@@ -1248,186 +1256,150 @@ class MobileAttendanceController extends Controller
                 $teacher->update(['user_id' => $user->id]);
             }
 
-            $absen = AbsensiGuru::where('guru_id', $teacher->id)
-                ->where('tanggal', $today)
-                ->whereNull('jadwal_pelajaran_id')
-                ->first();
+            $coreResult = $this->attendanceCore->recordTeacherAttendance($teacher, [
+                'school_id' => $schoolId,
+                'now' => $now,
+                'mode' => 'pulang',
+                'channel' => 'mobile',
+                'similarity' => $faceSimilarity,
+                'uid' => $teacher->nip ?? ($user->username ?? $user->email),
+                'ignore_checkout_toggle' => true,
+            ]);
 
-            if (!$absen || !$absen->jam_masuk) {
-                return response()->json(['success' => false, 'message' => 'Anda belum melakukan absen masuk hari ini'], 422);
+            $absen = $coreResult['absensi_guru'] ?? null;
+            if (!$absen) {
+                $absen = AbsensiGuru::where('guru_id', $teacher->id)
+                    ->where('tanggal', $today)
+                    ->whereNull('jadwal_pelajaran_id')
+                    ->first();
             }
+            if ($absen) {
+                $absen->loadMissing('shift');
+            }
+            $shift = $absen?->shift ?? $teacher->getShiftForDate($now);
 
-            // CEK SHIFT & RENTANG JAM PULANG
-            $shift = $teacher->getShiftForDate($now);
-            if ($shift && !$shift->isInCheckOutWindow($nowTime)) {
-                $windowStr = ($shift->awal_absen_pulang && $shift->akhir_absen_pulang)
-                    ? Carbon::parse($shift->awal_absen_pulang)->format('H:i') . ' - ' . Carbon::parse($shift->akhir_absen_pulang)->format('H:i')
-                    : '-';
+            if ($coreResult['ok'] && ($coreResult['type'] ?? '') === 'absen_pulang') {
+                $faceNote = (isset($faceSimilarity) && $faceSimilarity !== null) ? " [Wajah Cocok: {$simPercent}%]" : "";
 
-                $msg = $nowTime < $shift->awal_absen_pulang
-                    ? "Belum masuk waktu absen pulang (Jadwal pulang: {$windowStr})"
-                    : "Batas waktu absen pulang sudah ditutup (Jadwal pulang: {$windowStr})";
+                $this->logMobile($schoolId, 'mobile_checkout', $teacher->nip ?? ($user->username ?? $user->email), true, "Absen Pulang: {$user->full_name} (Lat: {$request->latitude}, Lng: {$request->longitude}){$faceNote}", $request);
 
                 return response()->json([
-                    'success' => false,
-                    'message' => $msg,
-                    'window' => $windowStr
-                ], 422);
-            }
-
-            $absen->update([
-                'jam_pulang' => $nowTime,
-                'updated_at' => $now
-            ]);
-
-            // Send FCM Push Notification (Pop-up banner)
-            try {
-                FcmNotificationService::sendToGuru($teacher, "Presensi Pulang Tercatat", "Halo {$teacher->nama}, absensi pulang Anda berhasil dicatat pukul {$now->format('H:i')}.", [
-                    'type' => 'checkout_guru',
-                    'jam' => $now->format('H:i'),
+                    'success' => true,
+                    'message' => 'Absen pulang berhasil dicatat',
+                    'data' => [
+                        'tanggal' => $today,
+                        'jam_masuk' => $absen?->jam_masuk,
+                        'jam_pulang' => $absen?->jam_pulang,
+                        'status_kehadiran' => $absen?->status_kehadiran,
+                        'shift' => $absen?->shift ?? $shift,
+                        'shift_name' => $absen?->shift?->nama_shift ?? $shift?->nama_shift,
+                        'is_checked_in' => true,
+                        'is_checked_out' => true
+                    ]
                 ]);
-            } catch (\Throwable $e) {
-                // Ignore FCM failure
             }
 
-            $faceNote = (isset($faceSimilarity) && $faceSimilarity !== null) ? " [Wajah Cocok: {$simPercent}%]" : "";
-            ApiLog::create([
-                'school_id' => $schoolId,
-                'api_key' => 'MOBILE_APP',
-                'action' => 'mobile_checkout',
-                'uid' => $teacher->nip ?? ($user->username ?? $user->email),
-                'success' => true,
-                'message' => "Absen Pulang: {$user->full_name} (Lat: {$request->latitude}, Lng: {$request->longitude}){$faceNote}",
-                'ip_address' => $request->ip(),
-                'user_agent' => $request->userAgent() ?? 'Android Mobile App',
-                'created_at' => now(),
-            ]);
+            if (in_array($coreResult['type'] ?? '', ['sudah_lengkap', 'sudah_absen_pulang'])) {
+                $this->logMobile($schoolId, 'mobile_checkout_warning', $teacher->nip ?? ($user->username ?? $user->email), true, "Guru {$user->full_name} sudah melakukan absen pulang sebelumnya", $request);
 
-            $absen->loadMissing('shift');
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Anda sudah melakukan absen pulang hari ini',
+                    'data' => [
+                        'tanggal' => $today,
+                        'jam_masuk' => $absen?->jam_masuk,
+                        'jam_pulang' => $absen?->jam_pulang,
+                        'status_kehadiran' => $absen?->status_kehadiran,
+                        'shift' => $absen?->shift ?? $shift,
+                        'shift_name' => $absen?->shift?->nama_shift ?? $shift?->nama_shift,
+                        'is_checked_in' => true,
+                        'is_checked_out' => true
+                    ]
+                ]);
+            }
+
+            $this->logMobile($schoolId, 'mobile_checkout_rejected', $teacher->nip ?? ($user->username ?? $user->email), false, "Absen Pulang Ditolak: {$coreResult['message']} ({$user->full_name})", $request);
+
+            $windowStr = ($shift && $shift->awal_absen_pulang && $shift->akhir_absen_pulang)
+                ? Carbon::parse($shift->awal_absen_pulang)->format('H:i') . ' - ' . Carbon::parse($shift->akhir_absen_pulang)->format('H:i')
+                : '-';
 
             return response()->json([
-                'success' => true,
-                'message' => 'Absen pulang berhasil dicatat',
-                'data' => [
-                    'tanggal' => $today,
-                    'jam_masuk' => $absen->jam_masuk,
-                    'jam_pulang' => $absen->jam_pulang,
-                    'status_kehadiran' => $absen->status_kehadiran,
-                    'shift' => $absen->shift ?? $shift,
-                    'shift_name' => $absen->shift?->nama_shift ?? $shift?->nama_shift,
-                    'is_checked_in' => true,
-                    'is_checked_out' => true
-                ]
-            ]);
+                'success' => false,
+                'message' => $coreResult['message'] ?? 'Absen pulang ditolak',
+                'window' => $windowStr
+            ], 422);
         }
 
         // Case 2: Siswa (Student)
         if ($user && ($user->student || in_array($user->role, ['student', 'siswa']))) {
             $student = $user->student ?? Siswa::where('user_id', $user->id)->orWhere('nis', str_replace('siswa_', '', $user->username))->first();
             if ($student) {
-                $att = Attendance::where('student_id', $student->id)->where('tanggal', $today)->first();
-                if (!$att || !$att->jam_masuk) {
-                    return response()->json(['success' => false, 'message' => 'Anda belum melakukan absen masuk hari ini'], 422);
-                }
-
-                // CHECK: Jadwal Harian Pulang Siswa
-                $indexHari = (int) $now->format('N');
-                $jadwal = Jadwal::where('index_hari', $indexHari)
-                    ->where('is_active', 1)
-                    ->where('school_id', $schoolId)
-                    ->first();
-
-                if ($jadwal) {
-                    $jamPulang = $jadwal->jam_pulang;
-                    $akhirAbsenPulang = $jadwal->akhir_absen_pulang;
-
-                    if ($nowTime < $jamPulang) {
-                        $jamBuka = Carbon::parse($jamPulang)->format('H:i');
-                        return response()->json([
-                            'success' => false,
-                            'message' => "Belum masuk waktu absen pulang (Dibuka pukul {$jamBuka})"
-                        ], 422);
-                    }
-
-                    if ($nowTime > $akhirAbsenPulang) {
-                        $jamTutup = Carbon::parse($akhirAbsenPulang)->format('H:i');
-                        return response()->json([
-                            'success' => false,
-                            'message' => "Batas waktu absen pulang sudah ditutup (Pukul {$jamTutup})"
-                        ], 422);
-                    }
-                }
-
-                $masuk = Carbon::parse($att->tanggal . ' ' . $att->jam_masuk);
-                $totalSeconds = abs($masuk->diffInSeconds($now, false));
-
-                $newStatus = $att->status;
-                $newKeterangan = $att->keterangan;
-                if ($att->status === 'B') {
-                    $newStatus = ($att->jam_masuk > ($jadwal->jam_masuk ?? '07:30')) ? 'T' : 'H';
-                    $newKeterangan = trim(str_replace('[Auto: Tidak Absen Pulang]', '', $newKeterangan ?? ''));
-                }
-
-                $att->update([
-                    'jam_pulang' => $nowTime,
-                    'total_seconds' => $totalSeconds,
-                    'status' => $newStatus,
-                    'keterangan' => $newKeterangan,
-                    'updated_at' => $now
-                ]);
-
-                // Send FCM Push Notification (Pop-up banner)
-                try {
-                    FcmNotificationService::sendToSiswa($student, "Presensi Pulang Tercatat", "Halo {$student->nama}, absensi pulang Anda berhasil dicatat pukul {$now->format('H:i')}.", [
-                        'type' => 'checkout_siswa',
-                        'jam' => $now->format('H:i'),
-                    ]);
-                } catch (\Throwable $e) {
-                    // Ignore FCM failure
-                }
-
-                $faceNoteSiswa = (isset($faceSimilarity) && $faceSimilarity !== null) ? " [Wajah Cocok: {$simPercent}%]" : "";
-                ApiLog::create([
+                $coreResult = $this->attendanceCore->recordStudentAttendance($student, [
                     'school_id' => $schoolId,
-                    'api_key' => 'MOBILE_APP',
-                    'action' => 'mobile_checkout_student',
+                    'now' => $now,
+                    'mode' => 'pulang',
+                    'channel' => 'mobile',
+                    'similarity' => $faceSimilarity,
                     'uid' => $student->nis,
-                    'success' => true,
-                    'message' => "Absen Pulang Siswa: {$student->nama} (Lat: {$request->latitude}, Lng: {$request->longitude}){$faceNoteSiswa}",
-                    'ip_address' => $request->ip(),
-                    'user_agent' => $request->userAgent() ?? 'Android Mobile App',
-                    'created_at' => now(),
+                    'ignore_checkout_toggle' => true,
                 ]);
+
+                $att = $coreResult['attendance'] ?? null;
+                if (!$att) {
+                    $att = Attendance::where('student_id', $student->id)->where('tanggal', $today)->first();
+                }
+
+                if ($coreResult['ok'] && ($coreResult['type'] ?? '') === 'absen_pulang') {
+                    $faceNoteSiswa = (isset($faceSimilarity) && $faceSimilarity !== null) ? " [Wajah Cocok: {$simPercent}%]" : "";
+
+                    $this->logMobile($schoolId, 'mobile_checkout_student', $student->nis, true, "Absen Pulang Siswa: {$student->nama} (Lat: {$request->latitude}, Lng: {$request->longitude}){$faceNoteSiswa}", $request);
+
+                    return response()->json([
+                        'success' => true,
+                        'message' => 'Absen pulang berhasil dicatat',
+                        'data' => [
+                            'tanggal' => $today,
+                            'jam_masuk' => $att?->jam_masuk,
+                            'jam_pulang' => $att?->jam_pulang,
+                            'status_kehadiran' => $att?->status,
+                            'shift' => null,
+                            'shift_name' => null,
+                            'is_checked_in' => true,
+                            'is_checked_out' => true
+                        ]
+                    ]);
+                }
+
+                if (in_array($coreResult['type'] ?? '', ['sudah_lengkap', 'sudah_absen_pulang'])) {
+                    $this->logMobile($schoolId, 'mobile_checkout_student_warning', $student->nis, true, "Siswa {$student->nama} sudah melakukan absen pulang sebelumnya", $request);
+
+                    return response()->json([
+                        'success' => true,
+                        'message' => 'Anda sudah melakukan absen pulang hari ini',
+                        'data' => [
+                            'tanggal' => $today,
+                            'jam_masuk' => $att?->jam_masuk,
+                            'jam_pulang' => $att?->jam_pulang,
+                            'status_kehadiran' => $att?->status,
+                            'shift' => null,
+                            'shift_name' => null,
+                            'is_checked_in' => true,
+                            'is_checked_out' => true
+                        ]
+                    ]);
+                }
+
+                $this->logMobile($schoolId, 'mobile_checkout_student_rejected', $student->nis, false, "Absen Pulang Siswa Ditolak: {$coreResult['message']} ({$student->nama})", $request);
 
                 return response()->json([
-                    'success' => true,
-                    'message' => 'Absen pulang siswa berhasil dicatat',
-                    'data' => [
-                        'tanggal' => $today,
-                        'jam_masuk' => $att->jam_masuk,
-                        'jam_pulang' => $att->jam_pulang,
-                        'status' => $newStatus,
-                        'status_kehadiran' => $newStatus === 'T' ? 'terlambat' : 'hadir',
-                        'shift' => null,
-                        'shift_name' => null,
-                        'is_checked_in' => true,
-                        'is_checked_out' => true
-                    ]
-                ]);
+                    'success' => false,
+                    'message' => $coreResult['message'] ?? 'Absen pulang ditolak'
+                ], 422);
             }
         }
 
-        ApiLog::create([
-            'school_id' => $schoolId,
-            'api_key' => 'MOBILE_APP',
-            'action' => 'mobile_checkout_failed',
-            'uid' => $user?->username ?? $user?->email,
-            'success' => false,
-            'message' => 'Absen Pulang Gagal: Role tidak didukung',
-            'ip_address' => $request->ip(),
-            'user_agent' => $request->userAgent() ?? 'Android Mobile App',
-            'created_at' => now(),
-        ]);
+        $this->logMobile($schoolId, 'mobile_checkout_failed', $user?->username ?? $user?->email, false, 'Absen Pulang Gagal: Role tidak didukung', $request);
 
         return response()->json(['success' => false, 'message' => 'Role tidak didukung'], 400);
     }
@@ -1639,6 +1611,7 @@ class MobileAttendanceController extends Controller
         $isStaff = in_array($userRole, $allowedRoles) || !empty($user?->guru);
 
         if (!$user || !$isStaff) {
+            $this->logMobile($user?->school_id, 'mobile_single_attendance_forbidden', $user?->username ?? $user?->email, false, "Akses update absensi ditolak: khusus dewan guru ({$user?->full_name})", $request);
             return response()->json(['success' => false, 'message' => 'Akses khusus dewan guru dan staf sekolah'], 403);
         }
 
@@ -1763,6 +1736,7 @@ class MobileAttendanceController extends Controller
         $isStaff = in_array($userRole, $allowedRoles) || !empty($user?->guru);
 
         if (!$user || !$isStaff) {
+            $this->logMobile($user?->school_id, 'mobile_single_attendance_forbidden', $user?->username ?? $user?->email, false, "Akses update absensi ditolak: khusus dewan guru ({$user?->full_name})", $request);
             return response()->json(['success' => false, 'message' => 'Akses khusus dewan guru dan staf sekolah'], 403);
         }
 
@@ -1888,6 +1862,7 @@ class MobileAttendanceController extends Controller
         $isStaff = in_array($userRole, $allowedRoles) || !empty($user?->guru);
 
         if (!$user || !$isStaff) {
+            $this->logMobile($user?->school_id, 'mobile_single_attendance_forbidden', $user?->username ?? $user?->email, false, "Akses update absensi ditolak: khusus dewan guru ({$user?->full_name})", $request);
             return response()->json(['success' => false, 'message' => 'Akses khusus dewan guru dan staf sekolah'], 403);
         }
 
@@ -2008,6 +1983,15 @@ class MobileAttendanceController extends Controller
             // ignore
         }
 
+        $this->logMobile(
+            $schoolId,
+            'mobile_bulk_student_attendance',
+            $user->username ?? $user->email,
+            true,
+            "Guru {$user->full_name} menyimpan absensi {$count} siswa tanggal {$tanggal}",
+            $request
+        );
+
         return response()->json([
             'success' => true,
             'message' => 'Absensi seluruh siswa berhasil disimpan',
@@ -2024,6 +2008,7 @@ class MobileAttendanceController extends Controller
         $isStaff = in_array($userRole, $allowedRoles) || !empty($user?->guru);
 
         if (!$user || !$isStaff) {
+            $this->logMobile($user?->school_id, 'mobile_single_attendance_forbidden', $user?->username ?? $user?->email, false, "Akses update absensi ditolak: khusus dewan guru ({$user?->full_name})", $request);
             return response()->json(['success' => false, 'message' => 'Akses khusus dewan guru dan staf sekolah'], 403);
         }
 
@@ -2106,6 +2091,15 @@ class MobileAttendanceController extends Controller
         } catch (\Throwable $e) {
             // ignore
         }
+
+        $this->logMobile(
+            $schoolId,
+            'mobile_single_student_attendance',
+            $user->username ?? $user->email,
+            true,
+            "Update absensi siswa ID {$request->student_id} ({$status}) tanggal {$tanggal} oleh {$user->full_name}",
+            $request
+        );
 
         return response()->json(['success' => true, 'message' => 'Absensi siswa tersimpan secara realtime']);
     }
@@ -2247,6 +2241,15 @@ class MobileAttendanceController extends Controller
         $user = $request->user();
         if ($user) {
             $this->assignFcmToken($request->fcm_token, $user);
+
+            $this->logMobile(
+                $user->school_id,
+                'mobile_fcm_token_update',
+                $user->username ?? $user->email,
+                true,
+                "FCM Token berhasil diperbarui untuk {$user->full_name}",
+                $request
+            );
         }
 
         return response()->json([
@@ -2276,6 +2279,8 @@ class MobileAttendanceController extends Controller
 
         $isFaceEnabled = app(\App\Services\LicenseService::class)->isFaceFeatureEnabled($user?->school);
         if (!$isFaceEnabled) {
+            $this->logMobile($user?->school_id, 'face_register_rejected', $user?->username ?? $user?->email, false, 'Registrasi wajah ditolak: Fitur Face Recognition dinonaktifkan oleh administrator.', $request);
+
             return response()->json([
                 'success' => false,
                 'message' => 'Fitur Face Recognition dinonaktifkan oleh administrator.'
@@ -2292,6 +2297,8 @@ class MobileAttendanceController extends Controller
             ->first();
 
         if ($existingFace && !empty($existingFace->face_embedding)) {
+            $this->logMobile($user->school_id, 'face_register_rejected', $user->username ?? $user->email, false, "Registrasi wajah ditolak: Wajah {$user->full_name} sudah terdaftar di sistem", $request);
+
             return response()->json([
                 'success' => false,
                 'message' => 'Pendaftaran ditolak: Wajah Anda sudah terdaftar di sistem. Silakan hubungi admin sekolah jika ingin mereset/mendaftarkan ulang data Face ID.'
@@ -2303,9 +2310,13 @@ class MobileAttendanceController extends Controller
 
         if (!$extractResult['success'] || empty($extractResult['embedding'])) {
             $statusCode = !empty($extractResult['engine_offline']) ? 503 : 400;
+            $failMsg = $extractResult['message'] ?? 'Wajah tidak terdeteksi pada foto. Pastikan wajah terlihat jelas menghadap kamera.';
+
+            $this->logMobile($user->school_id, 'face_register_failed', $user->username ?? $user->email, false, "Registrasi wajah gagal: {$failMsg} ({$user->full_name})", $request);
+
             return response()->json([
                 'success' => false,
-                'message' => $extractResult['message'] ?? 'Wajah tidak terdeteksi pada foto. Pastikan wajah terlihat jelas menghadap kamera.'
+                'message' => $failMsg
             ], $statusCode);
         }
 
@@ -2321,17 +2332,7 @@ class MobileAttendanceController extends Controller
             ]
         );
 
-        ApiLog::create([
-            'school_id' => $user->school_id,
-            'api_key' => 'MOBILE_APP',
-            'action' => 'face_registered',
-            'uid' => $user->username ?? $user->email,
-            'success' => true,
-            'message' => "Registrasi Wajah Master Berhasil: {$user->full_name}",
-            'ip_address' => $request->ip(),
-            'user_agent' => $request->userAgent() ?? 'Android Mobile App',
-            'created_at' => now(),
-        ]);
+        $this->logMobile($user->school_id, 'face_registered', $user->username ?? $user->email, true, "Registrasi Wajah Master Berhasil: {$user->full_name}", $request);
 
         return response()->json([
             'success' => true,
@@ -2403,6 +2404,8 @@ class MobileAttendanceController extends Controller
 
         $isFaceEnabled = app(\App\Services\LicenseService::class)->isFaceFeatureEnabled($user?->school);
         if (!$isFaceEnabled) {
+            $this->logMobile($user->school_id, 'mobile_scan_face_rejected', $user->username ?? $user->email, false, 'Fitur Face Recognition scanner dinonaktifkan oleh administrator.', $request);
+
             return response()->json([
                 'success' => false,
                 'message' => 'Fitur Face Recognition scanner dinonaktifkan oleh administrator.',
@@ -2453,9 +2456,12 @@ class MobileAttendanceController extends Controller
         $bestScore = (float) ($identifyResult['similarity'] ?? 0.0);
 
         if (empty($identifyResult['is_match']) || !$matchedRecord || !$matchedRecord->siswa) {
+            $msg = $identifyResult['message'] ?? 'Wajah siswa tidak terdaftar atau tidak cocok dalam database';
+            $this->logMobile($schoolId, 'mobile_scan_face_failed', $user->username ?? $user->email, false, $msg, $request);
+
             return response()->json([
                 'success' => false,
-                'message' => $identifyResult['message'] ?? 'Wajah siswa tidak terdaftar atau tidak cocok dalam database',
+                'message' => $msg,
                 'data' => null
             ], 404);
         }
@@ -2463,321 +2469,56 @@ class MobileAttendanceController extends Controller
         $student = $matchedRecord->siswa;
         $studentSchoolId = $student->school_id ?: $schoolId;
         $kelasName = $student->kelas ? ($student->kelas->nama_kelas ?? $student->kelas->nama) : '-';
-
-        // 4. Cek Jadwal Harian Sekolah
-        $indexHari = (int) $targetCarbon->format('N');
-        $jadwal = Jadwal::where('index_hari', $indexHari)
-            ->where('is_active', 1)
-            ->when($studentSchoolId, fn($q, $sId) => $q->where('school_id', $sId))
-            ->first();
-
-        if (!$jadwal && $studentSchoolId > 0) {
-            $jadwal = Jadwal::where('index_hari', $indexHari)->where('is_active', 1)->first();
-        }
-
-        if (!$jadwal) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Hari ini adalah hari libur sekolah (tidak ada jadwal aktif)',
-                'data' => null
-            ], 422);
-        }
-
-        // Cek apakah absensi dinonaktifkan untuk kelas siswa
-        if ($student->kelas && isset($student->kelas->is_active_attendance) && !$student->kelas->is_active_attendance) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Absensi dinonaktifkan untuk kelas ' . ($student->kelas->nama_kelas ?? $student->kelas->nama),
-                'data' => null
-            ], 422);
-        }
-
-        // 5. Penentuan Otomatis Masuk vs Pulang Mengikuti Jadwal Sekolah
         $reqMode = $request->input('mode', 'auto');
-        $att = Attendance::where('student_id', $student->id)
-            ->where('tanggal', $targetDate)
-            ->first();
 
-        // Tentukan apakah proses ini Pulang atau Masuk
-        $isPulangAction = false;
-        if ($reqMode === 'pulang') {
-            $isPulangAction = true;
-        } elseif ($reqMode === 'masuk') {
-            $isPulangAction = false;
-        } else {
-            // Mode Auto: Jika sudah memiliki jam masuk, aksinya adalah Pulang
-            $isPulangAction = ($att && !empty($att->jam_masuk));
+        // Delegasi Presensi ke AttendanceCoreService
+        $coreResult = $this->attendanceCore->recordStudentAttendance($student, [
+            'school_id' => $studentSchoolId,
+            'now' => $now,
+            'mode' => $reqMode,
+            'channel' => 'mobile',
+            'similarity' => $bestScore,
+            'uid' => $student->nis,
+        ]);
+
+        $att = $coreResult['attendance'] ?? null;
+        if (!$att) {
+            $att = Attendance::where('student_id', $student->id)->where('tanggal', $targetDate)->first();
         }
 
-        $timeFormatted = $now->format('H:i');
-        $msgTime = "{$timeFormatted} {$tzSuffix}";
+        if ($coreResult['ok']) {
+            $isPulang = (($coreResult['type'] ?? '') === 'absen_pulang' || ($coreResult['type'] ?? '') === 'sudah_absen_pulang');
+            $action = $isPulang ? 'mobile_student_scan_face_out' : 'mobile_student_scan_face_in';
+            $actionLabel = $isPulang ? 'Pulang' : 'Masuk';
+            $simPercent = round($bestScore * 100, 1);
 
-        // ==========================================
-        // PROSES ABSEN PULANG (CHECK-OUT)
-        // ==========================================
-        if ($isPulangAction) {
-            // A. Siswa belum pernah absen masuk
-            if (!$att || empty($att->jam_masuk)) {
-                return response()->json([
-                    'success' => false,
-                    'message' => "Siswa {$student->nama} belum melakukan absen masuk hari ini",
-                    'data' => null
-                ], 422);
-            }
-
-            // B. Siswa sudah absen pulang sebelumnya (lengkap)
-            if (!empty($att->jam_pulang)) {
-                $alreadyMsg = "Siswa sudah lengkap absen Masuk & Pulang hari ini";
-                return response()->json([
-                    'success' => true,
-                    'message' => $alreadyMsg,
-                    'data' => [
-                        'student_id' => $student->id,
-                        'nama' => $student->nama,
-                        'nis' => (string) ($student->nis ?? '-'),
-                        'kelas_name' => $kelasName,
-                        'confidence' => round($bestScore, 3),
-                        'status' => $att->status,
-                        'jam_masuk' => $att->jam_masuk,
-                        'jam_pulang' => $att->jam_pulang,
-                        'message' => $alreadyMsg,
-                    ]
-                ], 200);
-            }
-
-            // C. Cek fitur kepulangan di pengaturan sekolah
-            $checkoutEnabled = Setting::where('school_id', $studentSchoolId)
-                ->where('setting_key', 'enable_checkout_attendance')
-                ->value('setting_value') ?? 'true';
-
-            if ($checkoutEnabled === 'false') {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Fitur absensi kepulangan dinonaktifkan oleh sekolah.',
-                    'data' => null
-                ], 422);
-            }
-
-            // D. Validasi Jadwal Kepulangan (jam_pulang & akhir_absen_pulang)
-            $jamPulang = $jadwal->jam_pulang;
-            $akhirAbsenPulang = $jadwal->akhir_absen_pulang;
-
-            if ($jamPulang && $nowTime < $jamPulang) {
-                $jamBuka = Carbon::parse($jamPulang)->format('H:i');
-                return response()->json([
-                    'success' => false,
-                    'message' => "Belum masuk waktu absen pulang (Dibuka pukul {$jamBuka})",
-                    'data' => null
-                ], 422);
-            }
-
-            if ($akhirAbsenPulang && $nowTime > $akhirAbsenPulang) {
-                $jamTutup = Carbon::parse($akhirAbsenPulang)->format('H:i');
-                return response()->json([
-                    'success' => false,
-                    'message' => "Batas waktu absen pulang sudah ditutup (Pukul {$jamTutup})",
-                    'data' => null
-                ], 422);
-            }
-
-            // Simpan data kepulangan
-            $masukCarbon = Carbon::parse($att->tanggal . ' ' . $att->jam_masuk);
-            $totalSeconds = abs($masukCarbon->diffInSeconds($now, false));
-            $hours = floor($totalSeconds / 3600);
-            $mins = floor(($totalSeconds % 3600) / 60);
-
-            $newStatus = $att->status;
-            $newKeterangan = $att->keterangan;
-            if ($att->status === 'B') {
-                $newStatus = ($att->jam_masuk > ($jadwal->jam_masuk ?? '07:30')) ? 'T' : 'H';
-                $newKeterangan = trim(str_replace('[Auto: Tidak Absen Pulang]', '', $newKeterangan ?? ''));
-            }
-
-            $successMsg = "Absen Pulang Berhasil ({$msgTime})";
-
-            $att->update([
-                'jam_pulang' => $nowTime,
-                'total_seconds' => $totalSeconds,
-                'status' => $newStatus,
-                'keterangan' => $newKeterangan,
-                'face_similarity_score' => round($bestScore, 4),
-                'is_face_matched' => true,
-                'updated_at' => $now,
-            ]);
-
-            // Notifikasi WhatsApp Checkout
-            try {
-                $wa = app(\App\Services\WhatsAppService::class);
-                $wa->sendCheckOut($student->nama, $student->no_wa, $now->format('H:i'), $hours, $mins, 'Face Scan Mobile', $studentSchoolId, Carbon::parse($att->jam_masuk)->format('H:i'), $student->wa_ortu, $targetCarbon->format('d/m/Y'));
-            } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::warning("WA Face Scan Checkout Error: " . $e->getMessage());
-            }
-
-            // Notifikasi FCM Checkout
-            try {
-                FcmNotificationService::sendToSiswa($student, "Presensi Pulang Tercatat", "Halo {$student->nama}, absensi pulang Anda berhasil dicatat pukul {$now->format('H:i')}.", [
-                    'type' => 'checkout_siswa',
-                    'jam' => $now->format('H:i'),
-                ]);
-            } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::warning("FCM Face Scan Checkout Error: " . $e->getMessage());
-            }
-
-            ApiLog::create([
-                'school_id' => $studentSchoolId,
-                'api_key' => 'MOBILE_APP',
-                'action' => 'mobile_student_scan_face_out',
-                'uid' => $student->nis ?? $student->nama,
-                'success' => true,
-                'message' => "Face Scan Pulang: {$student->nama} (" . round($bestScore * 100, 1) . "%)",
-                'ip_address' => $request->ip(),
-                'user_agent' => $request->userAgent() ?? 'Android Mobile App',
-                'created_at' => now(),
-            ]);
+            $this->logMobile($studentSchoolId, $action, $student->nis ?? $student->nama, true, "Face Scan {$actionLabel}: {$student->nama} ({$simPercent}%)", $request);
 
             return response()->json([
                 'success' => true,
-                'message' => $successMsg,
+                'message' => $coreResult['message'],
                 'data' => [
                     'student_id' => $student->id,
                     'nama' => $student->nama,
                     'nis' => (string) ($student->nis ?? '-'),
                     'kelas_name' => $kelasName,
                     'confidence' => round($bestScore, 3),
-                    'status' => $att->status,
-                    'jam_pulang' => $nowTime,
-                    'message' => $successMsg,
+                    'status' => $att?->status ?? 'H',
+                    'jam_masuk' => $att?->jam_masuk,
+                    'jam_pulang' => $att?->jam_pulang,
+                    'message' => $coreResult['message'],
                 ]
             ], 200);
         }
 
-        // ==========================================
-        // PROSES ABSEN MASUK (CHECK-IN)
-        // ==========================================
-
-        // A. Cek apakah sudah pernah absen masuk hari ini
-        if ($att && !empty($att->jam_masuk)) {
-            $jamMasukFormatted = Carbon::parse($att->jam_masuk)->format('H:i');
-            return response()->json([
-                'success' => false,
-                'message' => "Siswa {$student->nama} sudah melakukan absen masuk hari ini (Pukul {$jamMasukFormatted})",
-                'data' => [
-                    'student_id' => $student->id,
-                    'nama' => $student->nama,
-                    'nis' => (string) ($student->nis ?? '-'),
-                    'kelas_name' => $kelasName,
-                    'confidence' => round($bestScore, 3),
-                    'status' => $att->status,
-                    'jam_masuk' => $att->jam_masuk,
-                    'jam_pulang' => $att->jam_pulang,
-                    'message' => "Sudah absen masuk pukul {$jamMasukFormatted}",
-                ]
-            ], 422);
-        }
-
-        // B. Validasi Jadwal Waktu Masuk (awal_absen_masuk & akhir_absen_masuk)
-        $awalAbsenMasuk = $jadwal->awal_absen_masuk;
-        $akhirAbsenMasuk = $jadwal->akhir_absen_masuk;
-        $jamMasukJadwal = $jadwal->jam_masuk;
-
-        if ($awalAbsenMasuk && $nowTime < $awalAbsenMasuk) {
-            $jamBuka = Carbon::parse($awalAbsenMasuk)->format('H:i');
-            return response()->json([
-                'success' => false,
-                'message' => "Absen masuk belum dibuka (Dibuka pukul {$jamBuka})",
-                'data' => null
-            ], 422);
-        }
-
-        if ($akhirAbsenMasuk && $nowTime > $akhirAbsenMasuk) {
-            $jamTutup = Carbon::parse($akhirAbsenMasuk)->format('H:i');
-            return response()->json([
-                'success' => false,
-                'message' => "Batas waktu absen masuk sudah ditutup (Pukul {$jamTutup})",
-                'data' => null
-            ], 422);
-        }
-
-        // C. Hitung Tepat Waktu ('H') vs Terlambat ('T')
-        $status = 'H';
-        if ($jamMasukJadwal && $nowTime > $jamMasukJadwal) {
-            $status = 'T';
-            $diffSeconds = Carbon::parse($targetDate . ' ' . $nowTime)->diffInSeconds(Carbon::parse($targetDate . ' ' . $jamMasukJadwal));
-            $jam = floor($diffSeconds / 3600);
-            $menit = floor(($diffSeconds % 3600) / 60);
-            $durasi = $jam > 0 ? "{$jam} jam {$menit} menit" : "{$menit} menit";
-            $keterangan = "Telat {$durasi} - Face Scan Mobile";
-        } else {
-            $status = 'H';
-            $keterangan = "Tepat Waktu - Face Scan Mobile";
-        }
-
-        $successMsg = "Absen Masuk Berhasil ({$msgTime})";
-
-        // Simpan record attendance tanpa simpan foto fisik ke storage
-        $att = Attendance::updateOrCreate(
-            [
-                'student_id' => $student->id,
-                'tanggal' => $targetDate,
-            ],
-            [
-                'school_id' => $studentSchoolId,
-                'jam_masuk' => $nowTime,
-                'status' => $status,
-                'keterangan' => $keterangan,
-                'face_similarity_score' => round($bestScore, 4),
-                'is_face_matched' => true,
-                'photo_checkin_path' => null,
-                'updated_at' => $now,
-            ]
-        );
-
-        // Notifikasi WhatsApp
-        try {
-            $wa = app(\App\Services\WhatsAppService::class);
-            $wa->sendCheckIn($student->nama, $student->no_wa, $now->format('H:i'), $status, $studentSchoolId, $keterangan, $student->wa_ortu, $kelasName);
-        } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::warning("WA Face Scan Checkin Error: " . $e->getMessage());
-        }
-
-        // Notifikasi FCM
-        try {
-            $readableStatus = $status === 'T' ? 'Terlambat' : 'Hadir';
-            FcmNotificationService::sendToSiswa($student, "Presensi Masuk Tercatat", "Halo {$student->nama}, absensi masuk Anda berhasil dicatat pukul {$now->format('H:i')} (Status: {$readableStatus}).", [
-                'type' => 'checkin_siswa',
-                'status' => $readableStatus,
-                'jam' => $now->format('H:i'),
-            ]);
-        } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::warning("FCM Face Scan Checkin Error: " . $e->getMessage());
-        }
-
-        ApiLog::create([
-            'school_id' => $studentSchoolId,
-            'api_key' => 'MOBILE_APP',
-            'action' => 'mobile_student_scan_face_in',
-            'uid' => $student->nis ?? $student->nama,
-            'success' => true,
-            'message' => "Face Scan Masuk: {$student->nama} (" . round($bestScore * 100, 1) . "%)",
-            'ip_address' => $request->ip(),
-            'user_agent' => $request->userAgent() ?? 'Android Mobile App',
-            'created_at' => now(),
-        ]);
+        // Gagal / Ditolak oleh Core Service (misal: di luar jam, hari libur, kelas nonaktif, dsb)
+        $this->logMobile($studentSchoolId, 'mobile_student_scan_face_rejected', $student->nis ?? $student->nama, false, "Face Scan Ditolak: {$coreResult['message']} ({$student->nama})", $request);
 
         return response()->json([
-            'success' => true,
-            'message' => $successMsg,
-            'data' => [
-                'student_id' => $student->id,
-                'nama' => $student->nama,
-                'nis' => (string) ($student->nis ?? '-'),
-                'kelas_name' => $kelasName,
-                'confidence' => round($bestScore, 3),
-                'status' => $status,
-                'jam_masuk' => $nowTime,
-                'message' => $successMsg,
-            ]
-        ], 200);
+            'success' => false,
+            'message' => $coreResult['message'] ?? 'Absen face scan ditolak',
+            'data' => null
+        ], 422);
     }
 
     /**
@@ -2877,6 +2618,8 @@ class MobileAttendanceController extends Controller
     {
         $fileKey = $request->hasFile('photo') ? 'photo' : ($request->hasFile('foto') ? 'foto' : null);
         if (!$fileKey) {
+            $this->logMobile($request->user()?->school_id, 'mobile_upload_student_photo_failed', $request->user()?->username, false, 'Upload foto siswa gagal: File foto wajib diunggah', $request);
+
             return response()->json([
                 'success' => false,
                 'message' => 'File foto wajib diunggah (gunakan key: photo atau foto).'
@@ -2901,6 +2644,8 @@ class MobileAttendanceController extends Controller
         if ($studentId) {
             $siswa = Siswa::find($studentId);
             if (!$siswa) {
+                $this->logMobile($user->school_id, 'mobile_upload_student_photo_failed', $user->username, false, "Upload foto siswa gagal: Data siswa ID {$studentId} tidak ditemukan", $request);
+
                 return response()->json(['success' => false, 'message' => 'Data siswa tidak ditemukan.'], 404);
             }
 
@@ -2908,6 +2653,8 @@ class MobileAttendanceController extends Controller
             if (!$isStaff && $siswa->user_id !== $user->id) {
                 $cleanNis = str_replace('siswa_', '', $user->username);
                 if ($siswa->nis !== $cleanNis) {
+                    $this->logMobile($user->school_id, 'mobile_upload_student_photo_forbidden', $user->username, false, "Upload foto siswa ditolak: Bukan akun siswa sendiri", $request);
+
                     return response()->json(['success' => false, 'message' => 'Akses ditolak: Anda hanya dapat mengubah foto profil Anda sendiri.'], 403);
                 }
             }
@@ -2920,6 +2667,8 @@ class MobileAttendanceController extends Controller
             }
 
             if (!$siswa) {
+                $this->logMobile($user->school_id, 'mobile_upload_student_photo_failed', $user->username, false, "Upload foto siswa gagal: Parameter student_id diperlukan jika diunggah oleh staf/admin", $request);
+
                 return response()->json([
                     'success' => false,
                     'message' => 'Parameter student_id diperlukan jika diunggah oleh akun dewan guru/admin.'
@@ -3042,6 +2791,8 @@ class MobileAttendanceController extends Controller
     {
         $fileKey = $request->hasFile('photo') ? 'photo' : ($request->hasFile('foto') ? 'foto' : null);
         if (!$fileKey) {
+            $this->logMobile($request->user()?->school_id, 'mobile_upload_teacher_photo_failed', $request->user()?->username, false, 'Upload foto guru gagal: File foto wajib diunggah', $request);
+
             return response()->json([
                 'success' => false,
                 'message' => 'File foto wajib diunggah (gunakan key: photo atau foto).'
@@ -3067,15 +2818,21 @@ class MobileAttendanceController extends Controller
         if ($teacherId) {
             $guru = Guru::find($teacherId);
             if (!$guru) {
+                $this->logMobile($user->school_id, 'mobile_upload_teacher_photo_failed', $user->username, false, "Upload foto guru gagal: Guru ID {$teacherId} tidak ditemukan", $request);
+
                 return response()->json(['success' => false, 'message' => 'Data guru tidak ditemukan.'], 404);
             }
 
             if (!$isAdmin && $guru->user_id !== $user->id && $user->guru?->id !== $guru->id) {
+                $this->logMobile($user->school_id, 'mobile_upload_teacher_photo_forbidden', $user->username, false, "Upload foto guru ditolak: Bukan akun guru sendiri", $request);
+
                 return response()->json(['success' => false, 'message' => 'Akses ditolak: Anda hanya dapat mengubah foto profil Anda sendiri.'], 403);
             }
         } else {
             $guru = $user->guru ?? Guru::where('user_id', $user->id)->first();
             if (!$guru) {
+                $this->logMobile($user->school_id, 'mobile_upload_teacher_photo_failed', $user->username, false, "Upload foto guru gagal: Parameter guru_id diperlukan jika diunggah oleh akun admin", $request);
+
                 return response()->json([
                     'success' => false,
                     'message' => 'Parameter guru_id diperlukan jika diunggah oleh akun admin.'
@@ -3302,6 +3059,8 @@ class MobileAttendanceController extends Controller
         }
 
         if (!$isCurrentValid) {
+            $this->logMobile($user->school_id, 'mobile_change_password_failed', $user->username ?? $user->email, false, "Ganti password gagal: Password saat ini (lama) salah ({$user->full_name})", $request);
+
             return response()->json([
                 'success' => false,
                 'message' => 'Password saat ini (lama) yang Anda masukkan salah.'
@@ -3310,6 +3069,8 @@ class MobileAttendanceController extends Controller
 
         // 2. Pastikan password baru tidak sama persis dengan password saat ini
         if ($currentPassword === $newPassword) {
+            $this->logMobile($user->school_id, 'mobile_change_password_failed', $user->username ?? $user->email, false, "Ganti password gagal: Password baru sama dengan password lama ({$user->full_name})", $request);
+
             return response()->json([
                 'success' => false,
                 'message' => 'Password baru tidak boleh sama dengan password saat ini.'
@@ -3324,17 +3085,7 @@ class MobileAttendanceController extends Controller
         }
         $user->save();
 
-        ApiLog::create([
-            'school_id' => $user->school_id,
-            'api_key' => 'MOBILE_APP',
-            'action' => 'mobile_change_password',
-            'uid' => $user->username ?? $user->email,
-            'success' => true,
-            'message' => "Ganti password berhasil untuk pengguna: {$user->full_name} ({$user->role})",
-            'ip_address' => $request->ip(),
-            'user_agent' => $request->userAgent() ?? 'Android Mobile App',
-            'created_at' => now(),
-        ]);
+        $this->logMobile($user->school_id, 'mobile_change_password', $user->username ?? $user->email, true, "Ganti password berhasil untuk pengguna: {$user->full_name} ({$user->role})", $request);
 
         return response()->json([
             'success' => true,
@@ -3798,6 +3549,15 @@ class MobileAttendanceController extends Controller
             if ($user->currentAccessToken()) {
                 $user->currentAccessToken()->delete();
             }
+
+            $this->logMobile(
+                $user->school_id,
+                'mobile_logout',
+                $user->username ?? $user->email,
+                true,
+                "Pengguna {$user->full_name} ({$user->role}) berhasil logout dari aplikasi mobile",
+                $request
+            );
         }
         return response()->json(['success' => true, 'message' => 'Logout berhasil']);
     }

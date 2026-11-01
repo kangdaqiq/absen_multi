@@ -28,6 +28,7 @@ class RfidController extends Controller
     const SCAN_COOLDOWN_SECONDS = 0;
 
     protected $wa;
+    protected \App\Services\AttendanceCoreService $attendanceCore;
 
     // Logging context
     protected $apiVersion = 1;
@@ -37,293 +38,82 @@ class RfidController extends Controller
     private $hasLogged = false;
     private $isOfflineSync = false;
 
-    public function __construct(\App\Services\WhatsAppService $wa)
+    public function __construct(\App\Services\WhatsAppService $wa, \App\Services\AttendanceCoreService $attendanceCore)
     {
         $this->wa = $wa;
+        $this->attendanceCore = $attendanceCore;
     }
 
     private function handleGateScan($uid, $gateCard, $apiKey, $device, $now = null)
     {
-        try {
-            DB::beginTransaction();
-            $now = $now ?? now();
+        $res = $this->attendanceCore->handleGateCardScan($gateCard, [
+            'school_id' => $device->school_id,
+            'uid' => $uid,
+            'now' => $now,
+        ]);
 
-            $gateName = $gateCard->guru_id ? ($gateCard->guru->nama ?? $gateCard->name) : $gateCard->name;
+        $gateName = $res['data']['nama'] ?? ($gateCard->name ?: 'Kartu Gerbang');
+        $isClosed = ($res['type'] ?? '') === 'gate_closed';
+        $action = $isClosed ? 'gate_closed' : 'gate_access';
+        $logMsg = ($isClosed ? 'Sesi Kepulangan Ditutup: ' : 'Sesi Kepulangan Dibuka: ') . $gateName;
 
-            // Clean expired sessions
-            TeacherCheckoutSession::where('expires_at', '<', $now)->delete();
+        $this->logRequest($apiKey, $action, $uid, $res['ok'], $logMsg);
 
-            // Cek apakah gerbang sekolah ini sedang terbuka (oleh kartu gerbang mana saja di sekolah ini)
-            $schoolGateCardUids = GateCard::where('school_id', $device->school_id)
-                ->pluck('uid_rfid')
-                ->filter()
-                ->toArray();
-
-            $activeSession = TeacherCheckoutSession::where(function ($q) use ($uid, $schoolGateCardUids) {
-                $q->where('uid_rfid', $uid)
-                  ->orWhereIn('uid_rfid', $schoolGateCardUids);
-            })
-            ->where('expires_at', '>=', $now)
-            ->first();
-
-            if ($activeSession) {
-                // Jika sedang terbuka, TUTUP gerbang
-                $activeSession->delete();
-                DB::commit();
-
-                $this->logRequest($apiKey, 'gate_closed', $uid, true, 'Sesi Kepulangan Ditutup: ' . $gateName);
-                return $this->response(true, 'success', "Gerbang Ditutup.", 'ok', [
-                    'type' => 'gate_closed',
-                    'nama' => $gateName
-                ]);
-            }
-
-            // Jika belum terbuka, BUKA gerbang
-            TeacherCheckoutSession::create([
-                'teacher_id' => $gateCard->guru_id, // Link to Guru if exists
-                'teacher_name' => $gateName,
-                'uid_rfid' => $uid,
-                'status' => 'open',
-                'expires_at' => $now->copy()->addMinutes(30),
-                'created_at' => $now
-            ]);
-
-            DB::commit();
-
-            $this->logRequest($apiKey, 'gate_access', $uid, true, 'Sesi Kepulangan Dibuka: ' . $gateName);
-            return $this->response(true, 'success', "Gerbang Dibuka (30 Menit).", 'ok', [
-                'type' => 'gate_opened',
-                'nama' => $gateName
-            ]);
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error("Gate card scan error: " . $e->getMessage());
-            return $this->response(false, 'gagal', 'Gagal memproses kartu gerbang', 'error');
-        }
+        return $this->response(
+            $res['ok'],
+            $res['ok'] ? 'success' : 'gagal',
+            $isClosed ? "Gerbang Ditutup." : "Gerbang Dibuka (30 Menit).",
+            $res['sound'] ?? 'ok',
+            [
+                'type' => $res['type'] ?? ($isClosed ? 'gate_closed' : 'gate_opened'),
+                'nama' => $gateName,
+            ]
+        );
     }
 
     private function handleTeacherScan($uid, $teacher, $apiKey, $device, $now = null)
     {
-        try {
-            DB::beginTransaction();
-            $now = $now ?? now();
-            $today = $now->format('Y-m-d');
+        $res = $this->attendanceCore->recordTeacherAttendance($teacher, [
+            'school_id' => $device->school_id,
+            'uid' => $uid,
+            'now' => $now,
+            'channel' => 'rfid',
+            'mode' => 'auto',
+        ]);
 
-            // 0. CEK SHIFT GURU (Wajib memiliki shift aktif hari ini)
-            $shift = $teacher->getShiftForDate($now);
-            if (!$shift) {
-                DB::rollBack();
-                $this->logRequest($apiKey, 'scan_rejected', $uid, false, 'Guru Tanpa Shift: ' . $teacher->nama);
-                return $this->response(false, 'gagal', 'Tidak ada jadwal shift.', 'error', [
-                    'type' => 'no_shift',
-                    'nama' => $teacher->nama
-                ]);
-            }
+        $action = match ($res['type'] ?? '') {
+            'no_shift', 'outside_checkin_window', 'checkout_closed_guru', 'checkout_early_rejected_guru' => 'scan_rejected',
+            'absen_pulang_guru' => 'checkout_success',
+            'checkout_session_closed' => 'gate_closed',
+            'checkout_session_open' => 'gate_access',
+            default => $res['ok'] ? 'checkin_success' : 'scan_rejected',
+        };
 
-            // 1. ABSENSI HARIAN (Daily)
-            $absensi = \App\Models\AbsensiGuru::where('guru_id', $teacher->id)
-                ->where('tanggal', $today)
-                ->where('school_id', $device->school_id) // Scope
-                ->whereNull('jadwal_pelajaran_id')
-                ->lockForUpdate()
-                ->first();
+        $this->logRequest($apiKey, $action, $uid, $res['ok'], $res['message'] ?? 'Absensi Guru');
 
-            if (!$absensi) {
-                // CASE: CHECK-IN
-                // Cek Rentang Jam Scan Masuk
-                if (!$shift->isInCheckInWindow($now->format('H:i:s'))) {
-                    DB::rollBack();
-                    $windowStr = ($shift->awal_absen_masuk && $shift->akhir_absen_masuk)
-                        ? \Carbon\Carbon::parse($shift->awal_absen_masuk)->format('H:i') . '-' . \Carbon\Carbon::parse($shift->akhir_absen_masuk)->format('H:i')
-                        : '';
-                    $this->logRequest($apiKey, 'scan_rejected', $uid, false, "Di luar jam absen masuk ({$windowStr}): {$teacher->nama}");
-                    return $this->response(false, 'gagal', 'Di luar jam absen masuk.', 'warning', [
-                        'type' => 'outside_checkin_window',
-                        'nama' => $teacher->nama,
-                        'window' => $windowStr
-                    ]);
-                }
-
-                $shiftId = $shift->id;
-                $status = 'Hadir';
-                $statusKehadiran = 'tepat_waktu';
-                $menitTerlambat = 0;
-                $keterangan = null;
-
-                if ($shift->isLate($now->format('H:i:s'))) {
-                    $status = 'Terlambat';
-                    $statusKehadiran = 'terlambat';
-                    $menitTerlambat = $shift->calculateLateMinutes($now->format('H:i:s'));
-                    $keterangan = "Terlambat {$menitTerlambat} m ({$shift->nama_shift})";
-                } else {
-                    $status = 'Hadir';
-                    $statusKehadiran = 'tepat_waktu';
-                    $keterangan = "Tepat Waktu ({$shift->nama_shift})";
-                }
-
-                \App\Models\AbsensiGuru::create([
-                    'guru_id' => $teacher->id,
-                    'school_id' => $device->school_id, // Scope
-                    'jadwal_pelajaran_id' => null, // Daily
-                    'shift_id' => $shiftId,
-                    'tanggal' => $today,
-                    'jam_masuk' => $now->toTimeString(),
-                    'waktu_hadir' => $now, // Legacy field
-                    'menit_terlambat' => $menitTerlambat,
-                    'status' => $status,
-                    'status_kehadiran' => $statusKehadiran,
-                    'keterangan' => $keterangan,
-                    'created_at' => $now
-                ]);
-
-                DB::commit();
-
-                // Send WA Check-in
-                try {
-                    $this->wa->sendCheckIn($teacher->nama, $teacher->no_wa, $now->format('H:i'), $status, $device->school_id, $keterangan, null, '-');
-                } catch (\Exception $e) {
-                    Log::error("WA Guru Checkin Error: " . $e->getMessage());
-                }
-
-                // Send FCM Push Notification
-                try {
-                    FcmNotificationService::sendToGuru($teacher, "Presensi Masuk Tercatat", "Halo {$teacher->nama}, absensi masuk Anda berhasil dicatat pukul {$now->format('H:i')} (Status: {$status}).", [
-                        'type' => 'checkin_guru',
-                        'guru_id' => (string) $teacher->id,
-                        'time' => (string) $now->format('H:i'),
-                        'status' => (string) $status,
-                    ]);
-                } catch (\Exception $e) {
-                    Log::error("FCM Guru Checkin Error: " . $e->getMessage());
-                }
-
-                $msgLog = "Guru Masuk: {$teacher->nama} ({$shift->nama_shift} - {$status})";
-                $this->logRequest($apiKey, 'checkin_success', $uid, true, $msgLog);
-
-                $respMsg = $status === 'Terlambat'
-                    ? "Masuk ({$status}): {$teacher->nama} (+{$menitTerlambat}m)"
-                    : "Selamat Pagi, {$teacher->nama}.";
-
-                return $this->response(true, 'success', $respMsg, 'ok', [
-                    'type' => 'absen_masuk_guru',
-                    'nama' => $teacher->nama,
-                    'shift' => $shift,
-                    'shift_name' => $shift->nama_shift,
-                    'status' => $status,
-                    'menit_terlambat' => $menitTerlambat,
-                    'jam' => $now->format('H:i')
-                ]);
-
-            } else {
-                // CASE: ALREADY CHECKED IN (Check for Check-Out logic)
-
-                // Check if Teacher Check-Out is enabled
-                $checkoutEnabled = \App\Models\Setting::where('school_id', $device->school_id)
-                    ->where('setting_key', 'enable_checkout_teacher')
-                    ->value('setting_value') ?? 'false';
-
-                if ($checkoutEnabled === 'false') {
-                    DB::commit();
-                    $this->logRequest($apiKey, 'checkin_success', $uid, true, 'Sudah Absen Masuk: ' . $teacher->nama);
-                    return $this->response(true, 'success', "Sudah Absen.", 'ok', [
-                        'type' => 'absen_sudah_masuk_guru',
-                        'nama' => $teacher->nama
-                    ]);
-                }
-
-                // Teacher Check-Out is ENABLED
-                // 1. Cek apakah sedang berada di dalam rentang jam scan pulang shift
-                $inCheckoutWindow = $shift->isInCheckOutWindow($now->format('H:i:s'));
-
-                // 2. Cek sesi gerbang aktif (untuk pulang cepat / izin gerbang)
-                $schoolGateCardUids = GateCard::where('school_id', $device->school_id)
-                    ->pluck('uid_rfid')
-                    ->filter()
-                    ->toArray();
-
-                $gateSession = TeacherCheckoutSession::where('expires_at', '>', $now)
-                    ->where('status', 'open')
-                    ->where(function ($q) use ($device, $schoolGateCardUids) {
-                        $q->whereIn('uid_rfid', $schoolGateCardUids)
-                          ->orWhereHas('teacher', fn($t) => $t->where('school_id', $device->school_id));
-                    })
-                    ->orderBy('created_at', 'desc')
-                    ->first();
-
-                // 3. Jika di luar rentang jam pulang DAN tidak ada izin gerbang -> Tolak
-                if (!$inCheckoutWindow && !$gateSession) {
-                    // Jika masih dalam rentang jam masuk, anggap tap ulang (mencegah salah paham)
-                    if ($shift->isInCheckInWindow($now->format('H:i:s'))) {
-                        DB::commit();
-                        $this->logRequest($apiKey, 'checkin_success', $uid, true, 'Sudah Absen Masuk: ' . $teacher->nama);
-                        return $this->response(true, 'success', "Sudah Absen Masuk.", 'ok', [
-                            'type' => 'absen_sudah_masuk_guru',
-                            'nama' => $teacher->nama
-                        ]);
-                    }
-
-                    DB::rollBack();
-                    $windowStr = ($shift->awal_absen_pulang && $shift->akhir_absen_pulang)
-                        ? \Carbon\Carbon::parse($shift->awal_absen_pulang)->format('H:i') . '-' . \Carbon\Carbon::parse($shift->akhir_absen_pulang)->format('H:i')
-                        : '';
-                    $this->logRequest($apiKey, 'scan_rejected', $uid, false, "Di luar jam absen pulang ({$windowStr}): {$teacher->nama}");
-                    return $this->response(false, 'gagal', 'Di luar jam absen pulang.', 'warning', [
-                        'type' => 'outside_checkout_window',
-                        'nama' => $teacher->nama,
-                        'window' => $windowStr
-                    ]);
-                }
-
-                // 4. Proses Pulang
-                $masuk = Carbon::parse($absensi->tanggal . ' ' . $absensi->jam_masuk);
-                $totalSeconds = $masuk->diffInSeconds($now, false);
-                if ($totalSeconds < 0) {
-                    $totalSeconds = abs($totalSeconds);
-                }
-
-                $absensi->update([
-                    'jam_pulang' => $now->toTimeString(),
-                    'updated_at' => now(),
-                ]);
-                DB::commit();
-
-                $authorizedBy = $gateSession ? $gateSession->teacher_name : 'Sistem';
-
-                // Send WA Check-Out
-                $hours = floor($totalSeconds / 3600);
-                $mins = floor(($totalSeconds % 3600) / 60);
-
-                try {
-                    $this->wa->sendCheckOut($teacher->nama, $teacher->no_wa, $now->format('H:i'), $hours, $mins, $authorizedBy, $device->school_id, $masuk->format('H:i'), null, $now->format('d/m/Y'));
-                } catch (\Exception $e) {
-                    Log::error("WA Guru Checkout Error: " . $e->getMessage());
-                }
-
-                // Send FCM Push Notification
-                try {
-                    FcmNotificationService::sendToGuru($teacher, "Presensi Pulang Tercatat", "Halo {$teacher->nama}, absensi pulang Anda berhasil dicatat pukul {$now->format('H:i')}.", [
-                        'type' => 'checkout_guru',
-                        'guru_id' => (string) $teacher->id,
-                        'time' => (string) $now->format('H:i'),
-                    ]);
-                } catch (\Exception $e) {
-                    Log::error("FCM Guru Checkout Error: " . $e->getMessage());
-                }
-
-                $this->logRequest($apiKey, 'checkout_success', $uid, true, 'Guru Pulang: ' . $teacher->nama);
-                return $this->response(true, 'success', "Absen Berhasil.", 'ok', [
-                    'type' => 'absen_pulang_guru',
-                    'nama' => $teacher->nama,
-                    'authorized_by' => $authorizedBy
-                ]);
-            }
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error("Teacher scan error: " . $e->getMessage());
-            return $this->response(false, 'gagal', 'Gagal memproses absen guru', 'error');
+        $extra = [
+            'type' => $res['type'] ?? 'absen_guru',
+            'nama' => $teacher->nama,
+            'status' => $res['data']['status'] ?? '',
+            'jam' => $res['data']['jam'] ?? ($now ? $now->format('H:i') : now()->format('H:i')),
+        ];
+        if (isset($res['data']['shift_name'])) {
+            $extra['shift_name'] = $res['data']['shift_name'];
         }
+        if (isset($res['data']['menit_terlambat'])) {
+            $extra['menit_terlambat'] = $res['data']['menit_terlambat'];
+        }
+        if (isset($res['data']['session_id'])) {
+            $extra['session_id'] = $res['data']['session_id'];
+        }
+
+        return $this->response(
+            $res['ok'],
+            $res['status'] === 'success' ? 'success' : 'gagal',
+            $res['message'] ?? 'Absensi Guru',
+            $res['sound'] ?? 'ok',
+            $extra
+        );
     }
 
     public function handleV2(Request $request)
@@ -666,305 +456,63 @@ class RfidController extends Controller
 
     private function handleScan($uid, $apiKey, $device, $now = null)
     {
-        try {
-            // Find Student SCOPED to Device's School
-            $siswa = Siswa::with('kelas')
-                ->where('uid_rfid', $uid)
-                ->where('school_id', $device->school_id)
-                ->first();
+        // Find Student SCOPED to Device's School
+        $siswa = Siswa::with('kelas')
+            ->where('uid_rfid', $uid)
+            ->where('school_id', $device->school_id)
+            ->first();
 
-            if (!$siswa) {
-                $this->logRequest($apiKey, 'unknown_card', $uid, false, 'Kartu tidak terdaftar di sekolah ini');
-                return $this->response(false, 'unknown', 'Kartu tdk dikenal', 'error', ['type' => 'unknown_card', 'uid' => $uid]);
-            }
-
-            // CHECK: Is Class Attendance Active?
-            if ($siswa->kelas && !$siswa->kelas->is_active_attendance) {
-                return $this->response(false, 'gagal', 'Absensi dimatikan untuk kelas ini.', 'error', ['type' => 'class_disabled']);
-            }
-
-            $now = $now ?? now();
-            $today = $now->format('Y-m-d');
-            $indexHari = (int) $now->format('N'); // 1 (Mon) - 7 (Sun)
-
-            $jadwal = Jadwal::where('index_hari', $indexHari)
-                ->where('is_active', 1)
-                ->where('school_id', $device->school_id)
-                ->first();
-
-            if (!$jadwal) {
-                return $this->response(false, 'gagal', 'Jadwal Libur/Kosong', 'warning', ['type' => 'schedule_empty']);
-            }
-            $jamMasuk = Carbon::parse($now->format('Y-m-d') . ' ' . $jadwal->jam_masuk);
-            $jamPulang = Carbon::parse($now->format('Y-m-d') . ' ' . $jadwal->jam_pulang);
-
-            $awalAbsenMasuk = Carbon::parse($now->format('Y-m-d') . ' ' . $jadwal->awal_absen_masuk);
-            $akhirAbsenMasuk = Carbon::parse($now->format('Y-m-d') . ' ' . $jadwal->akhir_absen_masuk);
-            $akhirAbsenPulang = Carbon::parse($now->format('Y-m-d') . ' ' . $jadwal->akhir_absen_pulang);
-            $batasTelat = $jamMasuk; // Toleransi dihapus, telat dihitung langsung setelah jam_masuk
-
-            DB::beginTransaction();
-
-            $att = Attendance::where('student_id', $siswa->id)
-                ->where('tanggal', $now->format('Y-m-d'))
-                ->lockForUpdate()
-                ->first();
-
-            // If record exists but jam_masuk is NULL (Sakit, Izin, Alpha auto-marked from system/daily-report)
-            // allow a fresh check-in to override the system record
-            $isSystemAlpha = $att && $att->jam_masuk === null && ($att->is_auto_alpha || in_array($att->status, ['S', 'I', 'A', 'B']));
-            if ($isSystemAlpha) {
-                Log::info("[SCAN] Override system auto-record (status={$att->status}, is_auto_alpha=" . ($att->is_auto_alpha ? 'true' : 'false') . ") for student_id={$siswa->id} on {$today}");
-                $att->delete();
-                $att = null;
-            }
-
-            // Case 1: Lengkap (Jika sudah absen masuk & pulang, tapi tap di jam kegiatan aktif, catat kegiatan)
-            if ($att && $att->jam_pulang) {
-                $recordedKegiatans = $this->recordActiveKegiatans($device->school_id, $siswa, $now, $today, 'Scan Mandiri Kegiatan');
-                if (!empty($recordedKegiatans)) {
-                    DB::commit();
-                    $namaKeg = implode(', ', $recordedKegiatans);
-                    $this->logRequest($apiKey, 'kegiatan_success', $uid, true, "Kegiatan ({$namaKeg}): " . $siswa->nama);
-                    return $this->response(true, 'success', 'Absen Kegiatan Berhasil', 'ok', [
-                        'type' => 'absen_kegiatan',
-                        'nama' => $siswa->nama,
-                        'kegiatan' => $namaKeg,
-                    ]);
-                }
-                DB::rollBack();
-                return $this->response(true, 'success', 'Absen Lengkap', 'ok', ['type' => 'sudah_lengkap', 'nama' => $siswa->nama]);
-            }
-
-            // Case 2: Sudah Masuk, Belum Pulang
-            if ($att && $att->jam_masuk && !$att->jam_pulang) {
-                // Check if checkout is enabled in settings SCOPED
-                $checkoutEnabled = \App\Models\Setting::where('school_id', $device->school_id)
-                    ->where('setting_key', 'enable_checkout_attendance')
-                    ->value('setting_value') ?? 'true';
-
-                // If checkout is disabled, reject checkout entirely
-                if ($checkoutEnabled === 'false') {
-                    // Cek apakah ada kegiatan aktif
-                    $this->recordActiveKegiatans($device->school_id, $siswa, $now, $today, 'Auto dari Tap Kartu');
-                    DB::rollBack();
-                    return $this->response(true, 'success', 'Sudah Absen', 'ok', [
-                        'type' => 'sudah_absen_masuk',
-                        'nama' => $siswa->nama,
-                    ]);
-                }
-
-                // Check Teacher Session (only open gates) Global? Or should be scoped?
-                // Optimized: Check sessions where teacher belongs to this school
-                $teacherSession = TeacherCheckoutSession::select('teacher_checkout_sessions.*')
-                    ->join('guru', 'teacher_checkout_sessions.teacher_id', '=', 'guru.id')
-                    ->where('guru.school_id', $device->school_id)
-                    ->where('teacher_checkout_sessions.expires_at', '>', now())
-                    ->where('teacher_checkout_sessions.status', 'open')
-                    ->orderBy('teacher_checkout_sessions.created_at', 'desc')
-                    ->first();
-
-                $isAutoCheckoutTime = $now->between($jamPulang, $akhirAbsenPulang);
-
-                // Jika sudah melewati batas akhir absen pulang dan tidak ada sesi guru, tolak
-                if ($now->gt($akhirAbsenPulang) && !$teacherSession) {
-                    $recordedKegiatans = $this->recordActiveKegiatans($device->school_id, $siswa, $now, $today, 'Auto dari Tap Kartu');
-                    if (!empty($recordedKegiatans)) {
-                        DB::commit();
-                        $namaKeg = implode(', ', $recordedKegiatans);
-                        $this->logRequest($apiKey, 'kegiatan_success', $uid, true, "Kegiatan ({$namaKeg}): " . $siswa->nama);
-                        return $this->response(true, 'success', 'Absen Kegiatan Berhasil', 'ok', [
-                            'type' => 'absen_kegiatan',
-                            'nama' => $siswa->nama,
-                            'kegiatan' => $namaKeg,
-                        ]);
-                    }
-                    DB::rollBack();
-                    return $this->response(false, 'gagal', 'Pulang Ditutup', 'warning', ['type' => 'checkout_closed', 'nama' => $siswa->nama]);
-                }
-
-                // Jika belum masuk waktu pulang otomatis dan tidak ada izin guru, tolak
-                if (!$isAutoCheckoutTime && !$teacherSession) {
-                    // Tetap catat absen kegiatan jika sedang dalam jam kegiatan
-                    $recordedKegiatans = $this->recordActiveKegiatans($device->school_id, $siswa, $now, $today, 'Auto dari Tap Kartu');
-                    if (!empty($recordedKegiatans)) {
-                        DB::commit();
-                        $namaKeg = implode(', ', $recordedKegiatans);
-                        $this->logRequest($apiKey, 'kegiatan_success', $uid, true, "Kegiatan ({$namaKeg}): " . $siswa->nama);
-                        return $this->response(true, 'success', 'Absen Kegiatan Berhasil', 'ok', [
-                            'type' => 'absen_kegiatan',
-                            'nama' => $siswa->nama,
-                            'kegiatan' => $namaKeg,
-                        ]);
-                    }
-
-                    // Beri pesan berbeda jika masih di jam masuk (mencegah spam absen 2x)
-                    if ($now->between($awalAbsenMasuk, $akhirAbsenMasuk)) {
-                        DB::rollBack();
-                        return $this->response(true, 'success', 'Sudah Absen', 'ok', ['type' => 'sudah_absen_masuk', 'nama' => $siswa->nama]);
-                    }
-
-                    DB::rollBack();
-                    return $this->response(false, 'gagal', 'Belum pulang', 'warning', ['type' => 'no_authorization', 'nama' => $siswa->nama]);
-                }
-
-                // Pulang
-                $masuk = Carbon::parse($att->tanggal . ' ' . $att->jam_masuk);
-                $totalSeconds = $masuk->diffInSeconds($now, false);
-
-                if ($totalSeconds < 0) {
-                    $totalSeconds = abs($totalSeconds);
-                }
-
-                $newStatus = $att->status;
-                $newKeterangan = $att->keterangan;
-
-                // Jika sebelumnya terkena Auto Bolos (B), kembalikan statusnya ke H (Hadir) atau T (Terlambat)
-                if ($att->status === 'B') {
-                    $waktuMasuk = Carbon::parse($att->tanggal . ' ' . $att->jam_masuk);
-                    $newStatus = $waktuMasuk->gt($batasTelat) ? 'T' : 'H';
-
-                    // Bersihkan teks keterangan dari Auto Bolos
-                    if ($newKeterangan) {
-                        $newKeterangan = trim(str_replace('[Auto: Tidak Absen Pulang]', '', $newKeterangan));
-                        if (empty($newKeterangan)) {
-                            $newKeterangan = null;
-                        }
-                    }
-                }
-
-                $att->update([
-                    'jam_pulang' => $now->toTimeString(),
-                    'total_seconds' => $totalSeconds,
-                    'status' => $newStatus,
-                    'keterangan' => $newKeterangan,
-                    'updated_at' => now(),
-                ]);
-
-                // OTOMATIS CATAT ABSEN KEGIATAN JIKA TERDAPAT JADWAL KEGIATAN AKTIF SAAT PULANG
-                $this->recordActiveKegiatans($device->school_id, $siswa, $now, $today, 'Auto dari Absen Pulang');
-
-                DB::commit();
-
-                // WA
-                $hours = floor($totalSeconds / 3600);
-                $mins = floor(($totalSeconds % 3600) / 60);
-                $authorizedBy = $teacherSession ? $teacherSession->teacher_name : 'Sistem Otomatis';
-                $this->wa->sendCheckOut($siswa->nama, $siswa->no_wa, $now->format('H:i'), $hours, $mins, $authorizedBy, $device->school_id, $masuk->format('H:i'), $siswa->wa_ortu, $now->format('d/m/Y'));
-
-                // Send FCM Push Notification
-                try {
-                    FcmNotificationService::sendToSiswa($siswa, "Presensi Pulang Tercatat", "Halo {$siswa->nama}, absensi pulang Anda berhasil dicatat pukul {$now->format('H:i')}.", [
-                        'type' => 'checkout_siswa',
-                        'student_id' => (string) $siswa->id,
-                        'time' => (string) $now->format('H:i'),
-                    ]);
-                } catch (\Exception $e) {
-                    Log::error("FCM Siswa Checkout Error: " . $e->getMessage());
-                }
-
-                $this->logRequest($apiKey, 'checkout_success', $uid, true, 'Pulang: ' . $siswa->nama);
-                return $this->response(true, 'success', 'Absen Berhasil', 'ok', [
-                    'type' => 'absen_pulang',
-                    'nama' => $siswa->nama,
-                    'authorized_by' => $authorizedBy
-                ]);
-            }
-
-            // Case 3: Absen Masuk
-            if (!$att || !$att->jam_masuk) {
-                if ($now->lt($awalAbsenMasuk) || $now->gt($akhirAbsenMasuk)) {
-                    $recordedKegiatans = $this->recordActiveKegiatans($device->school_id, $siswa, $now, $today, 'Scan Mandiri Kegiatan');
-                    if (!empty($recordedKegiatans)) {
-                        DB::commit();
-                        $namaKeg = implode(', ', $recordedKegiatans);
-                        $this->logRequest($apiKey, 'kegiatan_success', $uid, true, "Kegiatan ({$namaKeg}): " . $siswa->nama);
-                        return $this->response(true, 'success', 'Absen Kegiatan Berhasil', 'ok', [
-                            'type' => 'absen_kegiatan',
-                            'nama' => $siswa->nama,
-                            'kegiatan' => $namaKeg,
-                        ]);
-                    }
-                }
-
-                if ($now->lt($awalAbsenMasuk)) {
-                    DB::rollBack();
-                    return $this->response(false, 'gagal', 'Absen Tutup', 'warning', ['type' => 'too_early']);
-                }
-                if ($now->gt($akhirAbsenMasuk)) {
-                    DB::rollBack();
-                    return $this->response(false, 'gagal', 'Absen Tutup', 'warning', ['type' => 'checkin_closed']);
-                }
-
-                $status = 'H';
-                $keterangan = null;
-
-                if ($now->gt($batasTelat)) {
-                    $status = 'T'; // Set status to Terlambat
-                    $diff = $now->timestamp - $batasTelat->timestamp;
-                    $jam = floor($diff / 3600);
-                    $menit = floor(($diff % 3600) / 60);
-
-                    if ($jam > 0) {
-                        $keterangan = "Telat {$jam} jam {$menit} menit";
-                    } else {
-                        $keterangan = "Telat {$menit} menit";
-                    }
-                }
-
-                if ($att) {
-                    $att->update([
-                        'jam_masuk' => $now->toTimeString(),
-                        'status' => $status,
-                        'keterangan' => $keterangan,
-                        'updated_at' => now(),
-                    ]);
-                } else {
-                    Attendance::create([
-                        'student_id' => $siswa->id,
-                        'tanggal' => $now->format('Y-m-d'),
-                        'jam_masuk' => $now->toTimeString(),
-                        'status' => $status,
-                        'keterangan' => $keterangan,
-                        'created_at' => now(),
-                    ]);
-                }
-
-                // OTOMATIS CATAT ABSEN KEGIATAN JIKA TERDAPAT JADWAL KEGIATAN AKTIF SAAT MASUK
-                $this->recordActiveKegiatans($device->school_id, $siswa, $now, $today, 'Auto dari Absen Masuk');
-
-                DB::commit();
-
-                $this->wa->sendCheckIn($siswa->nama, $siswa->no_wa, $now->format('H:i'), $status, $device->school_id, $keterangan, $siswa->wa_ortu, $siswa->kelas->nama_kelas ?? '-');
-
-                // Send FCM Push Notification
-                try {
-                    $readableStatus = ($status === 'T' || $status === 'Terlambat') ? 'Terlambat' : 'Hadir';
-                    FcmNotificationService::sendToSiswa($siswa, "Presensi Masuk Tercatat", "Halo {$siswa->nama}, absensi masuk Anda berhasil dicatat pukul {$now->format('H:i')} (Status: {$readableStatus}).", [
-                        'type' => 'checkin_siswa',
-                        'student_id' => (string) $siswa->id,
-                        'time' => (string) $now->format('H:i'),
-                        'status' => (string) $readableStatus,
-                    ]);
-                } catch (\Exception $e) {
-                    Log::error("FCM Siswa Checkin Error: " . $e->getMessage());
-                }
-
-                $this->logRequest($apiKey, 'checkin_success', $uid, true, 'Masuk: ' . $siswa->nama);
-                return $this->response(true, 'success', 'Absen Berhasil', 'ok', [
-                    'type' => 'absen_masuk',
-                    'nama' => $siswa->nama,
-                    'attendance_status' => $status
-                ]);
-            }
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error("Scan error: " . $e->getMessage());
-            return $this->response(false, 'gagal', 'Terjadi kesalahan sistem', 'error');
+        if (!$siswa) {
+            $this->logRequest($apiKey, 'unknown_card', $uid, false, 'Kartu tidak terdaftar di sekolah ini');
+            return $this->response(false, 'unknown', 'Kartu tdk dikenal', 'error', ['type' => 'unknown_card', 'uid' => $uid]);
         }
-    }
 
+        // CHECK: Is Class Attendance Active?
+        if ($siswa->kelas && !$siswa->kelas->is_active_attendance) {
+            return $this->response(false, 'gagal', 'Absensi dimatikan untuk kelas ini.', 'error', ['type' => 'class_disabled']);
+        }
+
+        $res = $this->attendanceCore->recordStudentAttendance($siswa, [
+            'school_id' => $device->school_id,
+            'uid' => $uid,
+            'now' => $now,
+            'channel' => 'rfid',
+            'mode' => 'auto',
+        ]);
+
+        $action = match ($res['type'] ?? '') {
+            'hari_libur', 'di_luar_jam', 'checkout_closed', 'checkout_early_rejected' => 'scan_rejected',
+            'pulang_normal', 'pulang_cepat' => 'checkout_success',
+            'absen_kegiatan' => 'kegiatan_success',
+            default => $res['ok'] ? 'checkin_success' : 'scan_rejected',
+        };
+
+        $this->logRequest($apiKey, $action, $uid, $res['ok'], $res['message']);
+
+        $extra = [
+            'type' => $res['type'] ?? 'absen_siswa',
+            'nama' => $siswa->nama,
+            'status' => $res['data']['status'] ?? '',
+            'jam' => $res['data']['jam'] ?? ($now ? $now->format('H:i') : now()->format('H:i')),
+        ];
+        if (isset($res['data']['kegiatan'])) {
+            $extra['kegiatan'] = $res['data']['kegiatan'];
+        }
+        if (isset($res['data']['jam_masuk'])) {
+            $extra['jam_masuk'] = $res['data']['jam_masuk'];
+        }
+        if (isset($res['data']['jam_pulang'])) {
+            $extra['jam_pulang'] = $res['data']['jam_pulang'];
+        }
+
+        return $this->response(
+            $res['ok'],
+            $res['status'] === 'success' ? 'success' : 'gagal',
+            $res['message'],
+            $res['sound'],
+            $extra
+        );
+    }
 
     private function response($ok, $status, $message, $sound = 'ok', $extra = [])
     {
@@ -1181,53 +729,6 @@ class RfidController extends Controller
      */
     private function recordActiveKegiatans($schoolId, $siswa, $now, $today, $keterangan = 'Auto dari Scan Mesin'): array
     {
-        $activeKegiatans = \App\Models\Kegiatan::where('school_id', $schoolId)
-            ->where('is_active', 1)
-            ->get()
-            ->filter(function ($keg) use ($now) {
-                return $keg->isScheduledNow($now);
-            });
-
-        $recordedKegiatans = [];
-        foreach ($activeKegiatans as $keg) {
-            if (!$keg->isStudentEligible($siswa)) {
-                continue;
-            }
-
-            $alreadyKeg = \App\Models\KegiatanAttendance::where('kegiatan_id', $keg->id)
-                ->where('student_id', $siswa->id)
-                ->where('tanggal', $today)
-                ->exists();
-
-            if (!$alreadyKeg) {
-                \App\Models\KegiatanAttendance::create([
-                    'school_id'   => $schoolId,
-                    'kegiatan_id' => $keg->id,
-                    'student_id'  => $siswa->id,
-                    'tanggal'     => $today,
-                    'jam_masuk'   => $now->toTimeString(),
-                    'status'      => 'H',
-                    'keterangan'  => $keterangan,
-                ]);
-                $recordedKegiatans[] = $keg->nama_kegiatan;
-
-                // Kirim notifikasi Telegram ke siswa & ortu (WA tidak dikirim)
-                try {
-                    $telegramService = app(\App\Services\TelegramService::class);
-                    $telegramService->sendKegiatanCheckIn(
-                        namaSiswa: $siswa->nama,
-                        namaKegiatan: $keg->nama_kegiatan,
-                        jam: $now->format('H:i'),
-                        tanggal: $now->translatedFormat('l, d F Y'),
-                        schoolId: $schoolId,
-                        chatIdSiswa: $siswa->telegram_chat_id ?: null,
-                        chatIdOrtu: $siswa->telegram_ortu_chat_id ?: null
-                    );
-                } catch (\Throwable $e) {
-                    \Log::error("Failed to send Telegram for kegiatan attendance: " . $e->getMessage());
-                }
-            }
-        }
-        return $recordedKegiatans;
+        return $this->attendanceCore->recordActiveKegiatans($schoolId, $siswa, $now, $today, $keterangan);
     }
 }

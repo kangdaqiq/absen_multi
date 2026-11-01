@@ -357,11 +357,16 @@ class MenuHelper
 
         // 5. SISTEM
         if (in_array($role, ['admin', 'super_admin'])) {
-            $sistemSubItems = [
-                ['name' => 'Update Sistem', 'path' => route('system.update', [], false)],
-                ['name' => 'Manajemen Admin', 'path' => route('users.index', [], false)],
-                ['name' => 'Backup & Restore', 'path' => route('backup.index', [], false)],
-            ];
+            $isSelfHosted = app(\App\Services\LicenseService::class)->isSelfHosted();
+            $sistemSubItems = [];
+
+            // Fitur Update Sistem & Web Console hanya untuk client self-hosted
+            if ($isSelfHosted) {
+                $sistemSubItems[] = ['name' => 'Update Sistem', 'path' => route('system.update', [], false)];
+            }
+
+            $sistemSubItems[] = ['name' => 'Manajemen Admin', 'path' => route('users.index', [], false)];
+            $sistemSubItems[] = ['name' => 'Backup & Restore', 'path' => route('backup.index', [], false)];
             if ($role === 'super_admin') {
                 $sistemSubItems[] = ['name' => 'Backup Sistem (SQL)', 'path' => route('backups.index', [], false)];
             }

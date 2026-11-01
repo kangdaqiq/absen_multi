@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\LicenseService;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -9,6 +10,10 @@ class SystemUpdateController extends Controller
 {
     public function index()
     {
+        if (!app(LicenseService::class)->isSelfHosted()) {
+            abort(404);
+        }
+
         $isWindows = (PHP_OS_FAMILY === 'Windows');
         $serverHost = gethostname() ?: 'JagatServer';
         $serverOS = PHP_OS . ' (' . php_uname('m') . ')';
@@ -19,6 +24,10 @@ class SystemUpdateController extends Controller
 
     public function stream(Request $request)
     {
+        if (!app(LicenseService::class)->isSelfHosted()) {
+            abort(404);
+        }
+
         @ini_set('max_execution_time', 0);
         @set_time_limit(0);
 

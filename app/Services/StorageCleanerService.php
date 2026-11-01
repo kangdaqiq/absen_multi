@@ -258,7 +258,7 @@ class StorageCleanerService
                     $this->registerReference($item, null, $usedUrls, $usedPaths, $usedBasenames, $usedIds);
                 } elseif (is_array($item)) {
                     $url = $item['url'] ?? ($item['view_url'] ?? ($item['download_url'] ?? null));
-                    $id  = $item['id'] ?? null;
+                    $id  = $item['id'] ?? ($item['file_id'] ?? null);
                     $this->registerReference($url, $id, $usedUrls, $usedPaths, $usedBasenames, $usedIds);
                 }
             }
@@ -275,10 +275,13 @@ class StorageCleanerService
     /**
      * Daftarkan item referensi ke lookup map
      */
-    protected function registerReference(?string $url, ?int $id, array &$usedUrls, array &$usedPaths, array &$usedBasenames, array &$usedIds): void
+    protected function registerReference(?string $url, string|int|null $id, array &$usedUrls, array &$usedPaths, array &$usedBasenames, array &$usedIds): void
     {
-        if ($id) {
-            $usedIds[(int) $id] = true;
+        if (!empty($id)) {
+            if (is_numeric($id)) {
+                $usedIds[(int) $id] = true;
+            }
+            $usedIds[(string) $id] = true;
         }
 
         if (empty($url)) {

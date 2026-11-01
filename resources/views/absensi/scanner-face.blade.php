@@ -1315,55 +1315,6 @@ function faceScannerApp() {
                     ctx.fill();
                 }
             }
-
-            // 3. Status Tag / Badge di atas kotak wajah
-            ctx.font = 'bold 11px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-
-            let badgeText = '✓ LURUS & SEJAJAR';
-            if (!isOk) {
-                if (pose.poseType === 'roll') {
-                    badgeText = `⚠️ MIRING ${Math.abs(pose.roll)}°`;
-                } else if (pose.poseType === 'yaw') {
-                    badgeText = `⚠️ MENOLEH ${Math.abs(pose.yaw)}°`;
-                } else if (pose.poseType === 'pitch_up') {
-                    badgeText = '⚠️ MENDONGAK';
-                } else if (pose.poseType === 'pitch_down') {
-                    badgeText = '⚠️ MENUNDUK';
-                } else if (pose.poseType === 'distance_far') {
-                    badgeText = '⚠️ DEKATKAN';
-                } else if (pose.poseType === 'distance_near') {
-                    badgeText = '⚠️ MUNDUR SEDIKIT';
-                } else {
-                    badgeText = '⚠️ ATUR POSISI';
-                }
-            }
-
-            const textMetrics = ctx.measureText(badgeText);
-            const badgeW = textMetrics.width + 16;
-            const badgeH = 20;
-            const badgeX = box.x + box.width / 2;
-            const badgeY = Math.max(16, box.y - 14);
-
-            // Un-mirror teks: karena elemen <canvas> dipasang CSS 'transform: scaleX(-1)' (mirror mode selfie),
-            // kita lakukan scale(-1, 1) di titik tengah badge agar tulisan terbaca normal dari kiri ke kanan.
-            ctx.save();
-            ctx.translate(badgeX, badgeY);
-            ctx.scale(-1, 1);
-
-            ctx.fillStyle = isOk ? 'rgba(16, 185, 129, 0.95)' : 'rgba(245, 158, 11, 0.95)';
-            if (ctx.roundRect) {
-                ctx.beginPath();
-                ctx.roundRect(-badgeW / 2, -badgeH / 2, badgeW, badgeH, 6);
-                ctx.fill();
-            } else {
-                ctx.fillRect(-badgeW / 2, -badgeH / 2, badgeW, badgeH);
-            }
-
-            ctx.fillStyle = '#ffffff';
-            ctx.fillText(badgeText, 0, 0);
-            ctx.restore();
         },
 
         drawCornerBrackets(ctx, x, y, w, h, color) {

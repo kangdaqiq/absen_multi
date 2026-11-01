@@ -486,4 +486,74 @@ class FaceRecognitionService
         }
         return ($normA > 0 && $normB > 0) ? ($dot / (sqrt($normA) * sqrt($normB))) : 0.0;
     }
+
+    /**
+     * Cari apakah wajah yang akan didaftarkan sudah terdaftar atas nama orang lain di sekolah yang sama.
+     * Mencegah salah identifikasi atau wajah yang sama didaftarkan ke 2 profil berbeda.
+     *
+     * @param array $newVec Vektor 512-dimensi yang sudah dinormalisasi
+     * @param int|null $schoolId ID sekolah operator
+     * @param string $excludeType 'siswa' atau 'guru'
+     * @param int $excludePersonId ID orang yang sedang didaftarkan (dikecualikan dari pengecekan)
+     * @param float|null $threshold Ambang batas kemiripan
+     * @return array|null Informasi orang lain yang wajahnya cocok atau null jika aman
+     */
+    public static function findDuplicateFace(array $newVec, $schoolId, string $excludeType, int $excludePersonId, ?float $threshold = null): ?array
+    {
+        $activeThreshold = $threshold ?? self::getThreshold();
+
+        $candidates = UserFaceData::whereNotNull('face_embedding')
+            ->with(['siswa.kelas', 'guru'])
+            ->when($schoolId, function ($q) use ($schoolId) {
+                $q->where(function ($sub) use ($schoolId) {
+                    $sub->whereHas('siswa', fn($s) => $s->where('school_id', $schoolId))
+                        ->orWhereHas('guru', fn($g) => $g->where('school_id', $schoolId));
+                });
+            })
+            ->get();
+
+        $highestSim = 0.0;
+        $matchedCandidate = null;
+
+        foreach ($candidates as $cand) {
+            // Kecualikan profil orang yang sedang didaftarkan
+            if ($excludeType === 'siswa' && (int) $cand->siswa_id === $excludePersonId) {
+                continue;
+            }
+            if ($excludeType === 'guru' && (int) $cand->guru_id === $excludePersonId) {
+                continue;
+            }
+
+            $unpacked = self::unpackEmbedding($cand->face_embedding);
+            $vec512 = $unpacked['v512'];
+            if (empty($vec512) || count($vec512) !== 512) {
+                continue;
+            }
+
+            $sim = self::cosineSimilarity($newVec, $vec512);
+            if ($sim >= $activeThreshold && $sim > $highestSim) {
+                $highestSim = $sim;
+                $matchedCandidate = $cand;
+            }
+        }
+
+        if ($matchedCandidate) {
+            $isSiswa = (bool) $matchedCandidate->siswa;
+            $nama = $isSiswa ? ($matchedCandidate->siswa->nama ?? 'Siswa') : ($matchedCandidate->guru->nama ?? 'Guru');
+            $label = $isSiswa
+                ? ('Siswa (' . ($matchedCandidate->siswa->kelas->nama_kelas ?? 'Tanpa Kelas') . ')')
+                : 'Guru / Staf';
+
+            return [
+                'nama' => $nama,
+                'label' => $label,
+                'type' => $isSiswa ? 'siswa' : 'guru',
+                'person_id' => $isSiswa ? $matchedCandidate->siswa_id : $matchedCandidate->guru_id,
+                'similarity' => round($highestSim, 4),
+                'similarity_percent' => round($highestSim * 100, 1),
+            ];
+        }
+
+        return null;
+    }
 }

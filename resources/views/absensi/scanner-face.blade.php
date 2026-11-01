@@ -845,6 +845,32 @@
                         <i class="fas fa-check-circle text-base" style="color: #4f6bed;"></i>
                     </div>
 
+                    <!-- Mode Pendaftaran jika siswa sudah punya Face ID -->
+                    <div x-show="selectedEnrollStudent && selectedEnrollStudent.has_face" class="p-3 rounded-xl border border-amber-200 bg-amber-50/70 dark:border-amber-800/40 dark:bg-amber-950/20 space-y-2">
+                        <div class="flex items-center gap-1.5 text-[11px] font-bold text-amber-800 dark:text-amber-400">
+                            <i class="fas fa-info-circle"></i>
+                            <span>Siswa ini sudah memiliki data Face ID terdaftar:</span>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+                            <label class="flex items-start gap-2 p-2 rounded-lg border cursor-pointer transition"
+                                :class="enrollMode === 'append' ? 'bg-white border-brand-500 shadow-sm dark:bg-gray-800' : 'border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-900/40'">
+                                <input type="radio" value="append" x-model="enrollMode" class="mt-0.5 text-brand-600">
+                                <div>
+                                    <p class="font-bold text-gray-800 dark:text-gray-200">Tambah Variasi</p>
+                                    <p class="text-[10px] text-gray-500 dark:text-gray-400">Gabungkan sudut/pencahayaan baru untuk akurasi lebih baik</p>
+                                </div>
+                            </label>
+                            <label class="flex items-start gap-2 p-2 rounded-lg border cursor-pointer transition"
+                                :class="enrollMode === 'replace' ? 'bg-white border-rose-500 shadow-sm dark:bg-gray-800' : 'border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-900/40'">
+                                <input type="radio" value="replace" x-model="enrollMode" class="mt-0.5 text-rose-600">
+                                <div>
+                                    <p class="font-bold text-gray-800 dark:text-gray-200">Ganti Total</p>
+                                    <p class="text-[10px] text-gray-500 dark:text-gray-400">Hapus template lama & daftarkan ulang dari awal</p>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
                     <div class="pt-2 flex items-center justify-end gap-2">
                         <button type="button" @click="showEnrollModal = false"
                             class="px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 font-semibold text-gray-600 dark:text-gray-400 hover:bg-gray-50 transition">
@@ -902,6 +928,8 @@ function faceScannerApp() {
         enrollSearch: '',
         showEnrollModal: false,
         selectedEnrollStudent: null,
+        enrollMode: 'append', // 'append' (tambah variasi) atau 'replace' (ganti total)
+        cooldownMs: 25000,    // Cooldown 25 detik untuk orang yang sama agar tidak spam scan/duplikat baris
 
         // Realtime stats & attendees
         stats: {
@@ -1331,8 +1359,25 @@ function faceScannerApp() {
 
                     const res = await response.json().catch(() => ({}));
                     if (response.ok && res.ok) {
+                        const personKey = (res.person && res.person.key) || (res.data && res.data.nis ? ('siswa:' + res.data.nis) : null);
+                        const now = Date.now();
+
+                        // Cegah scan berulang orang yang sama dalam periode cooldown
+                        if (personKey && this.recentScans[personKey] && (now - this.recentScans[personKey]) < this.cooldownMs) {
+                            this.lastScanError = false;
+                            this.detectionMessage = `${res.data?.nama || 'Pengguna'} sudah tercatat barusan. Silakan lanjut.`;
+                            this.holdMessageUntil = now + 3200;
+                            this.updateSpotlightOnly(res, res.data || {});
+                            return;
+                        }
+
+                        if (personKey) {
+                            this.recentScans[personKey] = now;
+                        }
+
                         this.lastScanError = false;
-                        this.handleScanResponse(res, res.data || {}, 0.88);
+                        const simScore = res.data && res.data.similarity ? (parseFloat(res.data.similarity) / 100) : 0.88;
+                        this.handleScanResponse(res, res.data || {}, simScore);
                         this.holdMessageUntil = Date.now() + 3800;
                     } else {
                         this.lastScanError = true;
@@ -1397,49 +1442,89 @@ function faceScannerApp() {
             }
         },
 
+        updateSpotlightOnly(res, data = {}, matchedItem = {}) {
+            this.spotlight = {
+                nama: data.nama || matchedItem.nama || 'Siswa',
+                nis: data.nis || matchedItem.nis || '-',
+                kelas: data.kelas || matchedItem.kelas || '-',
+                foto: data.foto || matchedItem.foto || null,
+                status: data.status || (res.type === 'absen_pulang' ? 'Pulang' : 'Hadir'),
+                statusType: res.type === 'absen_pulang' ? 'pulang' : (data.status === 'Terlambat' ? 'warning' : 'success'),
+                keterangan: data.keterangan || res.message || '',
+                waktu: data.jam || this.currentTime,
+                similarity: data.similarity || (this.spotlight.similarity || null),
+            };
+        },
+
         handleScanResponse(res, matchedItem, similarity) {
             const data = res.data || {};
             const sound = res.sound || (res.ok ? 'ok' : 'warning');
             this.playTone(sound);
 
             // Update Spotlight
-            this.spotlight = {
-                nama: data.nama || matchedItem.nama,
-                nis: data.nis || matchedItem.nis,
-                kelas: data.kelas || matchedItem.kelas,
-                foto: data.foto || matchedItem.foto,
-                status: data.status || (res.type === 'absen_pulang' ? 'Pulang' : 'Hadir'),
-                statusType: res.type === 'absen_pulang' ? 'pulang' : (data.status === 'Terlambat' ? 'warning' : 'success'),
-                keterangan: data.keterangan || res.message,
-                waktu: data.jam || this.currentTime,
-                similarity: data.similarity || (Math.round(similarity * 100) + '%'),
-            };
+            this.updateSpotlightOnly(res, data, matchedItem);
+            if (similarity) {
+                this.spotlight.similarity = Math.round(similarity * 100) + '%';
+            }
 
             this.detectionMessage = res.message || 'Presensi berhasil!';
 
-            // If success, increment stats & prepend to list
+            // If success, update data tabel aktivitas dengan aman (cegah duplikasi baris)
             if (res.ok) {
-                if (res.type === 'absen_masuk') {
-                    if (data.status === 'Terlambat') {
-                        this.stats.terlambat++;
-                    } else {
-                        this.stats.tepatWaktu++;
-                    }
-                    this.stats.sudahAbsen++;
-                }
-
-                // Prepend to table
-                this.attendances.unshift({
-                    id: Date.now(),
-                    waktu: data.jam_masuk || this.currentTime,
-                    nama: data.nama || matchedItem.nama,
-                    nis: data.nis || matchedItem.nis,
-                    foto: data.foto || matchedItem.foto,
-                    kelas: data.kelas || matchedItem.kelas,
-                    status: data.status || 'Hadir',
-                    statusType: res.type === 'absen_pulang' ? 'pulang' : (data.status === 'Terlambat' ? 'warning' : 'success'),
-                    is_face: true,
+                const personKey = (res.person && res.person.key) || ('siswa:' + (data.nis || matchedItem.nis || ''));
+                const existingIdx = this.attendances.findIndex(a => {
+                    if (a.personKey && personKey && a.personKey === personKey) return true;
+                    if (data.nis && a.nis && a.nis === data.nis && a.nis !== '-') return true;
+                    if (data.nama && a.nama === data.nama) return true;
+                    return false;
                 });
+
+                const timeDisplay = (res.type === 'absen_pulang' ? (data.jam_pulang || data.jam) : (data.jam_masuk || data.jam)) || this.currentTime;
+
+                if (existingIdx !== -1) {
+                    // Baris sudah ada di tabel: perbarui nilainya & pindahkan ke baris teratas (khusus pulang)
+                    const existing = this.attendances[existingIdx];
+                    if (res.type === 'absen_pulang') {
+                        existing.pulang = data.jam_pulang || data.jam || this.currentTime;
+                        existing.status = data.status || 'Pulang';
+                        existing.statusType = 'pulang';
+                        existing.waktu = timeDisplay;
+                        if (data.foto) existing.foto = data.foto;
+                        // Pindahkan ke paling atas
+                        this.attendances.splice(existingIdx, 1);
+                        this.attendances.unshift(existing);
+                    } else {
+                        existing.status = data.status || existing.status;
+                        existing.statusType = (data.status === 'Terlambat') ? 'warning' : existing.statusType;
+                        if (data.foto) existing.foto = data.foto;
+                    }
+                } else {
+                    // Belum ada di tabel: tambahkan baris baru
+                    this.attendances.unshift({
+                        id: Date.now(),
+                        personKey: personKey,
+                        waktu: timeDisplay,
+                        nama: data.nama || matchedItem.nama,
+                        nis: data.nis || matchedItem.nis,
+                        foto: data.foto || matchedItem.foto,
+                        kelas: data.kelas || matchedItem.kelas,
+                        masuk: data.jam_masuk || (res.type === 'absen_masuk' ? data.jam : '--:--'),
+                        pulang: data.jam_pulang || (res.type === 'absen_pulang' ? data.jam : '--:--'),
+                        status: data.status || (res.type === 'absen_pulang' ? 'Pulang' : 'Hadir'),
+                        statusType: res.type === 'absen_pulang' ? 'pulang' : (data.status === 'Terlambat' ? 'warning' : 'success'),
+                        is_face: true,
+                    });
+
+                    // Update total counter hanya jika absensi masuk baru tercatat
+                    if (res.type === 'absen_masuk') {
+                        if (data.status === 'Terlambat') {
+                            this.stats.terlambat++;
+                        } else {
+                            this.stats.tepatWaktu++;
+                        }
+                        this.stats.sudahAbsen++;
+                    }
+                }
             }
         },
 
@@ -1448,6 +1533,7 @@ function faceScannerApp() {
             this.showEnrollModal = true;
             this.enrollSearch = '';
             this.selectedEnrollStudent = null;
+            this.enrollMode = 'append';
 
             if (this.allStudents.length === 0) {
                 this.isLoadingStudents = true;
@@ -1538,11 +1624,13 @@ function faceScannerApp() {
                     body: JSON.stringify({
                         person_id: this.selectedEnrollStudent.id,
                         type: 'siswa',
-                        photo: snapshot
+                        photo: snapshot,
+                        enroll_mode: this.enrollMode
                     })
                 });
 
-                const res = await response.json();
+                const res = await response.json().catch(() => ({}));
+
                 if (response.ok && res.ok) {
                     this.playTone('ok');
                     this.faceCount++;
@@ -1550,6 +1638,16 @@ function faceScannerApp() {
                     if (stu) stu.has_face = true;
                     alert(res.message);
                     this.showEnrollModal = false;
+                } else if (response.status === 409 && res.code === 'requires_replace') {
+                    this.playTone('warning');
+                    if (confirm(res.message + "\n\nApakah Anda ingin mengganti total Face ID dengan wajah ini sekarang?")) {
+                        this.enrollMode = 'replace';
+                        // Re-trigger dengan mode replace
+                        await this.executeEnrollment();
+                    }
+                } else if (response.status === 409 && res.code === 'duplicate_face') {
+                    this.playTone('error');
+                    alert(res.message);
                 } else {
                     this.playTone('error');
                     alert('Gagal: ' + (res.message || 'Layanan AI Face ID tidak merespons.'));

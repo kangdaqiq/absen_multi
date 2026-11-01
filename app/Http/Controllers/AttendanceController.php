@@ -81,6 +81,7 @@ class AttendanceController extends Controller
 
             return [
                 'id' => $att->id,
+                'personKey' => 'siswa:' . $att->student_id,
                 'waktu' => $waktuFormatted,
                 'nama' => $student->nama ?? 'Siswa',
                 'nis' => $student->nis ?? '-',
@@ -153,6 +154,7 @@ class AttendanceController extends Controller
 
             return [
                 'id' => $att->id,
+                'personKey' => 'siswa:' . $att->student_id,
                 'waktu' => $waktuFormatted,
                 'nama' => $student->nama ?? 'Siswa',
                 'nis' => $student->nis ?? '-',
@@ -359,7 +361,60 @@ class AttendanceController extends Controller
             ], $engineOffline ? 503 : 404);
         }
 
-        $schoolId = auth()->user()?->school_id;
+        $response = $this->processFaceAttendanceFor($type, (int) $personId, $similarity, $reqMode, $schoolId);
+
+        return $this->withFacePerson($response, $type, (int) $personId);
+    }
+
+    /**
+     * Jarak minimal (menit) antara absen masuk dan absen pulang pada mode 'auto'.
+     * Mencegah siswa/guru yang masih berdiri di depan kiosk langsung tercatat PULANG
+     * beberapa detik setelah absen masuk (mis. saat ada sesi pembuka gerbang aktif).
+     */
+    private const FACE_MIN_CHECKOUT_GAP_MINUTES = 10;
+
+    /**
+     * Sisipkan identitas orang yang dikenali ke payload JSON agar kiosk dapat
+     * menerapkan cooldown per orang & tidak menduplikasi baris aktivitas.
+     */
+    private function withFacePerson($response, string $type, int $personId)
+    {
+        if ($response instanceof \Illuminate\Http\JsonResponse) {
+            $payload = $response->getData(true);
+            if (is_array($payload)) {
+                $payload['person'] = [
+                    'type' => $type,
+                    'id' => $personId,
+                    'key' => $type . ':' . $personId,
+                ];
+                $response->setData($payload);
+            }
+        }
+
+        return $response;
+    }
+
+    /**
+     * Cek apakah absen masuk baru saja terjadi (di bawah FACE_MIN_CHECKOUT_GAP_MINUTES).
+     */
+    private function isWithinCheckoutGap($tanggal, $jamMasuk, Carbon $now): bool
+    {
+        if (empty($jamMasuk)) {
+            return false;
+        }
+
+        try {
+            $tanggalStr = $tanggal ? Carbon::parse($tanggal)->format('Y-m-d') : $now->format('Y-m-d');
+            $jamStr = $jamMasuk instanceof \DateTimeInterface ? $jamMasuk->format('H:i:s') : (string) $jamMasuk;
+            $masukAt = Carbon::parse($tanggalStr . ' ' . $jamStr, $now->getTimezone());
+            return abs($masukAt->diffInSeconds($now, false)) < (self::FACE_MIN_CHECKOUT_GAP_MINUTES * 60);
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    private function processFaceAttendanceFor(string $type, int $personId, float $similarity, string $reqMode, $schoolId)
+    {
         $schoolTz = Setting::where('school_id', $schoolId)->where('setting_key', 'timezone')->value('setting_value') ?: config('app.timezone', 'Asia/Jakarta');
         $now = Carbon::now($schoolTz);
         $today = $now->format('Y-m-d');
@@ -506,8 +561,9 @@ class AttendanceController extends Controller
                 } elseif ($reqMode === 'masuk') {
                     $isPulangAction = false;
                 } else {
-                    // Auto mode
-                    $isPulangAction = ($att && $att->jam_masuk !== null);
+                    // Auto mode (jangan langsung pulang jika baru saja absen masuk)
+                    $isPulangAction = ($att && $att->jam_masuk !== null)
+                        && !$this->isWithinCheckoutGap($att->tanggal, $att->jam_masuk, $now);
                 }
 
                 // --- EKSEKUSI PULANG ---
@@ -993,7 +1049,9 @@ class AttendanceController extends Controller
                 } elseif ($reqMode === 'masuk') {
                     $isPulang = false;
                 } else {
-                    $isPulang = ($absensiGuru && $absensiGuru->jam_masuk !== null);
+                    // Auto mode (jangan langsung pulang jika baru saja absen masuk)
+                    $isPulang = ($absensiGuru && $absensiGuru->jam_masuk !== null)
+                        && !$this->isWithinCheckoutGap($absensiGuru->tanggal, $absensiGuru->jam_masuk, $now);
                 }
 
                 if ($isPulang) {
@@ -1298,159 +1356,205 @@ class AttendanceController extends Controller
         }
 
         $request->validate([
-            'person_id' => 'required',
+            'person_id' => 'required|integer',
             'type' => 'required|in:siswa,guru',
-            'photo' => 'required|string', // base64
+            'photo' => 'required|string|max:6000000', // base64 (maks ~4.5 MB biner)
+            'enroll_mode' => 'nullable|in:append,replace',
         ]);
 
-        $personId = $request->person_id;
-        $type = $request->type;
-        $photoBase64 = $request->photo;
+        $schoolId = $user?->school_id;
+        $type = $request->input('type');
+        $enrollMode = $request->input('enroll_mode', 'append');
+        $label = $type === 'siswa' ? 'Siswa' : 'Guru';
+
+        // 1. Ambil data orang HANYA dari sekolah operator (cegah IDOR lintas sekolah)
+        $personQuery = $type === 'siswa' ? Siswa::with('kelas') : Guru::query();
+        $person = $personQuery
+            ->where('id', $request->input('person_id'))
+            ->when($schoolId, fn($q) => $q->where('school_id', $schoolId))
+            ->first();
+
+        if (!$person) {
+            return response()->json([
+                'ok' => false,
+                'message' => "{$label} tidak ditemukan di sekolah ini."
+            ], 404);
+        }
+
+        // 2. Validasi & decode foto base64 (harus gambar JPEG/PNG/WEBP yang valid)
+        $imageData = $this->decodeBase64Image((string) $request->input('photo'));
+        if ($imageData === null) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'Format foto tidak valid. Silakan ulangi pengambilan foto.'
+            ], 422);
+        }
 
         // Decode photo ke file temporary (tidak disimpan ke disk permanen untuk hemat storage)
         $tempPath = sys_get_temp_dir() . '/kiosk_enroll_' . uniqid() . '.jpg';
         try {
-            $imageParts = explode(';base64,', $photoBase64);
-            $imageData = base64_decode($imageParts[1] ?? $photoBase64);
             file_put_contents($tempPath, $imageData);
 
-            if ($type === 'siswa') {
-                $siswa = Siswa::find($personId);
-                if (!$siswa) return response()->json(['ok' => false, 'message' => 'Siswa tidak ditemukan'], 404);
-
-                $existingFace = UserFaceData::where('siswa_id', $siswa->id)->first();
-                $oldUnpacked = $existingFace ? \App\Services\FaceRecognitionService::unpackEmbedding($existingFace->face_embedding) : ['v512' => null];
-
-                // Ekstrak & gabungkan Centroid 512-d (InsightFace Python Server)
-                $extract512 = \App\Services\FaceRecognitionService::extractVector($tempPath, $existingFace?->face_embedding, 0.5);
-                if (empty($extract512['success']) || empty($extract512['embedding'])) {
-                    $statusCode = !empty($extract512['engine_offline']) ? 503 : 422;
-                    return response()->json([
-                        'ok' => false,
-                        'message' => $extract512['message'] ?? 'Gagal memproses data wajah. Pastikan Face Engine aktif.'
-                    ], $statusCode);
-                }
-
-                $vec512 = $extract512['embedding'];
-
-                $targetUser = $siswa->user;
-                if (!$targetUser) {
-                    $targetUser = User::where('username', 'siswa_' . $siswa->nis)->orWhere('username', $siswa->nis)->first();
-                }
-                if (!$targetUser) {
-                    $targetUser = User::create([
-                        'full_name' => $siswa->nama,
-                        'username' => 'siswa_' . ($siswa->nis ?: $siswa->id),
-                        'email' => ($siswa->nis ?: $siswa->id) . '@siswa.local',
-                        'password_hash' => Hash::make('123456'),
-                        'role' => 'student',
-                        'school_id' => $siswa->school_id,
-                    ]);
-                }
-
-                if ($siswa->user_id !== $targetUser->id) {
-                    $siswa->user_id = $targetUser->id;
-                    $siswa->save();
-                }
-
-                UserFaceData::updateOrCreate(
-                    ['siswa_id' => $siswa->id],
-                    [
-                        'user_id' => $targetUser->id,
-                        'face_embedding' => \App\Services\FaceRecognitionService::packEmbedding($vec512),
-                        'sample_photo_path' => null,
-                        'is_verified' => true,
-                    ]
-                );
-
-                $isMultiShot = !empty($oldUnpacked['v512']);
-
+            // 3. Ekstrak vektor 512-d mentah dari foto baru (blending dilakukan di PHP setelah validasi)
+            $extract = \App\Services\FaceRecognitionService::extractVector($tempPath);
+            if (empty($extract['success']) || empty($extract['embedding']) || !is_array($extract['embedding']) || count($extract['embedding']) !== 512) {
+                $statusCode = !empty($extract['engine_offline']) ? 503 : 422;
                 return response()->json([
-                    'ok' => true,
-                    'message' => $isMultiShot
-                        ? "Sampel wajah tambahan {$siswa->nama} berhasil digabungkan!"
-                        : "Face ID siswa {$siswa->nama} berhasil didaftarkan!",
-                    'descriptor' => [
-                        'id' => $siswa->id,
-                        'type' => 'siswa',
-                        'nama' => $siswa->nama,
-                        'nis' => $siswa->nis ?? '-',
-                        'kelas' => $siswa->kelas->nama_kelas ?? '-',
-                        'foto' => $siswa->foto_url ?? null,
-                        'has_512' => true,
-                    ]
-                ]);
-            } else {
-                $guru = Guru::find($personId);
-                if (!$guru) return response()->json(['ok' => false, 'message' => 'Guru tidak ditemukan'], 404);
-
-                $existingFace = UserFaceData::where('guru_id', $guru->id)->first();
-                $oldUnpacked = $existingFace ? \App\Services\FaceRecognitionService::unpackEmbedding($existingFace->face_embedding) : ['v512' => null];
-
-                $extract512 = \App\Services\FaceRecognitionService::extractVector($tempPath, $existingFace?->face_embedding, 0.5);
-                if (empty($extract512['success']) || empty($extract512['embedding'])) {
-                    $statusCode = !empty($extract512['engine_offline']) ? 503 : 422;
-                    return response()->json([
-                        'ok' => false,
-                        'message' => $extract512['message'] ?? 'Gagal memproses data wajah. Pastikan Face Engine aktif.'
-                    ], $statusCode);
-                }
-
-                $vec512 = $extract512['embedding'];
-
-                $targetUser = $guru->user;
-                if (!$targetUser) {
-                    $targetUser = User::where('username', $guru->nip)->first();
-                }
-                if (!$targetUser) {
-                    $targetUser = User::create([
-                        'full_name' => $guru->nama,
-                        'username' => $guru->nip ?: 'guru_' . $guru->id,
-                        'email' => ($guru->nip ?: 'guru_' . $guru->id) . '@guru.local',
-                        'password_hash' => Hash::make('123456'),
-                        'role' => 'teacher',
-                        'school_id' => $guru->school_id,
-                    ]);
-                }
-
-                if ($guru->user_id !== $targetUser->id) {
-                    $guru->user_id = $targetUser->id;
-                    $guru->save();
-                }
-
-                UserFaceData::updateOrCreate(
-                    ['guru_id' => $guru->id],
-                    [
-                        'user_id' => $targetUser->id,
-                        'face_embedding' => \App\Services\FaceRecognitionService::packEmbedding($vec512),
-                        'sample_photo_path' => null,
-                        'is_verified' => true,
-                    ]
-                );
-
-                $isMultiShot = !empty($oldUnpacked['v512']);
-
-                return response()->json([
-                    'ok' => true,
-                    'message' => $isMultiShot
-                        ? "Sampel wajah tambahan {$guru->nama} berhasil digabungkan!"
-                        : "Face ID guru {$guru->nama} berhasil didaftarkan!",
-                    'descriptor' => [
-                        'id' => $guru->id,
-                        'type' => 'guru',
-                        'nama' => $guru->nama,
-                        'nis' => $guru->nip ?? '-',
-                        'kelas' => 'Dewan Guru',
-                        'foto' => $guru->foto_url ?? null,
-                        'has_512' => true,
-                    ]
-                ]);
+                    'ok' => false,
+                    'message' => $extract['message'] ?? 'Gagal memproses data wajah. Pastikan Face Engine aktif.'
+                ], $statusCode);
             }
+
+            $newVec = \App\Services\FaceRecognitionService::normalizeVector($extract['embedding']);
+            $threshold = \App\Services\FaceRecognitionService::getThreshold();
+
+            // 4. Cegah wajah yang sama terdaftar atas nama orang lain
+            $duplicate = \App\Services\FaceRecognitionService::findDuplicateFace($newVec, $schoolId, $type, (int) $person->id, $threshold);
+            if ($duplicate) {
+                return response()->json([
+                    'ok' => false,
+                    'code' => 'duplicate_face',
+                    'message' => "Wajah ini sudah terdaftar atas nama {$duplicate['nama']} ({$duplicate['label']}, kemiripan {$duplicate['similarity_percent']}%). "
+                        . "Pastikan orang di depan kamera adalah {$person->nama}. Jika data lama salah, hapus Face ID {$duplicate['nama']} terlebih dahulu.",
+                    'duplicate' => $duplicate,
+                ], 409);
+            }
+
+            $fkColumn = $type === 'siswa' ? 'siswa_id' : 'guru_id';
+            $existingFace = UserFaceData::where($fkColumn, $person->id)->first();
+            $oldVec = $existingFace
+                ? \App\Services\FaceRecognitionService::unpackEmbedding($existingFace->face_embedding)['v512']
+                : null;
+
+            // 5. Mode tambah sampel: wajah baru wajib cocok dengan Face ID lama agar template tidak tercampur wajah orang lain
+            $isMerged = false;
+            if (!empty($oldVec) && $enrollMode === 'append') {
+                $selfSim = \App\Services\FaceRecognitionService::cosineSimilarity($newVec, $oldVec);
+                if ($selfSim < $threshold) {
+                    $selfPct = round($selfSim * 100, 1);
+                    $minPct = round($threshold * 100);
+                    return response()->json([
+                        'ok' => false,
+                        'code' => 'requires_replace',
+                        'message' => "Wajah tidak cocok dengan Face ID {$person->nama} yang sudah terdaftar (kemiripan {$selfPct}%, minimal {$minPct}%). "
+                            . "Jika Anda yakin ini orang yang benar, pilih mode 'Ganti Total' lalu daftarkan ulang.",
+                        'similarity_percent' => $selfPct,
+                    ], 409);
+                }
+                $finalVec = \App\Services\FaceRecognitionService::blendCentroid($oldVec, $newVec, 0.5);
+                $isMerged = true;
+            } else {
+                $finalVec = $newVec;
+            }
+
+            $targetUser = $this->resolveFaceOwnerUser($person, $type);
+
+            DB::transaction(function () use ($person, $targetUser, $fkColumn, $finalVec) {
+                if ($person->user_id !== $targetUser->id) {
+                    $person->user_id = $targetUser->id;
+                    $person->save();
+                }
+
+                UserFaceData::updateOrCreate(
+                    [$fkColumn => $person->id],
+                    [
+                        'user_id' => $targetUser->id,
+                        'face_embedding' => \App\Services\FaceRecognitionService::packEmbedding($finalVec),
+                        'sample_photo_path' => null,
+                        'is_verified' => true,
+                    ]
+                );
+            });
+
+            if ($isMerged) {
+                $message = "Sampel wajah tambahan {$person->nama} berhasil digabungkan!";
+            } elseif (!empty($oldVec)) {
+                $message = "Face ID {$person->nama} berhasil diganti total dengan wajah baru!";
+            } else {
+                $message = "Face ID " . strtolower($label) . " {$person->nama} berhasil didaftarkan!";
+            }
+
+            return response()->json([
+                'ok' => true,
+                'message' => $message,
+                'descriptor' => [
+                    'id' => $person->id,
+                    'type' => $type,
+                    'nama' => $person->nama,
+                    'nis' => ($type === 'siswa' ? $person->nis : $person->nip) ?? '-',
+                    'kelas' => $type === 'siswa' ? ($person->kelas->nama_kelas ?? '-') : 'Dewan Guru',
+                    'foto' => $person->foto_url ?? null,
+                    'has_512' => true,
+                ]
+            ]);
         } finally {
             if ($tempPath && file_exists($tempPath)) {
                 @unlink($tempPath);
             }
         }
+    }
+
+    /**
+     * Decode data URL / base64 menjadi biner gambar. Mengembalikan null jika bukan gambar valid.
+     */
+    private function decodeBase64Image(string $data): ?string
+    {
+        $parts = explode(';base64,', $data, 2);
+        $raw = base64_decode($parts[1] ?? $parts[0], true);
+        if ($raw === false || strlen($raw) < 1024) {
+            return null;
+        }
+
+        $info = @getimagesizefromstring($raw);
+        if (!$info || !in_array($info[2] ?? null, [IMAGETYPE_JPEG, IMAGETYPE_PNG, IMAGETYPE_WEBP], true)) {
+            return null;
+        }
+
+        return $raw;
+    }
+
+    /**
+     * Cari / buat akun User pemilik data wajah (kolom user_id pada user_face_data wajib terisi).
+     * Akun baru dibuat dengan password acak (bukan default yang mudah ditebak);
+     * admin dapat mereset password melalui menu manajemen user bila akun perlu dipakai login.
+     */
+    private function resolveFaceOwnerUser($person, string $type): User
+    {
+        $targetUser = $person->user;
+
+        if ($type === 'siswa') {
+            if (!$targetUser && !empty($person->nis)) {
+                $targetUser = User::where('username', 'siswa_' . $person->nis)
+                    ->orWhere('username', $person->nis)
+                    ->first();
+            }
+            if (!$targetUser) {
+                $targetUser = User::create([
+                    'full_name' => $person->nama,
+                    'username' => 'siswa_' . ($person->nis ?: $person->id),
+                    'email' => ($person->nis ?: $person->id) . '@siswa.local',
+                    'password_hash' => Hash::make(\Illuminate\Support\Str::random(32)),
+                    'role' => 'student',
+                    'school_id' => $person->school_id,
+                ]);
+            }
+            return $targetUser;
+        }
+
+        if (!$targetUser && !empty($person->nip)) {
+            $targetUser = User::where('username', $person->nip)->first();
+        }
+        if (!$targetUser) {
+            $targetUser = User::create([
+                'full_name' => $person->nama,
+                'username' => $person->nip ?: 'guru_' . $person->id,
+                'email' => ($person->nip ?: 'guru_' . $person->id) . '@guru.local',
+                'password_hash' => Hash::make(\Illuminate\Support\Str::random(32)),
+                'role' => 'teacher',
+                'school_id' => $person->school_id,
+            ]);
+        }
+        return $targetUser;
     }
 
     public function index(Request $request)

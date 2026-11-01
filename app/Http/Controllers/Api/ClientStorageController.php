@@ -78,6 +78,10 @@ class ClientStorageController extends Controller
                 uploaderId: null
             );
 
+            if (!empty($docItem['id'])) {
+                \App\Models\StorageFile::where('id', $docItem['id'])->update(['license_id' => $license->id]);
+            }
+
             Log::info("[ClientStorageRelay] Berhasil relay upload file untuk lisensi '{$license->client_name}': {$docItem['path']}");
 
             return response()->json([
@@ -196,6 +200,10 @@ class ClientStorageController extends Controller
                 category: $request->category ?? 'kbm',
                 uploaderId: null
             );
+
+            if (!empty($res['file_id'])) {
+                \App\Models\StorageFile::where('id', $res['file_id'])->update(['license_id' => $license->id]);
+            }
 
             return response()->json([
                 'success'    => true,

@@ -76,8 +76,11 @@ class StorageServerController extends Controller
         // Ambil seluruh Lisensi (Client Self-Hosted)
         $licenses = License::orderBy('client_name')
             ->get()
-            ->map(function ($license) use ($licenseFilesAgg) {
+            ->map(function ($license) use ($licenseFilesAgg, $schoolFilesAgg) {
                 $agg = $licenseFilesAgg->get($license->id);
+                if (!$agg && $license->school_id) {
+                    $agg = $schoolFilesAgg->get($license->school_id);
+                }
                 $usedBytes = (int) ($agg->total_bytes ?? 0);
                 $totalFiles = (int) ($agg->total_files ?? 0);
 

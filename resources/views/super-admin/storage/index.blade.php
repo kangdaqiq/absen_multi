@@ -98,20 +98,24 @@
 
 {{-- ── Action Toolbar ── --}}
 <div class="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-gray-200 bg-white p-4 shadow-theme-sm dark:border-gray-800 dark:bg-gray-dark">
-    <div class="flex items-center gap-2">
+    <div class="flex flex-wrap items-center gap-2">
         <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">
-            <i class="fas fa-tools text-brand-500 mr-1.5"></i> Operasi Cepat:
+            <i class="fas fa-tools text-brand-500 mr-1.5"></i> Operasi Cloudflare R2:
         </span>
         @if(!$stats['is_online'])
             <span class="inline-flex items-center gap-1.5 rounded-lg bg-error-50 px-2.5 py-1 text-xs font-semibold text-error-600 dark:bg-error-500/15 dark:text-error-400">
-                <i class="fas fa-exclamation-triangle"></i> Storage server tidak dapat dijangkau
+                <i class="fas fa-exclamation-triangle"></i> R2 Bucket tidak dapat dijangkau
+            </span>
+        @else
+            <span class="inline-flex items-center gap-1.5 rounded-lg bg-orange-50 px-2.5 py-1 text-xs font-semibold text-orange-600 dark:bg-orange-500/15 dark:text-orange-400 border border-orange-200/60 dark:border-orange-800/40">
+                <i class="fas fa-cloud"></i> S3 API Active &bull; Zero Egress
             </span>
         @endif
     </div>
     <div class="flex flex-wrap items-center gap-2.5">
         <button type="button" id="btnTestConn"
             class="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3.5 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 transition">
-            <i class="fas fa-plug text-info-500"></i> Tes Koneksi
+            <i class="fas fa-plug text-info-500"></i> Tes Koneksi R2
         </button>
         <button type="button" id="btnRecalculate"
             class="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3.5 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 transition">
@@ -120,10 +124,6 @@
         <button type="button" id="btnOpenCleaner"
             class="inline-flex items-center gap-2 rounded-xl bg-error-500 hover:bg-error-600 px-3.5 py-2 text-xs font-semibold text-white shadow-sm hover:shadow transition">
             <i class="fas fa-broom"></i> Bersihkan File Sampah
-        </button>
-        <button type="button" id="btnSyncAll"
-            class="inline-flex items-center gap-2 rounded-xl bg-brand-500 px-4 py-2 text-xs font-semibold text-white shadow hover:bg-brand-600 transition">
-            <i class="fas fa-user-plus"></i> Auto-Sync Semua Client
         </button>
     </div>
 </div>
@@ -151,8 +151,8 @@
     <div x-show="tab === 'schools'" class="p-5 sm:p-6">
         <div class="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-                <h4 class="text-base font-bold text-gray-800 dark:text-white/90">Daftar Tenant Sekolah</h4>
-                <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Atur kuota individual tiap sekolah. Kuota ini membatasi kapasitas unggahan foto & video KBM dari aplikasi Android guru.</p>
+                <h4 class="text-base font-bold text-gray-800 dark:text-white/90">Daftar Tenant Sekolah (SaaS)</h4>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Sekolah terdaftar di cloud yang mengunggah foto & video KBM langsung ke Cloudflare R2 bucket.</p>
             </div>
             <div class="relative flex-shrink-0">
                 <input type="text" id="searchSchools" placeholder="Cari sekolah..."
@@ -167,7 +167,7 @@
                     <tr class="border-b border-gray-100 bg-gray-50/75 dark:border-gray-800 dark:bg-gray-800/50 text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
                         <th class="py-3 px-4">Sekolah</th>
                         <th class="py-3 px-4">Dok KBM</th>
-                        <th class="py-3 px-4">Storage API Key</th>
+                        <th class="py-3 px-4">Penyimpanan R2</th>
                         <th class="py-3 px-4 min-w-[220px]">Kuota & Pemakaian</th>
                         <th class="py-3 px-4 text-center">Berkas</th>
                         <th class="py-3 px-4 text-right">Aksi</th>
@@ -205,23 +205,12 @@
                             @endif
                         </td>
                         <td class="py-3.5 px-4 align-middle">
-                            @if($school->storage_api_key)
-                                <div class="flex items-center gap-1.5">
-                                    <code class="rounded bg-gray-100 dark:bg-gray-800 px-2 py-1 text-[11px] text-gray-600 dark:text-gray-300 max-w-[120px] truncate block"
-                                          title="{{ $school->storage_api_key }}">{{ substr($school->storage_api_key, 0, 14) }}…</code>
-                                    <button type="button"
-                                        onclick="copyToClipboard('{{ $school->storage_api_key }}')"
-                                        class="rounded p-1.5 text-gray-400 hover:text-brand-500 hover:bg-brand-50 dark:hover:bg-brand-500/10 transition"
-                                        title="Salin API Key">
-                                        <i class="fas fa-copy text-xs"></i>
-                                    </button>
-                                </div>
-                                @if($school->storage_user_id)
-                                    <p class="text-[10px] text-gray-400 mt-0.5 font-mono truncate max-w-[140px]" title="{{ $school->storage_user_id }}">ID: {{ $school->storage_user_id }}</p>
-                                @endif
-                            @else
-                                <span class="text-xs text-gray-400 italic">Belum dibuat</span>
-                            @endif
+                            <div class="flex flex-col gap-0.5">
+                                <span class="inline-flex items-center gap-1.5 rounded-lg bg-orange-50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400 font-semibold px-2 py-0.5 text-[11px] border border-orange-200/60 dark:border-orange-800/40 w-fit">
+                                    <i class="fas fa-cloud text-[10px]"></i> R2 Direct
+                                </span>
+                                <code class="text-[10px] text-gray-400 font-mono truncate max-w-[140px]" title="Folder: kbm/sch_{{ $school->id }}">kbm/sch_{{ $school->id }}</code>
+                            </div>
                         </td>
                         <td class="py-3.5 px-4 align-middle min-w-[220px]">
                             <div class="flex items-center justify-between mb-1">
@@ -264,12 +253,6 @@
                                     <i class="fas fa-sliders-h text-[11px]"></i> Kuota
                                 </button>
                                 <button type="button"
-                                    class="btn-sync-single inline-flex items-center justify-center rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 w-8 h-8 text-gray-500 hover:text-brand-500 hover:border-brand-300 transition"
-                                    data-url="{{ route('super-admin.storage.sync-school', $school) }}"
-                                    title="Sinkronkan ke Storage Server">
-                                    <i class="fas fa-sync text-xs"></i>
-                                </button>
-                                <button type="button"
                                     class="btn-clean-school inline-flex items-center justify-center rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 w-8 h-8 text-gray-500 hover:text-error-500 hover:border-error-300 transition"
                                     data-school-id="{{ $school->id }}"
                                     data-school-name="{{ $school->name }}"
@@ -294,21 +277,30 @@
         </div>
     </div>
 
-    {{-- Tab Lisensi --}}
+    {{-- Tab Lisensi (Self-Hosted) --}}
     <div x-show="tab === 'licenses'" class="p-5 sm:p-6" style="display:none;">
-        <div class="mb-4">
-            <h4 class="text-base font-bold text-gray-800 dark:text-white/90">Client Lisensi (Self-Hosted)</h4>
-            <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Kuota penyimpanan untuk instansi yang memasang sistem absen secara mandiri.</p>
+        <div class="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+                <h4 class="text-base font-bold text-gray-800 dark:text-white/90">Client Lisensi (Self-Hosted)</h4>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                    Instansi self-hosted yang memasang sistem mandiri. Mendukung relay upload foto/video KBM langsung ke Cloudflare R2 lewat Server Utama menggunakan License Key.
+                </p>
+            </div>
+            <div class="relative flex-shrink-0">
+                <input type="text" id="searchLicenses" placeholder="Cari client / license key..."
+                    class="w-64 rounded-xl border border-gray-200 bg-gray-50 py-2 pl-9 pr-4 text-xs outline-none focus:border-brand-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white transition" />
+                <i class="fas fa-search absolute left-3 top-2.5 text-xs text-gray-400"></i>
+            </div>
         </div>
 
         <div class="overflow-x-auto rounded-xl ring-1 ring-gray-100 dark:ring-gray-800">
-            <table class="w-full table-auto text-left">
+            <table class="w-full table-auto text-left" id="tableLicenses">
                 <thead>
                     <tr class="border-b border-gray-100 bg-gray-50/75 dark:border-gray-800 dark:bg-gray-800/50 text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
                         <th class="py-3 px-4">Client</th>
                         <th class="py-3 px-4">Status</th>
-                        <th class="py-3 px-4">Storage API Key</th>
-                        <th class="py-3 px-4 min-w-[220px]">Kuota & Pemakaian</th>
+                        <th class="py-3 px-4">Autentikasi R2 Relay</th>
+                        <th class="py-3 px-4 min-w-[220px]">Kuota & Pemakaian Relay</th>
                         <th class="py-3 px-4 text-center">Berkas</th>
                         <th class="py-3 px-4 text-right">Aksi</th>
                     </tr>
@@ -322,47 +314,51 @@
                         $barColor = $pct >= 90 ? 'bg-error-500' : ($pct >= 70 ? 'bg-warning-500' : 'bg-info-500');
                         $pctText  = $pct >= 90 ? 'text-error-600' : ($pct >= 70 ? 'text-warning-600' : 'text-gray-500 dark:text-gray-400');
                     @endphp
-                    <tr class="hover:bg-gray-50/60 dark:hover:bg-gray-800/30 transition">
+                    <tr class="hover:bg-gray-50/60 dark:hover:bg-gray-800/30 transition license-row"
+                        data-name="{{ strtolower($license->client_name . ' ' . $license->license_key) }}">
                         <td class="py-3.5 px-4 align-middle">
                             <div class="flex items-center gap-3">
                                 <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-info-50 text-info-500 dark:bg-info-500/15 text-xs font-bold">
                                     {{ strtoupper(substr($license->client_name, 0, 2)) }}
                                 </div>
                                 <div class="min-w-0">
-                                    <p class="font-semibold text-gray-800 dark:text-white/90 truncate max-w-[160px]" title="{{ $license->client_name }}">{{ $license->client_name }}</p>
-                                    <p class="text-[10px] text-gray-400 font-mono truncate max-w-[160px]">{{ $license->license_key }}</p>
+                                    <p class="font-semibold text-gray-800 dark:text-white/90 truncate max-w-[170px]" title="{{ $license->client_name }}">{{ $license->client_name }}</p>
+                                    <div class="flex items-center gap-1.5 mt-0.5">
+                                        <code class="text-[10px] text-gray-500 dark:text-gray-400 font-mono truncate max-w-[130px]">{{ $license->license_key }}</code>
+                                        <button type="button"
+                                            onclick="copyToClipboard('{{ $license->license_key }}')"
+                                            class="text-gray-400 hover:text-brand-500 transition"
+                                            title="Salin License Key">
+                                            <i class="fas fa-copy text-[10px]"></i>
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </td>
                         <td class="py-3.5 px-4 align-middle">
-                            @if($license->is_active)
-                                <span class="inline-flex items-center gap-1 rounded-full bg-success-50 px-2.5 py-1 text-xs font-semibold text-success-600 dark:bg-success-500/15 dark:text-success-400">
-                                    <i class="fas fa-check-circle text-[10px]"></i> Aktif
-                                </span>
-                            @else
+                            @if(!$license->is_active)
                                 <span class="inline-flex items-center gap-1 rounded-full bg-error-50 px-2.5 py-1 text-xs font-semibold text-error-600 dark:bg-error-500/15 dark:text-error-400">
                                     <i class="fas fa-ban text-[10px]"></i> Nonaktif
+                                </span>
+                            @elseif($license->isExpired())
+                                <span class="inline-flex items-center gap-1 rounded-full bg-warning-50 px-2.5 py-1 text-xs font-semibold text-warning-600 dark:bg-warning-500/15 dark:text-warning-400">
+                                    <i class="fas fa-clock text-[10px]"></i> Expired
+                                </span>
+                            @else
+                                <span class="inline-flex items-center gap-1 rounded-full bg-success-50 px-2.5 py-1 text-xs font-semibold text-success-600 dark:bg-success-500/15 dark:text-success-400">
+                                    <i class="fas fa-check-circle text-[10px]"></i> Aktif
                                 </span>
                             @endif
                         </td>
                         <td class="py-3.5 px-4 align-middle">
-                            @if($license->storage_api_key)
-                                <div class="flex items-center gap-1.5">
-                                    <code class="rounded bg-gray-100 dark:bg-gray-800 px-2 py-1 text-[11px] text-gray-600 dark:text-gray-300 max-w-[120px] truncate block"
-                                          title="{{ $license->storage_api_key }}">{{ substr($license->storage_api_key, 0, 14) }}…</code>
-                                    <button type="button"
-                                        onclick="copyToClipboard('{{ $license->storage_api_key }}')"
-                                        class="rounded p-1.5 text-gray-400 hover:text-brand-500 hover:bg-brand-50 dark:hover:bg-brand-500/10 transition"
-                                        title="Salin API Key">
-                                        <i class="fas fa-copy text-xs"></i>
-                                    </button>
-                                </div>
-                                @if($license->storage_user_id)
-                                    <p class="text-[10px] text-gray-400 mt-0.5 font-mono truncate max-w-[140px]" title="{{ $license->storage_user_id }}">ID: {{ $license->storage_user_id }}</p>
-                                @endif
-                            @else
-                                <span class="text-xs text-gray-400 italic">Belum dibuat</span>
-                            @endif
+                            <div class="flex flex-col gap-1">
+                                <span class="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 font-semibold px-2.5 py-1 text-xs border border-emerald-200/70 dark:border-emerald-800/30 w-fit">
+                                    <span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span> R2 Relay Ready
+                                </span>
+                                <span class="text-[10px] text-gray-400 font-mono flex items-center gap-1" title="Autentikasi otomatis via header X-License-Key">
+                                    <i class="fas fa-shield-alt text-[9px] text-emerald-500"></i> X-License-Key
+                                </span>
+                            </div>
                         </td>
                         <td class="py-3.5 px-4 align-middle min-w-[220px]">
                             <div class="flex items-center justify-between mb-1">
@@ -413,6 +409,36 @@
                     @endforelse
                 </tbody>
             </table>
+        </div>
+
+        {{-- Info Box Arsitektur Dual Storage Self-Hosted --}}
+        <div class="mt-5 rounded-2xl border border-gray-200 bg-gray-50/70 p-4 dark:border-gray-800 dark:bg-gray-800/40">
+            <div class="flex items-start gap-3">
+                <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-orange-100 text-orange-600 dark:bg-orange-500/20 dark:text-orange-400">
+                    <i class="fas fa-cloud text-sm"></i>
+                </div>
+                <div class="text-xs">
+                    <h5 class="font-bold text-gray-800 dark:text-white">Panduan Penyimpanan Klien Self-Hosted:</h5>
+                    <div class="mt-2 grid grid-cols-1 md:grid-cols-2 gap-3 text-gray-600 dark:text-gray-300">
+                        <div class="rounded-xl bg-white dark:bg-gray-900/60 p-3 border border-gray-200/80 dark:border-gray-700/60">
+                            <div class="flex items-center gap-2 font-bold text-gray-800 dark:text-white mb-1">
+                                <span class="h-2 w-2 rounded-full bg-blue-500"></span> Opsi 1: Internal Storage (Lokal)
+                            </div>
+                            <p class="text-[11px] text-gray-500 dark:text-gray-400 leading-relaxed">
+                                Klien menyimpan berkas di disk lokal / flashdisk (<code class="font-mono bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded text-[10px]">KBM_STORAGE_DRIVER=internal</code>). 100% mandiri tanpa kuota cloud server.
+                            </p>
+                        </div>
+                        <div class="rounded-xl bg-white dark:bg-gray-900/60 p-3 border border-gray-200/80 dark:border-gray-700/60">
+                            <div class="flex items-center gap-2 font-bold text-gray-800 dark:text-white mb-1">
+                                <span class="h-2 w-2 rounded-full bg-emerald-500"></span> Opsi 2: Cloud Relay (Cloudflare R2)
+                            </div>
+                            <p class="text-[11px] text-gray-500 dark:text-gray-400 leading-relaxed">
+                                Klien mengunggah berkas ke R2 lewat Server Utama (<code class="font-mono bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded text-[10px]">KBM_STORAGE_DRIVER=cloud_relay</code>). Terautentikasi otomatis via <b>License Key</b> dan dibatasi kuota di atas.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -681,6 +707,16 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    const searchLicensesInput = document.getElementById('searchLicenses');
+    if (searchLicensesInput) {
+        searchLicensesInput.addEventListener('input', function () {
+            const q = this.value.toLowerCase().trim();
+            document.querySelectorAll('.license-row').forEach(row => {
+                row.style.display = (row.dataset.name || '').includes(q) ? '' : 'none';
+            });
+        });
+    }
+
     // ── Modal ──
     const modal       = document.getElementById('modalEditQuota');
     const form        = document.getElementById('formUpdateQuota');
@@ -785,7 +821,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    // ── Tes Koneksi ──
+    // ── Tes Koneksi R2 ──
     document.getElementById('btnTestConn')?.addEventListener('click', async function () {
         this.disabled = true;
         this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Memeriksa...';
@@ -793,7 +829,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const res = await fetch("{{ route('super-admin.storage.test-connection') }}");
             const data = await res.json();
             if (data.success) {
-                showToast(`✅ Storage Server online! v${data.data?.version || '?'} · Uptime: ${data.data?.uptime || '-'}`, 'success');
+                showToast(data.message || '✅ Cloudflare R2 online!', 'success');
             } else {
                 showToast('❌ Koneksi gagal: ' + data.message, 'error');
             }
@@ -801,7 +837,7 @@ document.addEventListener('DOMContentLoaded', function () {
             showToast('Error: ' + err.message, 'error');
         } finally {
             this.disabled = false;
-            this.innerHTML = '<i class="fas fa-plug text-info-500"></i> Tes Koneksi';
+            this.innerHTML = '<i class="fas fa-plug text-info-500"></i> Tes Koneksi R2';
         }
     });
 
@@ -824,55 +860,6 @@ document.addEventListener('DOMContentLoaded', function () {
             this.disabled = false;
             this.innerHTML = '<i class="fas fa-sync-alt text-warning-500"></i> Hitung Ulang Kapasitas';
         }
-    });
-
-    // ── Sync All ──
-    document.getElementById('btnSyncAll')?.addEventListener('click', async function () {
-        if (!confirm('Daftarkan / perbarui seluruh akun ke Storage Server sekarang?')) return;
-        this.disabled = true;
-        this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Menyinkronkan...';
-        try {
-            const res = await fetch("{{ route('super-admin.storage.sync-all') }}", {
-                method: 'POST',
-                headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json' }
-            });
-            const data = await res.json();
-            showToast(data.message, data.success ? 'success' : 'warning');
-            if (data.success) setTimeout(() => window.location.reload(), 1500);
-        } catch (err) {
-            showToast('Error: ' + err.message, 'error');
-        } finally {
-            this.disabled = false;
-            this.innerHTML = '<i class="fas fa-user-plus"></i> Auto-Sync Semua Client';
-        }
-    });
-
-    // ── Single Sync ──
-    document.querySelectorAll('.btn-sync-single').forEach(btn => {
-        btn.addEventListener('click', async function () {
-            const url = this.dataset.url;
-            const original = this.innerHTML;
-            this.innerHTML = '<i class="fas fa-spinner fa-spin text-brand-500 text-xs"></i>';
-            this.disabled = true;
-            try {
-                const res = await fetch(url, {
-                    method: 'POST',
-                    headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json' }
-                });
-                const data = await res.json();
-                if (data.success) {
-                    showToast('Akun storage berhasil disinkronkan!', 'success');
-                    setTimeout(() => window.location.reload(), 1000);
-                } else {
-                    showToast('Gagal: ' + (data.message || 'Error'), 'error');
-                }
-            } catch (err) {
-                showToast('Error: ' + err.message, 'error');
-            } finally {
-                this.innerHTML = original;
-                this.disabled = false;
-            }
-        });
     });
 
     // =========================================================================

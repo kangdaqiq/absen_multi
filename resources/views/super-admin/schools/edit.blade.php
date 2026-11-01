@@ -248,11 +248,11 @@
                         @enderror
                     </div>
 
-                    {{-- Kuota Storage Server --}}
+                    {{-- Kuota Cloudflare R2 Storage --}}
                     <div class="mb-4.5">
                         <label class="mb-2.5 block text-black dark:text-white">
-                            <i class="fas fa-database text-brand-500 mr-1"></i>
-                            Batas Kuota Storage Server (MB)
+                            <i class="fas fa-cloud text-brand-500 mr-1"></i>
+                            Batas Kuota Cloudflare R2 Storage (MB)
                             <span class="ml-2 inline-flex rounded-full bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400 px-2 py-0.5 text-xs font-bold">
                                 {{ $school->storage_quota_human }}
                             </span>
@@ -261,12 +261,12 @@
                         <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
                             Batas kapasitas berkas foto & video dokumentasi KBM untuk sekolah ini (dalam MB). 1000 MB = 1 GB. Masukkan 0 untuk Unlimited.
                         </p>
-                        @if($school->storage_api_key)
-                            <div class="mt-2 flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                                <span>Storage API Key:</span>
-                                <code class="rounded bg-gray-100 dark:bg-gray-800 px-2 py-0.5 font-mono text-gray-700 dark:text-gray-300">{{ $school->storage_api_key }}</code>
-                            </div>
-                        @endif
+                        <div class="mt-2 flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                            <span class="inline-flex items-center gap-1.5 rounded-full bg-orange-50 px-2.5 py-0.5 text-xs font-semibold text-orange-600 dark:bg-orange-500/15 dark:text-orange-400 border border-orange-200/60 dark:border-orange-800/40">
+                                <i class="fas fa-cloud text-[10px]"></i> Cloudflare R2 Direct
+                            </span>
+                            <span class="text-[11px] text-gray-400 font-mono">Prefix: kbm/sch_{{ $school->id }}</span>
+                        </div>
                         @error('storage_quota_mb')
                             <p class="mt-1 text-xs text-danger">{{ $message }}</p>
                         @enderror

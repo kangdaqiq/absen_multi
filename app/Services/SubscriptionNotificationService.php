@@ -329,16 +329,6 @@ class SubscriptionNotificationService
 
     private function formatPhone(string $phone): ?string
     {
-        $phone = preg_replace('/[^0-9]/', '', $phone);
-        if (empty($phone)) return null;
-        if (str_starts_with($phone, '0')) {
-            $phone = '62' . substr($phone, 1);
-        } elseif (str_starts_with($phone, '8') && strlen($phone) >= 9 && strlen($phone) <= 13) {
-            $phone = '62' . $phone;
-        }
-        if (strlen($phone) < 7 || strlen($phone) > 16) {
-            return null;
-        }
-        return $phone;
+        return \App\Models\MessageQueue::normalizePhoneNumber($phone);
     }
 }

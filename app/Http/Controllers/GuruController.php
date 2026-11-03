@@ -893,10 +893,6 @@ class GuruController extends Controller
     {
         if (!$wa)
             return null;
-        $wa = preg_replace('/[^0-9]/', '', (string)$wa);
-        if (str_starts_with($wa, '0')) {
-            $wa = '62' . substr($wa, 1);
-        }
-        return $wa;
+        return \App\Models\MessageQueue::normalizePhoneNumber($wa);
     }
 }

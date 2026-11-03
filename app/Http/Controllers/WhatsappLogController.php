@@ -670,15 +670,7 @@ class WhatsappLogController extends Controller
 
     private function normalizePhone(?string $phone): ?string
     {
-        if (empty($phone)) return null;
-        $clean = preg_replace('/[^0-9]/', '', $phone);
-        if (empty($clean)) return null;
-        if (str_starts_with($clean, '0')) {
-            return '62' . substr($clean, 1);
-        } elseif (str_starts_with($clean, '8') && strlen($clean) >= 9 && strlen($clean) <= 13) {
-            return '62' . $clean;
-        }
-        return $clean;
+        return \App\Models\MessageQueue::normalizePhoneNumber($phone);
     }
 
     /**
@@ -690,7 +682,11 @@ class WhatsappLogController extends Controller
         if (empty($clean)) return false;
 
         $variants = [$clean];
-        if (str_starts_with($clean, '62')) {
+        if (str_starts_with($clean, '62886')) {
+            $variants[] = substr($clean, 2);
+        } elseif (str_starts_with($clean, '886')) {
+            $variants[] = '62' . $clean;
+        } elseif (str_starts_with($clean, '62')) {
             $variants[] = '0' . substr($clean, 2);
         } elseif (str_starts_with($clean, '0')) {
             $variants[] = '62' . substr($clean, 1);

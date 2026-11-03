@@ -208,14 +208,6 @@ class SendLastSeenReminderCommand extends Command
 
     private function cleanPhone(?string $phone): ?string
     {
-        if (empty($phone)) return null;
-        $clean = preg_replace('/[^0-9]/', '', $phone);
-        if (empty($clean)) return null;
-        if (str_starts_with($clean, '0')) {
-            $clean = '62' . substr($clean, 1);
-        } elseif (!str_starts_with($clean, '62')) {
-            $clean = '62' . $clean;
-        }
-        return $clean;
+        return \App\Models\MessageQueue::normalizePhoneNumber($phone);
     }
 }

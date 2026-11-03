@@ -120,12 +120,12 @@ class SiswaController extends Controller
         if (empty($input['alamat']))
             $input['alamat'] = null;
         if (!empty($input['no_wa'])) {
-            $input['no_wa'] = preg_replace('/[^0-9]/', '', $input['no_wa']);
+            $input['no_wa'] = $this->normalizeWa($input['no_wa']);
         } else {
             $input['no_wa'] = null;
         }
         if (!empty($input['wa_ortu'])) {
-            $input['wa_ortu'] = preg_replace('/[^0-9]/', '', $input['wa_ortu']);
+            $input['wa_ortu'] = $this->normalizeWa($input['wa_ortu']);
         } else {
             $input['wa_ortu'] = null;
         }
@@ -228,12 +228,12 @@ class SiswaController extends Controller
         if (empty($input['alamat']))
             $input['alamat'] = null;
         if (!empty($input['no_wa'])) {
-            $input['no_wa'] = preg_replace('/[^0-9]/', '', $input['no_wa']);
+            $input['no_wa'] = $this->normalizeWa($input['no_wa']);
         } else {
             $input['no_wa'] = null;
         }
         if (!empty($input['wa_ortu'])) {
-            $input['wa_ortu'] = preg_replace('/[^0-9]/', '', $input['wa_ortu']);
+            $input['wa_ortu'] = $this->normalizeWa($input['wa_ortu']);
         } else {
             $input['wa_ortu'] = null;
         }
@@ -864,11 +864,7 @@ class SiswaController extends Controller
     {
         if (!$wa)
             return null;
-        $wa = preg_replace('/[^0-9]/', '', (string)$wa);
-        if (str_starts_with($wa, '0')) {
-            $wa = '62' . substr($wa, 1);
-        }
-        return $wa;
+        return \App\Models\MessageQueue::normalizePhoneNumber($wa);
     }
 
     // Enrollment Methods

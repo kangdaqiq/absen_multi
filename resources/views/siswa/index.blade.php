@@ -344,13 +344,13 @@
                 </div>
                 <div>
                     <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">No WhatsApp Siswa</label>
-                    <input type="text" name="no_wa" placeholder="08xxx atau 628xxx" pattern="^(08|628)[0-9]{8,13}$" class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
-                    <p class="mt-1 text-xs text-gray-500">Format: 08xxx atau 628xxx (8-13 digit)</p>
+                    <input type="text" name="no_wa" placeholder="08xxx, 628xxx, atau kode negara LN (misal: 886xxx)" pattern="^(\+?[0-9\s\-]{8,20})$" class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                    <p class="mt-1 text-xs text-gray-500">Format: 08xxx, 628xxx, atau kode LN misal 886xxx / +886xxx (8-16 digit)</p>
                 </div>
                 <div>
                     <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">No WhatsApp Ortu</label>
-                    <input type="text" name="wa_ortu" placeholder="08xxx atau 628xxx" pattern="^(08|628)[0-9]{8,13}$" class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
-                    <p class="mt-1 text-xs text-gray-500">Format: 08xxx atau 628xxx (8-13 digit)</p>
+                    <input type="text" name="wa_ortu" placeholder="08xxx, 628xxx, atau kode negara LN (misal: 886xxx)" pattern="^(\+?[0-9\s\-]{8,20})$" class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                    <p class="mt-1 text-xs text-gray-500">Format: 08xxx, 628xxx, atau kode LN misal 886xxx / +886xxx (8-16 digit)</p>
                 </div>
                 <div>
                     <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Telegram Chat ID Siswa <span class="text-xs text-brand-500 font-normal"></span></label>
@@ -479,13 +479,13 @@
                 </div>
                 <div>
                     <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">No WhatsApp Siswa</label>
-                    <input type="text" name="no_wa" id="edit_no_wa" placeholder="08xxx atau 628xxx" pattern="^(08|628)[0-9]{8,13}$" class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
-                    <p class="mt-1 text-xs text-gray-500">Format: 08xxx atau 628xxx (8-13 digit)</p>
+                    <input type="text" name="no_wa" id="edit_no_wa" placeholder="08xxx, 628xxx, atau kode negara LN (misal: 886xxx)" pattern="^(\+?[0-9\s\-]{8,20})$" class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                    <p class="mt-1 text-xs text-gray-500">Format: 08xxx, 628xxx, atau kode LN misal 886xxx / +886xxx (8-16 digit)</p>
                 </div>
                 <div>
                     <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">No WhatsApp Ortu</label>
-                    <input type="text" name="wa_ortu" id="edit_wa_ortu" placeholder="08xxx atau 628xxx" pattern="^(08|628)[0-9]{8,13}$" class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
-                    <p class="mt-1 text-xs text-gray-500">Format: 08xxx atau 628xxx (8-13 digit)</p>
+                    <input type="text" name="wa_ortu" id="edit_wa_ortu" placeholder="08xxx, 628xxx, atau kode negara LN (misal: 886xxx)" pattern="^(\+?[0-9\s\-]{8,20})$" class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                    <p class="mt-1 text-xs text-gray-500">Format: 08xxx, 628xxx, atau kode LN misal 886xxx / +886xxx (8-16 digit)</p>
                 </div>
                 <div>
                     <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Telegram Chat ID Siswa <span class="text-xs text-brand-500 font-normal"></span></label>

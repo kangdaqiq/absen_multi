@@ -73,7 +73,11 @@ class MessageQueue extends Model
         }
 
         $variants = [$clean];
-        if (str_starts_with($clean, '62')) {
+        if (str_starts_with($clean, '62886')) {
+            $variants[] = substr($clean, 2);
+        } elseif (str_starts_with($clean, '886')) {
+            $variants[] = '62' . $clean;
+        } elseif (str_starts_with($clean, '62')) {
             $variants[] = '0' . substr($clean, 2);
         } elseif (str_starts_with($clean, '0')) {
             $variants[] = '62' . substr($clean, 1);
@@ -123,41 +127,77 @@ class MessageQueue extends Model
     }
     
     /**
-     * Mutator to automatically format phone number into WhatsApp JID.
+     * Normalisasi nomor telepon ke format internasional E.164 (tanpa simbol +).
+     * Mendukung nomor Indonesia (08xx -> 628xx, 8xx -> 628xx) dan nomor luar negeri (misal 886xx Taiwan, +60xx Malaysia, dll).
+     */
+    public static function normalizePhoneNumber(?string $phone): ?string
+    {
+        if (empty($phone)) {
+            return null;
+        }
+
+        $raw = trim((string)$phone);
+        if (empty($raw)) {
+            return null;
+        }
+
+        // Jika JID WA Group (@g.us), pertahankan
+        if (str_contains($raw, '@g.us')) {
+            return $raw;
+        }
+
+        // Jika berakhiran @s.whatsapp.net, buang suffix-nya
+        if (str_ends_with($raw, '@s.whatsapp.net')) {
+            $raw = str_replace('@s.whatsapp.net', '', $raw);
+        }
+
+        if (str_contains($raw, '@')) {
+            return $raw;
+        }
+
+        // Cek apakah nomor secara eksplisit menyertakan awalan internasional (+ atau 00)
+        $isExplicitInternational = str_starts_with($raw, '+') || str_starts_with($raw, '00');
+
+        // Bersihkan seluruh karakter non-angka
+        $digits = preg_replace('/[^0-9]/', '', $raw);
+        if (empty($digits)) {
+            return null;
+        }
+
+        // Jika diawali 00, buang prefix 00
+        if (str_starts_with($digits, '00')) {
+            $digits = substr($digits, 2);
+        }
+
+        if (!$isExplicitInternational) {
+            // Format lokal Indonesia berawalan 0 (misal 0812xxx -> 62812xxx)
+            if (str_starts_with($digits, '0')) {
+                $digits = '62' . substr($digits, 1);
+            } elseif (str_starts_with($digits, '8') && strlen($digits) >= 9 && strlen($digits) <= 13) {
+                // Jangan tambahkan 62 jika ini adalah kode negara internasional yang diawali digit 8 (misal 886 Taiwan, 880 Bangladesh)
+                if (!str_starts_with($digits, '886') && !str_starts_with($digits, '880')) {
+                    // Hanya tambahkan 62 jika digit berikutnya cocok dengan prefix seluler Indonesia: 81, 82, 83, 85, 87, 88, 89
+                    if (preg_match('/^8[1-3,5,7-9]/', $digits)) {
+                        $digits = '62' . $digits;
+                    }
+                }
+            }
+        }
+
+        // Validasi panjang digit standar internasional (7 s.d. 16 digit)
+        if (strlen($digits) < 7 || strlen($digits) > 16) {
+            return null;
+        }
+
+        return $digits;
+    }
+
+    /**
+     * Mutator to automatically format phone number into WhatsApp JID / pure numeric.
      */
     public function setPhoneNumberAttribute($value)
     {
-        if (empty($value)) {
-            $this->attributes['phone_number'] = $value;
-            return;
-        }
-
-        // If it already contains '@', assume it is already a JID (e.g. @s.whatsapp.net or @g.us)
-        // Since we are changing to pure numeric format, we will STRIP @s.whatsapp.net if it exists
-        if (str_ends_with($value, '@s.whatsapp.net')) {
-            $value = str_replace('@s.whatsapp.net', '', $value);
-        }
-        if (str_contains($value, '@')) {
-            $this->attributes['phone_number'] = $value;
-            return;
-        }
-
-        // Clean non-numeric characters
-        $phone = preg_replace('/[^0-9]/', '', $value);
-
-        if (empty($phone)) {
-            $this->attributes['phone_number'] = $value;
-            return;
-        }
-
-        // Standardize Indonesian format: 08xx -> 628xx
-        if (str_starts_with($phone, '0')) {
-            $phone = '62' . substr($phone, 1);
-        } elseif (str_starts_with($phone, '8') && strlen($phone) >= 9 && strlen($phone) <= 13) {
-            // Nomor lokal Indonesia tanpa awalan 0 atau 62 (misal 812xxxx)
-            $phone = '62' . $phone;
-        }
-
-        $this->attributes['phone_number'] = $phone;
+        $normalized = static::normalizePhoneNumber($value);
+        $this->attributes['phone_number'] = $normalized ?: $value;
     }
 }

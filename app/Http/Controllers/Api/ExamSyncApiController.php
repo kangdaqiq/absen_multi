@@ -152,7 +152,7 @@ class ExamSyncApiController extends Controller
 
         // 1. Ambil Data Guru
         if (in_array($type, ['all', 'guru'])) {
-            $guruQuery = Guru::with(['user:id,email,username', 'school:id,name']);
+            $guruQuery = Guru::with(['user:id,email,username,password_hash', 'school:id,name']);
             if (!empty($schoolId)) {
                 $guruQuery->where('school_id', $schoolId);
             }
@@ -164,6 +164,7 @@ class ExamSyncApiController extends Controller
                     'nip' => $guru->nip,
                     'no_wa' => $guru->no_wa,
                     'email' => $guru->user?->email,
+                    'password_hash' => $guru->user?->password_hash,
                     'school_id' => $guru->school_id,
                     'school_name' => $guru->school?->name,
                 ];
@@ -189,7 +190,8 @@ class ExamSyncApiController extends Controller
 
         // 3. Ambil Data Kelas
         if (in_array($type, ['all', 'kelas'])) {
-            $kelasQuery = Kelas::with(['school:id,name', 'jurusan:id,nama_jurusan', 'waliKelas:id,nama']);
+            $kelasQuery = Kelas::with(['school:id,name', 'jurusan:id,nama_jurusan', 'waliKelas:id,nama'])
+                ->withCount('siswas');
             if (!empty($schoolId)) {
                 $kelasQuery->where('school_id', $schoolId);
             }
@@ -201,6 +203,7 @@ class ExamSyncApiController extends Controller
                     'tingkat' => $kelas->tingkat,
                     'jurusan' => $kelas->jurusan?->nama_jurusan,
                     'wali_kelas' => $kelas->waliKelas?->nama,
+                    'jumlah_siswa' => (int) ($kelas->siswas_count ?? 0),
                     'school_id' => $kelas->school_id,
                     'school_name' => $kelas->school?->name,
                 ];

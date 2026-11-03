@@ -1,12 +1,15 @@
 <!DOCTYPE html>
 <html lang="id">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>RFIDv2 Hardware Device Simulator — Jagat Absen</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Share+Tech+Mono&display=swap"
+    rel="stylesheet">
   <style>
     :root {
       --bg-dark: #0b0f19;
@@ -130,6 +133,7 @@
       .main-grid {
         grid-template-columns: 360px 1fr;
       }
+
       .col-inspector {
         grid-column: span 2;
       }
@@ -139,6 +143,7 @@
       .main-grid {
         grid-template-columns: 1fr;
       }
+
       .col-inspector {
         grid-column: span 1;
       }
@@ -259,8 +264,15 @@
     }
 
     @keyframes pulseBtn {
-      0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5); }
-      50% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+
+      0%,
+      100% {
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5);
+      }
+
+      50% {
+        box-shadow: 0 0 0 8px rgba(16, 185, 129, 0);
+      }
     }
 
     /* VIRTUAL HARDWARE BOX */
@@ -273,7 +285,8 @@
       position: relative;
     }
 
-    .device-hardware::before, .device-hardware::after {
+    .device-hardware::before,
+    .device-hardware::after {
       content: "";
       position: absolute;
       width: 10px;
@@ -282,8 +295,16 @@
       background: #4b5563;
       box-shadow: inset 0 1px 2px #000;
     }
-    .device-hardware::before { top: 12px; left: 12px; }
-    .device-hardware::after { top: 12px; right: 12px; }
+
+    .device-hardware::before {
+      top: 12px;
+      left: 12px;
+    }
+
+    .device-hardware::after {
+      top: 12px;
+      right: 12px;
+    }
 
     .device-top-bar {
       display: flex;
@@ -692,22 +713,24 @@
       border-radius: 50%;
     }
 
-    input:checked + .slider {
+    input:checked+.slider {
       background-color: var(--accent);
     }
 
-    input:checked + .slider:before {
+    input:checked+.slider:before {
       transform: translateX(18px);
     }
   </style>
 </head>
+
 <body>
 
   <header>
     <div class="brand">
       <div class="brand-icon">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M2 12h5l3 7 4-14 3 7h5"/>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M2 12h5l3 7 4-14 3 7h5" />
         </svg>
       </div>
       <div>
@@ -742,18 +765,22 @@
         <span class="panel-title">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="3"></circle>
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            <path
+              d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z">
+            </path>
           </svg>
           Device & API Config
         </span>
-        <button id="btnResetConfig" class="btn btn-secondary" style="font-size: 0.7rem; padding: 0.25rem 0.5rem;">Reset</button>
+        <button id="btnResetConfig" class="btn btn-secondary"
+          style="font-size: 0.7rem; padding: 0.25rem 0.5rem;">Reset</button>
       </div>
 
       <div class="panel-body">
         <div class="form-group">
           <label class="form-label" for="cfgBaseUrl">Server Base URL</label>
           <input type="text" id="cfgBaseUrl" class="form-input" placeholder="http://localhost:8000">
-          <small style="color: var(--text-muted); font-size: 0.72rem;">Kosongkan jika menggunakan domain yang sama.</small>
+          <small style="color: var(--text-muted); font-size: 0.72rem;">Kosongkan jika menggunakan domain yang
+            sama.</small>
         </div>
 
 
@@ -762,7 +789,8 @@
           <div class="input-wrapper">
             <input type="text" id="cfgApiKey" class="form-input" placeholder="Isi API Key mesin absensi...">
           </div>
-          <small style="color: var(--text-muted); font-size: 0.72rem;">Tersimpan otomatis di browser (`localStorage`).</small>
+          <small style="color: var(--text-muted); font-size: 0.72rem;">Tersimpan otomatis di browser
+            (`localStorage`).</small>
         </div>
 
         <button id="btnPingTest" class="btn btn-secondary" style="width: 100%;">
@@ -772,15 +800,19 @@
           Test Ping / Heartbeat Server
         </button>
 
-        <div id="pingResultBox" style="display: none; padding: 0.65rem 0.85rem; border-radius: 8px; font-size: 0.75rem; font-family: 'JetBrains Mono', monospace;"></div>
+        <div id="pingResultBox"
+          style="display: none; padding: 0.65rem 0.85rem; border-radius: 8px; font-size: 0.75rem; font-family: 'JetBrains Mono', monospace;">
+        </div>
 
         <hr style="border: 0; border-top: 1px solid var(--panel-border);">
 
         <div class="form-group">
           <label class="form-label">Tampilan Backlight LCD</label>
           <div style="display: flex; gap: 0.5rem;">
-            <button id="btnThemeGreen" class="btn btn-secondary" style="flex: 1; font-size: 0.75rem; border-color: #78e032;">🟢 Hijau Klasik</button>
-            <button id="btnThemeBlue" class="btn btn-secondary" style="flex: 1; font-size: 0.75rem; border-color: #38bdf8;">🔵 Biru Cyan</button>
+            <button id="btnThemeGreen" class="btn btn-secondary"
+              style="flex: 1; font-size: 0.75rem; border-color: #78e032;">🟢 Hijau Klasik</button>
+            <button id="btnThemeBlue" class="btn btn-secondary"
+              style="flex: 1; font-size: 0.75rem; border-color: #38bdf8;">🔵 Biru Cyan</button>
           </div>
         </div>
 
@@ -838,13 +870,15 @@
         <div id="rfidAntenna" class="rfid-antenna-target" onclick="triggerScanCard()">
           <div class="rfid-coil-icon">
             <svg viewBox="0 0 24 24">
-              <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z"/>
-              <path d="M12 6a6 6 0 1 0 6 6 6 6 0 0 0-6-6zm0 10a4 4 0 1 1 4-4 4 4 0 0 1-4 4z"/>
+              <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z" />
+              <path d="M12 6a6 6 0 1 0 6 6 6 6 0 0 0-6-6zm0 10a4 4 0 1 1 4-4 4 4 0 0 1-4 4z" />
             </svg>
           </div>
           <div>
             <div style="font-weight: 700; font-size: 0.95rem; color: #fff;">TAP KARTU RFID DISINI</div>
-            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.2rem;">Atau tekan tombol <kbd style="background: rgba(255,255,255,0.1); padding: 0.15rem 0.35rem; border-radius: 4px; font-family: monospace;">SPACE</kbd> / Scan Presensi</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.2rem;">Atau tekan tombol <kbd
+                style="background: rgba(255,255,255,0.1); padding: 0.15rem 0.35rem; border-radius: 4px; font-family: monospace;">SPACE</kbd>
+              / Scan Presensi</div>
           </div>
         </div>
 
@@ -866,9 +900,11 @@
           <div class="form-group">
             <div style="display: flex; justify-content: space-between; align-items: center;">
               <label class="form-label" for="txtCardUid">Nomor UID Kartu (HEX)</label>
-              <button id="btnRandomUid" class="btn btn-secondary" style="padding: 0.2rem 0.5rem; font-size: 0.7rem;">🎲 Acak UID</button>
+              <button id="btnRandomUid" class="btn btn-secondary" style="padding: 0.2rem 0.5rem; font-size: 0.7rem;">🎲
+                Acak UID</button>
             </div>
-            <input type="text" id="txtCardUid" class="form-input" value="53A26B1E" maxlength="14" style="text-transform: uppercase; font-size: 1.1rem; letter-spacing: 0.1em; font-weight: bold; color: var(--accent);">
+            <input type="text" id="txtCardUid" class="form-input" value="53A26B1E" maxlength="14"
+              style="text-transform: uppercase; font-size: 1.1rem; letter-spacing: 0.1em; font-weight: bold; color: var(--accent);">
           </div>
 
           <div class="form-group">
@@ -894,11 +930,13 @@
           </div>
 
           <!-- OFFLINE MODE TOGGLE -->
-          <div style="background: rgba(0,0,0,0.25); border: 1px solid var(--panel-border); border-radius: 8px; padding: 0.75rem;">
+          <div
+            style="background: rgba(0,0,0,0.25); border: 1px solid var(--panel-border); border-radius: 8px; padding: 0.75rem;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
               <div>
                 <div style="font-size: 0.825rem; font-weight: 600;">Simulasi Antrean Offline</div>
-                <div style="font-size: 0.72rem; color: var(--text-muted);">Sertakan parameter `scanned_at` (LittleFS)</div>
+                <div style="font-size: 0.72rem; color: var(--text-muted);">Sertakan parameter `scanned_at` (LittleFS)
+                </div>
               </div>
               <label class="toggle-switch">
                 <input type="checkbox" id="chkOfflineMode" onchange="toggleOfflineControls()">
@@ -906,18 +944,25 @@
               </label>
             </div>
 
-            <div id="offlineTimeGroup" style="display: none; margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px dashed rgba(255,255,255,0.08);">
-              <label class="form-label" for="txtScannedAt" style="margin-bottom: 0.3rem;">Waktu Scan Offline (`scanned_at`)</label>
-              <input type="text" id="txtScannedAt" class="form-input" style="font-size: 0.8rem;" placeholder="YYYY-MM-DD HH:mm:ss">
+            <div id="offlineTimeGroup"
+              style="display: none; margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px dashed rgba(255,255,255,0.08);">
+              <label class="form-label" for="txtScannedAt" style="margin-bottom: 0.3rem;">Waktu Scan Offline
+                (`scanned_at`)</label>
+              <input type="text" id="txtScannedAt" class="form-input" style="font-size: 0.8rem;"
+                placeholder="YYYY-MM-DD HH:mm:ss">
               <div style="display: flex; gap: 0.4rem; margin-top: 0.4rem;">
-                <button type="button" class="btn btn-secondary" style="font-size: 0.68rem; padding: 0.2rem 0.4rem;" onclick="setOfflinePreset(5)">5 Menit Lalu</button>
-                <button type="button" class="btn btn-secondary" style="font-size: 0.68rem; padding: 0.2rem 0.4rem;" onclick="setOfflinePreset(60)">1 Jam Lalu</button>
-                <button type="button" class="btn btn-secondary" style="font-size: 0.68rem; padding: 0.2rem 0.4rem;" onclick="setOfflinePreset(1440)">Kemarin</button>
+                <button type="button" class="btn btn-secondary" style="font-size: 0.68rem; padding: 0.2rem 0.4rem;"
+                  onclick="setOfflinePreset(5)">5 Menit Lalu</button>
+                <button type="button" class="btn btn-secondary" style="font-size: 0.68rem; padding: 0.2rem 0.4rem;"
+                  onclick="setOfflinePreset(60)">1 Jam Lalu</button>
+                <button type="button" class="btn btn-secondary" style="font-size: 0.68rem; padding: 0.2rem 0.4rem;"
+                  onclick="setOfflinePreset(1440)">Kemarin</button>
               </div>
             </div>
           </div>
 
-          <button id="btnScanAction" class="btn btn-primary btn-pulse" style="width: 100%; padding: 0.85rem; font-size: 1rem;" onclick="triggerScanCard()">
+          <button id="btnScanAction" class="btn btn-primary btn-pulse"
+            style="width: 100%; padding: 0.85rem; font-size: 1rem;" onclick="triggerScanCard()">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
               <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
             </svg>
@@ -928,7 +973,7 @@
 
     </div>
 
-    <!-- KOLOM 3: LOG RESPON JSON -->
+    <!-- KOLOM 3: LOG RESPON & INSPEKTOR -->
     <div class="card-panel col-inspector">
       <div class="panel-header">
         <span class="panel-title">
@@ -936,28 +981,47 @@
             <polyline points="4 17 10 11 4 5"></polyline>
             <line x1="12" y1="19" x2="20" y2="19"></line>
           </svg>
-          Log Respon JSON
+          Log Respon & Inspektor
         </span>
         <div style="display: flex; gap: 0.5rem; align-items: center;">
-          <button id="btnCopyJson" class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.35rem 0.65rem;" onclick="copyJsonPayload()">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-            Salin JSON
+          <button id="btnCopyJson" class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.35rem 0.65rem;"
+            onclick="copyActiveTabContent()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+            <span id="lblCopyBtnText">Salin Teks</span>
           </button>
-          <button id="btnClearLogs" class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.35rem 0.65rem;" onclick="clearLogHistory()">Clear Log</button>
+          <button id="btnClearLogs" class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.35rem 0.65rem;"
+            onclick="clearLogHistory()">Clear Log</button>
         </div>
       </div>
 
+      <!-- TAB PILIHAN INSPEKTOR -->
+      <div class="inspector-tabs" style="display: flex; gap: 0.25rem; border-bottom: 1px solid var(--panel-border); background: rgba(0,0,0,0.25); padding: 0.35rem 0.75rem 0 0.75rem;">
+        <button id="tabBtnJson" class="tab-btn active" onclick="switchInspectorTab('json')">{ } JSON Terformat</button>
+        <button id="tabBtnRaw" class="tab-btn" onclick="switchInspectorTab('raw')">📄 Respon Raw (Mentah)</button>
+        <button id="tabBtnCurl" class="tab-btn" onclick="switchInspectorTab('curl')">🌐 Request & cURL</button>
+      </div>
+
       <div class="panel-body" style="flex: 1; display: flex; flex-direction: column; gap: 0.75rem;">
-        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; background: rgba(0,0,0,0.35); padding: 0.6rem 0.85rem; border-radius: 8px; border: 1px solid var(--panel-border);">
+        <div
+          style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; background: rgba(0,0,0,0.35); padding: 0.6rem 0.85rem; border-radius: 8px; border: 1px solid var(--panel-border);">
           <div style="display: flex; align-items: center; gap: 0.6rem;">
             <span id="lblHttpCodeBadge" class="badge-status badge-ok" style="display:none;">200 OK</span>
-            <span id="inspectorSummary" style="color: var(--text-muted); font-size: 0.8rem;">Menunggu scan kartu / ping...</span>
+            <span id="inspectorSummary" style="color: var(--text-muted); font-size: 0.8rem;">Menunggu scan kartu /
+              ping...</span>
           </div>
-          <span id="lblLatencyBadge" style="font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--text-muted);"></span>
+          <span id="lblLatencyBadge"
+            style="font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--text-muted);"></span>
         </div>
 
-        <pre id="rawJsonResponse" class="code-block" style="flex: 1; min-height: 480px; max-height: none; font-size: 0.85rem; line-height: 1.5; margin: 0; padding: 1.25rem;">// Belum ada respon yang diterima
-// Silakan tap kartu atau jalankan Ping Test untuk melihat log JSON</pre>
+        <div id="inspectorWarningBox" style="display:none; background: rgba(244, 63, 94, 0.12); border: 1px solid rgba(244, 63, 94, 0.35); border-radius: 8px; padding: 0.75rem; font-size: 0.8rem; color: #fb7185; line-height: 1.45;">
+        </div>
+
+        <pre id="rawJsonResponse" class="code-block"
+          style="flex: 1; min-height: 480px; max-height: none; font-size: 0.85rem; line-height: 1.5; margin: 0; padding: 1.25rem; white-space: pre-wrap; word-break: break-all;">// Belum ada respon yang diterima
+// Silakan tap kartu atau jalankan Ping Test untuk melihat log JSON & Respon Raw</pre>
       </div>
     </div>
 
@@ -1202,7 +1266,9 @@
       try {
         const resp = await fetch(url, { method: 'GET' });
         const latency = Math.round(performance.now() - t0);
-        const data = await resp.json().catch(() => ({}));
+        const rawText = await resp.text();
+        let data = {};
+        try { data = JSON.parse(rawText); } catch (e) { data = { error: 'Non-JSON response', raw: rawText }; }
 
         if (resp.status === 200 && data.ok) {
           resultBox.style.background = 'rgba(16, 185, 129, 0.15)';
@@ -1219,7 +1285,7 @@
           ledSrv.className = 'led led-red active';
         }
 
-        updateInspectorWithPing(resp.status, latency, data, url);
+        updateInspectorWithPing(resp.status, resp.statusText, latency, rawText, resp.headers, data, url);
 
       } catch (err) {
         const latency = Math.round(performance.now() - t0);
@@ -1228,6 +1294,8 @@
         resultBox.style.color = '#fb7185';
         resultBox.innerHTML = `❌ Gagal Menghubungi Server (${latency}ms)<br>${err.message}`;
         ledSrv.className = 'led led-red active';
+
+        updateInspectorWithPing(0, 'ERR_NETWORK', latency, '', null, null, url, err.message);
       }
     });
 
@@ -1268,7 +1336,10 @@
 
       const t0 = performance.now();
       let respStatus = 0;
+      let respStatusText = '';
       let respData = null;
+      let rawText = '';
+      let respHeaders = null;
       let latency = 0;
 
       try {
@@ -1279,20 +1350,39 @@
         });
 
         respStatus = response.status;
+        respStatusText = response.statusText;
+        respHeaders = response.headers;
         latency = Math.round(performance.now() - t0);
-        respData = await response.json().catch(() => ({ error: 'Invalid JSON response from server' }));
+        rawText = await response.text();
 
-        handleScanResponse(respStatus, respData, latency, payload);
+        try {
+          respData = JSON.parse(rawText);
+        } catch (e) {
+          respData = { error: 'Invalid JSON response from server', raw: rawText };
+        }
+
+        handleScanResponse(respStatus, respStatusText, respData, rawText, respHeaders, latency, payload, url);
 
       } catch (err) {
         latency = Math.round(performance.now() - t0);
         respStatus = 0;
+        respStatusText = 'ERR_NETWORK';
         respData = { error: err.message };
 
         // Handle offline / connection fail exactly as firmware does
         showServerDisplay("OFFLINE - SIMPAN", "Antrean Memori", 3000);
         playSimulatorBeep('ok'); // 2x bip lokal indikator offline
-        renderJsonLog(respStatus, respData, latency, payload);
+        renderScanLog({
+          status: 0,
+          statusText: 'ERR_NETWORK',
+          latency,
+          payload,
+          url,
+          rawResp: '',
+          respHeaders: null,
+          jsonData: respData,
+          errorMessage: err.message
+        });
       } finally {
         setTimeout(() => {
           target.classList.remove('scanning');
@@ -1302,7 +1392,7 @@
       }
     }
 
-    function handleScanResponse(status, data, latency, payload) {
+    function handleScanResponse(status, statusText, data, rawText, respHeaders, latency, payload, url) {
       if (status === 200 && data) {
         // Parse display & sound from server
         const display = data.display || {};
@@ -1326,56 +1416,260 @@
         ledSrv.className = 'led led-red active';
       }
 
-      renderJsonLog(status, data, latency, payload);
+      renderScanLog({
+        status,
+        statusText,
+        latency,
+        payload,
+        url,
+        rawResp: rawText,
+        respHeaders,
+        jsonData: data,
+        errorMessage: null
+      });
     }
 
     // ═════════════════════════════════════════════════════════════════════════
-    // JSON LOG RENDERER
+    // TAB MANAGEMENT & INSPECTOR RENDERER
     // ═════════════════════════════════════════════════════════════════════════
-    function renderJsonLog(status, data, latency, payload) {
+    let currentInspectorTab = 'json'; // 'json' | 'raw' | 'curl'
+    const inspectorStore = {
+      json: '// Belum ada respon yang diterima\n// Silakan tap kartu atau jalankan Ping Test untuk melihat log JSON & Respon Raw',
+      raw: '// Belum ada respon mentah',
+      curl: '// Belum ada riwayat request & cURL'
+    };
+
+    function switchInspectorTab(tab) {
+      currentInspectorTab = tab;
+      const btnJson = document.getElementById('tabBtnJson');
+      const btnRaw = document.getElementById('tabBtnRaw');
+      const btnCurl = document.getElementById('tabBtnCurl');
+      if (btnJson) btnJson.classList.toggle('active', tab === 'json');
+      if (btnRaw) btnRaw.classList.toggle('active', tab === 'raw');
+      if (btnCurl) btnCurl.classList.toggle('active', tab === 'curl');
+
+      const pre = document.getElementById('rawJsonResponse');
+      if (pre) pre.textContent = inspectorStore[tab] || '';
+
+      const lblCopy = document.getElementById('lblCopyBtnText');
+      if (lblCopy) {
+        if (tab === 'json') lblCopy.textContent = 'Salin JSON';
+        else if (tab === 'raw') lblCopy.textContent = 'Salin Raw';
+        else lblCopy.textContent = 'Salin cURL';
+      }
+    }
+
+    function renderScanLog({ status, statusText, latency, payload, url, rawResp, respHeaders, jsonData, errorMessage }) {
       const summary = document.getElementById('inspectorSummary');
-      if (payload && payload.uid) {
-        summary.innerHTML = `UID: <strong>${payload.uid}</strong>`;
+      if (summary) {
+        summary.innerHTML = payload && payload.uid ? `UID: <strong>${payload.uid}</strong>` : 'Scan Selesai';
       }
 
       const badge = document.getElementById('lblHttpCodeBadge');
-      badge.style.display = 'inline-block';
-      badge.textContent = status > 0 ? `HTTP ${status}` : 'ERR_NETWORK';
-      badge.className = status === 200 ? 'badge-status badge-ok' : 'badge-status badge-error';
+      if (badge) {
+        badge.style.display = 'inline-block';
+        badge.textContent = status > 0 ? `HTTP ${status} ${statusText || ''}`.trim() : 'ERR_NETWORK';
+        badge.className = status === 200 ? 'badge-status badge-ok' : 'badge-status badge-error';
+      }
 
       const lat = document.getElementById('lblLatencyBadge');
       if (lat) {
         lat.textContent = `${latency} ms`;
       }
 
-      document.getElementById('rawJsonResponse').textContent = JSON.stringify(data, null, 2);
-    }
+      const isMixedContent = window.location.protocol === 'https:' && url.startsWith('http://');
 
-    function updateInspectorWithPing(status, latency, data, url) {
-      const summary = document.getElementById('inspectorSummary');
-      summary.innerHTML = `Ping Server Heartbeat`;
-
-      const badge = document.getElementById('lblHttpCodeBadge');
-      badge.style.display = 'inline-block';
-      badge.textContent = status > 0 ? `HTTP ${status}` : 'ERR_NETWORK';
-      badge.className = status === 200 ? 'badge-status badge-ok' : 'badge-status badge-error';
-
-      const lat = document.getElementById('lblLatencyBadge');
-      if (lat) {
-        lat.textContent = `${latency} ms`;
+      // 1. FORMAT DATA JSON
+      if (jsonData) {
+        inspectorStore.json = JSON.stringify(jsonData, null, 2);
+      } else if (rawResp) {
+        try {
+          inspectorStore.json = JSON.stringify(JSON.parse(rawResp), null, 2);
+        } catch (e) {
+          inspectorStore.json = `// Respon server bukan format JSON valid:\n${rawResp}`;
+        }
+      } else {
+        inspectorStore.json = JSON.stringify({
+          error: errorMessage || "Failed to fetch",
+          target_url: url,
+          is_mixed_content: isMixedContent,
+          hint: isMixedContent
+            ? "Ubah http:// menjadi https:// pada Server Base URL"
+            : "Cek tab 'Respon Raw' & 'Request & cURL' untuk diagnosa preflight CORS / network"
+        }, null, 2);
       }
 
-      document.getElementById('rawJsonResponse').textContent = JSON.stringify(data, null, 2);
+      // 2. FORMAT DATA RAW (MENTAH)
+      if (status > 0) {
+        let headersStr = '';
+        if (respHeaders) {
+          try {
+            for (let [k, v] of respHeaders.entries()) {
+              headersStr += `${k}: ${v}\n`;
+            }
+          } catch (e) { }
+        }
+        inspectorStore.raw = `HTTP/1.1 ${status} ${statusText || 'OK'}
+${headersStr}
+${rawResp || '(Body Kosong)'}`;
+      } else {
+        let diagHelp = "";
+        if (isMixedContent) {
+          diagHelp = `⚠️ DIAGNOSA: MIXED CONTENT (HTTPS -> HTTP DIBLOKIR BROWSER)
+Halaman simulator ini dibuka lewat HTTPS (${window.location.origin}),
+namun URL tujuan menggunakan http:// (${url}).
+Browser secara otomatis MEMBLOKIR koneksi HTTP biasa dari halaman HTTPS demi keamanan.
+
+👉 SOLUSI CEPAT:
+Ganti Server Base URL menjadi:
+https://${url.replace(/^http:\/\//, '').split('/')[0]}`;
+        } else {
+          diagHelp = `⚠️ DIAGNOSA: CORS PREFLIGHT ATAU NETWORK ERROR
+Browser gagal melakukan request fetch (${errorMessage || 'Failed to fetch'}).
+
+Penyebab Paling Sering:
+1. CORS Preflight (OPTIONS): Browser mengirim request OPTIONS sebelum POST JSON.
+   Jika backend (Cloudflare Worker) tidak menangani method OPTIONS atau tidak mengembalikan
+   header Access-Control-Allow-Origin: *, browser langsung membatalkan request.
+2. Endpoint server tidak dapat diakses dari browser ini.
+
+👉 UJI BEBAS BATASAN BROWSER:
+Buka tab "🌐 Request & cURL" di atas, lalu salin perintah cURL dan jalankan di Terminal / CMD.`;
+        }
+
+        inspectorStore.raw = `[FETCH ERROR / NETWORK BLOCKED]
+Target URL   : ${url}
+Method       : POST
+Latency      : ${latency} ms
+Pesan Error  : ${errorMessage || 'Failed to fetch'}
+
+============================================================
+${diagHelp}
+============================================================`;
+      }
+
+      // 3. FORMAT REQUEST & cURL
+      const curlCmd = `curl -X POST "${url}" \\\n  -H "Content-Type: application/json" \\\n  -d '${JSON.stringify(payload)}'`;
+      inspectorStore.curl = `=== HTTP REQUEST DETAILS ===
+Method    : POST
+Endpoint  : ${url}
+Timestamp : ${new Date().toLocaleTimeString()}
+Headers   :
+  Content-Type: application/json
+
+Payload Body (JSON):
+${JSON.stringify(payload, null, 2)}
+
+============================================================
+=== PERINTAH cURL (Salin & Jalankan di Terminal / CMD) ===
+============================================================
+${curlCmd}`;
+
+      // Tampilkan peringatan visual jika ada error
+      const warnBox = document.getElementById('inspectorWarningBox');
+      if (warnBox) {
+        if (isMixedContent) {
+          warnBox.style.display = 'block';
+          warnBox.innerHTML = `⚠️ <strong>Mixed Content Blocked:</strong> Halaman simulator dibuka via HTTPS, sedangkan Base URL memakai HTTP (<code>${url}</code>). Ubah menjadi <strong style="color:#6ee7b7">https://</strong> agar browser tidak memblokir fetch.`;
+        } else if (status === 0) {
+          warnBox.style.display = 'block';
+          warnBox.innerHTML = `⚠️ <strong>Fetch Gagal (${errorMessage || 'Failed to fetch'}):</strong> Browser memblokir koneksi (CORS preflight atau server offline). Klik tab <strong>📄 Respon Raw</strong> untuk diagnosa lengkap atau tab <strong>🌐 Request & cURL</strong> untuk uji terminal.`;
+        } else if (status !== 200) {
+          warnBox.style.display = 'block';
+          warnBox.innerHTML = `ℹ️ Server merespon dengan status <strong>HTTP ${status}</strong>. Buka tab <strong>📄 Respon Raw</strong> untuk melihat header & respon mentah server.`;
+        } else {
+          warnBox.style.display = 'none';
+        }
+      }
+
+      // Render tab yang sedang aktif
+      switchInspectorTab(currentInspectorTab);
     }
 
-    function copyJsonPayload() {
-      const json = document.getElementById('rawJsonResponse').textContent;
-      navigator.clipboard.writeText(json);
-      const btn = document.getElementById('btnCopyJson');
-      if (btn) {
-        const orig = btn.innerHTML;
-        btn.innerHTML = '✅ Tersalin!';
-        setTimeout(() => { btn.innerHTML = orig; }, 1500);
+    function updateInspectorWithPing(status, statusText, latency, rawText, respHeaders, data, url, errorMessage = null) {
+      const summary = document.getElementById('inspectorSummary');
+      if (summary) summary.innerHTML = `Ping Server Heartbeat`;
+
+      const badge = document.getElementById('lblHttpCodeBadge');
+      if (badge) {
+        badge.style.display = 'inline-block';
+        badge.textContent = status > 0 ? `HTTP ${status} ${statusText || ''}`.trim() : 'ERR_NETWORK';
+        badge.className = status === 200 ? 'badge-status badge-ok' : 'badge-status badge-error';
+      }
+
+      const lat = document.getElementById('lblLatencyBadge');
+      if (lat) lat.textContent = `${latency} ms`;
+
+      const isMixedContent = window.location.protocol === 'https:' && url.startsWith('http://');
+
+      // JSON
+      if (data) {
+        inspectorStore.json = JSON.stringify(data, null, 2);
+      } else {
+        inspectorStore.json = JSON.stringify({
+          error: errorMessage || 'Failed to fetch',
+          target_url: url,
+          is_mixed_content: isMixedContent
+        }, null, 2);
+      }
+
+      // RAW
+      if (status > 0) {
+        let headersStr = '';
+        if (respHeaders) {
+          try {
+            for (let [k, v] of respHeaders.entries()) {
+              headersStr += `${k}: ${v}\n`;
+            }
+          } catch (e) { }
+        }
+        inspectorStore.raw = `HTTP/1.1 ${status} ${statusText || 'OK'}
+${headersStr}
+${rawText || '(Body Kosong)'}`;
+      } else {
+        inspectorStore.raw = `[PING ERROR / NETWORK BLOCKED]
+Target URL  : ${url}
+Method      : GET
+Latency     : ${latency} ms
+Pesan Error : ${errorMessage || 'Failed to fetch'}`;
+      }
+
+      // CURL
+      inspectorStore.curl = `=== HTTP REQUEST DETAILS ===
+Method    : GET
+Endpoint  : ${url}
+Timestamp : ${new Date().toLocaleTimeString()}
+
+============================================================
+=== PERINTAH cURL (Salin & Jalankan di Terminal / CMD) ===
+============================================================
+curl -i "${url}"`;
+
+      // Warning Box
+      const warnBox = document.getElementById('inspectorWarningBox');
+      if (warnBox) {
+        if (isMixedContent) {
+          warnBox.style.display = 'block';
+          warnBox.innerHTML = `⚠️ <strong>Mixed Content:</strong> Base URL memakai HTTP pada halaman HTTPS. Ubah ke HTTPS.`;
+        } else if (status === 0) {
+          warnBox.style.display = 'block';
+          warnBox.innerHTML = `⚠️ <strong>Ping Gagal:</strong> ${errorMessage || 'Koneksi ditolak browser'}`;
+        } else {
+          warnBox.style.display = 'none';
+        }
+      }
+
+      switchInspectorTab(currentInspectorTab);
+    }
+
+    function copyActiveTabContent() {
+      const content = document.getElementById('rawJsonResponse').textContent;
+      navigator.clipboard.writeText(content);
+      const btnText = document.getElementById('lblCopyBtnText');
+      if (btnText) {
+        const orig = btnText.textContent;
+        btnText.textContent = '✅ Tersalin!';
+        setTimeout(() => { btnText.textContent = orig; }, 1500);
       }
     }
 
@@ -1384,10 +1678,16 @@
       document.getElementById('lblHttpCodeBadge').style.display = 'none';
       const lat = document.getElementById('lblLatencyBadge');
       if (lat) lat.textContent = '';
-      document.getElementById('rawJsonResponse').textContent = "// Log telah dibersihkan";
+      const warnBox = document.getElementById('inspectorWarningBox');
+      if (warnBox) warnBox.style.display = 'none';
+
+      inspectorStore.json = '// Belum ada respon yang diterima\n// Silakan tap kartu atau jalankan Ping Test untuk melihat log';
+      inspectorStore.raw = '// Belum ada respon mentah';
+      inspectorStore.curl = '// Belum ada data request & cURL';
+      switchInspectorTab(currentInspectorTab);
     }
 
-    function updateCurlPreview() {}
+    function updateCurlPreview() { }
 
     // Keyboard shortcut (Spacebar to tap card)
     window.addEventListener('keydown', (e) => {
@@ -1401,4 +1701,5 @@
     loadConfig();
   </script>
 </body>
+
 </html>

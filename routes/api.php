@@ -106,3 +106,11 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::post('/mobile/logout', [MobileAttendanceController::class, 'logout']);
 });
+
+// --- CBT / Exam App Integration Endpoints ---
+Route::prefix('cbt-sync')->group(function () {
+    Route::get('/ping', [App\Http\Controllers\Api\ExamSyncApiController::class, 'ping']);
+    Route::get('/check-school', [App\Http\Controllers\Api\ExamSyncApiController::class, 'checkSchool']);
+    Route::get('/data', [App\Http\Controllers\Api\ExamSyncApiController::class, 'exportData']);
+});
+

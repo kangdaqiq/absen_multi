@@ -8,6 +8,7 @@ use App\Models\JadwalPelajaran;
 use App\Models\Kelas;
 use App\Models\Mapel;
 use App\Models\School;
+use App\Models\Siswa;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -55,6 +56,7 @@ class ExamSyncApiController extends Controller
             'timestamp' => now()->toIso8601String(),
             'counts' => [
                 'gurus' => Guru::count(),
+                'siswas' => Siswa::count(),
                 'mapels' => Mapel::count(),
                 'kelases' => Kelas::count(),
                 'jadwals' => JadwalPelajaran::count(),
@@ -95,6 +97,7 @@ class ExamSyncApiController extends Controller
         }
 
         $guruCount = Guru::where('school_id', $schoolId)->count();
+        $siswaCount = Siswa::where('school_id', $schoolId)->count();
         $mapelCount = Mapel::where('school_id', $schoolId)->count();
         $kelasCount = Kelas::where('school_id', $schoolId)->count();
         $jadwalCount = JadwalPelajaran::where('school_id', $schoolId)
@@ -113,6 +116,7 @@ class ExamSyncApiController extends Controller
             'code' => $school->code,
             'counts' => [
                 'gurus' => $guruCount,
+                'siswas' => $siswaCount,
                 'mapels' => $mapelCount,
                 'kelases' => $kelasCount,
                 'jadwals' => $jadwalCount,
@@ -210,7 +214,30 @@ class ExamSyncApiController extends Controller
             });
         }
 
-        // 4. Ambil Pemetaan Jadwal Mengajar (Guru mengajar Mapel apa di Kelas mana)
+        // 4. Ambil Data Siswa (Peserta Ujian)
+        if (in_array($type, ['all', 'siswa']) || (is_array($type) && in_array('siswa', $type))) {
+            $siswaQuery = Siswa::with(['user:id,email,username,password_hash', 'school:id,name', 'kelas:id,nama_kelas']);
+            if (!empty($schoolId)) {
+                $siswaQuery->where('school_id', $schoolId);
+            }
+
+            $result['siswas'] = $siswaQuery->get()->map(function ($s) {
+                return [
+                    'id' => $s->id,
+                    'nama' => $s->nama,
+                    'nis' => $s->nis,
+                    'kelas_id' => $s->kelas_id,
+                    'kelas_nama' => $s->kelas?->nama_kelas,
+                    'no_wa' => $s->no_wa,
+                    'email' => $s->user?->email,
+                    'password_hash' => $s->user?->password_hash,
+                    'school_id' => $s->school_id,
+                    'school_name' => $s->school?->name,
+                ];
+            });
+        }
+
+        // 5. Ambil Pemetaan Jadwal Mengajar (Guru mengajar Mapel apa di Kelas mana)
         $jadwalQuery = JadwalPelajaran::whereNotNull('guru_id')
             ->whereNotNull('mapel_id')
             ->whereNotNull('kelas_id')

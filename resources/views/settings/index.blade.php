@@ -609,9 +609,12 @@
                         </div>
                         <div class="flex items-center gap-3 bg-gray-50 dark:bg-gray-800/60 p-2.5 rounded-xl border border-gray-200 dark:border-gray-700">
                             <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Aktifkan Absensi Sholat</span>
-                            <label class="relative inline-flex items-center cursor-pointer">
-                                <input type="checkbox" name="prayer_enabled" value="true" class="sr-only peer" {{ $prayerEnabled ? 'checked' : '' }}>
-                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-emerald-500"></div>
+                            <label class="flex items-center cursor-pointer select-none">
+                                <div class="relative">
+                                    <input type="checkbox" id="prayer_enabled" name="prayer_enabled" value="true" class="sr-only" {{ $prayerEnabled ? 'checked' : '' }}>
+                                    <div class="block h-6 w-10 rounded-full bg-gray-300 dark:bg-gray-600 toggle-bg transition"></div>
+                                    <div class="dot absolute left-1 top-1 h-4 w-4 rounded-full bg-white transition toggle-dot"></div>
+                                </div>
                             </label>
                         </div>
                     </div>

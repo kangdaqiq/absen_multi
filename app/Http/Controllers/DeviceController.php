@@ -27,12 +27,14 @@ class DeviceController extends Controller
             'name' => 'required|string|max:100',
             'api_key' => 'required|string|max:64|unique:api_keys,api_key',
             'type' => 'required|in:rfid,fingerprint,rfid_fingerprint',
+            'device_category' => 'nullable|in:attendance,sholat',
             'finger_id_min' => 'nullable|integer|min:1',
             'finger_id_max' => 'nullable|integer|gte:finger_id_min',
             'active' => 'required|boolean',
         ]);
 
         $data = $request->all();
+        $data['device_category'] = $request->input('device_category', 'attendance') ?: 'attendance';
         $data['finger_id_min'] = $request->filled('finger_id_min') ? (int)$request->finger_id_min : 1;
         $data['finger_id_max'] = $request->filled('finger_id_max') ? (int)$request->finger_id_max : 200;
 
@@ -54,12 +56,14 @@ class DeviceController extends Controller
             'name' => 'required|string|max:100',
             'api_key' => 'required|string|max:64|unique:api_keys,api_key,' . $device->id,
             'type' => 'required|in:rfid,fingerprint,rfid_fingerprint',
+            'device_category' => 'nullable|in:attendance,sholat',
             'finger_id_min' => 'nullable|integer|min:1',
             'finger_id_max' => 'nullable|integer|gte:finger_id_min',
             'active' => 'required|boolean',
         ]);
 
         $data = $request->all();
+        $data['device_category'] = $request->input('device_category', 'attendance') ?: 'attendance';
         $data['finger_id_min'] = $request->filled('finger_id_min') ? (int)$request->finger_id_min : 1;
         $data['finger_id_max'] = $request->filled('finger_id_max') ? (int)$request->finger_id_max : 200;
 

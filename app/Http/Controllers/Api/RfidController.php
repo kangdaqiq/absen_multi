@@ -29,6 +29,7 @@ class RfidController extends Controller
 
     protected $wa;
     protected \App\Services\AttendanceCoreService $attendanceCore;
+    protected \App\Services\PrayerTimeService $prayerTimeService;
 
     // Logging context
     protected $apiVersion = 1;
@@ -38,10 +39,14 @@ class RfidController extends Controller
     private $hasLogged = false;
     private $isOfflineSync = false;
 
-    public function __construct(\App\Services\WhatsAppService $wa, \App\Services\AttendanceCoreService $attendanceCore)
-    {
+    public function __construct(
+        \App\Services\WhatsAppService $wa,
+        \App\Services\AttendanceCoreService $attendanceCore,
+        \App\Services\PrayerTimeService $prayerTimeService
+    ) {
         $this->wa = $wa;
         $this->attendanceCore = $attendanceCore;
+        $this->prayerTimeService = $prayerTimeService;
     }
 
     private function handleGateScan($uid, $gateCard, $apiKey, $device, $now = null)
@@ -188,6 +193,11 @@ class RfidController extends Controller
         // Process enrollment FIRST to catch duplicates of already registered cards
         if ($this->hasEnrollmentRequest($device->school_id)) {
             return $this->handleEnroll($uid, $apiKey, $device);
+        }
+
+        // Check Scanner Sholat - SCOPED (Dibedakan melalui API Key / device_category = 'sholat')
+        if ($device->isSholatDevice()) {
+            return $this->handlePrayerScan($uid, $apiKey, $device, $now);
         }
 
         // Check Gate Card - SCOPED
@@ -514,6 +524,128 @@ class RfidController extends Controller
         );
     }
 
+    /**
+     * Handle scan khusus perangkat Absensi Sholat (di Musholla/Masjid)
+     * Dibedakan berdasarkan API Key perangkat ($device->isSholatDevice())
+     */
+    private function handlePrayerScan($uid, $apiKey, $device, $now = null)
+    {
+        $now = $now ? $now->copy() : now();
+        $schoolId = $device->school_id;
+
+        // 1. Identifikasi Pemilik Kartu (Siswa atau Guru di sekolah terkait)
+        $siswa = Siswa::with('kelas')
+            ->where('uid_rfid', $uid)
+            ->where('school_id', $schoolId)
+            ->first();
+
+        $guru = null;
+        if (!$siswa) {
+            $guru = Guru::where('uid_rfid', $uid)
+                ->where('school_id', $schoolId)
+                ->first();
+        }
+
+        if (!$siswa && !$guru) {
+            $this->logRequest($apiKey, 'unknown_card', $uid, false, 'Kartu tidak terdaftar di sekolah ini (Scanner Sholat)');
+            return $this->response(false, 'unknown', "Kartu tdk dikenal\nSilakan Daftar", 'error', [
+                'type' => 'unknown_card',
+                'uid' => $uid
+            ]);
+        }
+
+        $isSiswa = ($siswa !== null);
+        $name = $isSiswa ? $siswa->nama : $guru->nama;
+        $personId = $isSiswa ? $siswa->id : $guru->id;
+        $personType = $isSiswa ? 'siswa' : 'guru';
+
+        // 2. Evaluasi Rentang Waktu Sholat Aktif Berdasarkan Koordinat & Offset
+        $activeWindow = $this->prayerTimeService->determineActivePrayerWindow($schoolId, $now);
+        if (!$activeWindow) {
+            $this->logRequest($apiKey, 'sholat_outside_window', $uid, false, "Di luar waktu absensi sholat ({$name})");
+            return $this->response(
+                false,
+                'gagal',
+                "Di Luar Waktu\nSholat",
+                'error',
+                [
+                    'type' => 'sholat_outside_window',
+                    'nama' => $name,
+                    'jam'  => $now->format('H:i')
+                ]
+            );
+        }
+
+        $sholatCode  = $activeWindow['sholat'];
+        $sholatLabel = $activeWindow['sholat_label'];
+        $today       = $now->format('Y-m-d');
+
+        // 3. Cek Duplikasi Absen Sholat Hari Ini
+        $existing = \App\Models\AbsensiSholat::where('school_id', $schoolId)
+            ->where('tanggal', $today)
+            ->where('sholat', $sholatCode)
+            ->where(function ($q) use ($isSiswa, $personId) {
+                if ($isSiswa) {
+                    $q->where('student_id', $personId);
+                } else {
+                    $q->where('guru_id', $personId);
+                }
+            })
+            ->first();
+
+        if ($existing) {
+            $this->logRequest($apiKey, 'sholat_duplicate', $uid, false, "Sudah absen sholat {$sholatLabel}: {$name}");
+            return $this->response(
+                false,
+                'gagal',
+                "Sudah Absen!\nSholat {$sholatLabel}",
+                'error',
+                [
+                    'type'      => 'sholat_duplicate',
+                    'sholat'    => $sholatLabel,
+                    'nama'      => $name,
+                    'jam_absen' => substr($existing->jam_absen, 0, 5),
+                ]
+            );
+        }
+
+        // 4. Catat Absensi Sholat
+        $attendance = \App\Models\AbsensiSholat::create([
+            'school_id'    => $schoolId,
+            'device_id'    => $device->id,
+            'person_type'  => $personType,
+            'student_id'   => $isSiswa ? $personId : null,
+            'guru_id'      => $isSiswa ? null : $personId,
+            'tanggal'      => $today,
+            'sholat'       => $sholatCode,
+            'jam_absen'    => $now->format('H:i:s'),
+            'waktu_sholat' => $activeWindow['waktu_sholat'],
+            'status'       => $activeWindow['status'], // 'hadir' atau 'terlambat'
+            'keterangan'   => $activeWindow['is_ontime'] ? 'Tepat Waktu' : 'Terlambat/Masbuk',
+        ]);
+
+        $this->logRequest($apiKey, 'sholat_success', $uid, true, "Absen sholat {$sholatLabel} berhasil: {$name}");
+
+        $shortName = \Illuminate\Support\Str::limit($name, 16, '');
+        $msg = "{$sholatLabel} Berhasil\n{$shortName}";
+
+        return $this->response(
+            true,
+            'success',
+            $msg,
+            'ok',
+            [
+                'type'         => 'sholat_success',
+                'sholat'       => $sholatLabel,
+                'nama'         => $name,
+                'jam'          => $now->format('H:i'),
+                'waktu_sholat' => $activeWindow['waktu_sholat'],
+                'status'       => $activeWindow['status'],
+                'role'         => $personType,
+            ]
+        );
+    }
+
     private function response($ok, $status, $message, $sound = 'ok', $extra = [])
     {
         if (!$this->hasLogged) {
@@ -585,6 +717,10 @@ class RfidController extends Controller
                 case 'gate_closed':
                     $line1 = 'PULANG DITUTUP';
                     break;
+                case 'sholat_success':
+                    $sholatName = strtoupper($extra['sholat'] ?? 'SHOLAT');
+                    $line1 = "SHOLAT {$sholatName}";
+                    break;
                 default:
                     $line1 = 'BERHASIL';
                     break;
@@ -618,6 +754,12 @@ class RfidController extends Controller
                 case 'invalid_uid':
                     $line1 = 'UID TDK VALID';
                     break;
+                case 'sholat_outside_window':
+                    $line1 = 'DILUAR JAM';
+                    break;
+                case 'sholat_duplicate':
+                    $line1 = 'SUDAH ABSEN';
+                    break;
                 default:
                     $line1 = 'ABSEN GAGAL!';
                     break;
@@ -626,7 +768,12 @@ class RfidController extends Controller
 
         // Baris 2: Nama atau rincian (maks 16 karakter)
         $line2 = '';
-        if (!empty($nama)) {
+        if ($type === 'sholat_outside_window') {
+            $line2 = 'WAKTU SHOLAT';
+        } elseif ($type === 'sholat_duplicate') {
+            $sholatName = strtoupper($extra['sholat'] ?? 'SHOLAT');
+            $line2 = "SHOLAT {$sholatName}";
+        } elseif (!empty($nama)) {
             $menitTerlambat = $extra['menit_terlambat'] ?? 0;
             if ($menitTerlambat > 0) {
                 $suffix = " (+{$menitTerlambat}m)";

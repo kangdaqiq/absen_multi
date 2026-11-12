@@ -54,8 +54,9 @@
                         <tr class="bg-gray-50 text-left dark:bg-gray-800/50 text-sm">
                             <th class="py-4 px-4 font-medium text-black dark:text-white xl:pl-11" width="5%">No</th>
                             <th class="py-4 px-4 font-medium text-black dark:text-white">Nama Device</th>
+                            <th class="py-4 px-4 font-medium text-black dark:text-white">Fungsi Scanner</th>
                             <th class="py-4 px-4 font-medium text-black dark:text-white">Token (api_key)</th>
-                            <th class="py-4 px-4 font-medium text-black dark:text-white">Tipe</th>
+                            <th class="py-4 px-4 font-medium text-black dark:text-white">Tipe Hardware</th>
                             <th class="py-4 px-4 font-medium text-black dark:text-white text-center">Slot ID Sidik Jari</th>
                             <th class="py-4 px-4 font-medium text-black dark:text-white">Status</th>
                             <th class="py-4 px-4 font-medium text-black dark:text-white" width="15%">Aksi</th>
@@ -69,6 +70,17 @@
                                 </td>
                                 <td class="border-b border-gray-100 py-5 px-4 dark:border-gray-800">
                                     <p class="text-black dark:text-white font-medium">{{ $d->name }}</p>
+                                </td>
+                                <td class="border-b border-gray-100 py-5 px-4 dark:border-gray-800">
+                                    @if($d->isSholatDevice())
+                                        <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
+                                            <i class="fas fa-mosque"></i> Scanner Sholat
+                                        </span>
+                                    @else
+                                        <span class="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700 dark:bg-blue-500/15 dark:text-blue-400 border border-blue-200 dark:border-blue-800">
+                                            <i class="fas fa-school"></i> Presensi Utama
+                                        </span>
+                                    @endif
                                 </td>
                                 <td class="border-b border-gray-100 py-5 px-4 dark:border-gray-800">
                                     <code
@@ -111,7 +123,7 @@
                                     <div class="flex items-center space-x-3.5" x-data>
                                         <button
                                             class="text-orange-500 hover:text-orange-700 hover:bg-orange-50 p-2 rounded-lg transition"
-                                            @click="$dispatch('open-modal', 'modalEditDevice'); $dispatch('set-edit-device', { id: '{{ $d->id }}', name: '{{ addslashes($d->name) }}', key: '{{ $d->api_key }}', type: '{{ $d->type }}', finger_min: '{{ $d->finger_id_min ?? 1 }}', finger_max: '{{ $d->finger_id_max ?? 200 }}', active: '{{ $d->active }}' })"
+                                            @click="$dispatch('open-modal', 'modalEditDevice'); $dispatch('set-edit-device', { id: '{{ $d->id }}', name: '{{ addslashes($d->name) }}', key: '{{ $d->api_key }}', type: '{{ $d->type }}', category: '{{ $d->device_category ?? 'attendance' }}', finger_min: '{{ $d->finger_id_min ?? 1 }}', finger_max: '{{ $d->finger_id_max ?? 200 }}', active: '{{ $d->active }}' })"
                                             title="Edit">
                                             <i class="fas fa-edit"></i>
                                         </button>
@@ -170,6 +182,21 @@
                     </div>
                 </div>
 
+                <div class="mb-4.5">
+                    <label class="mb-2.5 block text-black dark:text-white">Fungsi Scanner <span class="text-meta-1">*</span></label>
+                    <div class="relative z-20 bg-transparent dark:bg-form-input">
+                        <select name="device_category" required
+                            class="relative z-20 w-full appearance-none rounded border border-stroke bg-transparent py-3 px-5 outline-none transition focus:border-brand-500 active:border-brand-500 dark:border-form-strokedark dark:bg-form-input dark:focus:border-brand-500">
+                            <option value="attendance">Presensi Utama (Masuk & Pulang Gerbang/Kelas)</option>
+                            <option value="sholat">Presensi Sholat (Khusus Musholla / Masjid)</option>
+                        </select>
+                        <span class="absolute top-1/2 right-4 z-30 -translate-y-1/2">
+                            <i class="fas fa-chevron-down text-sm"></i>
+                        </span>
+                    </div>
+                    <span class="text-xs text-gray-500 mt-1 block">Pilih "Presensi Sholat" agar kartu yang di-tap pada alat ini dicatat sebagai kehadiran sholat berdasarkan jadwal koordinat sekolah.</span>
+                </div>
+
                 <div class="grid grid-cols-2 gap-4 mb-4.5">
                     <div>
                         <label class="mb-2.5 block text-black dark:text-white">Slot ID Min (Sidik Jari)</label>
@@ -212,13 +239,14 @@
     <!-- Modal Edit -->
     <x-ui.modal id="modalEditDevice">
         <div class="p-6" x-data="{ 
-                id: '', name: '', key: '', type: 'rfid_fingerprint', finger_min: 1, finger_max: 200, active: '1',
+                id: '', name: '', key: '', type: 'rfid_fingerprint', category: 'attendance', finger_min: 1, finger_max: 200, active: '1',
                 actionUrl: ''
             }" @set-edit-device.window="
                 id = $event.detail.id;
                 name = $event.detail.name;
                 key = $event.detail.key;
                 type = $event.detail.type;
+                category = $event.detail.category || 'attendance';
                 finger_min = $event.detail.finger_min || 1;
                 finger_max = $event.detail.finger_max || 200;
                 active = $event.detail.active;
@@ -261,6 +289,21 @@
                             <i class="fas fa-chevron-down text-sm"></i>
                         </span>
                     </div>
+                </div>
+
+                <div class="mb-4.5">
+                    <label class="mb-2.5 block text-black dark:text-white">Fungsi Scanner <span class="text-meta-1">*</span></label>
+                    <div class="relative z-20 bg-transparent dark:bg-form-input">
+                        <select name="device_category" x-model="category" required
+                            class="relative z-20 w-full appearance-none rounded border border-stroke bg-transparent py-3 px-5 outline-none transition focus:border-brand-500 active:border-brand-500 dark:border-form-strokedark dark:bg-form-input dark:focus:border-brand-500">
+                            <option value="attendance">Presensi Utama (Masuk & Pulang Gerbang/Kelas)</option>
+                            <option value="sholat">Presensi Sholat (Khusus Musholla / Masjid)</option>
+                        </select>
+                        <span class="absolute top-1/2 right-4 z-30 -translate-y-1/2">
+                            <i class="fas fa-chevron-down text-sm"></i>
+                        </span>
+                    </div>
+                    <span class="text-xs text-gray-500 mt-1 block">Jika diset ke "Presensi Sholat", tap kartu di perangkat ini langsung dicatat ke Absensi Sholat.</span>
                 </div>
 
                 <div class="grid grid-cols-2 gap-4 mb-4.5">

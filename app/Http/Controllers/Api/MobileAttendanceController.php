@@ -1772,12 +1772,15 @@ class MobileAttendanceController extends Controller
         $isWalas = !empty($waliKelasIds);
 
         // Jika tidak ada kelas_id DAN tidak ada kata kunci pencarian
-        if (empty($kelasId) && !$hasSearchQuery) {
-            if ($isWalas) {
+        $hasKelasParam = $kelasId !== null && $kelasId !== '';
+        if (!$hasKelasParam && !$hasSearchQuery) {
+            if ($isWakaOrAdmin) {
+                // Waka Kurikulum & Admin: boleh tampilkan semua siswa lintas kelas
+            } elseif ($isWalas) {
                 // Untuk Walas, default ke kelas wali pertama jika belum memilih kelas
                 $kelasId = $waliKelasIds[0];
             } else {
-                // Untuk Waka Kurikulum dan Guru non-walas, default kosong (harus pilih kelas dulu)
+                // Untuk Guru non-walas, default kosong
                 return response()->json(['success' => true, 'data' => []]);
             }
         }

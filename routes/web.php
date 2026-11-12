@@ -239,6 +239,13 @@ Route::middleware('auth')->group(function () {
         Route::get('/absensi-pelajaran/dokumentasi/{guru}', [App\Http\Controllers\AbsensiPelajaranController::class, 'dokumentasiGuru'])->name('absensi-pelajaran.dokumentasi.guru');
         Route::get('/absensi-pelajaran-dokumentasi', [App\Http\Controllers\AbsensiPelajaranController::class, 'dokumentasi']);
 
+        // Absensi Sholat
+        Route::get('/absensi-sholat', [App\Http\Controllers\AbsensiSholatController::class, 'index'])->name('absensi-sholat.index');
+        Route::get('/absensi-sholat/rekap', [App\Http\Controllers\AbsensiSholatController::class, 'rekap'])->name('absensi-sholat.rekap');
+        Route::get('/absensi-sholat/export-excel', [App\Http\Controllers\AbsensiSholatController::class, 'exportExcel'])->name('absensi-sholat.export-excel');
+        Route::get('/absensi-sholat/export-pdf', [App\Http\Controllers\AbsensiSholatController::class, 'exportPdf'])->name('absensi-sholat.export-pdf');
+        Route::delete('/absensi-sholat/{id}', [App\Http\Controllers\AbsensiSholatController::class, 'destroy'])->name('absensi-sholat.destroy');
+
         // Absensi
         Route::get('/absensi', [App\Http\Controllers\AttendanceController::class, 'index'])->name('absensi.index');
         Route::get('/absensi/scanner-usb', [App\Http\Controllers\AttendanceController::class, 'scannerUsbView'])->name('absensi.scanner-usb');
@@ -263,6 +270,14 @@ Route::middleware('auth')->group(function () {
         Route::post('/student-leaves/{id}/approve', [App\Http\Controllers\StudentLeaveController::class, 'approve'])->name('student-leaves.approve');
         Route::post('/student-leaves/{id}/reject', [App\Http\Controllers\StudentLeaveController::class, 'reject'])->name('student-leaves.reject');
         Route::delete('/student-leaves/{id}', [App\Http\Controllers\StudentLeaveController::class, 'destroy'])->name('student-leaves.destroy');
+
+        // Catatan Pelanggaran Siswa
+        Route::get('/pelanggaran', [App\Http\Controllers\PelanggaranController::class, 'index'])->name('pelanggaran.index');
+        Route::post('/pelanggaran', [App\Http\Controllers\PelanggaranController::class, 'store'])->name('pelanggaran.store');
+        Route::put('/pelanggaran/{id}', [App\Http\Controllers\PelanggaranController::class, 'update'])->name('pelanggaran.update');
+        Route::delete('/pelanggaran/{id}', [App\Http\Controllers\PelanggaranController::class, 'destroy'])->name('pelanggaran.destroy');
+        Route::post('/pelanggaran/kategori', [App\Http\Controllers\PelanggaranController::class, 'storeKategori'])->name('pelanggaran.kategori.store');
+        Route::delete('/pelanggaran/kategori/{id}', [App\Http\Controllers\PelanggaranController::class, 'destroyKategori'])->name('pelanggaran.kategori.destroy');
 
         // Rekap Siswa
         Route::get('/rekap', [App\Http\Controllers\RekapController::class, 'index'])->name('rekap.index');

@@ -192,6 +192,7 @@ class MenuHelper
             if (!$isOffice && !$isPesantren) {
                 $absensiSubItems[] = ['name' => 'Absensi Siswa', 'path' => route('absensi.index', [], false)];
                 $absensiSubItems[] = ['name' => 'Absensi Mapel', 'path' => route('absensi-pelajaran.index', [], false)];
+                $absensiSubItems[] = ['name' => 'Absensi Sholat', 'path' => route('absensi-sholat.index', [], false)];
                 $absensiSubItems[] = ['name' => 'Jurnal KBM', 'path' => route('absensi-pelajaran.jurnal-kbm', [], false)];
                 // Scanner Absensi Wajah & USB hanya untuk admin
                 if ($role === 'admin') {
@@ -204,6 +205,7 @@ class MenuHelper
                     $scannerSubItems[] = ['name' => 'Scanner USB RFID', 'path' => route('absensi.scanner-usb', [], false)];
                 }
                 $absensiSubItems[] = ['name' => 'Pengajuan Izin', 'path' => route('student-leaves.index', [], false)];
+                $absensiSubItems[] = ['name' => 'Catatan Pelanggaran', 'path' => route('pelanggaran.index', [], false)];
             }
 
             // Absensi Guru / Karyawan untuk Admin & Waka Kurikulum (bukan guru biasa/walas)
@@ -217,6 +219,7 @@ class MenuHelper
                 $isDokKbmLocked = !app(\App\Services\LicenseService::class)->isDokKbmFeatureEnabled($school);
                 $rekapSubItems[] = ['name' => 'Rekap Siswa', 'path' => route('rekap.index', [], false)];
                 $rekapSubItems[] = ['name' => 'Rekap Kelas', 'path' => route('rekap-kelas.index', [], false)];
+                $rekapSubItems[] = ['name' => 'Rekap Sholat', 'path' => route('absensi-sholat.rekap', [], false)];
                 $rekapSubItems[] = ['name' => 'Rekap Absensi Mapel', 'path' => route('absensi-pelajaran.rekap', [], false)];
                 $rekapSubItems[] = [
                     'name' => 'Dokumentasi KBM',

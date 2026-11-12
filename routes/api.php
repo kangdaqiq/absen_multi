@@ -104,6 +104,59 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/mobile/mapels', [App\Http\Controllers\Api\MobileJadwalPelajaranController::class, 'getMapels']);
     Route::get('/mobile/jam-pelajaran', [App\Http\Controllers\Api\MobileJadwalPelajaranController::class, 'getJamPelajaran']);
 
+    // --- Fitur Pengajuan & Pengelolaan Izin Siswa (Apps Siswa & Guru) ---
+    Route::get('/mobile/izin/my', [App\Http\Controllers\Api\MobileStudentLeaveController::class, 'myLeaves']);
+    Route::get('/mobile/student/izin', [App\Http\Controllers\Api\MobileStudentLeaveController::class, 'myLeaves']);
+    Route::get('/mobile/siswa/izin', [App\Http\Controllers\Api\MobileStudentLeaveController::class, 'myLeaves']);
+    Route::post('/mobile/izin', [App\Http\Controllers\Api\MobileStudentLeaveController::class, 'submitStudentLeave']);
+    Route::post('/mobile/student/izin', [App\Http\Controllers\Api\MobileStudentLeaveController::class, 'submitStudentLeave']);
+    Route::post('/mobile/siswa/izin', [App\Http\Controllers\Api\MobileStudentLeaveController::class, 'submitStudentLeave']);
+
+    Route::get('/mobile/guru/izin', [App\Http\Controllers\Api\MobileStudentLeaveController::class, 'teacherIndex']);
+    Route::get('/mobile/teacher/izin', [App\Http\Controllers\Api\MobileStudentLeaveController::class, 'teacherIndex']);
+    Route::get('/mobile/guru/izin/students', [App\Http\Controllers\Api\MobileStudentLeaveController::class, 'teacherStudents']);
+    Route::get('/mobile/teacher/izin/students', [App\Http\Controllers\Api\MobileStudentLeaveController::class, 'teacherStudents']);
+    Route::post('/mobile/guru/izin', [App\Http\Controllers\Api\MobileStudentLeaveController::class, 'teacherStore']);
+    Route::post('/mobile/teacher/izin', [App\Http\Controllers\Api\MobileStudentLeaveController::class, 'teacherStore']);
+    Route::post('/mobile/guru/izin/{id}/approve', [App\Http\Controllers\Api\MobileStudentLeaveController::class, 'approve']);
+    Route::post('/mobile/teacher/izin/{id}/approve', [App\Http\Controllers\Api\MobileStudentLeaveController::class, 'approve']);
+    Route::post('/mobile/izin/{id}/approve', [App\Http\Controllers\Api\MobileStudentLeaveController::class, 'approve']);
+    Route::post('/mobile/guru/izin/{id}/reject', [App\Http\Controllers\Api\MobileStudentLeaveController::class, 'reject']);
+    Route::post('/mobile/teacher/izin/{id}/reject', [App\Http\Controllers\Api\MobileStudentLeaveController::class, 'reject']);
+    Route::post('/mobile/izin/{id}/reject', [App\Http\Controllers\Api\MobileStudentLeaveController::class, 'reject']);
+    Route::delete('/mobile/guru/izin/{id}', [App\Http\Controllers\Api\MobileStudentLeaveController::class, 'destroy']);
+    Route::delete('/mobile/teacher/izin/{id}', [App\Http\Controllers\Api\MobileStudentLeaveController::class, 'destroy']);
+
+    Route::get('/mobile/izin/{id}', [App\Http\Controllers\Api\MobileStudentLeaveController::class, 'show']);
+    Route::get('/mobile/student/izin/{id}', [App\Http\Controllers\Api\MobileStudentLeaveController::class, 'show']);
+    Route::get('/mobile/siswa/izin/{id}', [App\Http\Controllers\Api\MobileStudentLeaveController::class, 'show']);
+    Route::delete('/mobile/izin/{id}', [App\Http\Controllers\Api\MobileStudentLeaveController::class, 'destroy']);
+    Route::delete('/mobile/student/izin/{id}', [App\Http\Controllers\Api\MobileStudentLeaveController::class, 'destroy']);
+    Route::delete('/mobile/siswa/izin/{id}', [App\Http\Controllers\Api\MobileStudentLeaveController::class, 'destroy']);
+
+    // --- Fitur Catatan Pelanggaran Siswa (Apps Siswa & Guru) ---
+    Route::get('/mobile/pelanggaran/my', [App\Http\Controllers\Api\MobilePelanggaranController::class, 'myViolations']);
+    Route::get('/mobile/student/pelanggaran', [App\Http\Controllers\Api\MobilePelanggaranController::class, 'myViolations']);
+    Route::get('/mobile/siswa/pelanggaran', [App\Http\Controllers\Api\MobilePelanggaranController::class, 'myViolations']);
+    Route::get('/mobile/pelanggaran/kategori', [App\Http\Controllers\Api\MobilePelanggaranController::class, 'kategoriList']);
+
+    Route::get('/mobile/guru/pelanggaran', [App\Http\Controllers\Api\MobilePelanggaranController::class, 'teacherIndex']);
+    Route::get('/mobile/teacher/pelanggaran', [App\Http\Controllers\Api\MobilePelanggaranController::class, 'teacherIndex']);
+    Route::get('/mobile/guru/pelanggaran/kategori', [App\Http\Controllers\Api\MobilePelanggaranController::class, 'kategoriList']);
+    Route::get('/mobile/teacher/pelanggaran/kategori', [App\Http\Controllers\Api\MobilePelanggaranController::class, 'kategoriList']);
+    Route::get('/mobile/guru/pelanggaran/students', [App\Http\Controllers\Api\MobilePelanggaranController::class, 'teacherStudents']);
+    Route::get('/mobile/teacher/pelanggaran/students', [App\Http\Controllers\Api\MobilePelanggaranController::class, 'teacherStudents']);
+    Route::post('/mobile/guru/pelanggaran', [App\Http\Controllers\Api\MobilePelanggaranController::class, 'teacherStore']);
+    Route::post('/mobile/teacher/pelanggaran', [App\Http\Controllers\Api\MobilePelanggaranController::class, 'teacherStore']);
+    Route::match(['put', 'patch', 'post'], '/mobile/guru/pelanggaran/{id}', [App\Http\Controllers\Api\MobilePelanggaranController::class, 'teacherUpdate']);
+    Route::match(['put', 'patch', 'post'], '/mobile/teacher/pelanggaran/{id}', [App\Http\Controllers\Api\MobilePelanggaranController::class, 'teacherUpdate']);
+    Route::delete('/mobile/guru/pelanggaran/{id}', [App\Http\Controllers\Api\MobilePelanggaranController::class, 'destroy']);
+    Route::delete('/mobile/teacher/pelanggaran/{id}', [App\Http\Controllers\Api\MobilePelanggaranController::class, 'destroy']);
+
+    Route::get('/mobile/pelanggaran/{id}', [App\Http\Controllers\Api\MobilePelanggaranController::class, 'show']);
+    Route::get('/mobile/student/pelanggaran/{id}', [App\Http\Controllers\Api\MobilePelanggaranController::class, 'show']);
+    Route::get('/mobile/siswa/pelanggaran/{id}', [App\Http\Controllers\Api\MobilePelanggaranController::class, 'show']);
+
     Route::post('/mobile/logout', [MobileAttendanceController::class, 'logout']);
 });
 

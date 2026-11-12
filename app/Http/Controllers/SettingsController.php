@@ -28,12 +28,16 @@ class SettingsController extends Controller
             $settings = collect($settings + $globalSettings);
         } else {
             // Super admin sees global settings (school_id = 0)
+            $schoolId = 0;
             $settings = Setting::where('school_id', 0)
                 ->get()
                 ->pluck('setting_value', 'setting_key');
         }
 
-        return view('settings.index', compact('settings'));
+        $prayerService = app(\App\Services\PrayerTimeService::class);
+        $prayerSchedule = $prayerService->getTodaySchedule($schoolId);
+
+        return view('settings.index', compact('settings', 'prayerSchedule'));
     }
 
     public function update(Request $request)
@@ -118,12 +122,18 @@ class SettingsController extends Controller
             'notification_tele_siswa',
             'notification_tele_ortu',
             'geofence_enabled',
+            'prayer_enabled',
         ];
 
         foreach ($checkboxSettings as $checkbox) {
             if (!isset($data[$checkbox])) {
                 $data[$checkbox] = 'false';
             }
+        }
+
+        // Handle prayer_active_list checkbox array
+        if ($request->has('prayer_active_list')) {
+            $data['prayer_active_list'] = json_encode(array_values((array) $request->input('prayer_active_list', [])));
         }
 
         // Get and validate school_id

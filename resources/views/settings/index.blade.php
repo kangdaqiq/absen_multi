@@ -33,6 +33,11 @@
                         class="border-b-2 py-4 px-2 text-sm font-medium transition-colors flex items-center gap-1.5">
                         <i class="fas fa-map-marker-alt text-xs"></i> Lokasi & Geofence (Mobile)
                     </button>
+                    <button @click.prevent="activeTab = 'prayer'"
+                        :class="activeTab === 'prayer' ? 'border-brand-500 text-brand-500' : 'border-transparent text-gray-500 hover:text-gray-800 dark:hover:text-white'"
+                        class="border-b-2 py-4 px-2 text-sm font-medium transition-colors flex items-center gap-1.5">
+                        <i class="fas fa-mosque text-xs"></i> Waktu & Absensi Sholat
+                    </button>
                     @if(config('app.mode') === 'self_hosted' && (auth()->user()->isSuperAdmin() || auth()->user()->isAdmin()))
                     <button @click.prevent="activeTab = 'license'"
                         :class="activeTab === 'license' ? 'border-brand-500 text-brand-500' : 'border-transparent text-gray-500 hover:text-gray-800 dark:hover:text-white'"
@@ -577,6 +582,191 @@
                             </div>
                             <div class="relative w-full rounded-xl overflow-hidden border border-gray-200 dark:border-gray-800 shadow-inner bg-gray-100 dark:bg-gray-900" style="height: 420px; min-height: 420px;">
                                 <div id="geofence-map" style="height: 100%; width: 100%; min-height: 420px; z-index: 1;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab Waktu & Absensi Sholat -->
+                <div x-show="activeTab === 'prayer'" x-transition:enter="transition ease-out duration-200"
+                    x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" class="space-y-6">
+
+                    @php
+                        $rawActive = $settings['prayer_active_list'] ?? '["dhuha", "dzuhur", "ashar"]';
+                        $activePrayers = is_array($rawActive) ? $rawActive : (json_decode($rawActive, true) ?: ['dhuha', 'dzuhur', 'ashar']);
+                        $activePrayers = array_map('strtolower', $activePrayers);
+                        $prayerEnabled = ($settings['prayer_enabled'] ?? 'true') !== 'false';
+                    @endphp
+
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-gray-200 dark:border-gray-800 pb-4">
+                        <div>
+                            <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90 flex items-center gap-2">
+                                <i class="fas fa-mosque text-emerald-500"></i> Pengaturan Waktu & Absensi Sholat
+                            </h3>
+                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                Perhitungan jadwal sholat otomatis dihitung berdasar koordinat latitude & longitude sekolah menggunakan hisab astronomi standar Kementerian Agama RI.
+                            </p>
+                        </div>
+                        <div class="flex items-center gap-3 bg-gray-50 dark:bg-gray-800/60 p-2.5 rounded-xl border border-gray-200 dark:border-gray-700">
+                            <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Aktifkan Absensi Sholat</span>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" name="prayer_enabled" value="true" class="sr-only peer" {{ $prayerEnabled ? 'checked' : '' }}>
+                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-emerald-500"></div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Live Preview Jadwal Sholat Hari Ini -->
+                    @if(isset($prayerSchedule))
+                    <div class="rounded-2xl border border-emerald-200 bg-gradient-to-r from-emerald-50/70 via-teal-50/40 to-emerald-50/70 p-5 dark:border-emerald-900/40 dark:from-emerald-950/20 dark:via-gray-900 dark:to-emerald-950/20">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="flex items-center gap-2">
+                                <span class="flex h-3 w-3 relative">
+                                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                    <span class="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                                </span>
+                                <h4 class="text-sm font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-300">
+                                    Live Hisab Jadwal Sholat Hari Ini ({{ now()->translatedFormat('l, d F Y') }})
+                                </h4>
+                            </div>
+                            <span class="text-xs text-gray-500 dark:text-gray-400">
+                                Koordinat: {{ $prayerSchedule['settings']['latitude'] }}, {{ $prayerSchedule['settings']['longitude'] }} ({{ $prayerSchedule['settings']['timezone'] }})
+                            </span>
+                        </div>
+                        <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+                            @foreach([
+                                'subuh' => ['Subuh', 'fas fa-cloud-moon'],
+                                'terbit' => ['Terbit', 'fas fa-sun'],
+                                'dhuha' => ['Dhuha', 'fas fa-sun'],
+                                'dzuhur' => ['Dzuhur / Jumat', 'fas fa-cloud-sun'],
+                                'ashar' => ['Ashar', 'fas fa-cloud-sun'],
+                                'maghrib' => ['Maghrib', 'fas fa-sunset'],
+                                'isya' => ['Isya', 'fas fa-moon']
+                            ] as $key => [$label, $icon])
+                                <div class="rounded-xl bg-white dark:bg-gray-800 p-3 text-center border {{ in_array($key, $activePrayers) ? 'border-emerald-300 dark:border-emerald-700 shadow-xs' : 'border-gray-200 dark:border-gray-700 opacity-60' }}">
+                                    <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1 flex items-center justify-center gap-1.5">
+                                        <i class="{{ $icon }} text-emerald-600 dark:text-emerald-400"></i> {{ $label }}
+                                    </p>
+                                    <p class="text-lg font-bold font-mono text-gray-900 dark:text-white">
+                                        {{ $prayerSchedule[$key] ?? '--:--' }}
+                                    </p>
+                                    @if(in_array($key, $activePrayers))
+                                        <span class="inline-block mt-1 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-1.5 py-0.5 rounded">Aktif Absen</span>
+                                    @else
+                                        <span class="inline-block mt-1 text-[10px] font-medium text-gray-400 bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded">Nonaktif</span>
+                                    @endif
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                    @endif
+
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <!-- Kolom Kiri: Sholat yang Diaktifkan & Window Absen -->
+                        <div class="space-y-6">
+                            <div class="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900/50 shadow-xs">
+                                <h4 class="text-sm font-semibold text-gray-800 dark:text-white/90 mb-3 flex items-center gap-2">
+                                    <i class="fas fa-check-double text-brand-500"></i> Sholat yang Diikutsertakan Absen
+                                </h4>
+                                <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">Centang sholat yang ingin diberlakukan absensinya di sekolah:</p>
+                                <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                    @foreach([
+                                        'dhuha'   => 'Sholat Dhuha',
+                                        'dzuhur'  => 'Dzuhur / Jumat',
+                                        'ashar'   => 'Sholat Ashar',
+                                        'subuh'   => 'Sholat Subuh',
+                                        'maghrib' => 'Sholat Maghrib',
+                                        'isya'    => 'Sholat Isya',
+                                    ] as $pKey => $pTitle)
+                                        <label class="flex items-center gap-2.5 p-3 rounded-lg border border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition">
+                                            <input type="checkbox" name="prayer_active_list[]" value="{{ $pKey }}"
+                                                {{ in_array($pKey, $activePrayers) ? 'checked' : '' }}
+                                                class="rounded border-gray-300 text-brand-500 focus:ring-brand-500 dark:border-gray-700 dark:bg-gray-900">
+                                            <span class="text-sm font-medium text-gray-800 dark:text-gray-200">{{ $pTitle }}</span>
+                                        </label>
+                                    @endforeach
+                                </div>
+                            </div>
+
+                            <div class="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900/50 shadow-xs">
+                                <h4 class="text-sm font-semibold text-gray-800 dark:text-white/90 mb-3 flex items-center gap-2">
+                                    <i class="fas fa-clock text-amber-500"></i> Rentang Waktu Scanner (*Attendance Window*)
+                                </h4>
+                                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                    <div>
+                                        <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">Buka Sebelum (Menit)</label>
+                                        <input type="number" name="prayer_window_before" min="0" max="120"
+                                            value="{{ $settings['prayer_window_before'] ?? '15' }}"
+                                            class="w-full rounded-lg border border-gray-200 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                                        <span class="text-[11px] text-gray-400 mt-1 block">Contoh: 15 mnt sebelum waktu sholat</span>
+                                    </div>
+                                    <div>
+                                        <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">Tutup Setelah (Menit)</label>
+                                        <input type="number" name="prayer_window_after" min="5" max="180"
+                                            value="{{ $settings['prayer_window_after'] ?? '45' }}"
+                                            class="w-full rounded-lg border border-gray-200 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                                        <span class="text-[11px] text-gray-400 mt-1 block">Contoh: 45 mnt setelah waktu sholat</span>
+                                    </div>
+                                    <div>
+                                        <label class="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">Toleransi Tepat Waktu</label>
+                                        <input type="number" name="prayer_ontime_tolerance" min="0" max="60"
+                                            value="{{ $settings['prayer_ontime_tolerance'] ?? '15' }}"
+                                            class="w-full rounded-lg border border-gray-200 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                                        <span class="text-[11px] text-gray-400 mt-1 block">Lewat menit ini status = Terlambat</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Kolom Kanan: Pengaturan Offset & Ihtiyat -->
+                        <div class="space-y-6">
+                            <div class="rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900/50 shadow-xs">
+                                <h4 class="text-sm font-semibold text-gray-800 dark:text-white/90 mb-3 flex items-center gap-2">
+                                    <i class="fas fa-sliders-h text-purple-500"></i> Pengaturan Offset Waktu Sholat & Ihtiyat
+                                </h4>
+                                <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">
+                                    Kementerian Agama RI menggunakan standar **Ihtiyat +2 menit** sebagai pengaman hisab astronomi. Anda dapat menyesuaikan per-sholat jika terdapat selisih menit dengan jadwal lokal:
+                                </p>
+
+                                <div class="mb-4">
+                                    <label class="mb-1.5 block text-xs font-medium text-gray-700 dark:text-gray-300">Ihtiyat Global (Standar Pengaman Kemenag)</label>
+                                    <div class="flex items-center gap-2">
+                                        <input type="number" name="prayer_ihtiyat_minutes" min="0" max="10"
+                                            value="{{ $settings['prayer_ihtiyat_minutes'] ?? '2' }}"
+                                            class="w-32 rounded-lg border border-gray-200 bg-transparent px-3 py-2 text-sm outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                                        <span class="text-xs text-gray-500">Menit (otomatis ditambahkan ke seluruh waktu sholat)</span>
+                                    </div>
+                                </div>
+
+                                <div class="border-t border-gray-100 dark:border-gray-800 pt-3">
+                                    <p class="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2.5">Offset Tambahan per Sholat (Opsional, +/- Menit):</p>
+                                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                        @foreach([
+                                            'dhuha'   => 'Offset Dhuha',
+                                            'dzuhur'  => 'Offset Dzuhur',
+                                            'ashar'   => 'Offset Ashar',
+                                            'subuh'   => 'Offset Subuh',
+                                            'maghrib' => 'Offset Maghrib',
+                                            'isya'    => 'Offset Isya',
+                                        ] as $offKey => $offLabel)
+                                            <div>
+                                                <label class="mb-1 block text-[11px] font-medium text-gray-600 dark:text-gray-400">{{ $offLabel }}</label>
+                                                <input type="number" name="prayer_offset_{{ $offKey }}"
+                                                    value="{{ $settings['prayer_offset_' . $offKey] ?? '0' }}"
+                                                    class="w-full rounded-lg border border-gray-200 bg-transparent px-2.5 py-1.5 text-xs outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="rounded-xl border border-blue-200 bg-blue-50/40 p-4 dark:border-blue-900/30 dark:bg-blue-900/10">
+                                <div class="flex gap-2.5 text-blue-900 dark:text-blue-300 text-xs leading-relaxed">
+                                    <i class="fas fa-lightbulb text-blue-600 dark:text-blue-400 mt-0.5"></i>
+                                    <div>
+                                        <strong>Petunjuk Scanner Sholat:</strong> Daftarkan perangkat RFID di menu <a href="{{ route('devices.index') }}" class="underline font-semibold hover:text-brand-600">Manajemen Device</a> dengan memilih fungsi <strong>"Scanner Sholat"</strong>. Masukkan API Key perangkat tersebut pada firmware alat di musholla/masjid. Kartu yang di-tap di alat tersebut akan langsung diproses sebagai absensi sholat sesuai jadwal hisab di atas.
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>

@@ -1740,3 +1740,294 @@ Menghapus file fisik dari Cloudflare R2 / Server Storage sekaligus membersihkan 
 }
 ```
 
+
+---
+
+## 10. Pengajuan & Pengelolaan Izin Siswa (Apps Siswa & Guru)
+
+### 10.1 Daftar Pengajuan Izin Siswa (`GET /api/mobile/izin/my`)
+Mengambil riwayat pengajuan izin/sakit/dispensasi milik siswa yang sedang login.
+
+- **URL**: `/api/mobile/izin/my` *(Alias: `/api/mobile/student/izin`, `/api/mobile/siswa/izin`)*
+- **Method**: `GET`
+- **Auth**: Bearer Token (Siswa)
+- **Query Params (Optional)**:
+  - `status`: `pending` | `approved` | `rejected`
+  - `jenis`: `sakit` | `izin` | `dispensasi`
+  - `per_page`: integer (default `15`, max `50`)
+
+- **Response Success (200 OK)**:
+```json
+{
+  "success": true,
+  "message": "Daftar pengajuan izin siswa berhasil diambil.",
+  "summary": {
+    "pending": 1,
+    "approved": 2,
+    "rejected": 0,
+    "total": 3
+  },
+  "data": [
+    {
+      "id": 12,
+      "code": "IZIN-AB12CD",
+      "school_id": 1,
+      "student_id": 45,
+      "student": {
+        "id": 45,
+        "nama": "Ani Wijaya",
+        "nis": "1001",
+        "kelas_id": 3,
+        "nama_kelas": "X IPA 1"
+      },
+      "jenis": "sakit",
+      "jenis_label": "Sakit",
+      "tanggal_mulai": "2026-11-15",
+      "tanggal_selesai": "2026-11-16",
+      "durasi_hari": 2,
+      "keterangan": "Demam tinggi",
+      "bukti_foto": "surat_izin/abc.jpg",
+      "bukti_foto_url": "https://domain.com/storage/surat_izin/abc.jpg",
+      "pengaju": "siswa",
+      "nama_pengaju": "Ani Wijaya",
+      "no_wa_pengaju": "081234567890",
+      "status": "pending",
+      "approved_by": null,
+      "approver_name": null,
+      "approved_at": null,
+      "rejected_reason": null,
+      "created_at": "2026-11-12T09:00:00+00:00",
+      "updated_at": "2026-11-12T09:00:00+00:00"
+    }
+  ],
+  "pagination": {
+    "current_page": 1,
+    "last_page": 1,
+    "per_page": 15,
+    "total": 1
+  }
+}
+```
+
+---
+
+### 10.2 Ajukan Izin Baru oleh Siswa (`POST /api/mobile/izin`)
+Mengirim pengajuan izin baru dari akun siswa (mendukung `multipart/form-data` untuk lampiran surat/foto). Otomatis mengirim notifikasi WhatsApp & Push Notification (FCM) ke Wali Kelas.
+
+- **URL**: `/api/mobile/izin` *(Alias: `/api/mobile/student/izin`, `/api/mobile/siswa/izin`)*
+- **Method**: `POST`
+- **Auth**: Bearer Token (Siswa)
+- **Body (`multipart/form-data` atau JSON)**:
+  - `jenis` (string, required): `sakit` | `izin` | `dispensasi`
+  - `tanggal_mulai` (date, required): Format `YYYY-MM-DD`
+  - `tanggal_selesai` (date, required): Format `YYYY-MM-DD` (>= `tanggal_mulai`)
+  - `keterangan` (string, required, max 1000)
+  - `bukti_foto` (file, optional): `jpeg, png, jpg, pdf`, max `5120` KB (5 MB). Alias field: `foto`.
+  - `pengaju` (string, optional): `siswa` | `ortu` (default: `siswa`)
+  - `nama_pengaju` (string, optional): Default nama siswa
+  - `no_wa_pengaju` (string, optional): Default `wa_ortu` / `no_wa` siswa
+
+- **Response Success (201 Created)**: Mengembalikan objek `data` pengajuan izin berstatus `pending`.
+- **Response Error (422 Unprocessable Entity)**: Validasi gagal atau terdapat pengajuan `pending`/`approved` yang tanggalnya bertumpukan.
+
+---
+
+### 10.3 Detail & Pembatalan Pengajuan Izin (`GET /api/mobile/izin/{id}` & `DELETE /api/mobile/izin/{id}`)
+- `GET /api/mobile/izin/{id}` *(Alias: `/api/mobile/student/izin/{id}`, `/api/mobile/siswa/izin/{id}`)*: Melihat detail satu pengajuan izin (dapat diakses siswa pemilik atau guru/admin yang berwenang).
+- `DELETE /api/mobile/izin/{id}` *(Alias: `/api/mobile/student/izin/{id}`, `/api/mobile/siswa/izin/{id}`)*: Siswa dapat membatalkan pengajuan miliknya selama status masih `pending`. Guru/Admin yang berwenang dapat menghapus data pengajuan.
+
+---
+
+### 10.4 Daftar Pengajuan Izin untuk Akun Guru / Wali Kelas (`GET /api/mobile/guru/izin`)
+Mengambil daftar pengajuan izin siswa pada kelas yang dikelola oleh wali kelas (atau seluruh sekolah untuk Admin / Waka Kurikulum).
+
+- **URL**: `/api/mobile/guru/izin` *(Alias: `/api/mobile/teacher/izin`)*
+- **Method**: `GET`
+- **Auth**: Bearer Token (Guru / Wali Kelas / Waka Kurikulum / Admin)
+- **Query Params (Optional)**:
+  - `status`: `pending` | `approved` | `rejected`
+  - `kelas_id`: integer
+  - `jenis`: `sakit` | `izin` | `dispensasi`
+  - `tanggal_mulai`: `YYYY-MM-DD`
+  - `tanggal_selesai`: `YYYY-MM-DD`
+  - `search`: kata kunci kode izin, nama/NIS siswa, nama pengaju, atau keterangan
+  - `per_page`: integer (default `15`, max `50`)
+
+- **Response Success (200 OK)**:
+```json
+{
+  "success": true,
+  "message": "Daftar pengajuan izin siswa berhasil diambil.",
+  "can_manage": true,
+  "is_full_school": false,
+  "summary": {
+    "total_pending": 2,
+    "total_approved": 5,
+    "total_rejected": 1,
+    "total_today": 1
+  },
+  "managed_kelases": [
+    {
+      "id": 3,
+      "nama_kelas": "X IPA 1",
+      "tingkat": "10"
+    }
+  ],
+  "data": [ ... ],
+  "pagination": {
+    "current_page": 1,
+    "last_page": 1,
+    "per_page": 15,
+    "total": 2
+  }
+}
+```
+
+---
+
+### 10.5 Daftar Siswa Kelas Binaan Guru (`GET /api/mobile/guru/izin/students`)
+Mengambil daftar siswa pada kelas yang dikelola guru untuk kebutuhan input izin manual oleh guru.
+
+- **URL**: `/api/mobile/guru/izin/students` *(Alias: `/api/mobile/teacher/izin/students`)*
+- **Method**: `GET`
+- **Auth**: Bearer Token (Guru / Wali Kelas / Admin)
+- **Query Params (Optional)**: `kelas_id`, `search`
+
+---
+
+### 10.6 Input Izin Manual oleh Guru (`POST /api/mobile/guru/izin`)
+Guru / wali kelas mencatat izin siswa secara langsung. Status otomatis `approved` dan langsung disinkronkan ke tabel `attendance` (`S` untuk sakit, `I` untuk izin/dispensasi).
+
+- **URL**: `/api/mobile/guru/izin` *(Alias: `/api/mobile/teacher/izin`)*
+- **Method**: `POST`
+- **Auth**: Bearer Token (Guru / Wali Kelas / Admin)
+- **Body**:
+  - `student_id` (integer, required)
+  - `jenis` (string, required): `sakit` | `izin` | `dispensasi`
+  - `tanggal_mulai` (date, required): `YYYY-MM-DD`
+  - `tanggal_selesai` (date, required): `YYYY-MM-DD`
+  - `keterangan` (string, required, max 1000)
+  - `bukti_foto` / `foto` (file, optional): `jpeg, png, jpg, pdf`, max 5 MB
+
+---
+
+### 10.7 Setujui Pengajuan Izin (`POST /api/mobile/guru/izin/{id}/approve`)
+Menyetujui pengajuan izin berstatus `pending`, menyinkronkan status `S`/`I` ke tabel `attendance` pada seluruh rentang tanggal izin, serta mengirim notifikasi WhatsApp & FCM ke siswa/orang tua.
+
+- **URL**: `/api/mobile/guru/izin/{id}/approve` *(Alias: `/api/mobile/teacher/izin/{id}/approve`, `/api/mobile/izin/{id}/approve`)*
+- **Method**: `POST`
+- **Auth**: Bearer Token (Guru / Wali Kelas / Admin)
+
+---
+
+### 10.8 Tolak Pengajuan Izin (`POST /api/mobile/guru/izin/{id}/reject`)
+Menolak pengajuan izin berstatus `pending` dengan alasan penolakan, serta mengirim notifikasi WhatsApp & FCM ke siswa/orang tua.
+
+- **URL**: `/api/mobile/guru/izin/{id}/reject` *(Alias: `/api/mobile/teacher/izin/{id}/reject`, `/api/mobile/izin/{id}/reject`)*
+- **Method**: `POST`
+- **Auth**: Bearer Token (Guru / Wali Kelas / Admin)
+- **Body**:
+  - `rejected_reason` (string, required, max 500): Alasan penolakan
+
+---
+
+### 10.9 Hapus Pengajuan Izin oleh Guru (`DELETE /api/mobile/guru/izin/{id}`)
+Menghapus data pengajuan izin beserta lampiran fotonya (jika ada).
+
+- **URL**: `/api/mobile/guru/izin/{id}` *(Alias: `/api/mobile/teacher/izin/{id}`)*
+- **Method**: `DELETE`
+- **Auth**: Bearer Token (Guru / Wali Kelas / Admin)
+
+---
+
+## 11. Catatan Pelanggaran Siswa (Apps Siswa & Guru)
+
+### 11.1 Daftar Catatan Pelanggaran Siswa (`GET /api/mobile/pelanggaran/my`)
+Mengambil daftar catatan pelanggaran dan total poin milik siswa yang sedang login.
+
+- **URL**: `/api/mobile/pelanggaran/my` *(Alias: `/api/mobile/student/pelanggaran`, `/api/mobile/siswa/pelanggaran`)*
+- **Method**: `GET`
+- **Auth**: Bearer Token (Siswa)
+- **Query Params (Optional)**:
+  - `kategori`: `ringan` | `sedang` | `berat`
+  - `status`: `tercatat` | `diproses` | `selesai`
+  - `per_page`: integer (default `15`, max `50`)
+
+- **Response Success (200 OK)**:
+```json
+{
+  "success": true,
+  "message": "Daftar catatan pelanggaran siswa berhasil diambil.",
+  "summary": {
+    "total_kasus": 2,
+    "total_poin": 15,
+    "ringan": 1,
+    "sedang": 1,
+    "berat": 0,
+    "tercatat": 1,
+    "diproses": 1,
+    "selesai": 0
+  },
+  "data": [ ... ],
+  "pagination": {
+    "current_page": 1,
+    "last_page": 1,
+    "per_page": 15,
+    "total": 2
+  }
+}
+```
+
+---
+
+### 11.2 Daftar Master Kategori Pelanggaran (`GET /api/mobile/guru/pelanggaran/kategori`)
+Mengambil daftar master kategori/jenis pelanggaran aktif di sekolah (untuk dropdown saat mencatat pelanggaran).
+
+- **URL**: `/api/mobile/guru/pelanggaran/kategori` *(Alias: `/api/mobile/teacher/pelanggaran/kategori`, `/api/mobile/pelanggaran/kategori`)*
+- **Method**: `GET`
+- **Auth**: Bearer Token
+
+---
+
+### 11.3 Daftar Pelanggaran untuk Akun Guru (`GET /api/mobile/guru/pelanggaran`)
+Mengambil daftar catatan pelanggaran siswa (wali kelas: kelas binaan + catatan yang dibuatnya; admin/waka: seluruh sekolah).
+
+- **URL**: `/api/mobile/guru/pelanggaran` *(Alias: `/api/mobile/teacher/pelanggaran`)*
+- **Method**: `GET`
+- **Auth**: Bearer Token (Guru / Wali Kelas / Admin)
+- **Query Params (Optional)**: `kelas_id`, `student_id`, `kategori`, `status`, `tanggal_mulai`, `tanggal_selesai`, `search`, `per_page`
+
+---
+
+### 11.4 Catat Pelanggaran Siswa oleh Guru (`POST /api/mobile/guru/pelanggaran`)
+Mencatat pelanggaran siswa baru dan mengirim notifikasi FCM ke akun siswa.
+
+- **URL**: `/api/mobile/guru/pelanggaran` *(Alias: `/api/mobile/teacher/pelanggaran`)*
+- **Method**: `POST`
+- **Auth**: Bearer Token (Guru / Wali Kelas / Admin)
+- **Body**:
+  - `student_id` (integer, required)
+  - `kategori_pelanggaran_id` (integer, optional): Jika diisi, `judul_pelanggaran`, `kategori`, `poin`, dan `tindak_lanjut` otomatis terisi dari master jika tidak di-override.
+  - `judul_pelanggaran` (string, required jika `kategori_pelanggaran_id` kosong)
+  - `kategori` (string, required jika `kategori_pelanggaran_id` kosong): `ringan` | `sedang` | `berat`
+  - `poin` (integer, optional, default `5`)
+  - `tanggal` (date, optional, default hari ini `YYYY-MM-DD`)
+  - `waktu` (string, optional, default jam saat ini `HH:MM`)
+  - `keterangan` (string, optional)
+  - `tindak_lanjut` (string, optional)
+  - `status` (string, optional): `tercatat` | `diproses` | `selesai` (default `tercatat`)
+  - `bukti_foto` / `foto` (file, optional): `jpeg, png, jpg, pdf`, max 5 MB
+
+---
+
+### 11.5 Update Status & Tindak Lanjut (`PUT/PATCH/POST /api/mobile/guru/pelanggaran/{id}`)
+Memperbarui `status` (`tercatat`, `diproses`, `selesai`), `tindak_lanjut`, atau `keterangan` catatan pelanggaran.
+
+- **URL**: `/api/mobile/guru/pelanggaran/{id}` *(Alias: `/api/mobile/teacher/pelanggaran/{id}`)*
+- **Auth**: Bearer Token (Guru pencatat / Wali Kelas / Admin)
+
+---
+
+### 11.6 Detail & Hapus Catatan Pelanggaran
+- `GET /api/mobile/pelanggaran/{id}` *(Alias: `/api/mobile/student/pelanggaran/{id}`, `/api/mobile/siswa/pelanggaran/{id}`)*: Melihat detail catatan pelanggaran.
+- `DELETE /api/mobile/guru/pelanggaran/{id}` *(Alias: `/api/mobile/teacher/pelanggaran/{id}`)*: Menghapus catatan pelanggaran beserta file buktinya.

@@ -24,12 +24,29 @@ class Device extends Model
         'name',
         'api_key',
         'type',
+        'device_category',
         'finger_id_min',
         'finger_id_max',
         'active',
         'created_at',
         'school_id'
     ];
+
+    /**
+     * Cek apakah perangkat difungsikan khusus untuk Absensi Sholat (di Musholla/Masjid)
+     */
+    public function isSholatDevice(): bool
+    {
+        return ($this->device_category ?? 'attendance') === 'sholat';
+    }
+
+    /**
+     * Cek apakah perangkat difungsikan untuk Absensi Harian Utama (Masuk/Pulang)
+     */
+    public function isAttendanceDevice(): bool
+    {
+        return ($this->device_category ?? 'attendance') === 'attendance';
+    }
 
     protected $casts = [
         'active' => 'boolean',

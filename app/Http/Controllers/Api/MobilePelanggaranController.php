@@ -255,7 +255,9 @@ class MobilePelanggaranController extends Controller
             });
         }
 
-        $students = $query->orderBy('nama')->limit(100)->get(['id', 'nama', 'nis', 'kelas_id']);
+        $students = $query->orderBy('nama')
+            ->when($request->filled('limit'), fn($q) => $q->limit(max(1, (int) $request->limit)))
+            ->get(['id', 'nama', 'nis', 'kelas_id']);
 
         return response()->json([
             'success' => true,

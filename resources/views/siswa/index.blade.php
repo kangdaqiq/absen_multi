@@ -212,6 +212,13 @@
                                     </span>
                                 @endif
                                 
+                                <!-- Reset Password ke Tgl Lahir -->
+                                <button type="button" class="btnResetPassword text-amber-600 hover:text-amber-800 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-900/20 p-2 rounded-lg transition" 
+                                    data-id="{{ $s->id }}" data-nama="{{ $s->nama }}" data-tgl="{{ $s->tgl_lahir ? \Carbon\Carbon::parse($s->tgl_lahir)->format('d/m/Y') : '' }}"
+                                    title="Reset Password Akun ke Default (Tgl Lahir / NIS)">
+                                    <i class="fas fa-key"></i>
+                                </button>
+                                
                                 <!-- Edit -->
                                 <button class="btnEdit text-orange-500 hover:text-orange-700 hover:bg-orange-50 p-2 rounded-lg transition" 
                                     data-id="{{ $s->id }}" data-nama="{{ $s->nama }}" data-nis="{{ $s->nis }}" data-tgl_lahir="{{ $s->tgl_lahir }}"
@@ -1417,6 +1424,41 @@
                 }, function (res) {
                     if (res.ok || res.success) {
                         alert('Face ID siswa ' + nama + ' berhasil dihapus.');
+                        location.reload();
+                    } else {
+                        alert('Gagal: ' + (res.message || 'Terjadi kesalahan'));
+                        $btn.prop('disabled', false).removeClass('opacity-50');
+                    }
+                }).fail(function (xhr) {
+                    var msg = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : 'Gagal menghubungi server.';
+                    alert(msg);
+                    $btn.prop('disabled', false).removeClass('opacity-50');
+                });
+            });
+
+            // Reset Password Siswa ke default tanggal lahir handler
+            $(document).on('click', '.btnResetPassword', function () {
+                var id = $(this).data('id');
+                var nama = $(this).data('nama');
+                var tgl = $(this).data('tgl');
+                if (!id) return;
+
+                var promptText = 'Reset password akun siswa "' + nama + '" ke default?\n\n' +
+                    (tgl ? 'Password default baru adalah tanggal lahir: ' + tgl + ' (format ddmmyyyy).' : 'Siswa belum memiliki data tanggal lahir, password default akan menggunakan NIS.') +
+                    '\n\nSetelah direset, password lama siswa tidak akan berlaku lagi.';
+
+                if (!confirm(promptText)) {
+                    return;
+                }
+
+                var $btn = $(this);
+                $btn.prop('disabled', true).addClass('opacity-50');
+
+                $.post('{{ url('siswa') }}/' + id + '/reset-password', {
+                    _token: '{{ csrf_token() }}'
+                }, function (res) {
+                    if (res.ok || res.success) {
+                        alert(res.message || ('Password siswa ' + nama + ' berhasil di-reset.'));
                         location.reload();
                     } else {
                         alert('Gagal: ' + (res.message || 'Terjadi kesalahan'));

@@ -187,6 +187,7 @@ Route::middleware('auth')->group(function () {
         Route::put('siswa/bulk-update-kelas', [SiswaController::class, 'bulkUpdateKelas'])->name('siswa.bulk-update-kelas');
         Route::match(['post', 'delete'], 'siswa/{id}/delete-face', [SiswaController::class, 'deleteFaceId'])->name('siswa.delete-face');
         Route::match(['post', 'delete'], 'siswa/{id}/delete-photo', [SiswaController::class, 'deletePhoto'])->name('siswa.delete-photo');
+        Route::post('siswa/{id}/reset-password', [SiswaController::class, 'resetPasswordToBirthdate'])->name('siswa.reset-password');
         Route::resource('siswa', SiswaController::class)->except(['create', 'show', 'edit']);
     });
 
@@ -273,6 +274,9 @@ Route::middleware('auth')->group(function () {
 
         // Catatan Pelanggaran Siswa
         Route::get('/pelanggaran', [App\Http\Controllers\PelanggaranController::class, 'index'])->name('pelanggaran.index');
+        Route::get('/pelanggaran/rekap', [App\Http\Controllers\PelanggaranController::class, 'rekap'])->name('pelanggaran.rekap');
+        Route::get('/pelanggaran/export-excel', [App\Http\Controllers\PelanggaranController::class, 'exportExcel'])->name('pelanggaran.export-excel');
+        Route::get('/pelanggaran/export-pdf', [App\Http\Controllers\PelanggaranController::class, 'exportPdf'])->name('pelanggaran.export-pdf');
         Route::post('/pelanggaran', [App\Http\Controllers\PelanggaranController::class, 'store'])->name('pelanggaran.store');
         Route::put('/pelanggaran/{id}', [App\Http\Controllers\PelanggaranController::class, 'update'])->name('pelanggaran.update');
         Route::delete('/pelanggaran/{id}', [App\Http\Controllers\PelanggaranController::class, 'destroy'])->name('pelanggaran.destroy');

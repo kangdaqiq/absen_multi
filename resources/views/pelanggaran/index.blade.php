@@ -10,6 +10,11 @@
         subtitle="Catat, pantau poin pelanggaran, dan kelola tindak lanjut kedisiplinan siswa"
         icon="fas fa-exclamation-triangle">
         <div class="flex flex-wrap items-center gap-3">
+            <a href="{{ route('pelanggaran.rekap') }}"
+               class="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800 transition shadow-theme-xs">
+                <i class="fas fa-file-invoice text-emerald-500"></i> Rekap Pelanggaran
+            </a>
+
             <button type="button" @click="openKategoriModal = true"
                     class="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800 transition shadow-theme-xs">
                 <i class="fas fa-list-ul text-brand-500"></i> Kategori Pelanggaran

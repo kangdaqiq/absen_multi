@@ -149,6 +149,7 @@ class PelanggaranFeatureTest extends TestCase
             $table->unsignedBigInteger('kelas_id')->nullable();
             $table->string('nama');
             $table->string('nis')->nullable();
+            $table->date('tgl_lahir')->nullable();
             $table->string('no_wa')->nullable();
             $table->string('wa_ortu')->nullable();
             $table->string('fcm_token')->nullable();
@@ -197,6 +198,14 @@ class PelanggaranFeatureTest extends TestCase
             $table->string('ip_address')->nullable();
             $table->string('user_agent')->nullable();
             $table->timestamp('created_at')->nullable();
+        });
+
+        Schema::create('announcements', function (Blueprint $table) {
+            $table->id();
+            $table->string('title');
+            $table->text('message')->nullable();
+            $table->boolean('is_active')->default(true);
+            $table->timestamps();
         });
     }
 
@@ -311,5 +320,50 @@ class PelanggaranFeatureTest extends TestCase
         $this->assertNotNull($kat);
         $this->delete("/pelanggaran/kategori/{$kat->id}")->assertRedirect();
         $this->assertDatabaseMissing('kategori_pelanggarans', ['id' => $kat->id]);
+    }
+
+    public function test_web_controller_can_view_rekap_and_export(): void
+    {
+        $this->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class);
+        $this->actingAs($this->teacherUser);
+
+        Pelanggaran::create([
+            'school_id' => $this->school->id,
+            'student_id' => $this->student->id,
+            'code' => 'PLG-REKAP1',
+            'tanggal' => now()->format('Y-m-d'),
+            'judul_pelanggaran' => 'Terlambat upacara',
+            'kategori' => 'ringan',
+            'poin' => 5,
+            'status' => 'tercatat',
+        ]);
+
+        $this->get('/pelanggaran/rekap')
+            ->assertStatus(200)
+            ->assertSee('Rekapitulasi Pelanggaran Siswa')
+            ->assertSee('Terlambat upacara');
+
+        $this->get('/pelanggaran/export-excel')
+            ->assertStatus(200);
+
+        $this->get('/pelanggaran/export-pdf')
+            ->assertStatus(200);
+    }
+
+    public function test_reset_password_siswa_to_birthdate(): void
+    {
+        $this->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class);
+        $this->actingAs($this->teacherUser);
+
+        $this->student->update(['tgl_lahir' => '2008-05-15']);
+        $this->studentUser->update(['password_hash' => Hash::make('CustomPass123')]);
+
+        $resp = $this->postJson("/siswa/{$this->student->id}/reset-password");
+        $resp->assertStatus(200)
+            ->assertJsonPath('success', true);
+
+        // Password hash now matches 15052008
+        $this->studentUser->refresh();
+        $this->assertTrue(Hash::check('15052008', $this->studentUser->password_hash));
     }
 }

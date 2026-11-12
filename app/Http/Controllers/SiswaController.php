@@ -1154,6 +1154,94 @@ class SiswaController extends Controller
         return redirect()->back()->with('success', "Foto profil siswa {$siswa->nama} berhasil dihapus.");
     }
 
+    /**
+     * Reset password siswa ke default tanggal lahir (format: ddmmyyyy).
+     * Jika siswa belum memiliki data tanggal lahir, password di-reset ke NIS siswa.
+     */
+    public function resetPasswordToBirthdate($id)
+    {
+        $siswa = Siswa::findOrFail($id);
+        $this->authorizeStudentAccess($siswa);
+
+        $defaultPassword = null;
+        $labelDefault = '';
+
+        if (!empty($siswa->tgl_lahir)) {
+            try {
+                $defaultPassword = \Carbon\Carbon::parse($siswa->tgl_lahir)->format('dmY');
+                $labelDefault = "tanggal lahir (" . \Carbon\Carbon::parse($siswa->tgl_lahir)->format('d/m/Y') . ")";
+            } catch (\Throwable $e) {
+                $defaultPassword = null;
+            }
+        }
+
+        if (empty($defaultPassword)) {
+            $defaultPassword = (string)($siswa->nis ?? '12345678');
+            $labelDefault = "NIS (" . $defaultPassword . ")";
+        }
+
+        $user = null;
+        if ($siswa->user_id) {
+            $user = \App\Models\User::find($siswa->user_id);
+        }
+
+        if (!$user && in_array($siswa->nis, [null, '']) === false) {
+            $user = \App\Models\User::where('username', 'siswa_' . $siswa->nis)
+                ->orWhere('username', $siswa->nis)
+                ->first();
+        }
+
+        if ($user) {
+            $user->update([
+                'password_hash'  => \Illuminate\Support\Facades\Hash::make($defaultPassword),
+                'plain_password' => null,
+            ]);
+
+            if (\Illuminate\Support\Facades\Schema::hasColumn('siswa', 'user_id') && (int)$siswa->user_id !== (int)$user->id) {
+                $siswa->user_id = $user->id;
+                $siswa->save();
+            }
+        } else {
+            $user = \App\Models\User::create([
+                'full_name'     => $siswa->nama,
+                'username'      => 'siswa_' . ($siswa->nis ?? $siswa->id),
+                'email'         => ($siswa->nis ?? $siswa->id) . '@siswa.local',
+                'password_hash' => \Illuminate\Support\Facades\Hash::make($defaultPassword),
+                'role'          => 'student',
+                'school_id'     => $siswa->school_id,
+            ]);
+
+            if (\Illuminate\Support\Facades\Schema::hasColumn('siswa', 'user_id')) {
+                $siswa->user_id = $user->id;
+                $siswa->save();
+            }
+        }
+
+        ApiLog::create([
+            'school_id'  => $siswa->school_id,
+            'api_key'    => 'WEB_ADMIN',
+            'action'     => 'reset_password_siswa_tgl_lahir',
+            'uid'        => $siswa->nis,
+            'success'    => true,
+            'message'    => "Reset password siswa: {$siswa->nama} (NIS: {$siswa->nis}) ke default {$labelDefault} oleh " . (auth()->user()->full_name ?? auth()->user()->username),
+            'ip_address' => request()->ip(),
+            'user_agent' => request()->userAgent() ?? 'Web Dashboard',
+            'created_at' => now(),
+        ]);
+
+        $successMsg = "Password akun siswa {$siswa->nama} berhasil di-reset ke default {$labelDefault}.";
+
+        if (request()->ajax() || request()->wantsJson()) {
+            return response()->json([
+                'ok'      => true,
+                'success' => true,
+                'message' => $successMsg,
+            ]);
+        }
+
+        return redirect()->back()->with('success', $successMsg);
+    }
+
     public function bulkDestroy(Request $request)
     {
         $request->validate([

@@ -221,6 +221,7 @@ class MenuHelper
                 $rekapSubItems[] = ['name' => 'Rekap Kelas', 'path' => route('rekap-kelas.index', [], false)];
                 $rekapSubItems[] = ['name' => 'Rekap Sholat', 'path' => route('absensi-sholat.rekap', [], false)];
                 $rekapSubItems[] = ['name' => 'Rekap Absensi Mapel', 'path' => route('absensi-pelajaran.rekap', [], false)];
+                $rekapSubItems[] = ['name' => 'Rekap Pelanggaran', 'path' => route('pelanggaran.rekap', [], false)];
                 $rekapSubItems[] = [
                     'name' => 'Dokumentasi KBM',
                     'path' => route('absensi-pelajaran.dokumentasi', [], false),

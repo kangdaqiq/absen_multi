@@ -51,7 +51,7 @@ class PelanggaranFeatureTest extends TestCase
             'username' => 'guru_budi',
             'email' => 'budi@school.test',
             'password_hash' => Hash::make('password'),
-            'role' => 'guru',
+            'role' => 'admin',
             'school_id' => $this->school->id,
         ]);
 
@@ -324,21 +324,22 @@ class PelanggaranFeatureTest extends TestCase
 
     public function test_web_controller_can_view_rekap_and_export(): void
     {
+        $this->withoutExceptionHandling();
         $this->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class);
         $this->actingAs($this->teacherUser);
 
-        Pelanggaran::create([
+        $p = Pelanggaran::create([
             'school_id' => $this->school->id,
             'student_id' => $this->student->id,
             'code' => 'PLG-REKAP1',
-            'tanggal' => now()->format('Y-m-d'),
+            'tanggal' => '2026-11-12',
             'judul_pelanggaran' => 'Terlambat upacara',
             'kategori' => 'ringan',
             'poin' => 5,
             'status' => 'tercatat',
         ]);
 
-        $this->get('/pelanggaran/rekap')
+        $this->get('/pelanggaran/rekap?start_date=2026-11-01&end_date=2026-11-30')
             ->assertStatus(200)
             ->assertSee('Rekapitulasi Pelanggaran Siswa')
             ->assertSee('Terlambat upacara');

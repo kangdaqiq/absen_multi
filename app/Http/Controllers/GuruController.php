@@ -347,7 +347,12 @@ class GuruController extends Controller
                         imagedestroy($src);
                         imagedestroy($dst);
 
-                        return $dbValue;
+                        try {
+                            $schoolId = auth()->user()?->school_id;
+                            return app(\App\Services\R2StorageService::class)->uploadWithFallback($destinationPath, $schoolId, 'guru');
+                        } catch (\Throwable $e) {
+                            return $dbValue;
+                        }
                     }
                 }
             } catch (\Throwable $e) {
@@ -355,7 +360,12 @@ class GuruController extends Controller
             }
         }
 
-        return $file->store('guru', 'public');
+        try {
+            $schoolId = auth()->user()?->school_id;
+            return app(\App\Services\R2StorageService::class)->uploadWithFallback($file, $schoolId, 'guru');
+        } catch (\Throwable $e) {
+            return $file->store('guru', 'public');
+        }
     }
 
     /**

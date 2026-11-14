@@ -279,14 +279,27 @@ class R2StorageService
 
         // 2. Tentukan struktur path di bucket R2
         $folderPrefix = $customFolder ?: match ($category) {
-            'kbm'        => 'kbm/' . ($schoolId ? "sch_{$schoolId}" : ($licenseId ? "lic_{$licenseId}" : 'general')) . '/' . date('Y/m'),
-            'face'       => 'faces/' . ($schoolId ? "sch_{$schoolId}" : ($licenseId ? "lic_{$licenseId}" : 'general')),
-            'siswa'      => 'siswa/' . ($schoolId ? "sch_{$schoolId}" : ($licenseId ? "lic_{$licenseId}" : 'general')),
-            'guru'       => 'guru/' . ($schoolId ? "sch_{$schoolId}" : ($licenseId ? "lic_{$licenseId}" : 'general')),
-            'attendance' => 'attendance/' . ($schoolId ? "sch_{$schoolId}" : ($licenseId ? "lic_{$licenseId}" : 'general')) . '/' . date('Y/m'),
-            'logo'       => 'schools/logos',
-            default      => 'uploads/' . date('Y/m'),
+            'kbm'           => 'kbm/' . ($schoolId ? "sch_{$schoolId}" : ($licenseId ? "lic_{$licenseId}" : 'general')) . '/' . date('Y/m'),
+            'face'          => 'faces/' . ($schoolId ? "sch_{$schoolId}" : ($licenseId ? "lic_{$licenseId}" : 'general')),
+            'siswa'         => 'siswa/' . ($schoolId ? "sch_{$schoolId}" : ($licenseId ? "lic_{$licenseId}" : 'general')),
+            'guru'          => 'guru/' . ($schoolId ? "sch_{$schoolId}" : ($licenseId ? "lic_{$licenseId}" : 'general')),
+            'attendance'    => 'attendance/' . ($schoolId ? "sch_{$schoolId}" : ($licenseId ? "lic_{$licenseId}" : 'general')) . '/' . date('Y/m'),
+            'pelanggaran'   => 'pelanggaran/' . ($schoolId ? "sch_{$schoolId}" : 'general') . '/' . date('Y/m'),
+            'penanganan_bk' => 'penanganan_bk/' . ($schoolId ? "sch_{$schoolId}" : 'general') . '/' . date('Y/m'),
+            'surat_izin'    => 'surat_izin/' . ($schoolId ? "sch_{$schoolId}" : 'general') . '/' . date('Y/m'),
+            'leaves'        => 'surat_izin/' . ($schoolId ? "sch_{$schoolId}" : 'general') . '/' . date('Y/m'),
+            'logo'          => 'schools/logos',
+            default         => 'uploads/' . date('Y/m'),
         };
+
+        // Otomatis kompresi foto kamera HP sebelum upload ke Cloudflare R2
+        $isTempFile = false;
+        if (str_starts_with($mimeType, 'image/')) {
+            [$realPath, $size, $mimeType, $isTempFile] = $this->compressImageIfNeeded($realPath, $mimeType);
+            if ($isTempFile) {
+                $extension = 'jpg';
+            }
+        }
 
         $uniqueName = Str::random(24) . '_' . time() . '.' . $extension;
         $cloudPath = trim($folderPrefix, '/') . '/' . $uniqueName;
@@ -300,6 +313,11 @@ class R2StorageService
         ]);
         if (is_resource($stream)) {
             fclose($stream);
+        }
+
+        // Hapus file temporary kompresi jika ada
+        if ($isTempFile && file_exists($realPath)) {
+            @unlink($realPath);
         }
 
         if (!$uploaded) {
@@ -493,6 +511,52 @@ class R2StorageService
     }
 
     /**
+     * Upload file ke Cloudflare R2 dengan fallback otomatis ke storage lokal jika R2 offline/gagal
+     */
+    public function uploadWithFallback(
+        UploadedFile|string $file,
+        School|int|null $school = null,
+        string $category = 'pelanggaran',
+        ?string $customFolder = null,
+        ?int $uploaderId = null
+    ): string {
+        try {
+            $uploaded = $this->uploadFile($file, $school, $category, $customFolder, $uploaderId);
+            return $uploaded['url'];
+        } catch (\Throwable $e) {
+            Log::warning("[R2StorageService] R2 upload failed, falling back to local public storage: " . $e->getMessage());
+            if ($file instanceof UploadedFile) {
+                return $file->store($category, 'public');
+            }
+            return Storage::disk('public')->putFile($category, $file);
+        }
+    }
+
+    /**
+     * Hapus berkas dengan aman (baik yang tersimpan di Cloudflare R2 maupun lokal disk)
+     */
+    public function safeDelete(?string $pathOrUrl, string $defaultDisk = 'public'): bool
+    {
+        if (empty($pathOrUrl)) {
+            return false;
+        }
+
+        if (str_starts_with($pathOrUrl, 'http')) {
+            return $this->deleteFileByUrl($pathOrUrl);
+        }
+
+        try {
+            if (Storage::disk($defaultDisk)->exists($pathOrUrl)) {
+                return Storage::disk($defaultDisk)->delete($pathOrUrl);
+            }
+        } catch (\Throwable $e) {
+            Log::warning("[R2StorageService] Failed to delete local file: " . $e->getMessage());
+        }
+
+        return false;
+    }
+
+    /**
      * Ambil statistik agregat untuk Super Admin Dashboard
      */
     public function getGlobalStats(): array
@@ -555,5 +619,91 @@ class R2StorageService
         $value = $bytes / pow(1024, $power);
 
         return round($value, $precision) . ' ' . $units[$power];
+    }
+
+    /**
+     * Kompresi gambar kamera HP (Full HD max 1600px, 82% quality, auto-orient EXIF).
+     *
+     * @return array [realPath, size, mimeType, isTempFile]
+     */
+    protected function compressImageIfNeeded(string $sourcePath, string $mimeType, int $maxDimension = 1600, int $quality = 82): array
+    {
+        $fileSize = @filesize($sourcePath) ?: 0;
+
+        // Hanya kompresi jika GD tersedia dan file bertipe JPEG/PNG/WEBP
+        if (!extension_loaded('gd') || !in_array($mimeType, ['image/jpeg', 'image/png', 'image/webp'])) {
+            return [$sourcePath, $fileSize, $mimeType, false];
+        }
+
+        // Jika ukuran file sudah sangat kecil (< 150KB), tidak perlu kompresi
+        if ($fileSize > 0 && $fileSize < 153600) {
+            return [$sourcePath, $fileSize, $mimeType, false];
+        }
+
+        try {
+            $image = match ($mimeType) {
+                'image/jpeg' => @imagecreatefromjpeg($sourcePath),
+                'image/png'  => @imagecreatefrompng($sourcePath),
+                'image/webp' => @imagecreatefromwebp($sourcePath),
+                default      => null,
+            };
+
+            if (!$image) {
+                return [$sourcePath, $fileSize, $mimeType, false];
+            }
+
+            // Auto-rotate berdasarkan EXIF (bila JPEG)
+            if ($mimeType === 'image/jpeg' && function_exists('exif_read_data')) {
+                $exif = @exif_read_data($sourcePath);
+                $orientation = $exif['Orientation'] ?? 1;
+                $image = match ($orientation) {
+                    3 => imagerotate($image, 180, 0),
+                    6 => imagerotate($image, -90, 0),
+                    8 => imagerotate($image, 90, 0),
+                    default => $image,
+                };
+            }
+
+            $origWidth = imagesx($image);
+            $origHeight = imagesy($image);
+
+            // Hitung dimensi baru jika melebihi batas maksimal (e.g. 1600px)
+            if ($origWidth > $maxDimension || $origHeight > $maxDimension) {
+                if ($origWidth > $origHeight) {
+                    $newWidth = $maxDimension;
+                    $newHeight = (int) round(($origHeight / $origWidth) * $maxDimension);
+                } else {
+                    $newHeight = $maxDimension;
+                    $newWidth = (int) round(($origWidth / $origHeight) * $maxDimension);
+                }
+
+                $resized = imagecreatetruecolor($newWidth, $newHeight);
+                imagealphablending($resized, false);
+                imagesavealpha($resized, true);
+                imagecopyresampled($resized, $image, 0, 0, 0, 0, $newWidth, $newHeight, $origWidth, $origHeight);
+                imagedestroy($image);
+                $image = $resized;
+            }
+
+            $tempPath = tempnam(sys_get_temp_dir(), 'r2_cmp_') . '.jpg';
+            // Simpan sebagai JPEG dengan quality 82%
+            imagejpeg($image, $tempPath, $quality);
+            imagedestroy($image);
+
+            $newSize = @filesize($tempPath) ?: 0;
+            // Jika kompresi menghasilkan file yang lebih kecil atau sama, gunakan file hasil kompresi
+            if ($newSize > 0 && ($fileSize === 0 || $newSize < $fileSize)) {
+                return [$tempPath, $newSize, 'image/jpeg', true];
+            }
+
+            // Jika tidak lebih kecil, hapus temp dan pakai aslinya
+            if (file_exists($tempPath)) {
+                @unlink($tempPath);
+            }
+        } catch (\Throwable $e) {
+            \Log::warning('R2 image compression failed: ' . $e->getMessage());
+        }
+
+        return [$sourcePath, $fileSize, $mimeType, false];
     }
 }

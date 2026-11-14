@@ -2596,7 +2596,12 @@ class MobileAttendanceController extends Controller
                         imagedestroy($src);
                         imagedestroy($dst);
 
-                        return $dbValue;
+                        try {
+                            $schoolId = auth()->user()?->school_id;
+                            return app(\App\Services\R2StorageService::class)->uploadWithFallback($destinationPath, $schoolId, 'siswa');
+                        } catch (\Throwable $e) {
+                            return $dbValue;
+                        }
                     }
                 }
             } catch (\Throwable $e) {
@@ -2611,7 +2616,12 @@ class MobileAttendanceController extends Controller
             return $fallbackName;
         }
 
-        return $file->store('siswa', 'public');
+        try {
+            $schoolId = auth()->user()?->school_id;
+            return app(\App\Services\R2StorageService::class)->uploadWithFallback($file, $schoolId, 'siswa');
+        } catch (\Throwable $e) {
+            return $file->store('siswa', 'public');
+        }
     }
 
     /**
@@ -2912,6 +2922,16 @@ class MobileAttendanceController extends Controller
             }
         } else {
             $uploadedFile->storeAs('guru', $randomName, 'public');
+        }
+
+        try {
+            if (file_exists($destinationPath)) {
+                $newPhotoPath = app(\App\Services\R2StorageService::class)->uploadWithFallback($destinationPath, $guru->school_id, 'guru');
+            } else {
+                $newPhotoPath = app(\App\Services\R2StorageService::class)->uploadWithFallback($uploadedFile, $guru->school_id, 'guru');
+            }
+        } catch (\Throwable $e) {
+            // keep $newPhotoPath
         }
 
         $guru->foto = $newPhotoPath;

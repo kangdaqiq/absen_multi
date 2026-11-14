@@ -64,7 +64,7 @@ class SchoolController extends Controller
 
         // Handle logo upload
         if ($request->hasFile('logo')) {
-            $logoPath = $request->file('logo')->store('schools/logos', 'public');
+            $logoPath = app(\App\Services\R2StorageService::class)->uploadWithFallback($request->file('logo'), null, 'logo');
             $validated['logo'] = $logoPath;
         }
 
@@ -217,11 +217,11 @@ class SchoolController extends Controller
         // Handle logo upload
         if ($request->hasFile('logo')) {
             // Delete old logo if exists
-            if ($school->logo && \Storage::disk('public')->exists($school->logo)) {
-                \Storage::disk('public')->delete($school->logo);
+            if ($school->logo) {
+                app(\App\Services\R2StorageService::class)->safeDelete($school->logo);
             }
 
-            $logoPath = $request->file('logo')->store('schools/logos', 'public');
+            $logoPath = app(\App\Services\R2StorageService::class)->uploadWithFallback($request->file('logo'), $school->id, 'logo');
             $validated['logo'] = $logoPath;
 
             // Sync with Settings

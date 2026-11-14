@@ -233,7 +233,7 @@ class StudentLeaveController extends Controller
 
         $filePath = null;
         if ($request->hasFile('bukti_foto')) {
-            $filePath = $request->file('bukti_foto')->store('surat_izin', 'public');
+            $filePath = app(\App\Services\R2StorageService::class)->uploadWithFallback($request->file('bukti_foto'), $student->school_id, 'surat_izin');
         }
 
         DB::beginTransaction();
@@ -299,8 +299,8 @@ class StudentLeaveController extends Controller
             abort(403, 'Akses tidak diizinkan.');
         }
 
-        if ($leave->bukti_foto && Storage::disk('public')->exists($leave->bukti_foto)) {
-            Storage::disk('public')->delete($leave->bukti_foto);
+        if ($leave->bukti_foto) {
+            app(\App\Services\R2StorageService::class)->safeDelete($leave->bukti_foto);
         }
 
         $leave->delete();

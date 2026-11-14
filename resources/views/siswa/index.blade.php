@@ -6,7 +6,7 @@
 <div x-data="bulkSiswaActions()">
 <x-page-header 
     title="Data Siswa" 
-    subtitle="Kelola data induk siswa, NISN, status, dan rombongan belajar" 
+    subtitle="Kelola data induk siswa, NIS / NISN, status, dan rombongan belajar" 
     icon="fas fa-user-graduate">
     <div class="flex flex-wrap gap-2">
         @if($photoEnabled)
@@ -120,7 +120,7 @@
                     </th>
                     <th class="px-4 py-4">No</th>
                     <th class="px-4 py-4">Nama</th>
-                    <th class="px-4 py-4">NISN</th>
+                    <th class="px-4 py-4">NIS / NISN</th>
                     <th class="px-4 py-4">Tgl Lahir</th>
                     <th class="px-4 py-4">Kelas</th>
                     <th class="px-4 py-4">Alamat</th>
@@ -151,7 +151,10 @@
                             </div>
                         </td>
                         <td class="border-b border-gray-100 px-4 py-4 dark:border-gray-800">
-                            <p class="text-gray-500 dark:text-gray-400">{{ $s->nis }}</p>
+                            <span class="text-gray-700 dark:text-gray-300 font-medium">{{ $s->nis }}</span>
+                            @if($s->nisn)
+                                <span class="text-[11px] text-gray-400 dark:text-gray-500 block font-mono">NISN: {{ $s->nisn }}</span>
+                            @endif
                         </td>
                         <td class="border-b border-gray-100 px-4 py-4 dark:border-gray-800">
                             <p class="text-gray-500 dark:text-gray-400">{{ $s->tgl_lahir ? \Carbon\Carbon::parse($s->tgl_lahir)->format('d-m-Y') : '-' }}</p>
@@ -221,7 +224,7 @@
                                 
                                 <!-- Edit -->
                                 <button class="btnEdit text-orange-500 hover:text-orange-700 hover:bg-orange-50 p-2 rounded-lg transition" 
-                                    data-id="{{ $s->id }}" data-nama="{{ $s->nama }}" data-nis="{{ $s->nis }}" data-tgl_lahir="{{ $s->tgl_lahir }}"
+                                    data-id="{{ $s->id }}" data-nama="{{ $s->nama }}" data-nis="{{ $s->nis }}" data-nisn="{{ $s->nisn }}" data-tgl_lahir="{{ $s->tgl_lahir }}"
                                     data-alamat="{{ $s->alamat }}"
                                     data-kelas="{{ $s->kelas_id }}" data-wa="{{ $s->no_wa }}" data-wa_ortu="{{ $s->wa_ortu }}" data-uid="{{ $s->uid_rfid }}"
                                     data-telegram="{{ $s->telegram_chat_id }}" data-telegram_ortu="{{ $s->telegram_ortu_chat_id }}"
@@ -331,6 +334,10 @@
                 <div>
                     <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">NIS <span class="text-error-500">*</span></label>
                     <input type="text" name="nis" required class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                </div>
+                <div>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">NISN <span class="text-gray-400 font-normal">(opsional)</span></label>
+                    <input type="text" name="nisn" placeholder="Nomor Induk Siswa Nasional" class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
                 </div>
                 <div>
                     <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Tanggal Lahir</label>
@@ -464,8 +471,12 @@
                     <input type="text" name="nama" id="edit_nama" required class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
                 </div>
                 <div>
-                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">NISN <span class="text-error-500">*</span></label>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">NIS <span class="text-error-500">*</span></label>
                     <input type="text" name="nis" id="edit_nis" required class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                </div>
+                <div>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">NISN <span class="text-gray-400 font-normal">(opsional)</span></label>
+                    <input type="text" name="nisn" id="edit_nisn" placeholder="Nomor Induk Siswa Nasional" class="w-full rounded-lg border border-gray-200 bg-transparent px-4 py-2 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
                 </div>
                 <div>
                     <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">Tanggal Lahir</label>
@@ -602,7 +613,7 @@
         <form @submit.prevent="submitForm" x-show="!isImporting && !isFinished" enctype="multipart/form-data">
             @csrf
             <div class="mb-4 rounded-lg bg-info-50 p-4 text-sm text-info-700 dark:bg-info-500/15 dark:text-info-500">
-                <i class="fas fa-info-circle mr-1"></i> Gunakan file Excel (.xlsx) dengan format kolom: <strong>Nama, NIS, Tgl Lahir, Kelas, WA Siswa, WA Ortu, Alamat, UID RFID (Opsional)</strong>.
+                <i class="fas fa-info-circle mr-1"></i> Gunakan file Excel (.xlsx) dengan format kolom: <strong>Nama, NIS, Tgl Lahir, Kelas, WA Siswa, WA Ortu, Alamat, UID RFID (Opsional), NISN (Opsional)</strong>.
             </div>
             <div class="space-y-4">
                 <div>
@@ -985,6 +996,7 @@
                 currentEditSiswaId = id;
                 currentEditSiswaNama = nama;
                 var nis = $(this).data('nis');
+                var nisn = $(this).data('nisn');
                 var tgl_lahir = $(this).data('tgl_lahir');
                 var alamat = $(this).data('alamat');
                 var kelas = $(this).data('kelas');
@@ -1012,6 +1024,7 @@
 
                 $('#edit_nama').val(nama);
                 $('#edit_nis').val(nis);
+                $('#edit_nisn').val(nisn || '');
                 $('#edit_tgl_lahir').val(tgl_lahir);
                 $('#edit_alamat').val(alamat);
                 $('#edit_kelas_id').val(kelas);

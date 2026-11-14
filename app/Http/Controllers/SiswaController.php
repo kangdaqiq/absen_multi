@@ -31,6 +31,7 @@ class SiswaController extends Controller
             $query->where(function($q) use ($search) {
                 $q->where('nama', 'like', "%{$search}%")
                   ->orWhere('nis', 'like', "%{$search}%")
+                  ->orWhere('nisn', 'like', "%{$search}%")
                   ->orWhere('no_wa', 'like', "%{$search}%")
                   ->orWhere('alamat', 'like', "%{$search}%");
             });
@@ -86,6 +87,7 @@ class SiswaController extends Controller
                 'max:20',
                 Rule::unique('siswa')->where(fn($q) => $q->where('school_id', $schoolId))
             ],
+            'nisn' => 'nullable|string|max:30',
             'tgl_lahir' => 'nullable|date',
             'alamat' => 'nullable|string|max:500',
             'kelas_id' => 'required|exists:kelas,id',
@@ -117,6 +119,10 @@ class SiswaController extends Controller
             unset($input['foto']);
         }
         // Force null if empty string to avoid unique constraint issues on empty strings
+        if (empty($input['nisn']))
+            $input['nisn'] = null;
+        else
+            $input['nisn'] = trim((string)$input['nisn']);
         if (empty($input['alamat']))
             $input['alamat'] = null;
         if (!empty($input['no_wa'])) {
@@ -187,6 +193,7 @@ class SiswaController extends Controller
                 'max:20',
                 Rule::unique('siswa')->ignore($siswa->id)->where(fn($q) => $q->where('school_id', $schoolId))
             ],
+            'nisn' => 'nullable|string|max:30',
             'tgl_lahir' => 'nullable|date',
             'alamat' => 'nullable|string|max:500',
             'kelas_id' => 'required|exists:kelas,id',
@@ -225,6 +232,10 @@ class SiswaController extends Controller
         } else {
             unset($input['foto']);
         }
+        if (empty($input['nisn']))
+            $input['nisn'] = null;
+        else
+            $input['nisn'] = trim((string)$input['nisn']);
         if (empty($input['alamat']))
             $input['alamat'] = null;
         if (!empty($input['no_wa'])) {
@@ -402,6 +413,10 @@ class SiswaController extends Controller
                     $uidRfidRaw = isset($row[7]) ? trim((string)$row[7]) : '';
                     $uidRfid = $uidRfidRaw !== '' ? strtoupper($uidRfidRaw) : null;
 
+                    // Column I (Index 8): NISN (Opsional)
+                    $nisnRaw = isset($row[8]) ? trim((string)$row[8]) : '';
+                    $nisn = $nisnRaw !== '' ? $nisnRaw : null;
+
                     if ($nama === '' && $nis === '') {
                         $failures[] = [
                             'row' => $excelRowIndex,
@@ -491,6 +506,7 @@ class SiswaController extends Controller
                     $siswa = Siswa::create([
                         'nama' => $nama,
                         'nis' => $nis,
+                        'nisn' => $nisn,
                         'tgl_lahir' => $tglLahir ?: null, // Ensure null if empty string
                         'alamat' => $alamat ?: null,
                         'kelas_id' => $kelasId,
@@ -817,6 +833,7 @@ class SiswaController extends Controller
         $sheet->setCellValue('F1', 'No WhatsApp Ortu');
         $sheet->setCellValue('G1', 'Alamat');
         $sheet->setCellValue('H1', 'UID RFID (Opsional)');
+        $sheet->setCellValue('I1', 'NISN (Opsional)');
 
         // Example
         $sheet->setCellValue('A2', 'Ahmad Dani');
@@ -827,10 +844,12 @@ class SiswaController extends Controller
         $sheet->setCellValue('F2', '081234567891');
         $sheet->setCellValue('G2', 'Jl. Merdeka No. 123');
         $sheet->setCellValue('H2', '1A2B3C4D');
+        $sheet->setCellValue('I2', '0051234567');
 
-        // Format kolom C dan H sebagai teks agar Excel tidak mengubah format tanggal / UID
+        // Format kolom C, H, dan I sebagai teks agar Excel tidak mengubah format tanggal / UID / leading zero
         $sheet->getStyle('C2:C1000')->getNumberFormat()->setFormatCode(\PhpOffice\PhpSpreadsheet\Style\NumberFormat::FORMAT_TEXT);
         $sheet->getStyle('H2:H1000')->getNumberFormat()->setFormatCode(\PhpOffice\PhpSpreadsheet\Style\NumberFormat::FORMAT_TEXT);
+        $sheet->getStyle('I2:I1000')->getNumberFormat()->setFormatCode(\PhpOffice\PhpSpreadsheet\Style\NumberFormat::FORMAT_TEXT);
         // Set lebar kolom
         $sheet->getColumnDimension('A')->setWidth(25);
         $sheet->getColumnDimension('B')->setWidth(15);
@@ -840,10 +859,11 @@ class SiswaController extends Controller
         $sheet->getColumnDimension('F')->setWidth(20);
         $sheet->getColumnDimension('G')->setWidth(30);
         $sheet->getColumnDimension('H')->setWidth(22);
+        $sheet->getColumnDimension('I')->setWidth(20);
         // Style header
-        $sheet->getStyle('A1:H1')->getFont()->setBold(true);
-        $sheet->getStyle('A1:H1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB('FF3C50E0');
-        $sheet->getStyle('A1:H1')->getFont()->getColor()->setARGB('FFFFFFFF');
+        $sheet->getStyle('A1:I1')->getFont()->setBold(true);
+        $sheet->getStyle('A1:I1')->getFill()->setFillType(\PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID)->getStartColor()->setARGB('FF3C50E0');
+        $sheet->getStyle('A1:I1')->getFont()->getColor()->setARGB('FFFFFFFF');
 
         $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
 
@@ -1398,7 +1418,12 @@ class SiswaController extends Controller
                         imagedestroy($src);
                         imagedestroy($dst);
 
-                        return $dbValue;
+                        try {
+                            $schoolId = auth()->user()?->school_id;
+                            return app(\App\Services\R2StorageService::class)->uploadWithFallback($destinationPath, $schoolId, 'siswa');
+                        } catch (\Throwable $e) {
+                            return $dbValue;
+                        }
                     }
                 }
             } catch (\Throwable $e) {
@@ -1414,6 +1439,11 @@ class SiswaController extends Controller
             return $fallbackName;
         }
 
-        return $file->store('siswa', 'public');
+        try {
+            $schoolId = auth()->user()?->school_id;
+            return app(\App\Services\R2StorageService::class)->uploadWithFallback($file, $schoolId, 'siswa');
+        } catch (\Throwable $e) {
+            return $file->store('siswa', 'public');
+        }
     }
 }

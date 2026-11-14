@@ -36,6 +36,19 @@ class StudentLeave extends Model
         'approved_at'     => 'datetime',
     ];
 
+    protected $appends = ['bukti_foto_url'];
+
+    public function getBuktiFotoUrlAttribute(): ?string
+    {
+        if (empty($this->bukti_foto)) {
+            return null;
+        }
+
+        return str_starts_with($this->bukti_foto, 'http')
+            ? $this->bukti_foto
+            : asset('storage/' . ltrim($this->bukti_foto, '/'));
+    }
+
     public function school()
     {
         return $this->belongsTo(School::class, 'school_id');

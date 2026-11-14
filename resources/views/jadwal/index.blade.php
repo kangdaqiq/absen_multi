@@ -100,9 +100,9 @@
                                     <!-- Toggle Switch -->
                                     <label for="activeSwitch{{ $index }}" class="flex cursor-pointer select-none items-center justify-center">
                                         <div class="relative">
-                                            <input type="checkbox" id="activeSwitch{{ $index }}" name="schedules[{{ $index }}][is_active]" value="1" class="sr-only peer" {{ ($current && $current->is_active) ? 'checked' : '' }} />
-                                            <div class="block h-8 w-14 rounded-full bg-gray-300 dark:bg-gray-600 peer-checked:bg-brand-500 transition-colors"></div>
-                                            <div class="dot absolute left-1 top-1 h-6 w-6 rounded-full bg-white transition-transform peer-checked:translate-x-6 shadow-sm"></div>
+                                            <input type="checkbox" id="activeSwitch{{ $index }}" name="schedules[{{ $index }}][is_active]" value="1" class="sr-only" {{ ($current && $current->is_active) ? 'checked' : '' }} />
+                                            <div class="block h-6 w-10 rounded-full bg-gray-300 dark:bg-gray-600 toggle-bg transition"></div>
+                                            <div class="dot absolute left-1 top-1 h-4 w-4 rounded-full bg-white transition toggle-dot"></div>
                                         </div>
                                     </label>
                                 </td>
@@ -123,3 +123,21 @@
 </div>
 
 @endsection
+
+@push('styles')
+    <style>
+        .toggle-bg {
+            transition: background-color 0.2s ease;
+        }
+        input:checked ~ .toggle-bg {
+            background-color: #3C50E0 !important;
+        }
+        .toggle-dot {
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.25);
+            transition: transform 0.2s ease;
+        }
+        input:checked ~ .toggle-dot {
+            transform: translateX(100%) !important;
+        }
+    </style>
+@endpush

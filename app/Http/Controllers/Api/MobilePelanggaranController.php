@@ -296,8 +296,8 @@ class MobilePelanggaranController extends Controller
             'keterangan'              => 'nullable|string|max:2000',
             'tindak_lanjut'           => 'nullable|string|max:1000',
             'status'                  => 'nullable|in:tercatat,diproses,selesai',
-            'bukti_foto'              => 'nullable|file|mimes:jpeg,png,jpg,pdf|max:5120',
-            'foto'                    => 'nullable|file|mimes:jpeg,png,jpg,pdf|max:5120',
+            'bukti_foto'              => 'nullable|file|mimes:jpeg,png,jpg,webp,pdf,mp4,mov,avi,webm,mkv,3gp|max:51200',
+            'foto'                    => 'nullable|file|mimes:jpeg,png,jpg,webp,pdf,mp4,mov,avi,webm,mkv,3gp|max:51200',
         ]);
 
         $student = Siswa::with('kelas')->findOrFail($validated['student_id']);
@@ -320,7 +320,9 @@ class MobilePelanggaranController extends Controller
         }
 
         $file = $request->file('bukti_foto') ?? $request->file('foto');
-        $filePath = $file ? $file->store('pelanggaran', 'public') : null;
+        $filePath = $file
+            ? app(\App\Services\R2StorageService::class)->uploadWithFallback($file, $student->school_id, 'pelanggaran', null, $user->id)
+            : null;
 
         $pelanggaran = Pelanggaran::create([
             'school_id'               => $student->school_id,
@@ -455,10 +457,8 @@ class MobilePelanggaranController extends Controller
             ], 403);
         }
 
-        if ($pelanggaran->bukti_foto && !str_starts_with($pelanggaran->bukti_foto, 'http')) {
-            if (Storage::disk('public')->exists($pelanggaran->bukti_foto)) {
-                Storage::disk('public')->delete($pelanggaran->bukti_foto);
-            }
+        if ($pelanggaran->bukti_foto) {
+            app(\App\Services\R2StorageService::class)->safeDelete($pelanggaran->bukti_foto);
         }
 
         $code = $pelanggaran->code;
@@ -761,7 +761,9 @@ class MobilePelanggaranController extends Controller
         }
 
         $file = $request->file('lampiran_file') ?? $request->file('foto');
-        $lampiranPath = $file ? $file->store('penanganan_bk', 'public') : null;
+        $lampiranPath = $file
+            ? app(\App\Services\R2StorageService::class)->uploadWithFallback($file, $student->school_id ?? $user->school_id, 'penanganan_bk', null, $user->id)
+            : null;
 
         $statusPenanganan = $validated['status_penanganan'] ?? 'dalam_proses';
 
@@ -911,10 +913,8 @@ class MobilePelanggaranController extends Controller
             ], 403);
         }
 
-        if ($penanganan->lampiran_file && !str_starts_with($penanganan->lampiran_file, 'http')) {
-            if (Storage::disk('public')->exists($penanganan->lampiran_file)) {
-                Storage::disk('public')->delete($penanganan->lampiran_file);
-            }
+        if ($penanganan->lampiran_file) {
+            app(\App\Services\R2StorageService::class)->safeDelete($penanganan->lampiran_file);
         }
 
         $penanganan->delete();
@@ -1052,6 +1052,7 @@ class MobilePelanggaranController extends Controller
             'tindak_lanjut'           => $p->tindak_lanjut,
             'bukti_foto'              => $p->bukti_foto,
             'bukti_foto_url'          => $p->bukti_foto_url,
+            'is_video'                => (bool) $p->is_video,
             'status'                  => $p->status,
             'status_label'            => $p->status_label,
             'recorded_by'             => $p->recorded_by,

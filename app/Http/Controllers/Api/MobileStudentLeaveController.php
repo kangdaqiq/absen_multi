@@ -119,7 +119,9 @@ class MobileStudentLeaveController extends Controller
         }
 
         $file = $request->file('bukti_foto') ?? $request->file('foto');
-        $filePath = $file ? $file->store('surat_izin', 'public') : null;
+        $filePath = $file
+            ? app(\App\Services\R2StorageService::class)->uploadWithFallback($file, $siswa->school_id, 'surat_izin')
+            : null;
 
         $leave = StudentLeave::create([
             'school_id'       => $siswa->school_id,
@@ -429,7 +431,9 @@ class MobileStudentLeaveController extends Controller
         }
 
         $file = $request->file('bukti_foto') ?? $request->file('foto');
-        $filePath = $file ? $file->store('surat_izin', 'public') : null;
+        $filePath = $file
+            ? app(\App\Services\R2StorageService::class)->uploadWithFallback($file, $siswa->school_id, 'surat_izin')
+            : null;
 
         DB::beginTransaction();
         try {
@@ -779,10 +783,8 @@ class MobileStudentLeaveController extends Controller
 
     private function deleteAttachmentIfExists(StudentLeave $leave): void
     {
-        if ($leave->bukti_foto && !str_starts_with($leave->bukti_foto, 'http')) {
-            if (Storage::disk('public')->exists($leave->bukti_foto)) {
-                Storage::disk('public')->delete($leave->bukti_foto);
-            }
+        if ($leave->bukti_foto) {
+            app(\App\Services\R2StorageService::class)->safeDelete($leave->bukti_foto);
         }
     }
 

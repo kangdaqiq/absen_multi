@@ -609,10 +609,10 @@
                         </div>
                         <label for="prayer_enabled" class="flex items-center justify-between sm:justify-start gap-3 bg-gray-50 dark:bg-gray-800/60 hover:bg-gray-100 dark:hover:bg-gray-800/80 px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 cursor-pointer select-none shrink-0 transition shadow-xs">
                             <span class="text-sm font-semibold text-gray-800 dark:text-gray-200">Aktifkan Absensi Sholat</span>
-                            <div class="relative inline-flex items-center">
-                                <input type="checkbox" id="prayer_enabled" name="prayer_enabled" value="true" class="sr-only peer" {{ $prayerEnabled ? 'checked' : '' }}>
-                                <div class="block h-7 w-12 rounded-full bg-gray-300 dark:bg-gray-600 peer-checked:bg-emerald-500 transition-colors"></div>
-                                <div class="dot absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow-md transition-transform peer-checked:translate-x-5"></div>
+                            <div class="relative">
+                                <input type="checkbox" id="prayer_enabled" name="prayer_enabled" value="true" class="sr-only" {{ $prayerEnabled ? 'checked' : '' }}>
+                                <div class="block h-6 w-10 rounded-full bg-gray-300 dark:bg-gray-600 toggle-bg toggle-bg-emerald transition"></div>
+                                <div class="dot absolute left-1 top-1 h-4 w-4 rounded-full bg-white transition toggle-dot"></div>
                             </div>
                         </label>
                     </div>
@@ -794,6 +794,11 @@
         input:checked~.toggle-bg {
             background-color: #3C50E0 !important;
             /* brand-500 */
+        }
+
+        input:checked~.toggle-bg-emerald {
+            background-color: #10B981 !important;
+            /* emerald-500 */
         }
 
         .toggle-dot {

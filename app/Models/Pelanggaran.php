@@ -34,6 +34,13 @@ class Pelanggaran extends Model
         'poin'    => 'integer',
     ];
 
+    protected $appends = [
+        'kategori_label',
+        'status_label',
+        'bukti_foto_url',
+        'is_video',
+    ];
+
     public function school()
     {
         return $this->belongsTo(School::class, 'school_id');
@@ -98,6 +105,18 @@ class Pelanggaran extends Model
         return str_starts_with($this->bukti_foto, 'http')
             ? $this->bukti_foto
             : asset('storage/' . ltrim($this->bukti_foto, '/'));
+    }
+
+    public function getIsVideoAttribute(): bool
+    {
+        if (!$this->bukti_foto) {
+            return false;
+        }
+
+        $path = parse_url($this->bukti_foto, PHP_URL_PATH) ?: $this->bukti_foto;
+        $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+
+        return in_array($ext, ['mp4', 'mov', 'avi', 'webm', 'mkv', '3gp']);
     }
 
     public static function generateCode(): string

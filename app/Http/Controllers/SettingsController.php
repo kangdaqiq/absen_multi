@@ -52,8 +52,8 @@ class SettingsController extends Controller
             // Get school_id (0 for Super Admin)
             $schoolId = auth()->user()->school_id ?? 0;
 
-            // Upload to storage (same as SchoolController)
-            $path = $request->file('logo')->store('schools/logos', 'public');
+            // Upload to storage (Cloudflare R2 with local fallback)
+            $path = app(\App\Services\R2StorageService::class)->uploadWithFallback($request->file('logo'), $schoolId, 'logo');
 
             // Save full path to settings using DB facade to handle composite key correctly
             \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(
@@ -99,7 +99,7 @@ class SettingsController extends Controller
             ]);
 
             $schoolId = auth()->user()->school_id ?? 0;
-            $path = $request->file('kop_surat')->store('schools/kop_surat', 'public');
+            $path = app(\App\Services\R2StorageService::class)->uploadWithFallback($request->file('kop_surat'), $schoolId, 'logo');
 
             \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(
                 [

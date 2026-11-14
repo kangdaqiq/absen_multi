@@ -1034,6 +1034,9 @@ pre[class*='language-'] {
 input:checked ~ .toggle-bg {
   background-color: #3C50E0 !important;
 }
+input:checked ~ .toggle-bg-emerald {
+  background-color: #10B981 !important;
+}
 .toggle-dot {
   @apply bg-white;
   box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.25);
@@ -1048,6 +1051,9 @@ input:checked ~ .toggle-dot {
 }
 .dark input:checked ~ .toggle-bg {
   background-color: #3C50E0 !important;
+}
+input:checked ~ .toggle-bg-emerald {
+  background-color: #10B981 !important;
 }
 .dark input:checked ~ .toggle-dot,
 .dark .toggle-dot {

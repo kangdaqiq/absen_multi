@@ -137,7 +137,7 @@ class PelanggaranController extends Controller
             'keterangan'              => 'nullable|string|max:2000',
             'tindak_lanjut'           => 'nullable|string|max:1000',
             'status'                  => 'nullable|in:tercatat,diproses,selesai',
-            'bukti_foto'              => 'nullable|file|mimes:jpeg,png,jpg,pdf|max:5120',
+            'bukti_foto'              => 'nullable|file|mimes:jpeg,png,jpg,webp,pdf,mp4,mov,avi,webm,mkv,3gp|max:51200',
         ]);
 
         $student = Siswa::findOrFail($validated['student_id']);
@@ -155,7 +155,7 @@ class PelanggaranController extends Controller
         $tindakLanjut = $validated['tindak_lanjut'] ?? $master?->sanksi_default;
 
         $filePath = $request->hasFile('bukti_foto')
-            ? $request->file('bukti_foto')->store('pelanggaran', 'public')
+            ? app(\App\Services\R2StorageService::class)->uploadWithFallback($request->file('bukti_foto'), $student->school_id, 'pelanggaran', null, $user->id)
             : null;
 
         $pelanggaran = Pelanggaran::create([
@@ -226,8 +226,8 @@ class PelanggaranController extends Controller
             abort(403, 'Akses tidak diizinkan.');
         }
 
-        if ($pelanggaran->bukti_foto && Storage::disk('public')->exists($pelanggaran->bukti_foto)) {
-            Storage::disk('public')->delete($pelanggaran->bukti_foto);
+        if ($pelanggaran->bukti_foto) {
+            app(\App\Services\R2StorageService::class)->safeDelete($pelanggaran->bukti_foto);
         }
 
         $pelanggaran->delete();
@@ -299,7 +299,7 @@ class PelanggaranController extends Controller
         ]);
 
         $lampiranPath = $request->hasFile('lampiran_file')
-            ? $request->file('lampiran_file')->store('penanganan_bk', 'public')
+            ? app(\App\Services\R2StorageService::class)->uploadWithFallback($request->file('lampiran_file'), $pelanggaran->school_id, 'penanganan_bk', null, $user->id)
             : null;
 
         $penanganan = PenangananPelanggaran::create([
@@ -385,7 +385,7 @@ class PelanggaranController extends Controller
         }
 
         $lampiranPath = $request->hasFile('lampiran_file')
-            ? $request->file('lampiran_file')->store('penanganan_bk', 'public')
+            ? app(\App\Services\R2StorageService::class)->uploadWithFallback($request->file('lampiran_file'), $pelanggaran->school_id, 'penanganan_bk', null, $user->id)
             : null;
 
         $penanganan = PenangananPelanggaran::create([
@@ -443,8 +443,8 @@ class PelanggaranController extends Controller
             abort(403, 'Akses tidak diizinkan.');
         }
 
-        if ($penanganan->lampiran_file && Storage::disk('public')->exists($penanganan->lampiran_file)) {
-            Storage::disk('public')->delete($penanganan->lampiran_file);
+        if ($penanganan->lampiran_file) {
+            app(\App\Services\R2StorageService::class)->safeDelete($penanganan->lampiran_file);
         }
 
         $penanganan->delete();

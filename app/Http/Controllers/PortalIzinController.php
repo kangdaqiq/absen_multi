@@ -122,7 +122,7 @@ class PortalIzinController extends Controller
 
         $filePath = null;
         if ($request->hasFile('bukti_foto')) {
-            $filePath = $request->file('bukti_foto')->store('surat_izin', 'public');
+            $filePath = app(\App\Services\R2StorageService::class)->uploadWithFallback($request->file('bukti_foto'), $validated['school_id'], 'surat_izin');
         }
 
         $code = StudentLeave::generateCode();

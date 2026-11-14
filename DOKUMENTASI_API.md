@@ -2029,5 +2029,371 @@ Memperbarui `status` (`tercatat`, `diproses`, `selesai`), `tindak_lanjut`, atau 
 ---
 
 ### 11.6 Detail & Hapus Catatan Pelanggaran
-- `GET /api/mobile/pelanggaran/{id}` *(Alias: `/api/mobile/student/pelanggaran/{id}`, `/api/mobile/siswa/pelanggaran/{id}`)*: Melihat detail catatan pelanggaran.
+- `GET /api/mobile/pelanggaran/{id}` *(Alias: `/api/mobile/student/pelanggaran/{id}`, `/api/mobile/siswa/pelanggaran/{id}`)*: Melihat detail catatan pelanggaran (termasuk riwayat `penanganans` Guru BK).
 - `DELETE /api/mobile/guru/pelanggaran/{id}` *(Alias: `/api/mobile/teacher/pelanggaran/{id}`)*: Menghapus catatan pelanggaran beserta file buktinya.
+
+---
+
+### 11.7 Catatan Penanganan Kasus oleh Guru BK / Kesiswaan (SP & Link GDrive)
+Pada objek detail pelanggaran (`formatPelanggaran`), terdapat array `penanganans` dan objek `latest_penanganan`:
+```json
+{
+  "penanganans": [
+    {
+      "id": 1,
+      "tanggal": "2026-11-13",
+      "tindakan_sp": "sp_1",
+      "tindakan_sp_label": "Surat Peringatan 1 (SP 1)",
+      "catatan_penanganan": "Pemanggilan orang tua dan penandatanganan surat pernyataan.",
+      "hasil_kesepakatan": "Siswa berjanji hadir tepat waktu setiap pagi.",
+      "link_gdrive": "https://drive.google.com/file/d/xxxxxx/view",
+      "lampiran_file_url": null,
+      "status_penanganan": "dalam_proses",
+      "status_penanganan_label": "Dalam Proses Bimbingan",
+      "handler_name": "Ibu Rahmawati (Guru BK)",
+      "created_at": "2026-11-13 14:30:00"
+    }
+  ],
+  "latest_penanganan": {
+    "tindakan_sp": "sp_1",
+    "tindakan_sp_label": "Surat Peringatan 1 (SP 1)",
+    "link_gdrive": "https://drive.google.com/file/d/xxxxxx/view",
+    "status_penanganan": "dalam_proses"
+  }
+}
+```
+
+Opsi tindakan penanganan Guru BK (`tindakan_sp`):
+- `pembinaan` : Pembinaan / Konseling BK
+- `teguran_lisan` : Teguran Lisan
+- `teguran_tertulis` : Teguran Tertulis
+- `sp_1` : Surat Peringatan 1 (SP 1)
+- `sp_2` : Surat Peringatan 2 (SP 2)
+- `sp_3` : Surat Peringatan 3 (SP 3)
+- `sp_4` : Surat Peringatan 4 (SP 4)
+- `skorsing` : Skorsing Sementara
+- `dikembalikan_ortu` : Dikembalikan ke Orang Tua / Dikeluarkan
+
+---
+
+### 11.8 Rekapitulasi Pelanggaran & Akumulasi Poin Siswa (`GET /api/mobile/guru/pelanggaran/rekap`)
+Mengambil daftar rekapitulasi seluruh siswa beserta akumulasi poin, total kasus pelanggaran, pelanggaran terakhir, dan tindakan BK terakhirnya.
+
+- **URL**: `/api/mobile/guru/pelanggaran/rekap` *(Alias: `/api/mobile/teacher/pelanggaran/rekap`, `/api/mobile/pelanggaran/rekap`)*
+- **Method**: `GET`
+- **Auth**: Bearer Token (Guru / Wali Kelas / Admin)
+- **Query Params (Optional)**:
+  - `filter_poin`: `with_points` (default: hanya siswa berpoin) | `all` (seluruh siswa termasuk 0 poin)
+  - `kelas_id`: integer (filter per kelas)
+  - `start_date`: date `YYYY-MM-DD` (filter rentang tanggal)
+  - `end_date`: date `YYYY-MM-DD`
+  - `search`: string (nama / NIS siswa)
+  - `per_page`: integer (default `15`, max `50`)
+
+- **Response Success (200 OK)**:
+```json
+{
+  "success": true,
+  "message": "Rekapitulasi poin pelanggaran siswa berhasil diambil.",
+  "summary": {
+    "total_siswa": 350,
+    "total_siswa_pelanggar": 18,
+    "total_kasus": 42,
+    "total_poin": 285,
+    "total_penanganan": 7
+  },
+  "data": [
+    {
+      "id": 10,
+      "nama": "Ahmad Fajar",
+      "nis": "1001",
+      "kelas_id": 3,
+      "nama_kelas": "XII RPL 1",
+      "foto_url": "http://absen.jagattech.my.id/storage/siswa/1001.jpg",
+      "total_poin": 35,
+      "total_kasus": 3,
+      "total_penanganan": 1,
+      "display_text": "Ahmad Fajar (35 Poin) - XII RPL 1",
+      "latest_pelanggaran": {
+        "id": 105,
+        "code": "PLG-202611-012",
+        "tanggal": "2026-11-12",
+        "judul_pelanggaran": "Membolos jam pelajaran ke-3",
+        "poin": 15,
+        "kategori": "sedang",
+        "kategori_label": "Sedang"
+      },
+      "latest_penanganan": {
+        "id": 4,
+        "tanggal": "2026-11-13",
+        "tindakan_sp": "sp_1",
+        "tindakan_sp_label": "Surat Peringatan 1 (SP 1)",
+        "link_gdrive": "https://drive.google.com/file/d/xxxxx/view",
+        "status_penanganan": "dalam_proses"
+      }
+    }
+  ],
+  "pagination": {
+    "current_page": 1,
+    "last_page": 2,
+    "per_page": 15,
+    "total": 18
+  }
+}
+```
+
+---
+
+### 11.9 Daftar Siswa Berpoin untuk Form Penanganan BK (`GET /api/mobile/guru/penanganan/students`)
+Mengambil daftar siswa dari rekapitulasi yang **memiliki poin pelanggaran** (`total_poin > 0`), siswa tanpa poin tidak disertakan. Disiapkan untuk komponen dropdown / picker saat guru mencatatkan penanganan BK dengan format label `Nama Siswa (Poin) - Kelas`, beserta daftar kasus aktif yang dapat dikaitkan.
+
+- **URL**: `/api/mobile/guru/penanganan/students` *(Alias: `/api/mobile/teacher/penanganan/students`)*
+- **Method**: `GET`
+- **Auth**: Bearer Token (Guru / Wali Kelas / Admin)
+- **Query Params (Optional)**: `kelas_id`, `search`
+
+- **Response Success (200 OK)**:
+```json
+{
+  "success": true,
+  "message": "Daftar siswa berpoin untuk penanganan BK berhasil diambil.",
+  "data": [
+    {
+      "id": 10,
+      "nama": "Ahmad Fajar",
+      "nis": "1001",
+      "kelas_id": 3,
+      "nama_kelas": "XII RPL 1",
+      "total_poin": 35,
+      "total_kasus": 3,
+      "display_text": "Ahmad Fajar (35 Poin) - XII RPL 1",
+      "violations": [
+        {
+          "id": 105,
+          "code": "PLG-202611-012",
+          "tanggal": "2026-11-12",
+          "judul_pelanggaran": "Membolos jam pelajaran ke-3",
+          "poin": 15,
+          "status": "diproses",
+          "status_label": "Diproses"
+        }
+      ]
+    }
+  ]
+}
+```
+
+---
+
+### 11.10 Daftar Riwayat Penanganan BK (`GET /api/mobile/guru/penanganan`)
+Mengambil daftar seluruh riwayat penanganan, pembinaan, sanksi SP, dan arsip berkas Google Drive yang telah dilakukan oleh Guru BK / Kesiswaan.
+
+- **URL**: `/api/mobile/guru/penanganan` *(Alias: `/api/mobile/teacher/penanganan`, `/api/mobile/penanganan`)*
+- **Method**: `GET`
+- **Auth**: Bearer Token (Guru / Wali Kelas / Admin)
+- **Query Params (Optional)**:
+  - `student_id`: integer (filter satu siswa)
+  - `kelas_id`: integer | `all`
+  - `tindakan_sp`: `pembinaan` | `teguran_lisan` | `teguran_tertulis` | `sp_1` | `sp_2` | `sp_3` | `sp_4` | `skorsing` | `dikembalikan_ortu`
+  - `status_penanganan`: `dalam_proses` | `selesai` | `evaluasi_lanjutan`
+  - `start_date`: date `YYYY-MM-DD`
+  - `end_date`: date `YYYY-MM-DD`
+  - `search`: string
+  - `per_page`: integer (default `15`)
+
+- **Response Success (200 OK)**:
+```json
+{
+  "success": true,
+  "message": "Daftar riwayat penanganan BK berhasil diambil.",
+  "summary": {
+    "total": 12,
+    "sp_1": 5,
+    "sp_2": 2,
+    "sp_3": 1,
+    "sp_4": 0,
+    "pembinaan": 4,
+    "selesai": 8,
+    "dalam_proses": 4
+  },
+  "data": [
+    {
+      "id": 4,
+      "school_id": 1,
+      "student_id": 10,
+      "student": {
+        "id": 10,
+        "nama": "Ahmad Fajar",
+        "nis": "1001",
+        "kelas_id": 3,
+        "nama_kelas": "XII RPL 1"
+      },
+      "pelanggaran_id": 105,
+      "kasus": {
+        "id": 105,
+        "code": "PLG-202611-012",
+        "judul_pelanggaran": "Membolos jam pelajaran ke-3",
+        "poin": 15
+      },
+      "tanggal": "2026-11-13",
+      "tindakan_sp": "sp_1",
+      "tindakan_sp_label": "Surat Peringatan 1 (SP 1)",
+      "catatan_penanganan": "Konseling tatap muka bersama orang tua siswa di ruang BK.",
+      "hasil_kesepakatan": "Siswa menandatangani surat peringatan dan berkomitmen tidak mengulangi.",
+      "link_gdrive": "https://drive.google.com/file/d/xxxxx/view",
+      "lampiran_file": null,
+      "lampiran_file_url": null,
+      "status_penanganan": "dalam_proses",
+      "status_penanganan_label": "Dalam Proses",
+      "handled_by": 2,
+      "handler_name": "Ibu Rahmawati, S.Pd",
+      "created_at": "2026-11-13T14:30:00+07:00"
+    }
+  ],
+  "pagination": { ... }
+}
+```
+
+---
+
+### 11.11 Catat Penanganan BK Langsung Berdasarkan Siswa (`POST /api/mobile/guru/penanganan`)
+Digunakan oleh Guru BK / Kesiswaan untuk mencatat tindakan penanganan, sanksi SP 1 - SP 4, pembinaan, atau lampiran Link Google Drive. Cukup memilih `student_id` dari siswa yang berpoin; sistem otomatis mengaitkan ke kasus aktif siswa jika `pelanggaran_id` tidak diisi.
+
+- **URL**: `/api/mobile/guru/penanganan` *(Alias: `/api/mobile/teacher/penanganan`, `/api/mobile/penanganan`)*
+- **Method**: `POST`
+- **Auth**: Bearer Token (Guru / Wali Kelas / Admin)
+- **Body Request**:
+  - `student_id` (integer, required): ID siswa dari rekapitulasi poin
+  - `pelanggaran_id` (integer, optional): ID pelanggaran spesifik (jika kosong, sistem otomatis mengaitkan kasus terbaru siswa)
+  - `tanggal` (date, optional, default hari ini): `YYYY-MM-DD`
+  - `tindakan_sp` (string, required): `pembinaan` | `teguran_lisan` | `teguran_tertulis` | `sp_1` | `sp_2` | `sp_3` | `sp_4` | `skorsing` | `dikembalikan_ortu`
+  - `catatan_penanganan` (string, required, max 3000): Uraian proses konseling/pembinaan
+  - `hasil_kesepakatan` (string, optional, max 2000): Pernyataan/komitmen siswa
+  - `link_gdrive` (string URL, optional, max 1000): Link arsip file surat peringatan Google Drive
+  - `status_penanganan` (string, optional): `dalam_proses` | `selesai` | `evaluasi_lanjutan` (default: `dalam_proses`)
+  - `lampiran_file` / `foto` (file, optional): `pdf, doc, docx, jpg, jpeg, png`, max 10 MB
+  - `update_status` (string, optional): `tercatat` | `diproses` | `selesai`
+
+- **Response Success (201 Created)**:
+```json
+{
+  "success": true,
+  "message": "Catatan penanganan BK (Surat Peringatan 1 (SP 1)) an. Ahmad Fajar berhasil disimpan.",
+  "data": {
+    "id": 5,
+    "student_id": 10,
+    "student": {
+      "id": 10,
+      "nama": "Ahmad Fajar",
+      "nis": "1001",
+      "kelas_id": 3,
+      "nama_kelas": "XII RPL 1"
+    },
+    "pelanggaran_id": 105,
+    "tanggal": "2026-11-13",
+    "tindakan_sp": "sp_1",
+    "tindakan_sp_label": "Surat Peringatan 1 (SP 1)",
+    "catatan_penanganan": "Konseling tatap muka bersama orang tua siswa di ruang BK.",
+    "hasil_kesepakatan": "Siswa menandatangani surat peringatan dan berkomitmen tidak mengulangi.",
+    "link_gdrive": "https://drive.google.com/file/d/xxxxx/view",
+    "status_penanganan": "dalam_proses",
+    "status_penanganan_label": "Dalam Proses"
+  }
+}
+```
+
+---
+
+### 11.12 Rekam Jejak Dossier Siswa (`GET /api/mobile/guru/penanganan/student/{id}`)
+Mengambil rekam jejak utuh satu siswa, termasuk profil, akumulasi poin, seluruh riwayat kasus pelanggaran, dan seluruh riwayat penanganan BK/SP yang pernah diterima.
+
+- **URL**: `/api/mobile/guru/penanganan/student/{id}` *(Alias: `/api/mobile/teacher/penanganan/student/{id}`)*
+- **Method**: `GET`
+- **Auth**: Bearer Token (Guru / Wali Kelas / Admin)
+
+- **Response Success (200 OK)**:
+```json
+{
+  "success": true,
+  "student": {
+    "id": 10,
+    "nama": "Ahmad Fajar",
+    "nis": "1001",
+    "kelas_id": 3,
+    "nama_kelas": "XII RPL 1",
+    "total_poin": 35,
+    "total_kasus": 3,
+    "total_penanganan": 2,
+    "display_text": "Ahmad Fajar (35 Poin) - XII RPL 1"
+  },
+  "violations": [
+    {
+      "id": 105,
+      "code": "PLG-202611-012",
+      "tanggal": "2026-11-12",
+      "judul_pelanggaran": "Membolos jam pelajaran",
+      "poin": 15,
+      "kategori": "sedang",
+      "status": "diproses",
+      "status_label": "Diproses"
+    }
+  ],
+  "penanganans": [
+    {
+      "id": 4,
+      "tanggal": "2026-11-13",
+      "tindakan_sp": "sp_1",
+      "tindakan_sp_label": "Surat Peringatan 1 (SP 1)",
+      "catatan_penanganan": "Konseling tatap muka bersama orang tua.",
+      "hasil_kesepakatan": "Berjanji tidak mengulangi.",
+      "link_gdrive": "https://drive.google.com/file/d/xxxxx/view",
+      "status_penanganan": "dalam_proses",
+      "handler_name": "Ibu Rahmawati"
+    }
+  ]
+}
+```
+
+---
+
+### 11.13 Hapus Riwayat Penanganan BK (`DELETE /api/mobile/guru/penanganan/{id}`)
+Menghapus satu catatan penanganan BK beserta berkas fisiknya (jika ada).
+
+- **URL**: `/api/mobile/guru/penanganan/{id}` *(Alias: `/api/mobile/teacher/penanganan/{id}`, `/api/mobile/penanganan/{id}`)*
+- **Method**: `DELETE`
+- **Auth**: Bearer Token (Guru / Wali Kelas / Admin)
+
+---
+
+### 11.14 Riwayat Penanganan & SP Siswa untuk Akun Siswa (`GET /api/mobile/student/penanganan/my`)
+Mengambil rekam jejak bimbingan konseling dan sanksi SP yang pernah diterima oleh akun siswa yang sedang login.
+
+- **URL**: `/api/mobile/student/penanganan/my` *(Alias: `/api/mobile/siswa/penanganan/my`, `/api/mobile/penanganan/my`)*
+- **Method**: `GET`
+- **Auth**: Bearer Token (Siswa)
+
+- **Response Success (200 OK)**:
+```json
+{
+  "success": true,
+  "message": "Riwayat penanganan BK siswa berhasil diambil.",
+  "summary": {
+    "total_penanganan": 1,
+    "sp_aktif": "Surat Peringatan 1 (SP 1)"
+  },
+  "data": [
+    {
+      "id": 4,
+      "tanggal": "2026-11-13",
+      "tindakan_sp": "sp_1",
+      "tindakan_sp_label": "Surat Peringatan 1 (SP 1)",
+      "catatan_penanganan": "Konseling bersama Guru BK dan Wali Kelas.",
+      "hasil_kesepakatan": "Menandatangani surat pernyataan.",
+      "link_gdrive": "https://drive.google.com/file/d/xxxxx/view",
+      "status_penanganan": "dalam_proses",
+      "status_penanganan_label": "Dalam Proses",
+      "handler_name": "Ibu Rahmawati, S.Pd"
+    }
+  ]
+}
+```

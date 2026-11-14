@@ -7,6 +7,7 @@ use App\Models\ApiLog;
 use App\Models\KategoriPelanggaran;
 use App\Models\Kelas;
 use App\Models\Pelanggaran;
+use App\Models\PenangananPelanggaran;
 use App\Models\Siswa;
 use App\Models\User;
 use App\Services\FcmNotificationService;
@@ -32,7 +33,7 @@ class MobilePelanggaranController extends Controller
             ], 403);
         }
 
-        $baseQuery = Pelanggaran::with(['student.kelas', 'kategoriPelanggaran', 'recorder'])
+        $baseQuery = Pelanggaran::with(['student.kelas', 'kategoriPelanggaran', 'recorder', 'penanganans.handler'])
             ->where('school_id', $siswa->school_id)
             ->where('student_id', $siswa->id);
 
@@ -75,7 +76,7 @@ class MobilePelanggaranController extends Controller
     public function show(Request $request, $id)
     {
         $user = $request->user();
-        $pelanggaran = Pelanggaran::with(['student.kelas', 'kategoriPelanggaran', 'recorder'])->find($id);
+        $pelanggaran = Pelanggaran::with(['student.kelas', 'kategoriPelanggaran', 'recorder', 'penanganans.handler'])->find($id);
 
         if (!$pelanggaran) {
             return response()->json([
@@ -144,7 +145,7 @@ class MobilePelanggaranController extends Controller
         $isFullSchool = $user->isAdmin() || $user->isWakaKurikulum();
         $managedKelasIds = $isFullSchool ? [] : $user->getManagedKelasIds();
 
-        $baseQuery = Pelanggaran::with(['student.kelas', 'kategoriPelanggaran', 'recorder'])
+        $baseQuery = Pelanggaran::with(['student.kelas', 'kategoriPelanggaran', 'recorder', 'penanganans.handler'])
             ->when($schoolId, fn($q) => $q->where('school_id', $schoolId));
 
         if (!$isFullSchool) {
@@ -379,7 +380,7 @@ class MobilePelanggaranController extends Controller
     public function teacherUpdate(Request $request, $id)
     {
         $user = $request->user();
-        $pelanggaran = Pelanggaran::with(['student.kelas', 'kategoriPelanggaran', 'recorder'])->find($id);
+        $pelanggaran = Pelanggaran::with(['student.kelas', 'kategoriPelanggaran', 'recorder', 'penanganans.handler'])->find($id);
 
         if (!$pelanggaran) {
             return response()->json([
@@ -426,11 +427,18 @@ class MobilePelanggaranController extends Controller
     }
 
     /**
-     * Guru / admin menghapus catatan pelanggaran.
+     * Waka Kesiswaan / Admin menghapus catatan pelanggaran (guru biasa tidak bisa).
      */
     public function destroy(Request $request, $id)
     {
         $user = $request->user();
+        if (!$this->canDeletePelanggaran($user)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Akses ditolak. Hanya Waka Kesiswaan atau Admin yang dapat menghapus catatan pelanggaran.',
+            ], 403);
+        }
+
         $pelanggaran = Pelanggaran::with('student')->find($id);
 
         if (!$pelanggaran) {
@@ -440,10 +448,10 @@ class MobilePelanggaranController extends Controller
             ], 404);
         }
 
-        if (!$this->canManagePelanggaran($user, $pelanggaran)) {
+        if ($user->school_id && (int) $pelanggaran->school_id !== (int) $user->school_id) {
             return response()->json([
                 'success' => false,
-                'message' => 'Anda tidak memiliki akses untuk menghapus catatan pelanggaran ini.',
+                'message' => 'Anda tidak memiliki akses ke catatan pelanggaran sekolah ini.',
             ], 403);
         }
 
@@ -469,6 +477,484 @@ class MobilePelanggaranController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Catatan pelanggaran berhasil dihapus.',
+        ]);
+    }
+
+    /**
+     * Rekapitulasi poin & kasus pelanggaran siswa untuk akun Guru / Wali Kelas / Admin.
+     */
+    public function rekapStudents(Request $request)
+    {
+        $user = $request->user();
+        if (!$this->isStaffRole($user)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Akses ditolak. Endpoint ini khusus untuk akun guru/wali kelas/admin.',
+            ], 403);
+        }
+
+        $schoolId = $user->school_id;
+        $isFullSchool = $user->isAdmin() || $user->isWakaKurikulum();
+        $managedKelasIds = $isFullSchool ? [] : $user->getManagedKelasIds();
+
+        $filterPoin = $request->input('filter_poin', 'with_points'); // 'with_points' (default) or 'all'
+        $startDate  = $request->input('start_date');
+        $endDate    = $request->input('end_date');
+
+        $query = Siswa::with(['kelas', 'latestPelanggaran', 'latestPenanganan'])
+            ->when($schoolId, fn($q) => $q->where('school_id', $schoolId))
+            ->when(!$isFullSchool, fn($q) => $q->whereIn('kelas_id', empty($managedKelasIds) ? [-1] : $managedKelasIds));
+
+        if ($request->filled('kelas_id') && $request->kelas_id !== 'all') {
+            $query->where('kelas_id', (int) $request->kelas_id);
+        }
+
+        if ($request->filled('search')) {
+            $search = trim($request->search);
+            $query->where(function ($q) use ($search) {
+                $q->where('nama', 'LIKE', "%{$search}%")
+                    ->orWhere('nis', 'LIKE', "%{$search}%");
+            });
+        }
+
+        if ($startDate && $endDate) {
+            $query->withSum(['pelanggarans as total_poin' => fn($q) => $q->whereBetween('tanggal', [$startDate, $endDate])], 'poin')
+                  ->withCount(['pelanggarans as total_kasus' => fn($q) => $q->whereBetween('tanggal', [$startDate, $endDate])])
+                  ->withCount(['penanganans as total_penanganan' => fn($q) => $q->whereBetween('tanggal', [$startDate, $endDate])]);
+        } else {
+            $query->withSum('pelanggarans as total_poin', 'poin')
+                  ->withCount('pelanggarans as total_kasus')
+                  ->withCount('penanganans as total_penanganan');
+        }
+
+        if ($filterPoin === 'with_points') {
+            $query->whereHas('pelanggarans', function ($q) use ($startDate, $endDate) {
+                $q->where('poin', '>', 0);
+                if ($startDate && $endDate) {
+                    $q->whereBetween('tanggal', [$startDate, $endDate]);
+                }
+            });
+        }
+
+        // Summary Stats
+        $baseStudent = Siswa::when($schoolId, fn($q) => $q->where('school_id', $schoolId))
+            ->when(!$isFullSchool, fn($q) => $q->whereIn('kelas_id', empty($managedKelasIds) ? [-1] : $managedKelasIds));
+
+        $violationBase = Pelanggaran::when($schoolId, fn($q) => $q->where('school_id', $schoolId))
+            ->when(!$isFullSchool, fn($q) => $q->whereHas('student', fn($sq) => $sq->whereIn('kelas_id', empty($managedKelasIds) ? [-1] : $managedKelasIds)));
+
+        $summary = [
+            'total_siswa'           => (clone $baseStudent)->count(),
+            'total_siswa_pelanggar' => (clone $baseStudent)->whereHas('pelanggarans', fn($q) => $q->where('poin', '>', 0))->count(),
+            'total_kasus'           => (clone $violationBase)->count(),
+            'total_poin'            => (int) (clone $violationBase)->sum('poin'),
+            'total_penanganan'      => PenangananPelanggaran::when($schoolId, fn($q) => $q->where('school_id', $schoolId))
+                ->when(!$isFullSchool, fn($q) => $q->whereHas('student', fn($sq) => $sq->whereIn('kelas_id', empty($managedKelasIds) ? [-1] : $managedKelasIds)))
+                ->count(),
+        ];
+
+        $perPage = min(max((int) $request->input('per_page', 15), 1), 50);
+        $paginated = $query->orderByDesc('total_poin')->orderBy('nama')->paginate($perPage);
+
+        return response()->json([
+            'success'    => true,
+            'message'    => 'Rekapitulasi poin pelanggaran siswa berhasil diambil.',
+            'summary'    => $summary,
+            'data'       => $paginated->getCollection()->map(fn($s) => $this->formatRekapStudent($s))->values(),
+            'pagination' => $this->formatPagination($paginated),
+        ]);
+    }
+
+    /**
+     * Daftar siswa yang memiliki poin pelanggaran di rekap (siswa tanpa poin tidak ditampilkan).
+     * Digunakan untuk dropdown saat guru/BK mencatat penanganan.
+     */
+    public function penangananStudents(Request $request)
+    {
+        $user = $request->user();
+        if (!$this->isStaffRole($user)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Akses ditolak. Endpoint ini khusus untuk akun guru/wali kelas/admin.',
+            ], 403);
+        }
+
+        $schoolId = $user->school_id;
+        $isFullSchool = $user->isAdmin() || $user->isWakaKurikulum();
+        $managedKelasIds = $isFullSchool ? [] : $user->getManagedKelasIds();
+
+        $query = Siswa::with(['kelas', 'pelanggarans' => fn($q) => $q->orderBy('tanggal', 'desc')])
+            ->when($schoolId, fn($q) => $q->where('school_id', $schoolId))
+            ->when(!$isFullSchool, fn($q) => $q->whereIn('kelas_id', empty($managedKelasIds) ? [-1] : $managedKelasIds))
+            ->whereHas('pelanggarans', fn($q) => $q->where('poin', '>', 0))
+            ->withSum('pelanggarans as total_poin', 'poin')
+            ->withCount('pelanggarans as total_kasus');
+
+        if ($request->filled('kelas_id')) {
+            $query->where('kelas_id', (int) $request->kelas_id);
+        }
+
+        if ($request->filled('search')) {
+            $search = trim($request->search);
+            $query->where(function ($q) use ($search) {
+                $q->where('nama', 'LIKE', "%{$search}%")
+                    ->orWhere('nis', 'LIKE', "%{$search}%");
+            });
+        }
+
+        $students = $query->orderByDesc('total_poin')->orderBy('nama')->get();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Daftar siswa berpoin untuk penanganan BK berhasil diambil.',
+            'data'    => $students->map(function ($s) {
+                $totalPoin = (int) ($s->total_poin ?? 0);
+                $kelasName = $s->kelas?->nama_kelas ?? '-';
+                return [
+                    'id'           => $s->id,
+                    'nama'         => $s->nama,
+                    'nis'          => $s->nis,
+                    'kelas_id'     => $s->kelas_id,
+                    'nama_kelas'   => $kelasName,
+                    'total_poin'   => $totalPoin,
+                    'total_kasus'  => (int) ($s->total_kasus ?? 0),
+                    'display_text' => "{$s->nama} ({$totalPoin} Poin) - {$kelasName}",
+                    'violations'   => $s->pelanggarans->map(fn($v) => [
+                        'id'                => $v->id,
+                        'code'              => $v->code,
+                        'tanggal'           => $v->tanggal?->format('Y-m-d'),
+                        'judul_pelanggaran' => $v->judul_pelanggaran,
+                        'poin'              => $v->poin,
+                        'status'            => $v->status,
+                        'status_label'      => $v->status_label,
+                    ])->values(),
+                ];
+            })->values(),
+        ]);
+    }
+
+    /**
+     * Riwayat penanganan & konseling BK (SP 1 - 4, Link GDrive, Pembinaan).
+     */
+    public function penangananIndex(Request $request)
+    {
+        $user = $request->user();
+        if (!$this->isStaffRole($user)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Akses ditolak. Endpoint ini khusus untuk akun guru/wali kelas/admin.',
+            ], 403);
+        }
+
+        $schoolId = $user->school_id;
+        $isFullSchool = $user->isAdmin() || $user->isWakaKurikulum();
+        $managedKelasIds = $isFullSchool ? [] : $user->getManagedKelasIds();
+
+        $query = PenangananPelanggaran::with(['student.kelas', 'pelanggaran', 'handler'])
+            ->when($schoolId, fn($q) => $q->where('school_id', $schoolId))
+            ->when(!$isFullSchool, fn($q) => $q->whereHas('student', fn($sq) => $sq->whereIn('kelas_id', empty($managedKelasIds) ? [-1] : $managedKelasIds)));
+
+        if ($request->filled('student_id')) {
+            $query->where('student_id', (int) $request->student_id);
+        }
+
+        if ($request->filled('kelas_id') && $request->kelas_id !== 'all') {
+            $query->whereHas('student', fn($q) => $q->where('kelas_id', (int) $request->kelas_id));
+        }
+
+        if ($request->filled('tindakan_sp') && $request->tindakan_sp !== 'all') {
+            $query->where('tindakan_sp', $request->tindakan_sp);
+        }
+
+        if ($request->filled('status_penanganan') && $request->status_penanganan !== 'all') {
+            $query->where('status_penanganan', $request->status_penanganan);
+        }
+
+        if ($request->filled('start_date') && $request->filled('end_date')) {
+            $query->whereBetween('tanggal', [$request->start_date, $request->end_date]);
+        }
+
+        if ($request->filled('search')) {
+            $search = trim($request->search);
+            $query->where(function ($q) use ($search) {
+                $q->where('catatan_penanganan', 'LIKE', "%{$search}%")
+                    ->orWhere('hasil_kesepakatan', 'LIKE', "%{$search}%")
+                    ->orWhere('link_gdrive', 'LIKE', "%{$search}%")
+                    ->orWhereHas('student', function ($sq) use ($search) {
+                        $sq->where('nama', 'LIKE', "%{$search}%")
+                            ->orWhere('nis', 'LIKE', "%{$search}%");
+                    })
+                    ->orWhereHas('pelanggaran', function ($pq) use ($search) {
+                        $pq->where('code', 'LIKE', "%{$search}%")
+                            ->orWhere('judul_pelanggaran', 'LIKE', "%{$search}%");
+                    });
+            });
+        }
+
+        $summary = [
+            'total'          => (clone $query)->count(),
+            'sp_1'           => (clone $query)->where('tindakan_sp', 'sp_1')->count(),
+            'sp_2'           => (clone $query)->where('tindakan_sp', 'sp_2')->count(),
+            'sp_3'           => (clone $query)->where('tindakan_sp', 'sp_3')->count(),
+            'sp_4'           => (clone $query)->where('tindakan_sp', 'sp_4')->count(),
+            'pembinaan'      => (clone $query)->whereIn('tindakan_sp', ['pembinaan', 'teguran_lisan', 'teguran_tertulis'])->count(),
+            'selesai'        => (clone $query)->where('status_penanganan', 'selesai')->count(),
+            'dalam_proses'   => (clone $query)->where('status_penanganan', 'dalam_proses')->count(),
+        ];
+
+        $perPage = min(max((int) $request->input('per_page', 15), 1), 50);
+        $items = $query->orderBy('tanggal', 'desc')->orderBy('id', 'desc')->paginate($perPage);
+
+        return response()->json([
+            'success'    => true,
+            'message'    => 'Daftar riwayat penanganan BK berhasil diambil.',
+            'summary'    => $summary,
+            'data'       => $items->getCollection()->map(fn($pn) => $this->formatPenanganan($pn))->values(),
+            'pagination' => $this->formatPagination($items),
+        ]);
+    }
+
+    /**
+     * Guru / Guru BK mencatat penanganan & sanksi SP via mobile app.
+     */
+    public function storePenanganan(Request $request)
+    {
+        $user = $request->user();
+        if (!$this->isStaffRole($user)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Akses ditolak. Endpoint ini khusus untuk akun guru/wali kelas/admin.',
+            ], 403);
+        }
+
+        $validated = $request->validate([
+            'student_id'         => 'required|exists:siswa,id',
+            'pelanggaran_id'     => 'nullable|exists:pelanggarans,id',
+            'tanggal'            => 'nullable|date',
+            'tindakan_sp'        => 'required|in:pembinaan,teguran_lisan,teguran_tertulis,sp_1,sp_2,sp_3,sp_4,skorsing,dikembalikan_ortu',
+            'catatan_penanganan' => 'required|string|max:3000',
+            'hasil_kesepakatan'  => 'nullable|string|max:2000',
+            'link_gdrive'        => 'nullable|url|max:1000',
+            'status_penanganan'  => 'nullable|in:dalam_proses,selesai,evaluasi_lanjutan',
+            'lampiran_file'      => 'nullable|file|mimes:jpeg,png,jpg,pdf,doc,docx|max:10240',
+            'foto'               => 'nullable|file|mimes:jpeg,png,jpg,pdf,doc,docx|max:10240',
+            'update_status'      => 'nullable|in:tercatat,diproses,selesai',
+        ]);
+
+        $student = Siswa::with('kelas')->findOrFail($validated['student_id']);
+        if ($user->school_id && (int) $student->school_id !== (int) $user->school_id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Siswa bukan berasal dari sekolah Anda.',
+            ], 403);
+        }
+
+        $pelanggaran = null;
+        if (!empty($validated['pelanggaran_id'])) {
+            $pelanggaran = Pelanggaran::find($validated['pelanggaran_id']);
+        } else {
+            $pelanggaran = Pelanggaran::where('student_id', $student->id)
+                ->where('status', '!=', 'selesai')
+                ->latest('tanggal')
+                ->first()
+                ?? Pelanggaran::where('student_id', $student->id)->latest('tanggal')->first();
+        }
+
+        $file = $request->file('lampiran_file') ?? $request->file('foto');
+        $lampiranPath = $file ? $file->store('penanganan_bk', 'public') : null;
+
+        $statusPenanganan = $validated['status_penanganan'] ?? 'dalam_proses';
+
+        $penanganan = PenangananPelanggaran::create([
+            'school_id'          => $student->school_id ?? $user->school_id,
+            'pelanggaran_id'     => $pelanggaran?->id,
+            'student_id'         => $student->id,
+            'handled_by'         => $user->id,
+            'tanggal'            => !empty($validated['tanggal']) ? Carbon::parse($validated['tanggal'])->format('Y-m-d') : now()->format('Y-m-d'),
+            'tindakan_sp'        => $validated['tindakan_sp'],
+            'catatan_penanganan' => $validated['catatan_penanganan'],
+            'hasil_kesepakatan'  => $validated['hasil_kesepakatan'] ?? null,
+            'link_gdrive'        => $validated['link_gdrive'] ?? null,
+            'lampiran_file'      => $lampiranPath,
+            'status_penanganan'  => $statusPenanganan,
+        ]);
+
+        $penanganan->load(['student.kelas', 'pelanggaran', 'handler']);
+
+        $labelTindakan = $penanganan->tindakan_sp_label;
+
+        if ($pelanggaran) {
+            $newStatus = $validated['update_status'] ?? ($statusPenanganan === 'selesai' ? 'selesai' : 'diproses');
+            $tindakLanjutRingkas = "[BK: {$labelTindakan}] " . \Illuminate\Support\Str::limit($validated['catatan_penanganan'], 150);
+            $pelanggaran->update([
+                'status'        => $newStatus,
+                'tindak_lanjut' => $tindakLanjutRingkas,
+            ]);
+        }
+
+        try {
+            FcmNotificationService::sendToSiswa(
+                $student,
+                "Tindakan BK: {$labelTindakan}",
+                "Telah dicatat penanganan kedisiplinan oleh Guru BK/Kesiswaan pada " . $penanganan->tanggal->format('d/m/Y'),
+                [
+                    'type'           => 'student_penanganan_recorded',
+                    'pelanggaran_id' => (string) ($pelanggaran?->id ?? ''),
+                    'tindakan_sp'    => $penanganan->tindakan_sp,
+                ]
+            );
+        } catch (\Throwable $e) {
+            Log::warning("FCM penanganan notification failed (mobile): " . $e->getMessage());
+        }
+
+        $this->logMobile(
+            $penanganan->school_id,
+            'mobile_penanganan_store',
+            $student->nis,
+            true,
+            "Penanganan BK {$labelTindakan} dicatat untuk {$student->nama}",
+            $request
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => "Catatan penanganan BK ({$labelTindakan}) an. {$student->nama} berhasil disimpan.",
+            'data'    => $this->formatPenanganan($penanganan),
+        ], 201);
+    }
+
+    /**
+     * Rekam jejak utuh dossier pelanggaran dan penanganan BK per siswa.
+     */
+    public function studentHistory(Request $request, $studentId)
+    {
+        $user = $request->user();
+        if (!$this->isStaffRole($user)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Akses ditolak.',
+            ], 403);
+        }
+
+        $student = Siswa::with([
+            'kelas',
+            'pelanggarans' => fn($q) => $q->orderBy('tanggal', 'desc'),
+            'penanganans'  => fn($q) => $q->with(['pelanggaran', 'handler'])->orderBy('tanggal', 'desc')
+        ])->find($studentId);
+
+        if (!$student) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Data siswa tidak ditemukan.',
+            ], 404);
+        }
+
+        if ($user->school_id && (int) $student->school_id !== (int) $user->school_id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Siswa bukan berasal dari sekolah Anda.',
+            ], 403);
+        }
+
+        return response()->json([
+            'success' => true,
+            'student' => [
+                'id'               => $student->id,
+                'nama'             => $student->nama,
+                'nis'              => $student->nis ?? '-',
+                'kelas_id'         => $student->kelas_id,
+                'nama_kelas'       => $student->kelas?->nama_kelas ?? '-',
+                'total_poin'       => (int) $student->pelanggarans->sum('poin'),
+                'total_kasus'      => $student->pelanggarans->count(),
+                'total_penanganan' => $student->penanganans->count(),
+                'display_text'     => "{$student->nama} (" . (int)$student->pelanggarans->sum('poin') . " Poin) - " . ($student->kelas?->nama_kelas ?? '-'),
+            ],
+            'violations'  => $student->pelanggarans->map(fn($v) => [
+                'id'                => $v->id,
+                'code'              => $v->code,
+                'tanggal'           => $v->tanggal?->format('Y-m-d'),
+                'judul_pelanggaran' => $v->judul_pelanggaran,
+                'poin'              => $v->poin,
+                'kategori'          => $v->kategori,
+                'status'            => $v->status,
+                'status_label'      => $v->status_label,
+            ])->values(),
+            'penanganans' => $student->penanganans->map(fn($pn) => $this->formatPenanganan($pn))->values(),
+        ]);
+    }
+
+    /**
+     * Hapus satu catatan penanganan BK.
+     */
+    public function destroyPenanganan(Request $request, $id)
+    {
+        $user = $request->user();
+        if (!$this->isStaffRole($user)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Akses ditolak.',
+            ], 403);
+        }
+
+        $penanganan = PenangananPelanggaran::with('student')->find($id);
+        if (!$penanganan) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Data penanganan BK tidak ditemukan.',
+            ], 404);
+        }
+
+        if ($user->school_id && (int) $penanganan->school_id !== (int) $user->school_id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Akses tidak diizinkan.',
+            ], 403);
+        }
+
+        if ($penanganan->lampiran_file && !str_starts_with($penanganan->lampiran_file, 'http')) {
+            if (Storage::disk('public')->exists($penanganan->lampiran_file)) {
+                Storage::disk('public')->delete($penanganan->lampiran_file);
+            }
+        }
+
+        $penanganan->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Catatan penanganan BK berhasil dihapus.',
+        ]);
+    }
+
+    /**
+     * Siswa melihat catatan penanganan/SP milik diri sendiri.
+     */
+    public function myPenanganans(Request $request)
+    {
+        $user = $request->user();
+        $siswa = $this->resolveStudent($user);
+
+        if (!$siswa) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Akun Anda tidak terhubung dengan data siswa.',
+            ], 403);
+        }
+
+        $items = PenangananPelanggaran::with(['pelanggaran', 'handler'])
+            ->where('school_id', $siswa->school_id)
+            ->where('student_id', $siswa->id)
+            ->orderBy('tanggal', 'desc')
+            ->orderBy('id', 'desc')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Riwayat penanganan BK siswa berhasil diambil.',
+            'summary' => [
+                'total_penanganan' => $items->count(),
+                'sp_aktif'         => $items->firstWhere('status_penanganan', 'dalam_proses')?->tindakan_sp_label ?? 'Tidak Ada',
+            ],
+            'data'    => $items->map(fn($pn) => $this->formatPenanganan($pn))->values(),
         ]);
     }
 
@@ -525,8 +1011,24 @@ class MobilePelanggaranController extends Controller
         return $kelasId && in_array($kelasId, $managedKelasIds);
     }
 
+    private function canDeletePelanggaran(User $user): bool
+    {
+        if ($user->isAdmin()) {
+            return true;
+        }
+
+        $role = strtolower((string) ($user->role ?? ''));
+        if (str_contains($role, 'kesiswaan') || str_contains($role, 'kurikulum') || str_contains($role, 'waka')) {
+            return true;
+        }
+
+        return false;
+    }
+
     private function formatPelanggaran(Pelanggaran $p): array
     {
+        $latestPen = $p->latestPenanganan ?? ($p->relationLoaded('penanganans') ? $p->penanganans->first() : null);
+
         return [
             'id'                      => $p->id,
             'code'                    => $p->code,
@@ -554,8 +1056,93 @@ class MobilePelanggaranController extends Controller
             'status_label'            => $p->status_label,
             'recorded_by'             => $p->recorded_by,
             'recorder_name'           => $p->recorder?->full_name,
+            'penanganans'             => $p->relationLoaded('penanganans') ? $p->penanganans->map(fn($pn) => $this->formatPenanganan($pn))->values() : [],
+            'latest_penanganan'       => $latestPen ? [
+                'id'                      => $latestPen->id,
+                'tanggal'                 => $latestPen->tanggal?->format('Y-m-d'),
+                'tindakan_sp'             => $latestPen->tindakan_sp,
+                'tindakan_sp_label'       => $latestPen->tindakan_sp_label,
+                'catatan_penanganan'      => $latestPen->catatan_penanganan,
+                'hasil_kesepakatan'       => $latestPen->hasil_kesepakatan,
+                'link_gdrive'             => $latestPen->link_gdrive,
+                'lampiran_file_url'       => $latestPen->lampiran_file_url,
+                'status_penanganan'       => $latestPen->status_penanganan,
+                'status_penanganan_label' => $latestPen->status_penanganan_label,
+                'handler_name'            => $latestPen->handler?->full_name,
+            ] : null,
             'created_at'              => $p->created_at?->toIso8601String(),
             'updated_at'              => $p->updated_at?->toIso8601String(),
+        ];
+    }
+
+    private function formatPenanganan(PenangananPelanggaran $pn): array
+    {
+        return [
+            'id'                      => $pn->id,
+            'school_id'               => $pn->school_id,
+            'student_id'              => $pn->student_id,
+            'student'                 => $pn->student ? [
+                'id'         => $pn->student->id,
+                'nama'       => $pn->student->nama,
+                'nis'        => $pn->student->nis,
+                'kelas_id'   => $pn->student->kelas_id,
+                'nama_kelas' => $pn->student->kelas?->nama_kelas,
+            ] : null,
+            'pelanggaran_id'          => $pn->pelanggaran_id,
+            'kasus'                   => $pn->pelanggaran ? [
+                'id'                => $pn->pelanggaran->id,
+                'code'              => $pn->pelanggaran->code,
+                'judul_pelanggaran' => $pn->pelanggaran->judul_pelanggaran,
+                'poin'              => $pn->pelanggaran->poin,
+            ] : null,
+            'tanggal'                 => $pn->tanggal?->format('Y-m-d'),
+            'tindakan_sp'             => $pn->tindakan_sp,
+            'tindakan_sp_label'       => $pn->tindakan_sp_label,
+            'catatan_penanganan'      => $pn->catatan_penanganan,
+            'hasil_kesepakatan'       => $pn->hasil_kesepakatan,
+            'link_gdrive'             => $pn->link_gdrive,
+            'lampiran_file'           => $pn->lampiran_file,
+            'lampiran_file_url'       => $pn->lampiran_file_url,
+            'status_penanganan'       => $pn->status_penanganan,
+            'status_penanganan_label' => $pn->status_penanganan_label,
+            'handled_by'              => $pn->handled_by,
+            'handler_name'            => $pn->handler?->full_name ?? $pn->handler?->username ?? 'Guru BK',
+            'created_at'              => $pn->created_at?->toIso8601String(),
+        ];
+    }
+
+    private function formatRekapStudent(Siswa $s): array
+    {
+        $totalPoin = (int) ($s->total_poin ?? 0);
+        $kelasName = $s->kelas?->nama_kelas ?? '-';
+        return [
+            'id'                 => $s->id,
+            'nama'               => $s->nama,
+            'nis'                => $s->nis,
+            'kelas_id'           => $s->kelas_id,
+            'nama_kelas'         => $kelasName,
+            'foto_url'           => $s->foto_url,
+            'total_poin'         => $totalPoin,
+            'total_kasus'        => (int) ($s->total_kasus ?? 0),
+            'total_penanganan'   => (int) ($s->total_penanganan ?? 0),
+            'display_text'       => "{$s->nama} ({$totalPoin} Poin) - {$kelasName}",
+            'latest_pelanggaran' => $s->latestPelanggaran ? [
+                'id'                => $s->latestPelanggaran->id,
+                'code'              => $s->latestPelanggaran->code,
+                'tanggal'           => $s->latestPelanggaran->tanggal?->format('Y-m-d'),
+                'judul_pelanggaran' => $s->latestPelanggaran->judul_pelanggaran,
+                'poin'              => $s->latestPelanggaran->poin,
+                'kategori'          => $s->latestPelanggaran->kategori,
+                'kategori_label'    => $s->latestPelanggaran->kategori_label,
+            ] : null,
+            'latest_penanganan'  => $s->latestPenanganan ? [
+                'id'                => $s->latestPenanganan->id,
+                'tanggal'           => $s->latestPenanganan->tanggal?->format('Y-m-d'),
+                'tindakan_sp'       => $s->latestPenanganan->tindakan_sp,
+                'tindakan_sp_label' => $s->latestPenanganan->tindakan_sp_label,
+                'link_gdrive'       => $s->latestPenanganan->link_gdrive,
+                'status_penanganan' => $s->latestPenanganan->status_penanganan,
+            ] : null,
         ];
     }
 

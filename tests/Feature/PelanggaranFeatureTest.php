@@ -6,6 +6,7 @@ use App\Models\Guru;
 use App\Models\KategoriPelanggaran;
 use App\Models\Kelas;
 use App\Models\Pelanggaran;
+use App\Models\PenangananPelanggaran;
 use App\Models\School;
 use App\Models\Siswa;
 use App\Models\User;
@@ -187,6 +188,22 @@ class PelanggaranFeatureTest extends TestCase
             $table->timestamps();
         });
 
+        Schema::create('penanganan_pelanggarans', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('school_id');
+            $table->unsignedBigInteger('pelanggaran_id');
+            $table->unsignedBigInteger('student_id');
+            $table->unsignedBigInteger('handled_by')->nullable();
+            $table->date('tanggal');
+            $table->string('tindakan_sp')->default('pembinaan');
+            $table->text('catatan_penanganan');
+            $table->text('hasil_kesepakatan')->nullable();
+            $table->string('link_gdrive', 1000)->nullable();
+            $table->string('lampiran_file')->nullable();
+            $table->string('status_penanganan')->default('dalam_proses');
+            $table->timestamps();
+        });
+
         Schema::create('api_logs', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('school_id')->nullable();
@@ -205,6 +222,14 @@ class PelanggaranFeatureTest extends TestCase
             $table->string('title');
             $table->text('message')->nullable();
             $table->boolean('is_active')->default(true);
+            $table->timestamps();
+        });
+
+        Schema::create('settings', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('school_id')->nullable();
+            $table->string('setting_key');
+            $table->text('setting_value')->nullable();
             $table->timestamps();
         });
     }
@@ -366,5 +391,260 @@ class PelanggaranFeatureTest extends TestCase
         // Password hash now matches 15052008
         $this->studentUser->refresh();
         $this->assertTrue(Hash::check('15052008', $this->studentUser->password_hash));
+    }
+
+    public function test_bk_can_record_and_delete_penanganan_sp_and_link_gdrive(): void
+    {
+        $this->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class);
+        $this->actingAs($this->teacherUser);
+
+        $pelanggaran = Pelanggaran::create([
+            'school_id' => $this->school->id,
+            'student_id' => $this->student->id,
+            'code' => 'PLG-BK01',
+            'tanggal' => '2026-11-13',
+            'judul_pelanggaran' => 'Merokok di area sekolah',
+            'kategori' => 'berat',
+            'poin' => 50,
+            'status' => 'diproses',
+        ]);
+
+        $res = $this->from('/pelanggaran')->post("/pelanggaran/{$pelanggaran->id}/penanganan", [
+            'tanggal' => '2026-11-13',
+            'tindakan_sp' => 'sp_2',
+            'catatan_penanganan' => 'Pemanggilan orang tua dan bimbingan konseling intensif.',
+            'hasil_kesepakatan' => 'Siswa menandatangani surat peringatan kedua dan berjanji tidak mengulangi.',
+            'link_gdrive' => 'https://drive.google.com/file/d/12345sample/view',
+            'status_penanganan' => 'dalam_proses',
+        ]);
+
+        $res->assertSessionHas('success');
+        $this->assertDatabaseHas('penanganan_pelanggarans', [
+            'pelanggaran_id' => $pelanggaran->id,
+            'tindakan_sp' => 'sp_2',
+            'link_gdrive' => 'https://drive.google.com/file/d/12345sample/view',
+        ]);
+
+        $pelanggaran->refresh();
+        $this->assertStringContainsString('SP 2', $pelanggaran->tindak_lanjut);
+
+        $penanganan = $pelanggaran->penanganans()->first();
+        $del = $this->delete("/pelanggaran/penanganan/{$penanganan->id}");
+        $del->assertSessionHas('success');
+        $this->assertDatabaseMissing('penanganan_pelanggarans', ['id' => $penanganan->id]);
+    }
+
+    public function test_dedicated_penanganan_page_export_and_student_dossier(): void
+    {
+        $this->withoutExceptionHandling();
+        $this->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class);
+        $this->actingAs($this->teacherUser);
+
+        $pelanggaran = Pelanggaran::create([
+            'school_id' => $this->school->id,
+            'student_id' => $this->student->id,
+            'code' => 'PLG-HIST01',
+            'tanggal' => '2026-11-13',
+            'judul_pelanggaran' => 'Membolos jam pelajaran',
+            'kategori' => 'sedang',
+            'poin' => 20,
+            'status' => 'diproses',
+        ]);
+
+        $penanganan = PenangananPelanggaran::create([
+            'school_id' => $this->school->id,
+            'pelanggaran_id' => $pelanggaran->id,
+            'student_id' => $this->student->id,
+            'handled_by' => $this->teacherUser->id,
+            'tanggal' => '2026-11-13',
+            'tindakan_sp' => 'sp_1',
+            'catatan_penanganan' => 'Bimbingan konseling dan penandatanganan SP 1.',
+            'hasil_kesepakatan' => 'Siswa berkomitmen tidak mengulangi perbuatannya.',
+            'link_gdrive' => 'https://drive.google.com/file/d/testsp1/view',
+            'status_penanganan' => 'dalam_proses',
+        ]);
+
+        // 1. Dedicated index page
+        $this->get('/pelanggaran/penanganan')
+            ->assertStatus(200)
+            ->assertSee('Riwayat Penanganan &amp; Konseling BK', false)
+            ->assertSee('Ani Wijaya')
+            ->assertSee('https://drive.google.com/file/d/testsp1/view');
+
+        // 2. Student history dossier JSON
+        $dossier = $this->getJson("/pelanggaran/penanganan/student/{$this->student->id}");
+        $dossier->assertStatus(200)
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('student.nama', 'Ani Wijaya')
+            ->assertJsonPath('student.total_poin', 20)
+            ->assertJsonPath('penanganans.0.tindakan_sp', 'sp_1')
+            ->assertJsonPath('penanganans.0.link_gdrive', 'https://drive.google.com/file/d/testsp1/view');
+
+        // 3. Export Excel
+        $this->get('/pelanggaran/penanganan/export-excel')
+            ->assertStatus(200);
+    }
+
+    public function test_rekap_and_filter_and_direct_penanganan_flow(): void
+    {
+        $this->withoutExceptionHandling();
+        $this->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class);
+        $this->actingAs($this->teacherUser);
+
+        // Siswa 2 (tanpa pelanggaran)
+        $cleanStudent = Siswa::create([
+            'school_id' => $this->school->id,
+            'kelas_id'  => $this->kelas->id,
+            'nama'      => 'Bambang Tertib',
+            'nis'       => '1002',
+        ]);
+
+        // Buat 2 pelanggaran untuk student Ani
+        $v1 = Pelanggaran::create([
+            'school_id'         => $this->school->id,
+            'student_id'        => $this->student->id,
+            'code'              => 'PLG-FLOW-01',
+            'tanggal'           => '2026-11-10',
+            'judul_pelanggaran' => 'Terlambat upacara bendera',
+            'kategori'          => 'ringan',
+            'poin'              => 10,
+            'status'            => 'tercatat',
+        ]);
+
+        $v2 = Pelanggaran::create([
+            'school_id'         => $this->school->id,
+            'student_id'        => $this->student->id,
+            'code'              => 'PLG-FLOW-02',
+            'tanggal'           => '2026-11-12',
+            'judul_pelanggaran' => 'Atribut seragam tidak lengkap',
+            'kategori'          => 'ringan',
+            'poin'              => 5,
+            'status'            => 'tercatat',
+        ]);
+
+        // 1. Rekap page: Menampilkan Ani (akumulasi 15 poin)
+        $resRekap = $this->get('/pelanggaran/rekap');
+        $resRekap->assertStatus(200)
+            ->assertSee('Ani Wijaya')
+            ->assertSee('15 Poin')
+            ->assertSee('2 Kasus')
+            ->assertSee('/pelanggaran?student_id=' . $this->student->id);
+
+        // 2. Klik detail di rekap -> masuk ke /pelanggaran?student_id=XX
+        $resIndexFilter = $this->get("/pelanggaran?student_id={$this->student->id}");
+        $resIndexFilter->assertStatus(200)
+            ->assertSee('Filter Siswa Aktif')
+            ->assertSee('Ani Wijaya')
+            ->assertSee('PLG-FLOW-01')
+            ->assertSee('PLG-FLOW-02')
+            ->assertSee('Reset Filter');
+
+        // 3. Catat Penanganan BK langsung memilih Siswa (student_id)
+        $resPenangananStore = $this->post('/pelanggaran/penanganan', [
+            'student_id'         => $this->student->id,
+            'tanggal'            => '2026-11-13',
+            'tindakan_sp'        => 'sp_1',
+            'catatan_penanganan' => 'Konseling penertiban atribut & upacara bendera.',
+            'hasil_kesepakatan'  => 'Siswa berjanji mematuhi aturan sekolah.',
+            'link_gdrive'        => 'https://drive.google.com/file/d/sp1ani/view',
+            'status_penanganan'  => 'dalam_proses',
+        ]);
+
+        $resPenangananStore->assertSessionHas('success');
+
+        $this->assertDatabaseHas('penanganan_pelanggarans', [
+            'student_id'  => $this->student->id,
+            'tindakan_sp' => 'sp_1',
+            'link_gdrive' => 'https://drive.google.com/file/d/sp1ani/view',
+        ]);
+
+        // Pastikan status pelanggaran terbaru ter-update otomatis
+        $v2->refresh();
+        $this->assertEquals('diproses', $v2->status);
+        $this->assertStringContainsString('SP 1', $v2->tindak_lanjut);
+    }
+
+    public function test_mobile_api_rekap_and_penanganan_endpoints(): void
+    {
+        $this->withoutExceptionHandling();
+        Sanctum::actingAs($this->teacherUser);
+
+        // Buat 1 pelanggaran untuk student Ani
+        $v = Pelanggaran::create([
+            'school_id'         => $this->school->id,
+            'student_id'        => $this->student->id,
+            'code'              => 'PLG-MBL-01',
+            'tanggal'           => '2026-11-13',
+            'judul_pelanggaran' => 'Merokok di area sekolah',
+            'kategori'          => 'berat',
+            'poin'              => 50,
+            'status'            => 'tercatat',
+        ]);
+
+        // 1. Mobile Rekap Pelanggaran
+        $rekapRes = $this->getJson('/api/mobile/guru/pelanggaran/rekap');
+        $rekapRes->assertStatus(200)
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('summary.total_siswa_pelanggar', 1)
+            ->assertJsonPath('data.0.id', $this->student->id)
+            ->assertJsonPath('data.0.total_poin', 50)
+            ->assertJsonPath('data.0.total_kasus', 1)
+            ->assertJsonPath('data.0.display_text', "Ani Wijaya (50 Poin) - X IPA 1");
+
+        // 2. Mobile Penanganan Students Dropdown (hanya yang berpoin)
+        $studentsRes = $this->getJson('/api/mobile/guru/penanganan/students');
+        $studentsRes->assertStatus(200)
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.0.id', $this->student->id)
+            ->assertJsonPath('data.0.total_poin', 50)
+            ->assertJsonPath('data.0.violations.0.code', 'PLG-MBL-01');
+
+        // 3. Guru mencatat penanganan BK via mobile
+        $postRes = $this->postJson('/api/mobile/guru/penanganan', [
+            'student_id'         => $this->student->id,
+            'tindakan_sp'        => 'sp_2',
+            'catatan_penanganan' => 'Pemanggilan orang tua dan skorsing 3 hari.',
+            'hasil_kesepakatan'  => 'Orang tua menandatangani surat SP 2.',
+            'link_gdrive'        => 'https://drive.google.com/file/d/mblsp2/view',
+            'status_penanganan'  => 'dalam_proses',
+        ]);
+
+        $postRes->assertStatus(201)
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.tindakan_sp', 'sp_2')
+            ->assertJsonPath('data.link_gdrive', 'https://drive.google.com/file/d/mblsp2/view');
+
+        $penangananId = $postRes->json('data.id');
+
+        // 4. Guru melihat daftar penanganan BK
+        $indexRes = $this->getJson('/api/mobile/guru/penanganan');
+        $indexRes->assertStatus(200)
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('summary.total', 1)
+            ->assertJsonPath('data.0.id', $penangananId);
+
+        // 5. Guru melihat dossier utuh siswa
+        $dossierRes = $this->getJson("/api/mobile/guru/penanganan/student/{$this->student->id}");
+        $dossierRes->assertStatus(200)
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('student.nama', 'Ani Wijaya')
+            ->assertJsonPath('violations.0.code', 'PLG-MBL-01')
+            ->assertJsonPath('penanganans.0.tindakan_sp', 'sp_2');
+
+        // 6. Akun Siswa melihat riwayat penanganan/SP milik sendiri
+        Sanctum::actingAs($this->studentUser);
+        $myPenRes = $this->getJson('/api/mobile/student/penanganan/my');
+        $myPenRes->assertStatus(200)
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('summary.total_penanganan', 1)
+            ->assertJsonPath('data.0.id', $penangananId)
+            ->assertJsonPath('data.0.link_gdrive', 'https://drive.google.com/file/d/mblsp2/view');
+
+        // 7. Guru menghapus penanganan
+        Sanctum::actingAs($this->teacherUser);
+        $delRes = $this->deleteJson("/api/mobile/guru/penanganan/{$penangananId}");
+        $delRes->assertStatus(200)
+            ->assertJsonPath('success', true);
+        $this->assertDatabaseMissing('penanganan_pelanggarans', ['id' => $penangananId]);
     }
 }

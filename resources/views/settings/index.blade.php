@@ -599,7 +599,7 @@
                     @endphp
 
                     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-gray-200 dark:border-gray-800 pb-4">
-                        <div>
+                        <div class="max-w-2xl">
                             <h3 class="text-lg font-semibold text-gray-800 dark:text-white/90 flex items-center gap-2">
                                 <i class="fas fa-mosque text-emerald-500"></i> Pengaturan Waktu & Absensi Sholat
                             </h3>
@@ -607,16 +607,14 @@
                                 Perhitungan jadwal sholat otomatis dihitung berdasar koordinat latitude & longitude sekolah menggunakan hisab astronomi standar Kementerian Agama RI.
                             </p>
                         </div>
-                        <div class="flex items-center gap-3 bg-gray-50 dark:bg-gray-800/60 p-2.5 rounded-xl border border-gray-200 dark:border-gray-700">
-                            <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Aktifkan Absensi Sholat</span>
-                            <label class="flex items-center cursor-pointer select-none">
-                                <div class="relative">
-                                    <input type="checkbox" id="prayer_enabled" name="prayer_enabled" value="true" class="sr-only" {{ $prayerEnabled ? 'checked' : '' }}>
-                                    <div class="block h-6 w-10 rounded-full bg-gray-300 dark:bg-gray-600 toggle-bg transition"></div>
-                                    <div class="dot absolute left-1 top-1 h-4 w-4 rounded-full bg-white transition toggle-dot"></div>
-                                </div>
-                            </label>
-                        </div>
+                        <label for="prayer_enabled" class="flex items-center justify-between sm:justify-start gap-3 bg-gray-50 dark:bg-gray-800/60 hover:bg-gray-100 dark:hover:bg-gray-800/80 px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 cursor-pointer select-none shrink-0 transition shadow-xs">
+                            <span class="text-sm font-semibold text-gray-800 dark:text-gray-200">Aktifkan Absensi Sholat</span>
+                            <div class="relative inline-flex items-center">
+                                <input type="checkbox" id="prayer_enabled" name="prayer_enabled" value="true" class="sr-only peer" {{ $prayerEnabled ? 'checked' : '' }}>
+                                <div class="block h-7 w-12 rounded-full bg-gray-300 dark:bg-gray-600 peer-checked:bg-emerald-500 transition-colors"></div>
+                                <div class="dot absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow-md transition-transform peer-checked:translate-x-5"></div>
+                            </div>
+                        </label>
                     </div>
 
                     <!-- Live Preview Jadwal Sholat Hari Ini -->
@@ -789,13 +787,22 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         /* Custom Toggle Switch Styles */
+        .toggle-bg {
+            transition: background-color 0.2s ease;
+        }
+
         input:checked~.toggle-bg {
-            background-color: #3C50E0;
+            background-color: #3C50E0 !important;
             /* brand-500 */
         }
 
+        .toggle-dot {
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.25);
+            transition: transform 0.2s ease;
+        }
+
         input:checked~.toggle-dot {
-            transform: translateX(100%);
+            transform: translateX(100%) !important;
         }
 
         #geofence-map {

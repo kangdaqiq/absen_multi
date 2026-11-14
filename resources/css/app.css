@@ -1027,6 +1027,22 @@ pre[class*='language-'] {
 }
 
 /* ── Toggle Switch (custom `.toggle-bg`, `.dot`) ──── */
+.toggle-bg {
+  @apply bg-gray-300;
+  transition: background-color 0.2s ease;
+}
+input:checked ~ .toggle-bg {
+  background-color: #3C50E0 !important;
+}
+.toggle-dot {
+  @apply bg-white;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.25);
+  transition: transform 0.2s ease;
+}
+input:checked ~ .toggle-dot {
+  transform: translateX(100%) !important;
+}
+
 .dark .toggle-bg {
   @apply bg-gray-700;
 }

@@ -156,7 +156,7 @@ class ExamSyncApiController extends Controller
 
         // 1. Ambil Data Guru
         if (in_array($type, ['all', 'guru'])) {
-            $guruQuery = Guru::with(['user:id,email,username,password_hash', 'school:id,name']);
+            $guruQuery = Guru::with(['user:id,email,username,role,password_hash,plain_password', 'school:id,name']);
             if (!empty($schoolId)) {
                 $guruQuery->where('school_id', $schoolId);
             }
@@ -164,11 +164,15 @@ class ExamSyncApiController extends Controller
             $result['gurus'] = $guruQuery->get()->map(function ($guru) {
                 return [
                     'id' => $guru->id,
+                    'user_id' => $guru->user_id,
                     'nama' => $guru->nama,
                     'nip' => $guru->nip,
                     'no_wa' => $guru->no_wa,
+                    'username' => $guru->user?->username,
                     'email' => $guru->user?->email,
+                    'role' => $guru->user?->role,
                     'password_hash' => $guru->user?->password_hash,
+                    'plain_password' => $guru->user?->plain_password,
                     'school_id' => $guru->school_id,
                     'school_name' => $guru->school?->name,
                 ];
@@ -216,7 +220,7 @@ class ExamSyncApiController extends Controller
 
         // 4. Ambil Data Siswa (Peserta Ujian)
         if (in_array($type, ['all', 'siswa']) || (is_array($type) && in_array('siswa', $type))) {
-            $siswaQuery = Siswa::with(['user:id,email,username,password_hash', 'school:id,name', 'kelas:id,nama_kelas']);
+            $siswaQuery = Siswa::with(['user:id,email,username,password_hash,plain_password', 'school:id,name', 'kelas:id,nama_kelas']);
             if (!empty($schoolId)) {
                 $siswaQuery->where('school_id', $schoolId);
             }
@@ -224,15 +228,40 @@ class ExamSyncApiController extends Controller
             $result['siswas'] = $siswaQuery->get()->map(function ($s) {
                 return [
                     'id' => $s->id,
+                    'user_id' => $s->user_id,
                     'nama' => $s->nama,
                     'nis' => $s->nis,
+                    'tgl_lahir' => $s->tgl_lahir ? (is_string($s->tgl_lahir) ? $s->tgl_lahir : $s->tgl_lahir->format('Y-m-d')) : null,
                     'kelas_id' => $s->kelas_id,
                     'kelas_nama' => $s->kelas?->nama_kelas,
                     'no_wa' => $s->no_wa,
+                    'username' => $s->user?->username,
                     'email' => $s->user?->email,
                     'password_hash' => $s->user?->password_hash,
+                    'plain_password' => $s->user?->plain_password,
                     'school_id' => $s->school_id,
                     'school_name' => $s->school?->name,
+                ];
+            });
+        }
+
+        // 5. Ambil Seluruh Akun Pengguna Sekolah (Admin, Waka Kurikulum, Wali Kelas, Guru, Siswa)
+        if (in_array($type, ['all', 'users', 'user'])) {
+            $userQuery = \App\Models\User::query();
+            if (!empty($schoolId)) {
+                $userQuery->where('school_id', $schoolId);
+            }
+
+            $result['users'] = $userQuery->get()->map(function ($u) {
+                return [
+                    'id' => $u->id,
+                    'full_name' => $u->full_name,
+                    'username' => $u->username,
+                    'email' => $u->email,
+                    'role' => $u->role,
+                    'password_hash' => $u->password_hash,
+                    'plain_password' => $u->plain_password,
+                    'school_id' => $u->school_id,
                 ];
             });
         }
@@ -258,5 +287,86 @@ class ExamSyncApiController extends Controller
         });
 
         return response()->json($result);
+    }
+
+    /**
+     * Rekapitulasi Absensi Siswa per Semester / Rentang Tanggal
+     * GET /api/cbt-sync/rekap-absensi
+     */
+    public function exportRekapAbsensi(Request $request): JsonResponse
+    {
+        if (!$this->verifyKey($request)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized: API Key tidak valid.',
+            ], 401);
+        }
+
+        $schoolId = $request->input('school_id');
+        $kelasId = $request->input('kelas_id');
+        $startDate = $request->input('start_date');
+        $endDate = $request->input('end_date');
+
+        if (!$startDate || !$endDate) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Parameter start_date dan end_date wajib diisi (format Y-m-d).',
+            ], 400);
+        }
+
+        $siswaQuery = Siswa::with('kelas:id,nama_kelas');
+        if (!empty($schoolId)) {
+            $siswaQuery->where('school_id', $schoolId);
+        }
+        if (!empty($kelasId)) {
+            $siswaQuery->where('kelas_id', $kelasId);
+        }
+
+        $siswas = $siswaQuery->orderBy('nama', 'asc')->get();
+        $siswaIds = $siswas->pluck('id');
+
+        $allAttendances = \App\Models\Attendance::whereIn('student_id', $siswaIds)
+            ->whereBetween('tanggal', [$startDate, $endDate])
+            ->select('student_id', 'status')
+            ->get()
+            ->groupBy('student_id');
+
+        $rekapList = $siswas->map(function ($s) use ($allAttendances) {
+            $att = $allAttendances->get($s->id, collect());
+
+            $hadir = $att->whereIn('status', ['H', 'Hadir'])->count();
+            $terlambat = $att->whereIn('status', ['T', 'Terlambat'])->count();
+            $masuk = $hadir + $terlambat; // total masuk
+            $izin = $att->whereIn('status', ['I', 'Izin'])->count();
+            $sakit = $att->whereIn('status', ['S', 'Sakit'])->count();
+            $alpha = $att->whereIn('status', ['A', 'Alpha', 'Tidak Hadir'])->count();
+            $bolos = $att->whereIn('status', ['B', 'Bolos'])->count();
+            $totalHari = $att->count();
+
+            return [
+                'siswa_sync_id' => $s->id,
+                'nama' => $s->nama,
+                'nis' => $s->nis,
+                'kelas_sync_id' => $s->kelas_id,
+                'nama_kelas' => $s->kelas?->nama_kelas,
+                'masuk' => $masuk,
+                'hadir' => $hadir,
+                'terlambat' => $terlambat,
+                'izin' => $izin,
+                'sakit' => $sakit,
+                'alpha' => $alpha,
+                'bolos' => $bolos,
+                'total_hari' => $totalHari,
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'school_id' => $schoolId,
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+            'total_siswa' => $siswas->count(),
+            'rekap' => $rekapList,
+        ]);
     }
 }

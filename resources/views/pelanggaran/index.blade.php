@@ -10,6 +10,11 @@
         subtitle="Catat, pantau poin pelanggaran, dan kelola tindak lanjut kedisiplinan siswa"
         icon="fas fa-exclamation-triangle">
         <div class="flex flex-wrap items-center gap-3">
+            <a href="{{ route('pelanggaran.penanganan.index') }}"
+               class="inline-flex items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50/70 px-4 py-2.5 text-sm font-semibold text-indigo-700 hover:bg-indigo-100 dark:border-indigo-900/50 dark:bg-indigo-950/40 dark:text-indigo-300 dark:hover:bg-indigo-900/50 transition shadow-theme-xs">
+                <i class="fas fa-user-shield text-indigo-600 dark:text-indigo-400"></i> Riwayat Penanganan BK
+            </a>
+
             <a href="{{ route('pelanggaran.rekap') }}"
                class="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800 transition shadow-theme-xs">
                 <i class="fas fa-file-invoice text-emerald-500"></i> Rekap Pelanggaran
@@ -71,9 +76,49 @@
         </div>
     </div>
 
+    @if($selectedStudent)
+        <!-- Banner Filter Siswa Aktif dari Rekap -->
+        <div class="rounded-2xl border border-brand-200 bg-brand-50/70 p-4 dark:border-brand-900/40 dark:bg-brand-950/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-theme-xs">
+            <div class="flex items-center gap-3">
+                <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-500 text-white font-bold text-base shadow-sm">
+                    {{ strtoupper(substr($selectedStudent->nama, 0, 2)) }}
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs font-semibold uppercase tracking-wider text-brand-700 dark:text-brand-400">Filter Siswa Aktif</span>
+                        <span class="rounded-md bg-red-100 px-2 py-0.5 text-xs font-bold text-red-700 dark:bg-red-500/20 dark:text-red-400">
+                            Total: {{ $selectedStudent->pelanggarans->sum('poin') }} Poin
+                        </span>
+                    </div>
+                    <div class="text-base font-bold text-gray-900 dark:text-white mt-0.5">
+                        {{ $selectedStudent->nama }}
+                        <span class="text-sm font-normal text-gray-500">(NIS: {{ $selectedStudent->nis ?? '-' }} • Kelas: {{ $selectedStudent->kelas?->nama_kelas ?? '-' }})</span>
+                    </div>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <button type="button" @click="openCreateForStudent({{ $selectedStudent->id }})"
+                        class="rounded-xl bg-brand-500 px-3.5 py-2 text-xs font-semibold text-white hover:bg-brand-600 transition shadow-xs">
+                    <i class="fas fa-plus mr-1"></i> Catat Pelanggaran Siswa Ini
+                </button>
+                <a href="{{ route('pelanggaran.penanganan.index', ['student_id' => $selectedStudent->id]) }}"
+                   class="rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 dark:border-indigo-900 dark:bg-indigo-950/40 dark:text-indigo-300 transition">
+                    <i class="fas fa-user-shield mr-1"></i> Riwayat BK
+                </a>
+                <a href="{{ route('pelanggaran.index') }}"
+                   class="rounded-xl border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 transition">
+                    <i class="fas fa-times mr-1"></i> Reset Filter
+                </a>
+            </div>
+        </div>
+    @endif
+
     <!-- Filter -->
     <div class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
         <form method="GET" action="{{ route('pelanggaran.index') }}" class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6">
+            @if(request('student_id'))
+                <input type="hidden" name="student_id" value="{{ request('student_id') }}">
+            @endif
             <select name="kelas_id" class="rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-white">
                 <option value="">Semua Kelas</option>
                 @foreach($kelasList as $kelas)
@@ -165,7 +210,19 @@
                             </td>
                             <td class="px-4 py-3 max-w-xs">
                                 <div class="text-xs text-gray-700 dark:text-gray-300">{{ $item->tindak_lanjut ?: '-' }}</div>
-                                <div class="text-[11px] text-gray-400 mt-0.5">Dicatat: {{ $item->recorder?->full_name ?? '-' }}</div>
+                                @if($item->penanganans->isNotEmpty())
+                                    <div class="mt-1 flex flex-wrap gap-1">
+                                        @foreach($item->penanganans->take(2) as $pn)
+                                            <span class="inline-flex items-center gap-1 rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-400">
+                                                <i class="fas fa-user-shield text-[9px]"></i> {{ $pn->tindakan_sp_label }}
+                                            </span>
+                                        @endforeach
+                                        @if($item->penanganans->count() > 2)
+                                            <span class="text-[10px] text-gray-400">+{{ $item->penanganans->count() - 2 }} lainnya</span>
+                                        @endif
+                                    </div>
+                                @endif
+                                <div class="text-[11px] text-gray-400 mt-1">Dicatat: {{ $item->recorder?->full_name ?? '-' }}</div>
                             </td>
                             <td class="px-4 py-3 text-center whitespace-nowrap">
                                 @php
@@ -180,6 +237,14 @@
                                 </span>
                             </td>
                             <td class="px-4 py-3 text-right whitespace-nowrap">
+                                <a href="{{ route('pelanggaran.penanganan.index', ['student_id' => $item->student_id]) }}"
+                                   class="inline-flex items-center gap-1 rounded-lg bg-indigo-50 px-2.5 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-500/10 dark:text-indigo-400 mr-1"
+                                   title="Buka Riwayat Penanganan BK Siswa">
+                                    <i class="fas fa-user-shield"></i> BK
+                                    @if($item->penanganans->isNotEmpty())
+                                        <span class="ml-0.5 rounded-full bg-indigo-600 px-1.5 py-0.2 text-[10px] text-white">{{ $item->penanganans->count() }}</span>
+                                    @endif
+                                </a>
                                 <button type="button"
                                         @click="openEdit({{ $item->id }}, '{{ $item->status }}', @js($item->tindak_lanjut ?? ''))"
                                         class="inline-flex items-center rounded-lg bg-brand-50 px-2.5 py-1.5 text-xs font-semibold text-brand-600 hover:bg-brand-100 dark:bg-brand-500/10 dark:text-brand-400 mr-1">
@@ -223,7 +288,7 @@
                 @csrf
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Siswa *</label>
-                    <select name="student_id" required class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white">
+                    <select name="student_id" x-model="createStudentId" required class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white">
                         <option value="">-- Pilih Siswa --</option>
                         @foreach($siswaList as $s)
                             <option value="{{ $s->id }}">{{ $s->nama }} ({{ $s->nis ?? '-' }}) - {{ $s->kelas?->nama_kelas ?? '-' }}</option>
@@ -326,6 +391,142 @@
         </div>
     </div>
 
+    <!-- Modal Catatan Penanganan Pelanggaran (Guru BK / Kesiswaan) -->
+    <div x-show="openPenangananModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <div @click.away="openPenangananModal = false" class="w-full max-w-2xl rounded-2xl bg-white p-6 dark:bg-gray-900 shadow-xl max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between border-b border-gray-200 pb-3 dark:border-gray-800">
+                <div>
+                    <h3 class="text-lg font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                        <i class="fas fa-user-shield text-indigo-600"></i> Catatan Penanganan Kasus (Guru BK)
+                    </h3>
+                    <p class="text-xs text-gray-500 mt-0.5" x-text="penangananSiswaTitle"></p>
+                </div>
+                <button type="button" @click="openPenangananModal = false" class="text-gray-400 hover:text-gray-600">&times;</button>
+            </div>
+
+            <!-- Form Tambah Penanganan / Tindakan SP -->
+            <form method="POST" :action="`{{ url('/pelanggaran') }}/${penangananPelanggaranId}/penanganan`" enctype="multipart/form-data" class="mt-4 space-y-4 border-b border-gray-200 pb-6 dark:border-gray-800">
+                @csrf
+                <div class="rounded-xl border border-indigo-100 bg-indigo-50/60 p-3 text-xs text-indigo-900 dark:border-indigo-900/40 dark:bg-indigo-950/20 dark:text-indigo-300">
+                    <span class="font-bold">Kasus:</span> <span x-text="penangananKasusText"></span>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Tanggal Tindakan *</label>
+                        <input type="date" name="tanggal" value="{{ date('Y-m-d') }}" required
+                               class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Tindakan / Sanksi SP *</label>
+                        <select name="tindakan_sp" required class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white">
+                            <option value="pembinaan">Pembinaan BK</option>
+                            <option value="teguran_lisan">Teguran Lisan</option>
+                            <option value="teguran_tertulis">Teguran Tertulis</option>
+                            <option value="sp_1">Surat Peringatan 1 (SP 1)</option>
+                            <option value="sp_2">Surat Peringatan 2 (SP 2)</option>
+                            <option value="sp_3">Surat Peringatan 3 (SP 3)</option>
+                            <option value="sp_4">Surat Peringatan 4 (SP 4 / Terakhir)</option>
+                            <option value="skorsing">Skorsing</option>
+                            <option value="dikembalikan_ortu">Dikembalikan ke Orang Tua</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Catatan Penanganan / Proses Konseling *</label>
+                    <textarea name="catatan_penanganan" required rows="3" placeholder="Uraikan proses bimbingan, konseling, atau pemanggilan orang tua yang dilakukan oleh Guru BK..."
+                              class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white"></textarea>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Hasil Kesepakatan / Perjanjian (Opsional)</label>
+                    <textarea name="hasil_kesepakatan" rows="2" placeholder="Komitmen siswa, perjanjian bermaterai, poin perjanjian..."
+                              class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white"></textarea>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                        <i class="fab fa-google-drive text-emerald-600 mr-1"></i> Link Google Drive Berkas / Surat SP / Dokumentasi Guru BK (Opsional)
+                    </label>
+                    <input type="url" name="link_gdrive" placeholder="https://drive.google.com/drive/folders/..."
+                           class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white">
+                    <p class="text-[11px] text-gray-400 mt-1">Masukkan URL folder Google Drive atau file dokumen surat pernyataan / SP untuk arsip digital.</p>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Upload File Lampiran (Opsional, PDF/Foto/Doc max 10MB)</label>
+                        <input type="file" name="lampiran_file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                               class="w-full text-xs text-gray-500 file:mr-2 file:rounded-lg file:border-0 file:bg-gray-100 file:px-2.5 file:py-1.5 file:text-xs file:font-semibold">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Status Penanganan *</label>
+                        <select name="status_penanganan" required class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-800 dark:text-white">
+                            <option value="selesai">Selesai (Kasus Ditutup / Selesai)</option>
+                            <option value="dalam_proses">Dalam Proses (Masih Diproses)</option>
+                            <option value="evaluasi_lanjutan">Evaluasi Lanjutan (Dalam Pengawasan)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-2 pt-1">
+                    <button type="submit" class="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700 transition">
+                        <i class="fas fa-save"></i> Simpan Catatan Penanganan
+                    </button>
+                </div>
+            </form>
+
+            <!-- Riwayat Penanganan Sebelumnya -->
+            <div class="mt-5">
+                <h4 class="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">Riwayat Penanganan Kasus</h4>
+                <template x-if="penangananList.length === 0">
+                    <p class="text-xs text-gray-400 py-3 text-center italic">Belum ada catatan penanganan BK untuk kasus ini.</p>
+                </template>
+                <div class="space-y-3">
+                    <template x-for="pn in penangananList" :key="pn.id">
+                        <div class="rounded-xl border border-gray-200 bg-gray-50/70 p-3.5 dark:border-gray-800 dark:bg-gray-800/40">
+                            <div class="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200/60 pb-2 dark:border-gray-700/60">
+                                <div class="flex items-center gap-2">
+                                    <span class="rounded bg-indigo-100 px-2 py-0.5 text-xs font-bold text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300" x-text="pn.tindakan_sp_label"></span>
+                                    <span class="text-xs text-gray-500" x-text="pn.tanggal"></span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-[11px] text-gray-500">Oleh: <strong x-text="pn.handler_name || 'Guru BK'"></strong></span>
+                                    <form :action="`{{ url('/pelanggaran/penanganan') }}/${pn.id}`" method="POST" onsubmit="return confirm('Hapus riwayat penanganan ini?')" class="inline">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="text-xs text-error-500 hover:text-error-700 ml-2" title="Hapus"><i class="fas fa-trash-alt"></i></button>
+                                    </form>
+                                </div>
+                            </div>
+                            <div class="mt-2 text-xs text-gray-700 dark:text-gray-300 whitespace-pre-line" x-text="pn.catatan_penanganan"></div>
+                            <template x-if="pn.hasil_kesepakatan">
+                                <div class="mt-2 rounded-lg bg-white p-2 text-xs border border-gray-100 dark:border-gray-800 dark:bg-gray-900/60">
+                                    <span class="font-semibold text-gray-600 dark:text-gray-400">Hasil Kesepakatan:</span>
+                                    <span class="text-gray-800 dark:text-gray-200" x-text="pn.hasil_kesepakatan"></span>
+                                </div>
+                            </template>
+                            <div class="mt-2 flex flex-wrap items-center gap-3 pt-1 text-xs">
+                                <template x-if="pn.link_gdrive">
+                                    <a :href="pn.link_gdrive" target="_blank" class="inline-flex items-center gap-1.5 font-semibold text-emerald-600 hover:underline">
+                                        <i class="fab fa-google-drive"></i> Buka Berkas Google Drive
+                                    </a>
+                                </template>
+                                <template x-if="pn.lampiran_file_url">
+                                    <a :href="pn.lampiran_file_url" target="_blank" class="inline-flex items-center gap-1.5 font-semibold text-brand-600 hover:underline">
+                                        <i class="fas fa-paperclip"></i> Unduh File Lampiran
+                                    </a>
+                                </template>
+                                <span class="text-[11px] text-gray-400 ml-auto">Status: <span class="font-medium" x-text="pn.status_label"></span></span>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal Master Kategori -->
     <div x-show="openKategoriModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
         <div @click.away="openKategoriModal = false" class="w-full max-w-xl rounded-2xl bg-white p-6 dark:bg-gray-900 shadow-xl max-h-[90vh] overflow-y-auto">
@@ -377,9 +578,11 @@
 function pelanggaranAdmin() {
     const kategoris = @json($kategoriList->keyBy('id'));
     return {
+        createStudentId: '{{ $selectedStudent?->id ?? '' }}',
         openCreateModal: false,
         openEditModal: false,
         openKategoriModal: false,
+        openPenangananModal: false,
         selectedKategoriId: '',
         formJudul: '',
         formKategori: 'ringan',
@@ -388,6 +591,14 @@ function pelanggaranAdmin() {
         editId: null,
         editStatus: 'tercatat',
         editTindakLanjut: '',
+        penangananPelanggaranId: null,
+        penangananSiswaTitle: '',
+        penangananKasusText: '',
+        penangananList: [],
+        openCreateForStudent(studentId) {
+            this.createStudentId = String(studentId);
+            this.openCreateModal = true;
+        },
         applyKategori() {
             const kat = kategoris[this.selectedKategoriId];
             if (kat) {
@@ -402,6 +613,29 @@ function pelanggaranAdmin() {
             this.editStatus = status;
             this.editTindakLanjut = tindakLanjut || '';
             this.openEditModal = true;
+        },
+        openPenangananModalAction(item) {
+            this.penangananPelanggaranId = item.id;
+            const siswaNama = item.student ? item.student.nama : 'Siswa';
+            const siswaNis = item.student ? (item.student.nis || '-') : '-';
+            const kelas = item.student && item.student.kelas ? item.student.kelas.nama_kelas : '-';
+            this.penangananSiswaTitle = `Siswa: ${siswaNama} (NIS: ${siswaNis}) • Kelas: ${kelas} • Kode: ${item.code}`;
+            this.penangananKasusText = `${item.judul_pelanggaran} (${item.kategori_label || item.kategori} - ${item.poin} poin)`;
+            
+            // Format penanganans list
+            this.penangananList = (item.penanganans || []).map(p => ({
+                id: p.id,
+                tanggal: p.tanggal ? new Date(p.tanggal).toLocaleDateString('id-ID', {day: 'numeric', month: 'short', year: 'numeric'}) : '-',
+                tindakan_sp_label: p.tindakan_sp_label || p.tindakan_sp,
+                catatan_penanganan: p.catatan_penanganan,
+                hasil_kesepakatan: p.hasil_kesepakatan,
+                link_gdrive: p.link_gdrive,
+                lampiran_file_url: p.lampiran_file_url,
+                status_label: p.status_penanganan_label || p.status_penanganan,
+                handler_name: p.handler ? p.handler.full_name : null,
+            }));
+
+            this.openPenangananModal = true;
         }
     }
 }

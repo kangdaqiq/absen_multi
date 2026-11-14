@@ -272,14 +272,20 @@ Route::middleware('auth')->group(function () {
         Route::post('/student-leaves/{id}/reject', [App\Http\Controllers\StudentLeaveController::class, 'reject'])->name('student-leaves.reject');
         Route::delete('/student-leaves/{id}', [App\Http\Controllers\StudentLeaveController::class, 'destroy'])->name('student-leaves.destroy');
 
-        // Catatan Pelanggaran Siswa
+        // Catatan Pelanggaran Siswa & Penanganan BK
         Route::get('/pelanggaran', [App\Http\Controllers\PelanggaranController::class, 'index'])->name('pelanggaran.index');
+        Route::get('/pelanggaran/penanganan', [App\Http\Controllers\PelanggaranController::class, 'penangananIndex'])->name('pelanggaran.penanganan.index');
+        Route::get('/pelanggaran/penanganan/export-excel', [App\Http\Controllers\PelanggaranController::class, 'exportPenangananExcel'])->name('pelanggaran.penanganan.export-excel');
+        Route::get('/pelanggaran/penanganan/student/{id}', [App\Http\Controllers\PelanggaranController::class, 'studentHistory'])->name('pelanggaran.penanganan.student-history');
         Route::get('/pelanggaran/rekap', [App\Http\Controllers\PelanggaranController::class, 'rekap'])->name('pelanggaran.rekap');
         Route::get('/pelanggaran/export-excel', [App\Http\Controllers\PelanggaranController::class, 'exportExcel'])->name('pelanggaran.export-excel');
         Route::get('/pelanggaran/export-pdf', [App\Http\Controllers\PelanggaranController::class, 'exportPdf'])->name('pelanggaran.export-pdf');
         Route::post('/pelanggaran', [App\Http\Controllers\PelanggaranController::class, 'store'])->name('pelanggaran.store');
         Route::put('/pelanggaran/{id}', [App\Http\Controllers\PelanggaranController::class, 'update'])->name('pelanggaran.update');
         Route::delete('/pelanggaran/{id}', [App\Http\Controllers\PelanggaranController::class, 'destroy'])->name('pelanggaran.destroy');
+        Route::post('/pelanggaran/penanganan', [App\Http\Controllers\PelanggaranController::class, 'storePenangananDirect'])->name('pelanggaran.penanganan.storeDirect');
+        Route::post('/pelanggaran/{id}/penanganan', [App\Http\Controllers\PelanggaranController::class, 'storePenanganan'])->name('pelanggaran.penanganan.store');
+        Route::delete('/pelanggaran/penanganan/{id}', [App\Http\Controllers\PelanggaranController::class, 'destroyPenanganan'])->name('pelanggaran.penanganan.destroy');
         Route::post('/pelanggaran/kategori', [App\Http\Controllers\PelanggaranController::class, 'storeKategori'])->name('pelanggaran.kategori.store');
         Route::delete('/pelanggaran/kategori/{id}', [App\Http\Controllers\PelanggaranController::class, 'destroyKategori'])->name('pelanggaran.kategori.destroy');
 

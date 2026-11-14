@@ -261,6 +261,26 @@ class Siswa extends Model
         return $this->hasOne(UserFaceData::class, 'siswa_id');
     }
 
+    public function pelanggarans()
+    {
+        return $this->hasMany(Pelanggaran::class, 'student_id');
+    }
+
+    public function latestPelanggaran()
+    {
+        return $this->hasOne(Pelanggaran::class, 'student_id')->latestOfMany('tanggal');
+    }
+
+    public function penanganans()
+    {
+        return $this->hasMany(PenangananPelanggaran::class, 'student_id');
+    }
+
+    public function latestPenanganan()
+    {
+        return $this->hasOne(PenangananPelanggaran::class, 'student_id')->latestOfMany('tanggal');
+    }
+
     public function getHasFaceRegisteredAttribute(): bool
     {
         if ($this->relationLoaded('faceData') && $this->faceData) {

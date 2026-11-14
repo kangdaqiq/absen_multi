@@ -54,6 +54,16 @@ class Pelanggaran extends Model
         return $this->belongsTo(User::class, 'recorded_by');
     }
 
+    public function penanganans()
+    {
+        return $this->hasMany(PenangananPelanggaran::class, 'pelanggaran_id')->latest('tanggal')->latest('id');
+    }
+
+    public function latestPenanganan()
+    {
+        return $this->hasOne(PenangananPelanggaran::class, 'pelanggaran_id')->latestOfMany();
+    }
+
     public function scopeForSchool($query, $schoolId)
     {
         return $query->where('school_id', $schoolId);

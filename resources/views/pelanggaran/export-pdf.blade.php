@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Rekapitulasi Pelanggaran Siswa</title>
+    <title>Rekapitulasi Akumulasi Poin Pelanggaran Siswa</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -82,15 +82,6 @@
             font-weight: bold;
         }
 
-        .badge-ringan { background: #dcfce7; color: #15803d; }
-        .badge-sedang { background: #fef9c3; color: #854d0e; }
-        .badge-berat  { background: #fee2e2; color: #b91c1c; }
-
-        .footer {
-            margin-top: 25px;
-            width: 100%;
-        }
-
         .signature-table {
             width: 100%;
             border-collapse: collapse;
@@ -113,7 +104,7 @@
 <body>
     <div class="header">
         <h2>{{ $schoolName }}</h2>
-        <h3>LAPORAN REKAPITULASI PELANGGARAN SISWA</h3>
+        <h3>LAPORAN REKAPITULASI AKUMULASI POIN PELANGGARAN SISWA</h3>
         <p>{{ $schoolAddress }}</p>
     </div>
 
@@ -121,15 +112,21 @@
         <table>
             <tr>
                 <td style="width: 15%;"><strong>Periode:</strong></td>
-                <td style="width: 35%;">{{ \Carbon\Carbon::parse($startDate)->format('d/m/Y') }} s.d. {{ \Carbon\Carbon::parse($endDate)->format('d/m/Y') }}</td>
-                <td style="width: 18%;"><strong>Total Pelanggaran:</strong></td>
-                <td style="width: 32%;">{{ $totalKasus }} Kasus ({{ $totalPoin }} Poin)</td>
+                <td style="width: 35%;">
+                    @if($startDate && $endDate)
+                        {{ \Carbon\Carbon::parse($startDate)->format('d/m/Y') }} s.d. {{ \Carbon\Carbon::parse($endDate)->format('d/m/Y') }}
+                    @else
+                        Seluruh Riwayat (Kumulatif)
+                    @endif
+                </td>
+                <td style="width: 18%;"><strong>Ringkasan:</strong></td>
+                <td style="width: 32%;">{{ $totalSiswa }} Siswa • {{ $totalKasus }} Kasus ({{ $totalPoin }} Poin)</td>
             </tr>
             <tr>
                 <td><strong>Dicetak Pada:</strong></td>
-                <td>{{ now()->format('d/m/Y H:i') }}</td>
-                <td><strong>Waktu:</strong></td>
-                <td>WIB</td>
+                <td>{{ now()->translatedFormat('d F Y H:i') }} WIB</td>
+                <td><strong>Status Siswa:</strong></td>
+                <td>{{ $filterPoin === 'with_points' ? 'Hanya Siswa Berpoin' : 'Semua Siswa' }}</td>
             </tr>
         </table>
     </div>
@@ -138,46 +135,54 @@
         <thead>
             <tr>
                 <th style="width: 25px;">No</th>
-                <th style="width: 65px;">Kode</th>
-                <th style="width: 65px;">Tanggal</th>
-                <th style="width: 60px;">NIS</th>
+                <th style="width: 65px;">NIS</th>
                 <th>Nama Siswa</th>
-                <th style="width: 65px;">Kelas</th>
-                <th>Pelanggaran</th>
-                <th style="width: 55px;">Kategori</th>
-                <th style="width: 35px;">Poin</th>
-                <th style="width: 55px;">Status</th>
-                <th>Tindak Lanjut</th>
+                <th style="width: 75px;">Kelas</th>
+                <th style="width: 60px;">Total Kasus</th>
+                <th style="width: 60px;">Akumulasi Poin</th>
+                <th>Pelanggaran Terakhir</th>
+                <th>Tindakan / SP Terakhir</th>
+                <th style="width: 60px;">Jml Tindakan</th>
             </tr>
         </thead>
         <tbody>
-            @php $totalPoinCount = 0; @endphp
-            @forelse($items as $idx => $p)
-                @php $totalPoinCount += (int)$p->poin; @endphp
+            @php $totalPoinCount = 0; $totalKasusCount = 0; @endphp
+            @forelse($items as $idx => $s)
+                @php 
+                    $totalPoinCount += (int)$s->total_poin;
+                    $totalKasusCount += (int)$s->total_kasus;
+                @endphp
                 <tr>
                     <td class="text-center">{{ $idx + 1 }}</td>
-                    <td class="text-center font-mono" style="font-size: 9px;">{{ $p->code }}</td>
-                    <td class="text-center">{{ $p->tanggal?->format('d/m/Y') }}</td>
-                    <td class="text-center">{{ $p->student?->nis ?? '-' }}</td>
-                    <td><strong>{{ $p->student?->nama ?? '-' }}</strong></td>
-                    <td class="text-center">{{ $p->student?->kelas?->nama_kelas ?? '-' }}</td>
+                    <td class="text-center font-mono">{{ $s->nis ?? '-' }}</td>
+                    <td><strong>{{ $s->nama }}</strong></td>
+                    <td class="text-center">{{ $s->kelas?->nama_kelas ?? '-' }}</td>
+                    <td class="text-center">{{ $s->total_kasus }}</td>
+                    <td class="text-center font-bold" style="{{ (int)$s->total_poin > 25 ? 'color: #dc2626;' : '' }}">
+                        {{ (int)$s->total_poin }}
+                    </td>
                     <td>
-                        {{ $p->judul_pelanggaran }}
-                        @if($p->keterangan)
-                            <div style="font-size: 8.5px; color: #555;">{{ $p->keterangan }}</div>
+                        @if($s->latestPelanggaran)
+                            {{ $s->latestPelanggaran->judul_pelanggaran }}
+                            <div style="font-size: 8.5px; color: #666;">({{ $s->latestPelanggaran->tanggal?->format('d/m/Y') }} • +{{ $s->latestPelanggaran->poin }} poin)</div>
+                        @else
+                            <span style="color: #999;">-</span>
                         @endif
                     </td>
-                    <td class="text-center">
-                        <span class="badge badge-{{ $p->kategori }}">{{ ucfirst($p->kategori) }}</span>
+                    <td>
+                        @if($s->latestPenanganan)
+                            <strong>{{ $s->latestPenanganan->tindakan_sp_label }}</strong>
+                            <div style="font-size: 8.5px; color: #666;">({{ $s->latestPenanganan->tanggal?->format('d/m/Y') }})</div>
+                        @else
+                            <span style="color: #999;">-</span>
+                        @endif
                     </td>
-                    <td class="text-center font-bold">{{ $p->poin }}</td>
-                    <td class="text-center">{{ ucfirst($p->status) }}</td>
-                    <td style="font-size: 9px;">{{ $p->tindak_lanjut ?? '-' }}</td>
+                    <td class="text-center">{{ (int)$s->total_penanganan }}</td>
                 </tr>
             @empty
                 <tr>
-                    <td colspan="11" class="text-center" style="padding: 15px; color: #888;">
-                        Tidak ada data catatan pelanggaran pada periode ini.
+                    <td colspan="9" class="text-center" style="padding: 15px; color: #888;">
+                        Tidak ada data pelanggaran siswa yang memenuhi filter.
                     </td>
                 </tr>
             @endforelse
@@ -185,9 +190,10 @@
         @if($items->isNotEmpty())
             <tfoot>
                 <tr style="background-color: #f9fafb; font-weight: bold;">
-                    <td colspan="8" class="text-right">TOTAL POIN PELANGGARAN:</td>
+                    <td colspan="4" class="text-right">TOTAL:</td>
+                    <td class="text-center">{{ $totalKasusCount }}</td>
                     <td class="text-center">{{ $totalPoinCount }}</td>
-                    <td colspan="2"></td>
+                    <td colspan="3"></td>
                 </tr>
             </tfoot>
         @endif
@@ -206,4 +212,3 @@
     </table>
 </body>
 </html>
-

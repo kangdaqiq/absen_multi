@@ -157,6 +157,30 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/mobile/student/pelanggaran/{id}', [App\Http\Controllers\Api\MobilePelanggaranController::class, 'show']);
     Route::get('/mobile/siswa/pelanggaran/{id}', [App\Http\Controllers\Api\MobilePelanggaranController::class, 'show']);
 
+    // --- Rekap Pelanggaran Siswa & Akumulasi Poin (Apps Guru & Admin) ---
+    Route::get('/mobile/guru/pelanggaran/rekap', [App\Http\Controllers\Api\MobilePelanggaranController::class, 'rekapStudents']);
+    Route::get('/mobile/teacher/pelanggaran/rekap', [App\Http\Controllers\Api\MobilePelanggaranController::class, 'rekapStudents']);
+    Route::get('/mobile/pelanggaran/rekap', [App\Http\Controllers\Api\MobilePelanggaranController::class, 'rekapStudents']);
+
+    // --- Riwayat Penanganan & Konseling BK (SP 1-4, GDrive) (Apps Guru, BK & Siswa) ---
+    Route::get('/mobile/guru/penanganan', [App\Http\Controllers\Api\MobilePelanggaranController::class, 'penangananIndex']);
+    Route::get('/mobile/teacher/penanganan', [App\Http\Controllers\Api\MobilePelanggaranController::class, 'penangananIndex']);
+    Route::get('/mobile/penanganan', [App\Http\Controllers\Api\MobilePelanggaranController::class, 'penangananIndex']);
+    Route::get('/mobile/guru/penanganan/students', [App\Http\Controllers\Api\MobilePelanggaranController::class, 'penangananStudents']);
+    Route::get('/mobile/teacher/penanganan/students', [App\Http\Controllers\Api\MobilePelanggaranController::class, 'penangananStudents']);
+    Route::post('/mobile/guru/penanganan', [App\Http\Controllers\Api\MobilePelanggaranController::class, 'storePenanganan']);
+    Route::post('/mobile/teacher/penanganan', [App\Http\Controllers\Api\MobilePelanggaranController::class, 'storePenanganan']);
+    Route::post('/mobile/penanganan', [App\Http\Controllers\Api\MobilePelanggaranController::class, 'storePenanganan']);
+    Route::get('/mobile/guru/penanganan/student/{id}', [App\Http\Controllers\Api\MobilePelanggaranController::class, 'studentHistory']);
+    Route::get('/mobile/teacher/penanganan/student/{id}', [App\Http\Controllers\Api\MobilePelanggaranController::class, 'studentHistory']);
+    Route::delete('/mobile/guru/penanganan/{id}', [App\Http\Controllers\Api\MobilePelanggaranController::class, 'destroyPenanganan']);
+    Route::delete('/mobile/teacher/penanganan/{id}', [App\Http\Controllers\Api\MobilePelanggaranController::class, 'destroyPenanganan']);
+    Route::delete('/mobile/penanganan/{id}', [App\Http\Controllers\Api\MobilePelanggaranController::class, 'destroyPenanganan']);
+
+    Route::get('/mobile/student/penanganan/my', [App\Http\Controllers\Api\MobilePelanggaranController::class, 'myPenanganans']);
+    Route::get('/mobile/siswa/penanganan/my', [App\Http\Controllers\Api\MobilePelanggaranController::class, 'myPenanganans']);
+    Route::get('/mobile/penanganan/my', [App\Http\Controllers\Api\MobilePelanggaranController::class, 'myPenanganans']);
+
     Route::post('/mobile/logout', [MobileAttendanceController::class, 'logout']);
 });
 
@@ -165,5 +189,6 @@ Route::prefix('cbt-sync')->group(function () {
     Route::get('/ping', [App\Http\Controllers\Api\ExamSyncApiController::class, 'ping']);
     Route::get('/check-school', [App\Http\Controllers\Api\ExamSyncApiController::class, 'checkSchool']);
     Route::get('/data', [App\Http\Controllers\Api\ExamSyncApiController::class, 'exportData']);
+    Route::get('/rekap-absensi', [App\Http\Controllers\Api\ExamSyncApiController::class, 'exportRekapAbsensi']);
 });
 

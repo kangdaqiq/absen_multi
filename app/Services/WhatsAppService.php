@@ -258,7 +258,8 @@ class WhatsAppService
                     tglMulai: $leave->tanggal_mulai->format('d/m/Y'),
                     tglSelesai: $leave->tanggal_selesai->format('d/m/Y'),
                     keterangan: $leave->keterangan,
-                    code: $leave->code
+                    code: $leave->code,
+                    buktiUrl: $leave->bukti_foto_url
                 );
                 $this->queueMessage($wali->no_wa, $msg, $leave->school_id, delaySeconds: 10, bypassLastSeen: true);
             }

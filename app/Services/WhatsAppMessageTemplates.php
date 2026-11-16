@@ -1271,7 +1271,8 @@ class WhatsAppMessageTemplates
         string $tglMulai,
         string $tglSelesai,
         string $keterangan,
-        string $code
+        string $code,
+        ?string $buktiUrl = null
     ): string {
         $msg = "📩 *PENGAJUAN " . strtoupper($jenis) . " SISWA*\n\n";
         $msg .= "Yth. Bapak/Ibu Wali Kelas *{$namaWali}*,\n\n";
@@ -1281,9 +1282,14 @@ class WhatsAppMessageTemplates
         $msg .= "📋 Jenis      : *" . ucfirst($jenis) . "*\n";
         $msg .= "📅 Rentang    : {$tglMulai}" . ($tglMulai !== $tglSelesai ? " s/d {$tglSelesai}" : "") . "\n";
         $msg .= "📝 Alasan     : {$keterangan}\n";
-        $msg .= "🔖 Nomor Izin  : `{$code}`\n\n";
-        $msg .= "Silakan login ke Web Admin / Dashboard untuk meninjau dan menyetujui pengajuan ini.\n\n";
-        $msg .= "_Pesan otomatis Sistem Absensi_";
+        if (!empty($buktiUrl)) {
+            $msg .= "📎 Bukti      : {$buktiUrl}\n";
+        }
+        $msg .= "🔖 Kode Izin  : `{$code}`\n\n";
+        $msg .= "⚡ *Aksi Cepat via WhatsApp:*\n";
+        $msg .= "• Balas: `acc {$code}` untuk *menyetujui*\n";
+        $msg .= "• Balas: `tolak {$code} [alasan]` untuk *menolak*\n\n";
+        $msg .= "_Atau login ke Web Admin / Dashboard Sekolah._";
         return $msg;
     }
 

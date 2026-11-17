@@ -87,16 +87,16 @@ class School extends Model
     {
         $logo = $this->logo;
 
-        if (empty($logo)) {
+        if (empty($logo) || $logo === 'logo.png') {
             $logo = Setting::where('school_id', $this->id)->where('setting_key', 'logo_filename')->value('setting_value');
         }
 
-        if (empty($logo)) {
+        if (empty($logo) || $logo === 'logo.png') {
             $logo = Setting::where('school_id', 0)->where('setting_key', 'logo_filename')->value('setting_value');
         }
 
-        if (empty($logo)) {
-            return asset('images/logo/logo.svg');
+        if (empty($logo) || $logo === 'logo.png') {
+            return asset('images/logo/logo-icon.svg');
         }
 
         if (\Illuminate\Support\Str::startsWith($logo, ['http://', 'https://'])) {

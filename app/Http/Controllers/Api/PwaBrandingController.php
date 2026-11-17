@@ -262,11 +262,14 @@ class PwaBrandingController extends Controller
         }
 
         if ($school) {
-            return $school->logo_url ?: asset('img/logo.png');
+            $schoolLogo = $school->logo_url;
+            if ($schoolLogo && !Str::endsWith($schoolLogo, ['img/logo.png', '/logo.png'])) {
+                return $schoolLogo;
+            }
         }
 
         $logo = $settings['logo_filename'] ?? null;
-        if (!empty($logo)) {
+        if (!empty($logo) && $logo !== 'logo.png') {
             if (Str::startsWith($logo, ['http://', 'https://'])) {
                 return $logo;
             }
@@ -274,13 +277,13 @@ class PwaBrandingController extends Controller
             if (file_exists(public_path('storage/' . $clean))) {
                 return asset('storage/' . $clean);
             }
-            if (file_exists(public_path('img/' . $clean))) {
-                return asset('img/' . $clean);
+            if (file_exists(public_path('images/logo/' . $clean))) {
+                return asset('images/logo/' . $clean);
             }
             return asset('storage/' . $clean);
         }
 
-        return asset('img/logo.png');
+        return asset('images/logo/logo-icon.svg');
     }
 
     private function resolveLogoDiskPath(?School $school): ?string
@@ -295,7 +298,7 @@ class PwaBrandingController extends Controller
             $school?->logo,
             Setting::where('school_id', $schoolId)->where('setting_key', 'logo_filename')->value('setting_value'),
             Setting::where('school_id', 0)->where('setting_key', 'logo_filename')->value('setting_value'),
-        ]);
+        ], fn($val) => !empty($val) && $val !== 'logo.png');
 
         foreach ($candidates as $rel) {
             if (Str::startsWith($rel, ['http://', 'https://'])) {
@@ -305,7 +308,7 @@ class PwaBrandingController extends Controller
             $paths = [
                 storage_path('app/public/' . $clean),
                 public_path('storage/' . $clean),
-                public_path('img/' . $clean),
+                public_path('images/logo/' . $clean),
                 public_path($clean),
             ];
             foreach ($paths as $p) {
@@ -315,7 +318,6 @@ class PwaBrandingController extends Controller
             }
         }
 
-        $defaultPng = public_path('img/logo.png');
-        return file_exists($defaultPng) ? $defaultPng : null;
+        return null;
     }
 }

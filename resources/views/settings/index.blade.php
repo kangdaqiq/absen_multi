@@ -134,14 +134,19 @@
                                     Sekolah</label>
                                 <div class="mb-3">
                                     @php
-                                        $logo = !empty($settings['logo_filename']) ? $settings['logo_filename'] : 'logo.png';
-                                        $isStorage = \Illuminate\Support\Str::startsWith($logo, 'schools/');
-                                        $logoUrl = asset('img/logo.png'); // Default
+                                        $logo = $settings['logo_filename'] ?? '';
+                                        $logoUrl = asset('images/logo/logo-icon.svg'); // Default Jagat Absen
 
-                                        if ($isStorage && file_exists(storage_path('app/public/' . $logo))) {
-                                            $logoUrl = asset('storage/' . $logo);
-                                        } elseif (!$isStorage && file_exists(public_path('img/' . $logo))) {
-                                            $logoUrl = asset('img/' . $logo);
+                                        if (!empty($logo) && $logo !== 'logo.png') {
+                                            if (\Illuminate\Support\Str::startsWith($logo, ['http://', 'https://'])) {
+                                                $logoUrl = $logo;
+                                            } elseif (file_exists(storage_path('app/public/' . $logo)) || file_exists(public_path('storage/' . $logo))) {
+                                                $logoUrl = asset('storage/' . ltrim($logo, '/'));
+                                            } elseif (file_exists(public_path('images/logo/' . $logo))) {
+                                                $logoUrl = asset('images/logo/' . $logo);
+                                            } else {
+                                                $logoUrl = asset('storage/' . ltrim($logo, '/'));
+                                            }
                                         }
                                     @endphp
                                     <div

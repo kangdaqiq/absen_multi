@@ -231,11 +231,25 @@
                                 @php
                                     $currentSchoolObj = auth()->user()?->school;
                                     $pwaSchoolParam = $currentSchoolObj?->code ?: (auth()->user()?->school_id ?: 'default');
+                                    $fullPwaUrl = 'https://apps.jagattech.my.id/?school=' . $pwaSchoolParam;
                                 @endphp
-                                <div class="rounded-lg bg-white dark:bg-gray-900 border border-indigo-100 dark:border-gray-800 p-3 text-xs text-gray-600 dark:text-gray-300">
-                                    <div class="font-semibold text-indigo-700 dark:text-indigo-400 mb-1">Parameter Link PWA Sekolah Anda:</div>
-                                    <code class="px-2 py-1 rounded bg-gray-100 dark:bg-gray-800 text-indigo-600 font-mono">?school={{ $pwaSchoolParam }}</code>
-                                    <p class="mt-1 text-[11px] text-gray-500">Tambahkan parameter di atas pada URL PWA Anda (atau login sekali saja) agar logo & nama aplikasi di HP otomatis berubah menjadi identitas sekolah ini.</p>
+                                <div x-data="{ copied: false }" class="rounded-lg bg-white dark:bg-gray-900 border border-indigo-100 dark:border-gray-800 p-3 text-xs text-gray-600 dark:text-gray-300">
+                                    <div class="font-semibold text-indigo-700 dark:text-indigo-400 mb-1.5">Link Aplikasi PWA Sekolah Anda:</div>
+                                    <div class="flex items-center gap-2">
+                                        <code class="flex-1 px-2.5 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 text-indigo-600 dark:text-indigo-300 font-mono break-all select-all">{{ $fullPwaUrl }}</code>
+                                        <button type="button"
+                                            @click="navigator.clipboard.writeText('{{ $fullPwaUrl }}'); copied = true; setTimeout(() => copied = false, 2000)"
+                                            class="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold transition-colors cursor-pointer">
+                                            <i class="fas" :class="copied ? 'fa-check' : 'fa-copy'"></i>
+                                            <span x-text="copied ? 'Tersalin!' : 'Salin Link'"></span>
+                                        </button>
+                                        <a href="{{ $fullPwaUrl }}" target="_blank"
+                                            class="shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-indigo-200 dark:border-gray-700 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-gray-800 font-semibold transition-colors"
+                                            title="Buka PWA">
+                                            <i class="fas fa-external-link-alt"></i>
+                                        </a>
+                                    </div>
+                                    <p class="mt-1.5 text-[11px] text-gray-500">Bagikan link di atas kepada Guru & Siswa (atau cukup login sekali di <strong>https://apps.jagattech.my.id</strong>) agar logo & nama aplikasi di HP otomatis berubah menjadi identitas sekolah ini.</p>
                                 </div>
                             </div>
 

@@ -109,12 +109,12 @@ class PwaBrandingController extends Controller
                 $canvas = imagecreatetruecolor($size, $size);
                 imagealphablending($canvas, false);
                 imagesavealpha($canvas, true);
-                // Background putih bersih dengan padding halus agar logo sekolah proporsional
-                $white = imagecolorallocatealpha($canvas, 255, 255, 255, 0);
-                imagefilledrectangle($canvas, 0, 0, $size, $size, $white);
+                // Gunakan background transparan penuh agar PNG transparan tidak berubah warna
+                $transparent = imagecolorallocatealpha($canvas, 0, 0, 0, 127);
+                imagefilledrectangle($canvas, 0, 0, $size, $size, $transparent);
                 imagealphablending($canvas, true);
 
-                $padding = (int) round($size * 0.08);
+                $padding = (int) round($size * 0.06);
                 $avail = $size - ($padding * 2);
                 $scale = min($avail / max($srcW, 1), $avail / max($srcH, 1));
                 $dstW = (int) round($srcW * $scale);
@@ -123,6 +123,7 @@ class PwaBrandingController extends Controller
                 $dstY = (int) round(($size - $dstH) / 2);
 
                 imagecopyresampled($canvas, $srcImg, $dstX, $dstY, 0, 0, $dstW, $dstH, $srcW, $srcH);
+                imagesavealpha($canvas, true);
 
                 ob_start();
                 imagepng($canvas);

@@ -292,9 +292,9 @@ class R2StorageService
             default         => 'uploads/' . date('Y/m'),
         };
 
-        // Otomatis kompresi foto kamera HP sebelum upload ke Cloudflare R2
+        // Otomatis kompresi foto kamera HP sebelum upload ke Cloudflare R2 (lewati untuk kategori 'logo' agar transparansi PNG/SVG tetap utuh)
         $isTempFile = false;
-        if (str_starts_with($mimeType, 'image/')) {
+        if (str_starts_with($mimeType, 'image/') && $category !== 'logo') {
             [$realPath, $size, $mimeType, $isTempFile] = $this->compressImageIfNeeded($realPath, $mimeType);
             if ($isTempFile) {
                 $extension = 'jpg';
@@ -683,6 +683,19 @@ class R2StorageService
                 imagecopyresampled($resized, $image, 0, 0, 0, 0, $newWidth, $newHeight, $origWidth, $origHeight);
                 imagedestroy($image);
                 $image = $resized;
+            }
+
+            // Jika sumber adalah PNG atau WebP (memiliki alpha channel transparansi), beri canvas putih sebelum disimpan ke JPEG agar tidak menjadi background hitam
+            if (in_array($mimeType, ['image/png', 'image/webp'])) {
+                $w = imagesx($image);
+                $h = imagesy($image);
+                $whiteBg = imagecreatetruecolor($w, $h);
+                $white = imagecolorallocate($whiteBg, 255, 255, 255);
+                imagefill($whiteBg, 0, 0, $white);
+                imagealphablending($whiteBg, true);
+                imagecopy($whiteBg, $image, 0, 0, 0, 0, $w, $h);
+                imagedestroy($image);
+                $image = $whiteBg;
             }
 
             $tempPath = tempnam(sys_get_temp_dir(), 'r2_cmp_') . '.jpg';

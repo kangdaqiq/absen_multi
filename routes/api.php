@@ -42,6 +42,13 @@ Route::any('/endpoint/accept/{key?}', [App\Http\Controllers\Api\QrisCallbackCont
 
 // Mobile App REST API Routes
 use App\Http\Controllers\Api\MobileAttendanceController;
+use App\Http\Controllers\Api\PwaBrandingController;
+
+// Dynamic White-Label PWA Branding & Web App Manifest Endpoints
+Route::get('/pwa/branding', [PwaBrandingController::class, 'branding']);
+Route::get('/pwa/manifest', [PwaBrandingController::class, 'manifest']);
+Route::get('/pwa/manifest.webmanifest', [PwaBrandingController::class, 'manifest']);
+Route::get('/pwa/icon/{school}/{size}.png', [PwaBrandingController::class, 'icon']);
 
 Route::post('/mobile/login', [MobileAttendanceController::class, 'login']);
 

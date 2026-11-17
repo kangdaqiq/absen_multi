@@ -179,6 +179,61 @@
                                 <p class="mt-1 text-xs text-gray-500">Format: JPG, PNG. Rekomendasi resolusi lebar (contoh: 1200x200px). Maksimal 5MB.</p>
                             </div>
 
+                            <!-- Pengaturan Branding PWA (Custom Nama & Logo Aplikasi Mobile Web) -->
+                            <div class="rounded-xl border border-indigo-200/80 dark:border-indigo-900/60 p-4 bg-indigo-50/40 dark:bg-indigo-950/20 space-y-4">
+                                <div class="flex items-center justify-between border-b border-indigo-100 dark:border-indigo-900/50 pb-2.5">
+                                    <div>
+                                        <h4 class="text-sm font-semibold text-gray-800 dark:text-white/90 flex items-center gap-2">
+                                            <i class="fas fa-mobile-screen-button text-indigo-600"></i>
+                                            <span>Branding Aplikasi PWA (Custom Sekolah)</span>
+                                        </h4>
+                                        <p class="text-xs text-gray-500 mt-0.5">Kustomisasi Nama & Ikon aplikasi saat di-install ke layar utama HP Guru/Siswa.</p>
+                                    </div>
+                                </div>
+
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="mb-1.5 block text-xs font-medium text-gray-700 dark:text-gray-300">Nama Aplikasi PWA</label>
+                                        <input type="text" name="pwa_app_name"
+                                            value="{{ $settings['pwa_app_name'] ?? ($settings['nama_sekolah'] ?? '') }}"
+                                            placeholder="Contoh: E-Presensi SMKN 1"
+                                            class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                                    </div>
+                                    <div>
+                                        <label class="mb-1.5 block text-xs font-medium text-gray-700 dark:text-gray-300">Singkatan Ikon HP (Maks 15 Huruf)</label>
+                                        <input type="text" name="pwa_short_name" maxlength="20"
+                                            value="{{ $settings['pwa_short_name'] ?? '' }}"
+                                            placeholder="Contoh: SMKN 1"
+                                            class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label class="mb-1.5 block text-xs font-medium text-gray-700 dark:text-gray-300">Tagline / Deskripsi Halaman Login PWA</label>
+                                    <input type="text" name="pwa_description"
+                                        value="{{ $settings['pwa_description'] ?? '' }}"
+                                        placeholder="Contoh: Sistem Presensi & Jurnal Mengajar Digital Terpadu"
+                                        class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
+                                </div>
+
+                                <div>
+                                    <label class="mb-1.5 block text-xs font-medium text-gray-700 dark:text-gray-300">Ikon / Logo Khusus PWA (Opsional)</label>
+                                    <input type="file" name="pwa_logo" accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                                        class="w-full cursor-pointer rounded-lg border border-gray-200 bg-white text-xs outline-none dark:border-gray-800 dark:bg-gray-900 dark:text-white file:mr-3 file:py-1.5 file:px-3 file:rounded-l-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
+                                    <p class="mt-1 text-[11px] text-gray-500">Jika dikosongkan, PWA otomatis memakai <strong>Logo Sekolah</strong> di atas (otomatis di-resize ke 192x192 & 512x512 PNG).</p>
+                                </div>
+
+                                @php
+                                    $currentSchoolObj = auth()->user()?->school;
+                                    $pwaSchoolParam = $currentSchoolObj?->code ?: (auth()->user()?->school_id ?: 'default');
+                                @endphp
+                                <div class="rounded-lg bg-white dark:bg-gray-900 border border-indigo-100 dark:border-gray-800 p-3 text-xs text-gray-600 dark:text-gray-300">
+                                    <div class="font-semibold text-indigo-700 dark:text-indigo-400 mb-1">Parameter Link PWA Sekolah Anda:</div>
+                                    <code class="px-2 py-1 rounded bg-gray-100 dark:bg-gray-800 text-indigo-600 font-mono">?school={{ $pwaSchoolParam }}</code>
+                                    <p class="mt-1 text-[11px] text-gray-500">Tambahkan parameter di atas pada URL PWA Anda (atau login sekali saja) agar logo & nama aplikasi di HP otomatis berubah menjadi identitas sekolah ini.</p>
+                                </div>
+                            </div>
+
                             <div
                                 class="rounded-lg border border-gray-200 p-4 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
                                 <h4 class="mb-4 text-sm font-semibold text-gray-800 dark:text-white/90">Pengaturan Absen

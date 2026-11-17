@@ -758,11 +758,19 @@ class MobileAttendanceController extends Controller
             ? $school->storage_api_key
             : ($storageCfg['key'] ?? '');
 
+        $pwaBranding = app(\App\Http\Controllers\Api\PwaBrandingController::class)
+            ->buildBrandingPayload($school instanceof \App\Models\School ? $school : null);
+
         return [
             'id' => $id,
+            'code' => $school?->code ?: (string) $id,
             'name' => $school?->name ?? 'Sekolah',
             'domain' => $school?->domain ?? null,
-            'logo_url' => $logoUrl,
+            'logo_url' => $pwaBranding['logo_url'] ?: $logoUrl,
+            'pwa_app_name' => $pwaBranding['app_name'],
+            'pwa_short_name' => $pwaBranding['short_name'],
+            'pwa_description' => $pwaBranding['description'],
+            'pwa_manifest_url' => $pwaBranding['manifest_url'],
             'latitude' => $lat,
             'longitude' => $long,
             'radius' => $radius,

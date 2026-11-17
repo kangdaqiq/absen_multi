@@ -110,7 +110,25 @@ class SettingsController extends Controller
             );
         }
 
-        $data = $request->except('_token', '_method', 'logo', 'license_key', 'kop_surat');
+        // Handle custom PWA logo upload
+        if ($request->hasFile('pwa_logo')) {
+            $request->validate([
+                'pwa_logo' => 'required|image|mimes:jpeg,png,jpg,webp,svg|max:5120', // 5MB
+            ]);
+
+            $schoolId = auth()->user()->school_id ?? 0;
+            $path = app(\App\Services\R2StorageService::class)->uploadWithFallback($request->file('pwa_logo'), $schoolId, 'logo');
+
+            \Illuminate\Support\Facades\DB::table('settings')->updateOrInsert(
+                [
+                    'setting_key' => 'pwa_logo_filename',
+                    'school_id' => $schoolId
+                ],
+                ['setting_value' => $path]
+            );
+        }
+
+        $data = $request->except('_token', '_method', 'logo', 'license_key', 'kop_surat', 'pwa_logo');
 
         // Handle checkboxes (they don't send data when unchecked)
         $checkboxSettings = [

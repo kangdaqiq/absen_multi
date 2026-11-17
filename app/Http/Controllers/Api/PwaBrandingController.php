@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\School;
 use App\Models\Setting;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 
 class PwaBrandingController extends Controller
@@ -43,9 +44,6 @@ class PwaBrandingController extends Controller
 
         $scope = $origin ? ($origin . '/') : '/';
 
-        $icon192 = url("/api/pwa/icon/{$schoolIdentifier}/192.png");
-        $icon512 = url("/api/pwa/icon/{$schoolIdentifier}/512.png");
-
         $manifest = [
             'id' => 'jagat-absen-' . Str::slug((string) $schoolIdentifier),
             'name' => $branding['app_name'],
@@ -59,13 +57,13 @@ class PwaBrandingController extends Controller
             'start_url' => $startUrl,
             'icons' => [
                 [
-                    'src' => $icon192,
+                    'src' => $branding['icon_192_url'],
                     'sizes' => '192x192',
                     'type' => 'image/png',
                     'purpose' => 'any',
                 ],
                 [
-                    'src' => $icon512,
+                    'src' => $branding['icon_512_url'],
                     'sizes' => '512x512',
                     'type' => 'image/png',
                     'purpose' => 'any maskable',
@@ -76,33 +74,40 @@ class PwaBrandingController extends Controller
         return response(json_encode($manifest, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT), 200)
             ->header('Content-Type', 'application/manifest+json; charset=utf-8')
             ->header('Access-Control-Allow-Origin', '*')
-            ->header('Cache-Control', 'public, max-age=300');
+            ->header('Cache-Control', 'no-cache, must-revalidate');
     }
 
     /**
-     * Sajikan icon PNG ukuran {size}x{size} (192 / 512) untuk Web App Manifest & Apple Touch Icon.
+     * Sajikan icon PNG ukuran {size}x{size} (192 / 512) untuk Favicon, Web App Manifest & Apple Touch Icon.
      * GET /api/pwa/icon/{school}/{size}.png
      */
     public function icon(Request $request, string $schoolParam, int $size = 192)
     {
-        $size = in_array($size, [180, 192, 512]) ? $size : 192;
+        $size = in_array($size, [64, 180, 192, 512]) ? $size : 192;
         $request->merge(['school' => $schoolParam]);
         $school = $this->resolveSchool($request);
+        $branding = $this->buildBrandingPayload($school, $request);
 
+        $rawBytes = null;
         $diskPath = $this->resolveLogoDiskPath($school);
 
-        // Jika ekstensi GD tersedia dan file gambar raster ada di disk, resize ke ukuran persegi PNG
-        if ($diskPath && file_exists($diskPath) && function_exists('imagecreatetruecolor')) {
-            $ext = strtolower(pathinfo($diskPath, PATHINFO_EXTENSION));
-            $srcImg = match ($ext) {
-                'png' => @imagecreatefrompng($diskPath),
-                'jpg', 'jpeg' => @imagecreatefromjpeg($diskPath),
-                'gif' => @imagecreatefromgif($diskPath),
-                'webp' => function_exists('imagecreatefromwebp') ? @imagecreatefromwebp($diskPath) : false,
-                default => false,
-            };
+        if ($diskPath && file_exists($diskPath)) {
+            $rawBytes = @file_get_contents($diskPath);
+        } elseif (!empty($branding['logo_url']) && Str::startsWith($branding['logo_url'], ['http://', 'https://']) && !Str::endsWith($branding['logo_url'], '.svg')) {
+            try {
+                $resp = Http::timeout(10)->get($branding['logo_url']);
+                if ($resp->successful()) {
+                    $rawBytes = $resp->body();
+                }
+            } catch (\Throwable $e) {
+                // Ignore and fallback below
+            }
+        }
 
-            if ($srcImg) {
+        // Jika bytes gambar tersedia dan ekstensi GD aktif, resize ke ukuran persegi PNG transparan
+        if ($rawBytes && function_exists('imagecreatefromstring') && function_exists('imagecreatetruecolor')) {
+            $srcImg = @imagecreatefromstring($rawBytes);
+            if ($srcImg !== false) {
                 $srcW = imagesx($srcImg);
                 $srcH = imagesy($srcImg);
 
@@ -114,7 +119,7 @@ class PwaBrandingController extends Controller
                 imagefilledrectangle($canvas, 0, 0, $size, $size, $transparent);
                 imagealphablending($canvas, true);
 
-                $padding = (int) round($size * 0.06);
+                $padding = (int) round($size * 0.04);
                 $avail = $size - ($padding * 2);
                 $scale = min($avail / max($srcW, 1), $avail / max($srcH, 1));
                 $dstW = (int) round($srcW * $scale);
@@ -135,7 +140,7 @@ class PwaBrandingController extends Controller
                 return response($pngBytes, 200)
                     ->header('Content-Type', 'image/png')
                     ->header('Access-Control-Allow-Origin', '*')
-                    ->header('Cache-Control', 'public, max-age=3600');
+                    ->header('Cache-Control', 'public, max-age=300');
             }
         }
 
@@ -145,11 +150,10 @@ class PwaBrandingController extends Controller
             return response(file_get_contents($diskPath), 200)
                 ->header('Content-Type', $mime)
                 ->header('Access-Control-Allow-Origin', '*')
-                ->header('Cache-Control', 'public, max-age=3600');
+                ->header('Cache-Control', 'public, max-age=300');
         }
 
         // Fallback: redirect ke logo URL sekolah (misal di R2 / eksternal) atau avatar inisial PNG
-        $branding = $this->buildBrandingPayload($school, $request);
         if (!empty($branding['logo_url']) && Str::startsWith($branding['logo_url'], ['http://', 'https://']) && !Str::endsWith($branding['logo_url'], '.svg')) {
             return redirect()->away($branding['logo_url']);
         }
@@ -196,6 +200,7 @@ class PwaBrandingController extends Controller
 
         $logoUrl = $this->resolvePwaLogoUrl($school, $settings);
         $schoolCode = $school?->code ?: ($schoolId > 0 ? (string) $schoolId : 'default');
+        $versionHash = substr(md5((string) $logoUrl . '|' . $appName), 0, 10);
 
         return [
             'school_id' => $schoolId > 0 ? $schoolId : null,
@@ -205,9 +210,9 @@ class PwaBrandingController extends Controller
             'short_name' => $shortName,
             'description' => $description,
             'logo_url' => $logoUrl,
-            'icon_192_url' => url("/api/pwa/icon/{$schoolCode}/192.png"),
-            'icon_512_url' => url("/api/pwa/icon/{$schoolCode}/512.png"),
-            'manifest_url' => url('/api/pwa/manifest?school=' . urlencode((string) $schoolCode)),
+            'icon_192_url' => url("/api/pwa/icon/{$schoolCode}/192.png") . "?v={$versionHash}",
+            'icon_512_url' => url("/api/pwa/icon/{$schoolCode}/512.png") . "?v={$versionHash}",
+            'manifest_url' => url('/api/pwa/manifest?school=' . urlencode((string) $schoolCode) . "&v={$versionHash}"),
         ];
     }
 

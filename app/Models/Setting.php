@@ -9,9 +9,25 @@ class Setting extends Model
     protected $table = 'settings';
     public $timestamps = false;
     protected $fillable = ['setting_key', 'setting_value', 'school_id'];
-    protected $primaryKey = 'setting_key'; // Assuming key is primary or unique
+    protected $primaryKey = 'setting_key';
     public $incrementing = false;
     protected $keyType = 'string';
+
+    /**
+     * Pastikan operasi save/update/delete pada model Eloquent selalu menyertakan
+     * composite primary key (setting_key + school_id) agar tidak menimpa sekolah lain.
+     */
+    protected function setKeysForSaveQuery($query)
+    {
+        $settingKey = $this->getOriginal('setting_key') ?? $this->getAttribute('setting_key');
+        $schoolId = $this->getOriginal('school_id');
+        if ($schoolId === null) {
+            $schoolId = $this->getAttribute('school_id') ?? 0;
+        }
+
+        return $query->where('setting_key', $settingKey)
+                     ->where('school_id', $schoolId);
+    }
 
     /**
      * Ambil nilai setting dengan hirarki:

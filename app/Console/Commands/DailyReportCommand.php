@@ -60,12 +60,6 @@ class DailyReportCommand extends Command
         $this->info("------------------------------------------------");
         $this->info("Processing Daily Report for School: {$school->name} (ID: $schoolId) for $today [$schoolTz - $nowTimeStr]");
 
-        // 0. Cek masa aktif WA sekolah (nonaktif jika kedaluwarsa > 3 hari, sebelum 3 hari masih normal)
-        if (!$school->isWaActive()) {
-            $this->warn("Sekolah {$school->name} (ID: $schoolId) WA nonaktif (kedaluwarsa > 3 hari atau wa_enabled nonaktif). Laporan harian grup, wali kelas & global dilewati.");
-            return;
-        }
-
         $telegramEnabled = $school->telegram_enabled;
         $telegramToken = $school->telegram_bot_token;
 
@@ -334,6 +328,12 @@ class DailyReportCommand extends Command
             ['school_id' => $schoolId, 'setting_key' => 'last_daily_report_date'],
             ['setting_value' => $today]
         );
+
+        // Cek masa aktif WA sekolah (nonaktif jika kedaluwarsa > 3 hari, sebelum 3 hari masih normal)
+        if (!$school->isWaActive()) {
+            $this->warn("Sekolah {$school->name} (ID: $schoolId) WA nonaktif (kedaluwarsa > 3 hari atau wa_enabled nonaktif). Laporan harian grup, wali kelas & global dilewati.");
+            return;
+        }
 
         // Sort by Jurusan Name, then by Kelas Name
         ksort($statsByJurusan);

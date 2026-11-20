@@ -14,7 +14,7 @@ class MenuHelper
         $isOffice = $school?->isOffice() ?? false;
         $isPesantren = $school?->isPesantren() ?? false;
         $labelKaryawan = $school?->employeeLabel() ?? 'Guru';
-        $showTabunganMenu = false; // Dikunci sementara agar client tidak bisa akses via menu (akses developer via URL)
+        $showTabunganMenu = true; // Menu Tabungan Siswa aktif untuk Admin, Wali Kelas, dan Siswa
 
         $menu = [];
 
@@ -336,22 +336,23 @@ class MenuHelper
                         ]
                     ]
                 ];
+            }
 
-                if ($showTabunganMenu) {
-                    $menu[] = [
-                        'title' => 'Keuangan Siswa',
-                        'items' => [
-                            [
-                                'name'     => 'Tabungan Siswa',
-                                'icon'     => 'ecommerce',
-                                'subItems' => [
-                                    ['name' => 'Loket & Mutasi', 'path' => route('tabungan.index', [], false)],
-                                    ['name' => 'Rekap Saldo Siswa', 'path' => route('tabungan.rekap', [], false)],
-                                ]
+            if (!$isOffice && $showTabunganMenu) {
+                $menu[] = [
+                    'title' => 'Keuangan Siswa',
+                    'items' => [
+                        [
+                            'name'     => 'Tabungan Siswa',
+                            'icon'     => 'ecommerce',
+                            'subItems' => [
+                                ['name' => 'Monitoring Mutasi', 'path' => route('tabungan.index', [], false)],
+                                ['name' => 'Layar Kasir POS', 'path' => route('tabungan.kasir', [], false)],
+                                ['name' => 'Rekap Saldo Siswa', 'path' => route('tabungan.rekap', [], false)],
                             ]
                         ]
-                    ];
-                }
+                    ]
+                ];
             }
 
             // Kegiatan — HANYA untuk Admin (sekolah & pesantren non-office)

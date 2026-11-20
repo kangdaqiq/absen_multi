@@ -355,7 +355,7 @@ class WhatsAppService
                 isParent: true,
                 schoolId: $schoolId
             );
-            $this->queueMessage($phoneOrtu, $msgOrtu, $schoolId, delaySeconds: 15, bypassLastSeen: true);
+            $this->queueMessage($phoneOrtu, $msgOrtu, $schoolId, delaySeconds: 15);
         }
 
         if (!empty($phoneSiswa) && $siswaEnabled && $phoneSiswa !== $phoneOrtu) {
@@ -374,7 +374,7 @@ class WhatsAppService
                 isParent: false,
                 schoolId: $schoolId
             );
-            $this->queueMessage($phoneSiswa, $msgSiswa, $schoolId, delaySeconds: 20, bypassLastSeen: true);
+            $this->queueMessage($phoneSiswa, $msgSiswa, $schoolId, delaySeconds: 20);
         }
     }
 

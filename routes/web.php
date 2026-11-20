@@ -297,6 +297,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/rekap/pdf', [App\Http\Controllers\RekapController::class, 'printPdf'])->name('rekap.pdf');
         
         // Tabungan Siswa (Admin: Full CRUD & Loket Kasir RFID; Wali Kelas / Guru: Monitoring & Rekap)
+        Route::get('/tabungan/kasir', [App\Http\Controllers\TabunganController::class, 'kasir'])->name('tabungan.kasir');
         Route::get('/tabungan', [App\Http\Controllers\TabunganController::class, 'index'])->name('tabungan.index');
         Route::get('/tabungan/scan-lookup', [App\Http\Controllers\TabunganController::class, 'scanLookup'])->name('tabungan.scan-lookup');
         Route::get('/tabungan/rekap', [App\Http\Controllers\TabunganController::class, 'rekap'])->name('tabungan.rekap');

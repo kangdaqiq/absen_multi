@@ -1356,7 +1356,7 @@ class WhatsAppMessageTemplates
         $emoji = $jenis === 'tarik' ? '📤' : '💰';
         $nominalStr = 'Rp ' . number_format($nominal, 0, ',', '.');
         $saldoStr = 'Rp ' . number_format($saldoAkhir, 0, ',', '.');
-        $ketStr = !empty($keterangan) ? $keterangan : ($jenis === 'tarik' ? 'Penarikan tabungan siswa' : 'Setoran tabungan siswa');
+        $ketStr = !empty($keterangan) ? $keterangan : '-';
 
         $category = $isParent ? 'tabungan_ortu' : 'tabungan_siswa';
         $custom = self::resolveCustomTemplate($schoolId, $category, [
@@ -1394,7 +1394,9 @@ class WhatsAppMessageTemplates
         $msg .= "💵 Nominal      : *{$nominalStr}*\n";
         $msg .= "🏦 Saldo Akhir  : *{$saldoStr}*\n";
         $msg .= "📅 Waktu        : {$tanggal} ({$waktu} WIB)\n";
-        $msg .= "📝 Keterangan   : {$ketStr}\n";
+        if (!empty($keterangan)) {
+            $msg .= "📝 Keterangan   : {$keterangan}\n";
+        }
         $msg .= "👨‍💼 Petugas      : {$petugas}\n";
         $msg .= "🔖 No. Ref      : `{$code}`";
         $msg .= $closing;

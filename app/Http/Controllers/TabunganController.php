@@ -22,6 +22,67 @@ use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 class TabunganController extends Controller
 {
     /**
+     * Layar Khusus Loket Kasir Tabungan (POS Fullscreen Realtime)
+     */
+    public function kasir(Request $request)
+    {
+        $user = auth()->user();
+        if (!$user->isAdmin()) {
+            abort(403, 'Akses ditolak. Layar POS Kasir hanya untuk Admin / Petugas Loket Tabungan.');
+        }
+
+        $schoolId = $user->school_id;
+        $school = $schoolId ? School::find($schoolId) : null;
+
+        $statsBase = TabunganSiswa::when($schoolId, fn($q) => $q->where('school_id', $schoolId));
+        $totalSetorToday = (int) (clone $statsBase)->where('jenis', 'setor')->whereDate('tanggal', today())->sum('nominal');
+        $totalTarikToday = (int) (clone $statsBase)->where('jenis', 'tarik')->whereDate('tanggal', today())->sum('nominal');
+        $totalTrxToday   = (clone $statsBase)->whereDate('tanggal', today())->count();
+
+        $saldoSiswaQuery = Siswa::when($schoolId, fn($q) => $q->where('school_id', $schoolId));
+        $totalSaldoAktif = (int) (clone $saldoSiswaQuery)->sum('saldo_tabungan');
+        $jumlahPenabung  = (clone $saldoSiswaQuery)->where('saldo_tabungan', '>', 0)->count();
+
+        // 20 Transaksi Terakhir Hari Ini
+        $todayTransactions = TabunganSiswa::with(['student.kelas', 'recorder'])
+            ->when($schoolId, fn($q) => $q->where('school_id', $schoolId))
+            ->whereDate('tanggal', today())
+            ->orderBy('id', 'desc')
+            ->limit(20)
+            ->get()
+            ->map(fn($t) => [
+                'id'                      => $t->id,
+                'code'                    => $t->code,
+                'tanggal'                 => $t->tanggal ? $t->tanggal->format('d/m/Y') : '-',
+                'waktu'                   => $t->waktu ?: '-',
+                'jenis'                   => $t->jenis,
+                'jenis_label'             => $t->jenis_label,
+                'nominal'                 => (int) $t->nominal,
+                'nominal_formatted'       => $t->nominal_formatted,
+                'saldo_sesudah'           => (int) $t->saldo_sesudah,
+                'saldo_sesudah_formatted' => $t->saldo_sesudah_formatted,
+                'metode'                  => $t->metode,
+                'keterangan'              => $t->keterangan,
+                'student_id'              => $t->student_id,
+                'student_nama'            => $t->student?->nama ?? '-',
+                'student_nis'             => $t->student?->nis ?? '-',
+                'student_kelas'           => $t->student?->kelas?->nama_kelas ?? '-',
+                'recorder_nama'           => $t->recorder?->full_name ?? 'Admin',
+            ])->values();
+
+        return view('tabungan.kasir', compact(
+            'school',
+            'user',
+            'totalSetorToday',
+            'totalTarikToday',
+            'totalTrxToday',
+            'totalSaldoAktif',
+            'jumlahPenabung',
+            'todayTransactions'
+        ));
+    }
+
+    /**
      * Halaman Utama Mutasi & Loket Transaksi Tabungan Siswa
      */
     public function index(Request $request)
@@ -290,7 +351,7 @@ class TabunganController extends Controller
                     'saldo_sebelum' => $currentSaldo,
                     'saldo_sesudah' => $newSaldo,
                     'metode'        => $validated['metode'] ?? 'tunai',
-                    'keterangan'    => $validated['keterangan'] ?? ($jenis === 'setor' ? 'Setoran tabungan siswa' : 'Penarikan tabungan siswa'),
+                    'keterangan'    => !empty($validated['keterangan']) ? trim($validated['keterangan']) : null,
                 ]);
 
                 // Rekalkulasi penuh untuk menjaga urutan tanggal kronologis & update siswa.saldo_tabungan
@@ -342,11 +403,41 @@ class TabunganController extends Controller
         $msg = "Transaksi {$tabungan->jenis_label} ({$tabungan->nominal_formatted}) an. {$tabungan->student->nama} berhasil disimpan. Saldo akhir: {$tabungan->saldo_sesudah_formatted}.";
 
         if ($request->expectsJson()) {
+            $statsBase = TabunganSiswa::when($schoolId, fn($q) => $q->where('school_id', $schoolId));
+            $totalSetorToday = (int) (clone $statsBase)->where('jenis', 'setor')->whereDate('tanggal', today())->sum('nominal');
+            $totalTarikToday = (int) (clone $statsBase)->where('jenis', 'tarik')->whereDate('tanggal', today())->sum('nominal');
+            $totalTrxToday   = (clone $statsBase)->whereDate('tanggal', today())->count();
+
             return response()->json([
                 'success'  => true,
                 'message'  => $msg,
-                'tabungan' => $tabungan,
+                'tabungan' => [
+                    'id'                      => $tabungan->id,
+                    'code'                    => $tabungan->code,
+                    'tanggal'                 => $tabungan->tanggal ? $tabungan->tanggal->format('d/m/Y') : '-',
+                    'waktu'                   => $tabungan->waktu ?: '-',
+                    'jenis'                   => $tabungan->jenis,
+                    'jenis_label'             => $tabungan->jenis_label,
+                    'nominal'                 => (int) $tabungan->nominal,
+                    'nominal_formatted'       => $tabungan->nominal_formatted,
+                    'saldo_sesudah'           => (int) $tabungan->saldo_sesudah,
+                    'saldo_sesudah_formatted' => $tabungan->saldo_sesudah_formatted,
+                    'metode'                  => $tabungan->metode,
+                    'keterangan'              => $tabungan->keterangan,
+                    'student_id'              => $tabungan->student_id,
+                    'student_nama'            => $tabungan->student?->nama ?? '-',
+                    'student_nis'             => $tabungan->student?->nis ?? '-',
+                    'student_kelas'           => $tabungan->student?->kelas?->nama_kelas ?? '-',
+                    'recorder_nama'           => $user->full_name ?? 'Admin',
+                ],
                 'student'  => $this->formatStudentLookupPayload($tabungan->student->fresh(['kelas'])),
+                'stats_today' => [
+                    'setor'           => $totalSetorToday,
+                    'setor_formatted' => 'Rp ' . number_format($totalSetorToday, 0, ',', '.'),
+                    'tarik'           => $totalTarikToday,
+                    'tarik_formatted' => 'Rp ' . number_format($totalTarikToday, 0, ',', '.'),
+                    'trx_count'       => $totalTrxToday,
+                ],
             ]);
         }
 
@@ -380,10 +471,39 @@ class TabunganController extends Controller
                 }
             });
         } catch (\RuntimeException $e) {
+            if (request()->expectsJson()) {
+                return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+            }
             return back()->withErrors(['delete' => $e->getMessage()]);
         }
 
-        return back()->with('success', "Transaksi {$tabungan->code} berhasil dihapus dan saldo siswa telah disinkronkan kembali.");
+        $msg = "Transaksi {$tabungan->code} berhasil dibatalkan dan saldo siswa telah disinkronkan kembali.";
+
+        if (request()->expectsJson()) {
+            $schoolId = $user->school_id;
+            $statsBase = TabunganSiswa::when($schoolId, fn($q) => $q->where('school_id', $schoolId));
+            $totalSetorToday = (int) (clone $statsBase)->where('jenis', 'setor')->whereDate('tanggal', today())->sum('nominal');
+            $totalTarikToday = (int) (clone $statsBase)->where('jenis', 'tarik')->whereDate('tanggal', today())->sum('nominal');
+            $totalTrxToday   = (clone $statsBase)->whereDate('tanggal', today())->count();
+
+            $updatedStudent = Siswa::with('kelas')->find($tabungan->student_id);
+
+            return response()->json([
+                'success'    => true,
+                'message'    => $msg,
+                'deleted_id' => $tabungan->id,
+                'student'    => $updatedStudent ? $this->formatStudentLookupPayload($updatedStudent) : null,
+                'stats_today' => [
+                    'setor'           => $totalSetorToday,
+                    'setor_formatted' => 'Rp ' . number_format($totalSetorToday, 0, ',', '.'),
+                    'tarik'           => $totalTarikToday,
+                    'tarik_formatted' => 'Rp ' . number_format($totalTarikToday, 0, ',', '.'),
+                    'trx_count'       => $totalTrxToday,
+                ],
+            ]);
+        }
+
+        return back()->with('success', $msg);
     }
 
     /**

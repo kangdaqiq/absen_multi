@@ -14,6 +14,7 @@ class MenuHelper
         $isOffice = $school?->isOffice() ?? false;
         $isPesantren = $school?->isPesantren() ?? false;
         $labelKaryawan = $school?->employeeLabel() ?? 'Guru';
+        $showTabunganMenu = false; // Dikunci sementara agar client tidak bisa akses via menu (akses developer via URL)
 
         $menu = [];
 
@@ -99,19 +100,21 @@ class MenuHelper
                     ]
                 ];
 
-                $guruMenu[] = [
-                    'title' => 'Tabungan',
-                    'items' => [
-                        [
-                            'name'     => 'Tabungan Siswa',
-                            'icon'     => 'ecommerce',
-                            'subItems' => [
-                                ['name' => 'Mutasi Transaksi', 'path' => route('tabungan.index', [], false)],
-                                ['name' => 'Rekap Saldo Kelas', 'path' => route('tabungan.rekap', [], false)],
+                if ($showTabunganMenu) {
+                    $guruMenu[] = [
+                        'title' => 'Tabungan',
+                        'items' => [
+                            [
+                                'name'     => 'Tabungan Siswa',
+                                'icon'     => 'ecommerce',
+                                'subItems' => [
+                                    ['name' => 'Mutasi Transaksi', 'path' => route('tabungan.index', [], false)],
+                                    ['name' => 'Rekap Saldo Kelas', 'path' => route('tabungan.rekap', [], false)],
+                                ]
                             ]
                         ]
-                    ]
-                ];
+                    ];
+                }
             }
 
             return $guruMenu;
@@ -145,21 +148,25 @@ class MenuHelper
                     'name' => 'Riwayat Kehadiran',
                     'path' => route('siswa.riwayat', [], false),
                 ],
-                [
+            ];
+
+            if ($showTabunganMenu) {
+                $studentItems[] = [
                     'icon' => 'ecommerce',
                     'name' => 'Buku Tabungan',
                     'path' => route('tabungan.my', [], false),
-                ],
-                [
-                    'icon' => 'forms',
-                    'name' => 'Pengajuan Izin / Sakit',
-                    'path' => $school ? route('portal-izin.index', $school->id, false) : '/pengajuan-izin',
-                ],
-                [
-                    'icon' => 'user-profile',
-                    'name' => 'Profil Saya',
-                    'path' => route('profile.edit', [], false),
-                ]
+                ];
+            }
+
+            $studentItems[] = [
+                'icon' => 'forms',
+                'name' => 'Pengajuan Izin / Sakit',
+                'path' => $school ? route('portal-izin.index', $school->id, false) : '/pengajuan-izin',
+            ];
+            $studentItems[] = [
+                'icon' => 'user-profile',
+                'name' => 'Profil Saya',
+                'path' => route('profile.edit', [], false),
             ];
 
             $menu[] = [
@@ -330,19 +337,21 @@ class MenuHelper
                     ]
                 ];
 
-                $menu[] = [
-                    'title' => 'Keuangan Siswa',
-                    'items' => [
-                        [
-                            'name'     => 'Tabungan Siswa',
-                            'icon'     => 'ecommerce',
-                            'subItems' => [
-                                ['name' => 'Loket & Mutasi', 'path' => route('tabungan.index', [], false)],
-                                ['name' => 'Rekap Saldo Siswa', 'path' => route('tabungan.rekap', [], false)],
+                if ($showTabunganMenu) {
+                    $menu[] = [
+                        'title' => 'Keuangan Siswa',
+                        'items' => [
+                            [
+                                'name'     => 'Tabungan Siswa',
+                                'icon'     => 'ecommerce',
+                                'subItems' => [
+                                    ['name' => 'Loket & Mutasi', 'path' => route('tabungan.index', [], false)],
+                                    ['name' => 'Rekap Saldo Siswa', 'path' => route('tabungan.rekap', [], false)],
+                                ]
                             ]
                         ]
-                    ]
-                ];
+                    ];
+                }
             }
 
             // Kegiatan — HANYA untuk Admin (sekolah & pesantren non-office)

@@ -213,8 +213,8 @@ Route::middleware('auth')->group(function () {
         Route::match(['post', 'delete'], 'guru/{id}/delete-photo', [GuruController::class, 'deletePhoto'])->name('guru.delete-photo');
     });
 
-    // Absensi & Rekap Routes (Includes Wali Kelas & Waka Kurikulum)
-    Route::middleware('role:admin,teacher,wali_kelas,waka_kurikulum')->group(function () {
+    // Absensi, Tabungan & Rekap Routes (Includes Bendahara, Wali Kelas & Waka Kurikulum)
+    Route::middleware('role:admin,teacher,wali_kelas,waka_kurikulum,bendahara')->group(function () {
         // Jadwal Pembelajaran
         Route::get('jadwal-pelajaran/download-template', [App\Http\Controllers\JadwalPelajaranController::class, 'downloadTemplate'])->name('jadwal-pelajaran.download-template');
         Route::post('jadwal-pelajaran/import', [App\Http\Controllers\JadwalPelajaranController::class, 'import'])->name('jadwal-pelajaran.import');

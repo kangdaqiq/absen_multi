@@ -22,6 +22,11 @@ class DashboardController extends Controller
     {
         $user = auth()->user();
 
+        // Jika user adalah Bendahara Tabungan, arahkan ke Dashboard Khusus Bendahara
+        if ($user->role === 'bendahara' || $user->isBendahara()) {
+            return $this->bendaharaDashboard($request);
+        }
+
         // Jika user adalah Guru / Teacher / Wali Kelas atau meminta view=guru, arahkan ke Dashboard Guru
         if (in_array($user->role, ['teacher', 'guru', 'wali_kelas']) || $user->isWaliKelas() || ($user->guru && !$user->isAdmin()) || $request->query('view') === 'guru') {
             return $this->guruDashboard($request);
@@ -636,5 +641,96 @@ class DashboardController extends Controller
         }
 
         return back()->with('success', 'Jurnal KBM untuk ' . ($jadwal->mapel?->nama_mapel ?? 'Mata Pelajaran') . ' berhasil disimpan.');
+    }
+
+    /**
+     * Dashboard Khusus Pengelola / Bendahara Tabungan Siswa
+     */
+    public function bendaharaDashboard(Request $request)
+    {
+        $user = auth()->user();
+        $schoolId = $user->school_id;
+        $school = $schoolId ? \App\Models\School::find($schoolId) : null;
+        $today = Carbon::today();
+
+        // Scope data berdasarkan sekolah
+        $baseStudentQuery = Siswa::when($schoolId, fn($q) => $q->where('school_id', $schoolId));
+        $totalSiswa = (clone $baseStudentQuery)->count();
+        $totalSaldoAktif = (int) (clone $baseStudentQuery)->sum('saldo_tabungan');
+        $jumlahPenabung = (clone $baseStudentQuery)->where('saldo_tabungan', '>', 0)->count();
+        $persenPenabung = $totalSiswa > 0 ? round(($jumlahPenabung / $totalSiswa) * 100, 1) : 0;
+
+        // Mutasi Hari Ini
+        $trxBase = \App\Models\TabunganSiswa::when($schoolId, fn($q) => $q->where('school_id', $schoolId));
+        $setoranHariIni = (int) (clone $trxBase)->where('jenis', 'setor')->whereDate('tanggal', $today)->sum('nominal');
+        $tarikanHariIni = (int) (clone $trxBase)->where('jenis', 'tarik')->whereDate('tanggal', $today)->sum('nominal');
+        $totalTrxHariIni = (clone $trxBase)->whereDate('tanggal', $today)->count();
+        $netKasHariIni = $setoranHariIni - $tarikanHariIni;
+
+        // Akumulasi Mutasi Bulan Ini
+        $startOfMonth = Carbon::now()->startOfMonth()->toDateString();
+        $endOfMonth = Carbon::now()->endOfMonth()->toDateString();
+        $setoranBulanIni = (int) (clone $trxBase)->where('jenis', 'setor')->whereBetween('tanggal', [$startOfMonth, $endOfMonth])->sum('nominal');
+        $tarikanBulanIni = (int) (clone $trxBase)->where('jenis', 'tarik')->whereBetween('tanggal', [$startOfMonth, $endOfMonth])->sum('nominal');
+        $totalTrxBulanIni = (clone $trxBase)->whereBetween('tanggal', [$startOfMonth, $endOfMonth])->count();
+
+        // 10 Transaksi Terakhir Hari Ini
+        $recentTransactions = (clone $trxBase)
+            ->with(['student.kelas', 'recorder'])
+            ->orderBy('id', 'desc')
+            ->limit(10)
+            ->get();
+
+        // Top 5 Siswa Penabung Tertinggi
+        $topSavers = (clone $baseStudentQuery)
+            ->with('kelas')
+            ->where('saldo_tabungan', '>', 0)
+            ->orderBy('saldo_tabungan', 'desc')
+            ->limit(5)
+            ->get();
+
+        // Ringkasan per Kelas (Saldo Kelas Tertinggi)
+        $kelasSummaries = Kelas::when($schoolId, fn($q) => $q->where('school_id', $schoolId))
+            ->withCount(['siswa as total_siswa'])
+            ->withCount(['siswa as total_penabung' => fn($q) => $q->where('saldo_tabungan', '>', 0)])
+            ->withSum('siswa as total_saldo', 'saldo_tabungan')
+            ->orderByDesc('total_saldo')
+            ->limit(6)
+            ->get();
+
+        // Tren 7 Hari Terakhir
+        $chartDays = [];
+        for ($i = 6; $i >= 0; $i--) {
+            $d = Carbon::today()->subDays($i);
+            $dStr = $d->format('Y-m-d');
+            $setorD = (int) (clone $trxBase)->where('jenis', 'setor')->whereDate('tanggal', $dStr)->sum('nominal');
+            $tarikD = (int) (clone $trxBase)->where('jenis', 'tarik')->whereDate('tanggal', $dStr)->sum('nominal');
+            $chartDays[] = [
+                'tanggal' => $d->format('d/m'),
+                'hari'    => $d->translatedFormat('D'),
+                'setor'   => $setorD,
+                'tarik'   => $tarikD,
+            ];
+        }
+
+        return view('dashboard.bendahara', compact(
+            'user',
+            'school',
+            'totalSiswa',
+            'totalSaldoAktif',
+            'jumlahPenabung',
+            'persenPenabung',
+            'setoranHariIni',
+            'tarikanHariIni',
+            'totalTrxHariIni',
+            'netKasHariIni',
+            'setoranBulanIni',
+            'tarikanBulanIni',
+            'totalTrxBulanIni',
+            'recentTransactions',
+            'topSavers',
+            'kelasSummaries',
+            'chartDays'
+        ));
     }
 }

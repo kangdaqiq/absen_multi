@@ -62,6 +62,7 @@
                     <select name="role" required class="relative z-20 w-full appearance-none rounded border border-stroke bg-transparent py-3 px-5 outline-none transition focus:border-brand-500 active:border-brand-500 dark:border-form-strokedark dark:bg-form-input dark:focus:border-brand-500 @error('role') border-danger @enderror">
                         <option value="guru" {{ in_array(old('role', $user->role), ['guru', 'teacher']) ? 'selected' : '' }}>Guru Pengajar</option>
                         <option value="admin" {{ old('role', $user->role) == 'admin' ? 'selected' : '' }}>Admin</option>
+                        <option value="bendahara" {{ old('role', $user->role) == 'bendahara' ? 'selected' : '' }}>Bendahara Tabungan</option>
                         @if(auth()->user() && auth()->user()->isSuperAdmin())
                         <option value="super_admin" {{ old('role', $user->role) == 'super_admin' ? 'selected' : '' }}>Super Admin</option>
                         @endif

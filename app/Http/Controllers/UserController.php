@@ -15,7 +15,7 @@ class UserController extends Controller
 {
     public function index(Request $request)
     {
-        $allowedRoles = ['admin', 'super_admin', 'wali_kelas', 'waka_kurikulum', 'guru', 'teacher'];
+        $allowedRoles = ['admin', 'super_admin', 'bendahara', 'wali_kelas', 'waka_kurikulum', 'guru', 'teacher'];
         $query = User::with('guru')->whereIn('role', $allowedRoles)->orderBy('full_name');
 
         // Filter by school_id for non-super admin users
@@ -24,7 +24,7 @@ class UserController extends Controller
 
         if (auth()->user() && !$isSuperAdmin && $schoolId) {
             $query->where('school_id', $schoolId)
-                  ->whereIn('role', ['admin', 'wali_kelas', 'waka_kurikulum', 'guru', 'teacher']);
+                  ->whereIn('role', ['admin', 'bendahara', 'wali_kelas', 'waka_kurikulum', 'guru', 'teacher']);
         }
 
         // Filter by role if requested
@@ -82,7 +82,7 @@ class UserController extends Controller
             'username' => 'required|string|max:255|unique:users',
             'email' => 'required|string|max:255|unique:users',
             'password' => 'required|string|min:8|confirmed',
-            'role' => 'required|in:admin,super_admin,wali_kelas,waka_kurikulum,guru,teacher',
+            'role' => 'required|in:admin,super_admin,bendahara,wali_kelas,waka_kurikulum,guru,teacher',
             'guru_id' => 'nullable|exists:guru,id'
         ]);
 
@@ -113,7 +113,7 @@ class UserController extends Controller
      */
     public function exportPdf(Request $request)
     {
-        $allowedRoles = ['admin', 'super_admin', 'wali_kelas', 'waka_kurikulum', 'guru', 'teacher'];
+        $allowedRoles = ['admin', 'super_admin', 'bendahara', 'wali_kelas', 'waka_kurikulum', 'guru', 'teacher'];
         $query = User::with('guru')->whereIn('role', $allowedRoles)->orderBy('role')->orderBy('full_name');
 
         $user = auth()->user();
@@ -122,7 +122,7 @@ class UserController extends Controller
 
         if ($user && !$isSuperAdmin && $schoolId) {
             $query->where('school_id', $schoolId)
-                  ->whereIn('role', ['admin', 'wali_kelas', 'waka_kurikulum', 'guru', 'teacher']);
+                  ->whereIn('role', ['admin', 'bendahara', 'wali_kelas', 'waka_kurikulum', 'guru', 'teacher']);
         }
 
         // Filter role jika diminta
@@ -167,6 +167,7 @@ class UserController extends Controller
             'guru' => 'Guru Pengajar',
             'wali_kelas' => 'Wali Kelas',
             'waka_kurikulum' => 'Waka Kurikulum',
+            'bendahara' => 'Bendahara Tabungan',
             'admin' => 'Administrator',
             default => 'Semua Pengguna'
         };
@@ -200,7 +201,7 @@ class UserController extends Controller
             'username' => ['required', 'string', 'max:255', Rule::unique('users')->ignore($user->id)],
             'email' => ['required', 'string', 'max:255', Rule::unique('users')->ignore($user->id)],
             'password' => 'nullable|string|min:4|confirmed',
-            'role' => 'required|in:admin,super_admin,wali_kelas,waka_kurikulum,guru,teacher',
+            'role' => 'required|in:admin,super_admin,bendahara,wali_kelas,waka_kurikulum,guru,teacher',
             'guru_id' => 'nullable|exists:guru,id'
         ]);
 

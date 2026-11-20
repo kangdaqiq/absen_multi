@@ -66,6 +66,7 @@ class User extends Authenticatable
         return match ($this->role) {
             'super_admin'    => 'Super Admin',
             'admin'          => 'Administrator',
+            'bendahara'      => 'Bendahara Tabungan',
             'waka_kurikulum' => 'Waka Kurikulum',
             'wali_kelas'     => 'Wali Kelas',
             'guru', 'teacher' => 'Guru Pengajar',
@@ -196,5 +197,15 @@ class User extends Authenticatable
     public function isWakaKurikulum()
     {
         return $this->role === 'waka_kurikulum';
+    }
+
+    public function isBendahara(): bool
+    {
+        return $this->role === 'bendahara';
+    }
+
+    public function canManageTabungan(): bool
+    {
+        return in_array($this->role, ['admin', 'super_admin', 'bendahara']);
     }
 }

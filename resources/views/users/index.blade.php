@@ -172,6 +172,9 @@
                 <a href="{{ route('users.index', ['role' => 'admin']) }}" class="px-3 py-1.5 rounded-md transition {{ request('role') == 'admin' ? 'bg-blue-600 text-white shadow-xs font-bold' : 'text-gray-600 dark:text-gray-400 hover:text-blue-600' }}">
                     Admin
                 </a>
+                <a href="{{ route('users.index', ['role' => 'bendahara']) }}" class="px-3 py-1.5 rounded-md transition {{ request('role') == 'bendahara' ? 'bg-emerald-600 text-white shadow-xs font-bold' : 'text-gray-600 dark:text-gray-400 hover:text-emerald-600' }}">
+                    Bendahara Tabungan
+                </a>
             </div>
 
             {{-- Export PDF Button Filtered --}}
@@ -269,6 +272,10 @@
                                 @elseif($user->role === 'waka_kurikulum')
                                     <span class="inline-flex items-center gap-1 rounded-full bg-purple-500/10 px-3 py-1 text-xs font-semibold text-purple-600 dark:text-purple-400 border border-purple-500/20">
                                         <i class="fas fa-book-reader"></i> Waka Kurikulum
+                                    </span>
+                                @elseif($user->role === 'bendahara')
+                                    <span class="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                                        <i class="fas fa-coins"></i> Bendahara Tabungan
                                     </span>
                                 @elseif($user->role === 'super_admin')
                                     <span class="inline-flex items-center gap-1 rounded-full bg-rose-500/10 px-3 py-1 text-xs font-semibold text-rose-600 dark:text-rose-400 border border-rose-500/20">
@@ -501,6 +508,7 @@
                         class="w-full appearance-none rounded-lg border border-gray-200 bg-transparent px-4 py-2.5 outline-none focus:border-brand-500 dark:border-gray-800 dark:bg-gray-900 dark:text-white">
                         <option value="guru">Guru Pengajar</option>
                         <option value="admin">Admin</option>
+                        <option value="bendahara">Bendahara Tabungan</option>
                         @if(auth()->user() && auth()->user()->isSuperAdmin())
                         <option value="super_admin">Super Admin</option>
                         @endif

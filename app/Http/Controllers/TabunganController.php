@@ -27,8 +27,8 @@ class TabunganController extends Controller
     public function kasir(Request $request)
     {
         $user = auth()->user();
-        if (!$user->isAdmin()) {
-            abort(403, 'Akses ditolak. Layar POS Kasir hanya untuk Admin / Petugas Loket Tabungan.');
+        if (!$user->canManageTabungan()) {
+            abort(403, 'Akses ditolak. Layar POS Kasir hanya untuk Admin / Bendahara Tabungan.');
         }
 
         $schoolId = $user->school_id;
@@ -89,7 +89,7 @@ class TabunganController extends Controller
     {
         $user = auth()->user();
         $schoolId = $user->school_id;
-        $canManage = $user->isAdmin();
+        $canManage = $user->canManageTabungan();
 
         $isWaliKelas = !$canManage && $user->isWaliKelas() && $user->guru;
         $waliKelasIds = $isWaliKelas ? $user->getManagedKelasIds() : [];
@@ -295,8 +295,8 @@ class TabunganController extends Controller
     public function store(Request $request)
     {
         $user = auth()->user();
-        if (!$user->isAdmin()) {
-            abort(403, 'Hanya Admin / Petugas Tabungan yang berhak mencatat transaksi tabungan.');
+        if (!$user->canManageTabungan()) {
+            abort(403, 'Hanya Admin / Bendahara Tabungan yang berhak mencatat transaksi tabungan.');
         }
 
         // Bersihkan titik/koma pada input nominal jika dikirim dalam format ribuan (misal "50.000")
@@ -450,8 +450,8 @@ class TabunganController extends Controller
     public function destroy($id)
     {
         $user = auth()->user();
-        if (!$user->isAdmin()) {
-            abort(403, 'Hanya Admin / Petugas Tabungan yang dapat menghapus transaksi.');
+        if (!$user->canManageTabungan()) {
+            abort(403, 'Hanya Admin / Bendahara Tabungan yang dapat menghapus transaksi.');
         }
 
         $tabungan = TabunganSiswa::with('student')->findOrFail($id);
@@ -513,7 +513,7 @@ class TabunganController extends Controller
     {
         $user = auth()->user();
         $schoolId = $user->school_id;
-        $canManage = $user->isAdmin();
+        $canManage = $user->canManageTabungan();
 
         $isWaliKelas = !$canManage && $user->isWaliKelas() && $user->guru;
         $waliKelasIds = $isWaliKelas ? $user->getManagedKelasIds() : [];
@@ -619,7 +619,7 @@ class TabunganController extends Controller
     {
         $user = auth()->user();
         $schoolId = $user->school_id;
-        $canManage = $user->isAdmin();
+        $canManage = $user->canManageTabungan();
 
         $student = Siswa::with('kelas')->findOrFail($studentId);
         if ($schoolId && (int) $student->school_id !== (int) $schoolId) {
@@ -693,7 +693,7 @@ class TabunganController extends Controller
     {
         $user = auth()->user();
         $schoolId = $user->school_id;
-        $isWaliKelas = !$user->isAdmin() && $user->isWaliKelas() && $user->guru;
+        $isWaliKelas = !$user->canManageTabungan() && $user->isWaliKelas() && $user->guru;
         $waliKelasIds = $isWaliKelas ? $user->getManagedKelasIds() : [];
 
         $mode = $request->input('mode', 'rekap'); // 'rekap' atau 'mutasi'
@@ -826,7 +826,7 @@ class TabunganController extends Controller
         $user = auth()->user();
         $schoolId = $user->school_id;
         $school = $schoolId ? School::find($schoolId) : null;
-        $isWaliKelas = !$user->isAdmin() && $user->isWaliKelas() && $user->guru;
+        $isWaliKelas = !$user->canManageTabungan() && $user->isWaliKelas() && $user->guru;
         $waliKelasIds = $isWaliKelas ? $user->getManagedKelasIds() : [];
 
         $query = Siswa::with('kelas')

@@ -18,6 +18,36 @@ class MenuHelper
 
         $menu = [];
 
+        // 0. MENU KHUSUS BENDAHARA TABUNGAN (Hanya Menu Tabungan & Dashboard yang Aktif & Muncul)
+        if ($role === 'bendahara' || $user->isBendahara()) {
+            return [
+                [
+                    'title' => 'Utama',
+                    'items' => [
+                        [
+                            'icon' => 'dashboard',
+                            'name' => 'Dashboard Bendahara',
+                            'path' => route('dashboard', [], false),
+                        ],
+                    ]
+                ],
+                [
+                    'title' => 'Keuangan Siswa',
+                    'items' => [
+                        [
+                            'name'     => 'Tabungan Siswa',
+                            'icon'     => 'ecommerce',
+                            'subItems' => [
+                                ['name' => 'Layar Kasir POS', 'path' => route('tabungan.kasir', [], false)],
+                                ['name' => 'Monitoring Mutasi', 'path' => route('tabungan.index', [], false)],
+                                ['name' => 'Rekap Saldo Siswa', 'path' => route('tabungan.rekap', [], false)],
+                            ]
+                        ]
+                    ]
+                ]
+            ];
+        }
+
         // 0. MENU KHUSUS GURU & WALI KELAS
         $isWaliKelas = $user->isWaliKelas();
         $isGuru = in_array($role, ['teacher', 'guru', 'wali_kelas']) || ($user->guru && !in_array($role, ['admin', 'super_admin']));

@@ -181,10 +181,13 @@
                     @forelse($students as $index => $student)
                         @php
                             $hasAttendance = $student->attendance ? true : false;
-                            $currentStatus = $hasAttendance ? $student->attendance->status : 'A';
+                            $isPklExempt = (bool) $student->is_khusus;
+                            $isKhususExempt = (bool) $student->is_siswa_khusus && !$student->isEntryDay($tanggal);
+                            $isExempt = $isPklExempt || $isKhususExempt;
+                            $currentStatus = $hasAttendance ? $student->attendance->status : ($isExempt ? 'EXEMPT' : 'A');
                             $jamMasukStr = ($hasAttendance && $student->attendance->jam_masuk) 
                                 ? \Carbon\Carbon::parse($student->attendance->jam_masuk)->format('H:i') 
-                                : '-';
+                                : ($isPklExempt ? 'Bebas (PKL)' : ($isKhususExempt ? 'Bebas (Jadwal Khusus)' : '-'));
                         @endphp
                         <tr x-data="{ 
                             attendance: '{{ $currentStatus }}', 
@@ -232,9 +235,17 @@
                                 {{ ($students->currentPage() - 1) * $students->perPage() + $index + 1 }}
                             </td>
                             <td class="px-5 py-4">
-                                <p class="font-semibold text-gray-800 dark:text-white/90">
-                                    {{ $student->nama }}
-                                </p>
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <p class="font-semibold text-gray-800 dark:text-white/90">
+                                        {{ $student->nama }}
+                                    </p>
+                                    @if($student->is_khusus)
+                                        <span class="inline-flex rounded-full bg-success-50 px-2 py-0.5 text-[11px] font-semibold text-success-600 dark:bg-success-500/15 dark:text-success-500">PKL</span>
+                                    @endif
+                                    @if($student->is_siswa_khusus)
+                                        <span class="inline-flex rounded-full bg-purple-50 px-2 py-0.5 text-[11px] font-semibold text-purple-600 dark:bg-purple-500/15 dark:text-purple-500">Khusus</span>
+                                    @endif
+                                </div>
                             </td>
                             <td class="px-5 py-4 text-gray-600 dark:text-gray-400 font-mono">
                                 {{ $student->nis }}

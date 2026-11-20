@@ -1333,4 +1333,72 @@ class WhatsAppMessageTemplates
         $msg .= "_Terima kasih._ 🙏";
         return $msg;
     }
+
+    /**
+     * Notifikasi Transaksi Tabungan Siswa (Setor / Tarik) ke Orang Tua & Siswa
+     */
+    public static function tabunganTransaction(
+        string $namaSiswa,
+        string $nis,
+        string $kelas,
+        string $jenis,
+        int $nominal,
+        int $saldoAkhir,
+        string $tanggal,
+        string $waktu,
+        string $code,
+        string $petugas,
+        ?string $keterangan = null,
+        bool $isParent = true,
+        ?int $schoolId = null
+    ): string {
+        $jenisLabel = $jenis === 'tarik' ? 'TARIK TUNAI' : 'SETOR TUNAI';
+        $emoji = $jenis === 'tarik' ? '📤' : '💰';
+        $nominalStr = 'Rp ' . number_format($nominal, 0, ',', '.');
+        $saldoStr = 'Rp ' . number_format($saldoAkhir, 0, ',', '.');
+        $ketStr = !empty($keterangan) ? $keterangan : ($jenis === 'tarik' ? 'Penarikan tabungan siswa' : 'Setoran tabungan siswa');
+
+        $category = $isParent ? 'tabungan_ortu' : 'tabungan_siswa';
+        $custom = self::resolveCustomTemplate($schoolId, $category, [
+            '{nama}'       => $namaSiswa,
+            '{nis}'        => $nis,
+            '{kelas}'      => $kelas,
+            '{jenis}'      => $jenisLabel,
+            '{nominal}'    => $nominalStr,
+            '{saldo}'      => $saldoStr,
+            '{tanggal}'    => $tanggal,
+            '{jam}'        => $waktu,
+            '{waktu}'      => $waktu,
+            '{kode}'       => $code,
+            '{petugas}'    => $petugas,
+            '{keterangan}' => $ketStr,
+        ], $code);
+
+        if ($custom !== null) {
+            return $custom;
+        }
+
+        $greeting = self::randomGreeting($namaSiswa, $isParent, $schoolId);
+        $closing = self::randomClosing($namaSiswa, $isParent, $schoolId);
+
+        $msg = "{$emoji} *INFORMASI TABUNGAN SISWA ({$jenisLabel})*\n\n";
+        $msg .= "{$greeting}\n\n";
+        if ($isParent) {
+            $msg .= "Kami informasikan transaksi tabungan putra/putri Anda telah tercatat di sistem sekolah:\n\n";
+        } else {
+            $msg .= "Transaksi buku tabungan Anda telah berhasil tercatat:\n\n";
+        }
+        $msg .= "👤 Nama Siswa   : *{$namaSiswa}*\n";
+        $msg .= "🆔 NIS / Kelas  : {$nis} / {$kelas}\n";
+        $msg .= "📋 Jenis Mutasi : *{$jenisLabel}*\n";
+        $msg .= "💵 Nominal      : *{$nominalStr}*\n";
+        $msg .= "🏦 Saldo Akhir  : *{$saldoStr}*\n";
+        $msg .= "📅 Waktu        : {$tanggal} ({$waktu} WIB)\n";
+        $msg .= "📝 Keterangan   : {$ketStr}\n";
+        $msg .= "👨‍💼 Petugas      : {$petugas}\n";
+        $msg .= "🔖 No. Ref      : `{$code}`";
+        $msg .= $closing;
+
+        return $msg;
+    }
 }

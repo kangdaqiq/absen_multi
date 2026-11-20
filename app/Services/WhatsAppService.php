@@ -318,6 +318,66 @@ class WhatsAppService
         }
     }
 
+    /**
+     * Kirim notifikasi transaksi Tabungan Siswa (Setor / Tarik) ke Orang Tua & Siswa
+     */
+    public function sendTabunganNotification(\App\Models\TabunganSiswa $tabungan, string $petugasName = 'Admin'): void
+    {
+        $siswa = $tabungan->student;
+        if (!$siswa) return;
+
+        $schoolId = $tabungan->school_id ?: $siswa->school_id;
+        $phoneSiswa = $siswa->no_wa;
+        $phoneOrtu = $siswa->wa_ortu;
+
+        if (!$phoneSiswa && !$phoneOrtu) return;
+
+        $siswaEnabled = $schoolId ? (\App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'notification_wa_siswa')->value('setting_value') !== 'false') : true;
+        $ortuEnabled = $schoolId ? (\App\Models\Setting::where('school_id', $schoolId)->where('setting_key', 'notification_wa_ortu')->value('setting_value') !== 'false') : true;
+
+        $kelasName = $siswa->kelas?->nama_kelas ?? '-';
+        $tglStr = $tabungan->tanggal ? $tabungan->tanggal->format('d/m/Y') : now()->format('d/m/Y');
+        $waktuStr = $tabungan->waktu ?: now()->format('H:i');
+
+        if (!empty($phoneOrtu) && $ortuEnabled) {
+            $msgOrtu = WhatsAppMessageTemplates::tabunganTransaction(
+                namaSiswa: $siswa->nama,
+                nis: $siswa->nis ?? '-',
+                kelas: $kelasName,
+                jenis: $tabungan->jenis,
+                nominal: (int) $tabungan->nominal,
+                saldoAkhir: (int) $tabungan->saldo_sesudah,
+                tanggal: $tglStr,
+                waktu: $waktuStr,
+                code: $tabungan->code,
+                petugas: $petugasName,
+                keterangan: $tabungan->keterangan,
+                isParent: true,
+                schoolId: $schoolId
+            );
+            $this->queueMessage($phoneOrtu, $msgOrtu, $schoolId, delaySeconds: 15, bypassLastSeen: true);
+        }
+
+        if (!empty($phoneSiswa) && $siswaEnabled && $phoneSiswa !== $phoneOrtu) {
+            $msgSiswa = WhatsAppMessageTemplates::tabunganTransaction(
+                namaSiswa: $siswa->nama,
+                nis: $siswa->nis ?? '-',
+                kelas: $kelasName,
+                jenis: $tabungan->jenis,
+                nominal: (int) $tabungan->nominal,
+                saldoAkhir: (int) $tabungan->saldo_sesudah,
+                tanggal: $tglStr,
+                waktu: $waktuStr,
+                code: $tabungan->code,
+                petugas: $petugasName,
+                keterangan: $tabungan->keterangan,
+                isParent: false,
+                schoolId: $schoolId
+            );
+            $this->queueMessage($phoneSiswa, $msgSiswa, $schoolId, delaySeconds: 20, bypassLastSeen: true);
+        }
+    }
+
     private function queueMessage($phone, $message, $schoolId = null, ?int $delaySeconds = null, bool $bypassLastSeen = false)
     {
         $originalPhone = $phone;

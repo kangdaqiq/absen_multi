@@ -845,17 +845,25 @@ class AttendanceController extends Controller
 
         // Check if record exists
         $att = Attendance::where('student_id', $studentId)->where('tanggal', $date)->first();
+        $student = Siswa::find($studentId);
+        $schoolId = $student?->school_id ?? auth()->user()?->school_id;
+        $schoolTz = $this->attendanceCore->getSchoolTimezone($schoolId);
 
         // format time or null (Time only)
         $jamMasuk = ($request->jam_masuk && $request->jam_masuk != '-') ? \Carbon\Carbon::parse($request->jam_masuk)->format('H:i:s') : null;
         $jamPulang = ($request->jam_pulang && $request->jam_pulang != '-') ? \Carbon\Carbon::parse($request->jam_pulang)->format('H:i:s') : null;
+
+        if (!$jamMasuk && in_array($status, ['H', 'T'])) {
+            $jamMasuk = $att?->jam_masuk ?: Carbon::now($schoolTz)->format('H:i:s');
+        }
 
         if ($att) {
             $att->update([
                 'status' => $status,
                 'keterangan' => $request->keterangan,
                 'jam_masuk' => $jamMasuk,
-                'jam_pulang' => $jamPulang
+                'jam_pulang' => $jamPulang,
+                'is_auto_alpha' => false,
             ]);
         } else {
             // Create new record
@@ -865,13 +873,13 @@ class AttendanceController extends Controller
                 'status' => $status,
                 'keterangan' => $request->keterangan,
                 'jam_masuk' => $jamMasuk,
-                'jam_pulang' => $jamPulang
+                'jam_pulang' => $jamPulang,
+                'is_auto_alpha' => false,
             ]);
         }
 
         // Send FCM Push Notification if status is Alpha or Bolos
         try {
-            $student = Siswa::find($studentId);
             if ($student) {
                 if ($status === 'A') {
                     FcmNotificationService::sendToSiswa(
@@ -942,17 +950,32 @@ class AttendanceController extends Controller
             'keterangan' => 'nullable',
         ]);
 
-        $studentIds = explode(',', $request->student_ids);
+        $studentIds = array_filter(explode(',', $request->student_ids));
         $date = $request->tanggal;
         $status = $request->status;
+        $isHadir = in_array($status, ['H', 'T']);
+
+        $firstStudent = !empty($studentIds) ? Siswa::find(reset($studentIds)) : null;
+        $schoolId = $firstStudent?->school_id ?? auth()->user()?->school_id;
+        $schoolTz = $this->attendanceCore->getSchoolTimezone($schoolId);
+        $currentTime = Carbon::now($schoolTz)->format('H:i:s');
 
         foreach ($studentIds as $id) {
             $att = Attendance::where('student_id', $id)->where('tanggal', $date)->first();
 
             if ($att) {
+                $jamMasuk = $att->jam_masuk;
+                if (!$jamMasuk && $isHadir) {
+                    $jamMasuk = $currentTime;
+                } elseif (!$isHadir && $status !== 'B') {
+                    $jamMasuk = null;
+                }
+
                 $att->update([
                     'status' => $status,
                     'keterangan' => $request->keterangan,
+                    'jam_masuk' => $jamMasuk,
+                    'is_auto_alpha' => false,
                 ]);
             } else {
                 Attendance::create([
@@ -960,6 +983,8 @@ class AttendanceController extends Controller
                     'tanggal' => $date,
                     'status' => $status,
                     'keterangan' => $request->keterangan,
+                    'jam_masuk' => $isHadir ? $currentTime : null,
+                    'is_auto_alpha' => false,
                 ]);
             }
         }

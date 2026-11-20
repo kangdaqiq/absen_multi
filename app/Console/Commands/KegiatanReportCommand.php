@@ -24,7 +24,14 @@ class KegiatanReportCommand extends Command
         $schools = School::where('is_active', true)->get();
 
         foreach ($schools as $school) {
-            $this->processSchoolKegiatanReports($school);
+            try {
+                $this->processSchoolKegiatanReports($school);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::error("[KegiatanReport] Error processing school ID {$school->id} ({$school->name}): " . $e->getMessage(), [
+                    'exception' => $e
+                ]);
+                $this->error("Error processing school ID {$school->id} ({$school->name}): " . $e->getMessage());
+            }
         }
     }
 
@@ -119,15 +126,27 @@ class KegiatanReportCommand extends Command
             $totalSakit = $attendancesToday->where('status', 'S')->count();
 
             // Total active target students for this kegiatan
+            // Kecualikan siswa PKL (is_khusus) dan Siswa Khusus di luar jadwal hari masuknya (!isEntryDay) jika tidak hadir
             $allStudents = $kegiatan->getTargetStudentsQuery()
                 ->whereHas('kelas', fn($q) => $q->where('is_active_attendance', true))
                 ->with('kelas')
-                ->get();
-
-            $totalAlpha = max(0, $allStudents->count() - ($totalHadir + $totalIzin + $totalSakit));
+                ->get()
+                ->reject(function ($st) use ($today, $attendancesToday, $kegiatan) {
+                    if ($attendancesToday->has($st->id)) {
+                        return false; // Jika siswa tetap hadir/izin/sakit pada kegiatan ini, tetap dihitung
+                    }
+                    if ($kegiatan->target_type === 'siswa') {
+                        // Untuk ekskul/kegiatan siswa terpilih, tetap kecualikan jika sedang PKL atau di luar hari masuk khusus
+                    }
+                    $isPklExempt = (bool) $st->is_khusus;
+                    $isKhususExempt = (bool) $st->is_siswa_khusus && !$st->isEntryDay($today);
+                    return $isPklExempt || $isKhususExempt;
+                })
+                ->values();
 
             // Stats per class for global report
             $statsByKelas = [];
+            $totalAlpha = 0;
             foreach ($allStudents->groupBy('kelas_id') as $kelasId => $classStudents) {
                 $kelasName = $classStudents->first()->kelas->nama_kelas ?? 'Tanpa Kelas';
                 $h = 0; $i = 0; $s = 0; $a = 0;
@@ -139,6 +158,7 @@ class KegiatanReportCommand extends Command
                         elseif ($status === 'S') $s++;
                     } else {
                         $a++;
+                        $totalAlpha++;
                     }
                 }
                 $statsByKelas[$kelasName] = ['H' => $h, 'I' => $i, 'S' => $s, 'A' => $a];

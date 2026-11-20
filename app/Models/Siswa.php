@@ -37,6 +37,7 @@ class Siswa extends Model
         'nama',
         'nis',
         'nisn',
+        'saldo_tabungan',
         'kelas_id',
         'tgl_lahir',
         'alamat',
@@ -280,6 +281,16 @@ class Siswa extends Model
     public function latestPenanganan()
     {
         return $this->hasOne(PenangananPelanggaran::class, 'student_id')->latestOfMany('tanggal');
+    }
+
+    public function tabungans()
+    {
+        return $this->hasMany(TabunganSiswa::class, 'student_id');
+    }
+
+    public function latestTabungan()
+    {
+        return $this->hasOne(TabunganSiswa::class, 'student_id')->latestOfMany('id');
     }
 
     public function getHasFaceRegisteredAttribute(): bool

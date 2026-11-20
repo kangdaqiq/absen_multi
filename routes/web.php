@@ -180,6 +180,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/live/box-data', [App\Http\Controllers\LiveDashboardController::class, 'boxData'])->name('live.box-data');
     Route::post('/live/simulate-tap', [App\Http\Controllers\LiveDashboardController::class, 'simulateTap'])->name('live.simulate-tap');
     Route::get('/siswa/riwayat-kehadiran', [App\Http\Controllers\StudentAttendanceHistoryController::class, 'index'])->name('siswa.riwayat');
+    Route::get('/siswa/tabungan', [App\Http\Controllers\TabunganController::class, 'myBook'])->name('tabungan.my');
+    Route::get('/tabungan/buku-saya', [App\Http\Controllers\TabunganController::class, 'myBook']);
 
     // Data Siswa (Admin, Teacher, Wali Kelas, Waka Kurikulum)
     Route::middleware('role:admin,teacher,wali_kelas,waka_kurikulum')->group(function () {
@@ -294,6 +296,17 @@ Route::middleware('auth')->group(function () {
         Route::get('/rekap/export', [App\Http\Controllers\RekapController::class, 'export'])->name('rekap.export');
         Route::get('/rekap/pdf', [App\Http\Controllers\RekapController::class, 'printPdf'])->name('rekap.pdf');
         
+        // Tabungan Siswa (Admin: Full CRUD & Loket Kasir RFID; Wali Kelas / Guru: Monitoring & Rekap)
+        Route::get('/tabungan', [App\Http\Controllers\TabunganController::class, 'index'])->name('tabungan.index');
+        Route::get('/tabungan/scan-lookup', [App\Http\Controllers\TabunganController::class, 'scanLookup'])->name('tabungan.scan-lookup');
+        Route::get('/tabungan/rekap', [App\Http\Controllers\TabunganController::class, 'rekap'])->name('tabungan.rekap');
+        Route::get('/tabungan/export-excel', [App\Http\Controllers\TabunganController::class, 'exportExcel'])->name('tabungan.export-excel');
+        Route::get('/tabungan/export-pdf', [App\Http\Controllers\TabunganController::class, 'exportPdf'])->name('tabungan.export-pdf');
+        Route::get('/tabungan/siswa/{id}', [App\Http\Controllers\TabunganController::class, 'show'])->name('tabungan.show');
+        Route::get('/tabungan/siswa/{id}/cetak-buku', [App\Http\Controllers\TabunganController::class, 'printStudentBookPdf'])->name('tabungan.print-book');
+        Route::post('/tabungan', [App\Http\Controllers\TabunganController::class, 'store'])->name('tabungan.store');
+        Route::delete('/tabungan/{id}', [App\Http\Controllers\TabunganController::class, 'destroy'])->name('tabungan.destroy');
+
         // Rekap Kelas
         Route::get('/rekap-kelas', [App\Http\Controllers\RekapKelasController::class, 'index'])->name('rekap-kelas.index');
         Route::get('/rekap-kelas/export', [App\Http\Controllers\RekapKelasController::class, 'export'])->name('rekap-kelas.export');

@@ -157,7 +157,9 @@
                         $hadirCount = $student->count_hadir ?? $student->total_kehadiran ?? 0;
                         $izinCount  = $student->count_izin ?? 0;
                         $sakitCount = $student->count_sakit ?? 0;
-                        $percentage = $totalMeetings > 0 ? round(($hadirCount / $totalMeetings) * 100) : 0;
+                        $studentMeetings = $student->eligible_meetings ?? $totalMeetings;
+                        $isExemptStudent = ($student->is_khusus || $student->is_siswa_khusus) && $studentMeetings === 0;
+                        $percentage = $studentMeetings > 0 ? min(100, round(($hadirCount / $studentMeetings) * 100)) : ($isExemptStudent ? 100 : 0);
                         
                         if ($percentage >= 80) {
                             $barClass = 'bg-success-500';
@@ -172,9 +174,17 @@
                             {{ ($students->currentPage() - 1) * $students->perPage() + $index + 1 }}
                         </td>
                         <td class="px-5 py-4">
-                            <p class="font-semibold text-gray-800 dark:text-white/90">
-                                {{ $student->nama }}
-                            </p>
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <p class="font-semibold text-gray-800 dark:text-white/90">
+                                    {{ $student->nama }}
+                                </p>
+                                @if($student->is_khusus)
+                                    <span class="inline-flex rounded-full bg-success-50 px-2 py-0.5 text-[11px] font-semibold text-success-600 dark:bg-success-500/15 dark:text-success-500">PKL</span>
+                                @endif
+                                @if($student->is_siswa_khusus)
+                                    <span class="inline-flex rounded-full bg-purple-50 px-2 py-0.5 text-[11px] font-semibold text-purple-600 dark:bg-purple-500/15 dark:text-purple-500">Khusus</span>
+                                @endif
+                            </div>
                         </td>
                         <td class="px-5 py-4 text-gray-600 dark:text-gray-400 font-mono">
                             {{ $student->nis }}
@@ -198,15 +208,21 @@
                             </span>
                         </td>
                         <td class="px-5 py-4">
-                            <div class="flex items-center gap-3">
-                                <div class="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-2">
-                                    <div class="h-2 rounded-full {{ $barClass }} transition-all duration-500" style="width: {{ $percentage }}%"></div>
-                                </div>
-                                <span class="text-xs font-semibold text-gray-700 dark:text-gray-300 w-12 text-right">
-                                    {{ $hadirCount }}/{{ $totalMeetings }}
-                                    <span class="text-gray-400 block text-[10px] mt-0.5">({{ $percentage }}%)</span>
+                            @if($isExemptStudent)
+                                <span class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
+                                    Dibebaskan ({{ $student->is_khusus ? 'PKL' : 'Jadwal Khusus' }})
                                 </span>
-                            </div>
+                            @else
+                                <div class="flex items-center gap-3">
+                                    <div class="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-2">
+                                        <div class="h-2 rounded-full {{ $barClass }} transition-all duration-500" style="width: {{ $percentage }}%"></div>
+                                    </div>
+                                    <span class="text-xs font-semibold text-gray-700 dark:text-gray-300 w-12 text-right">
+                                        {{ $hadirCount }}/{{ $studentMeetings }}
+                                        <span class="text-gray-400 block text-[10px] mt-0.5">({{ $percentage }}%)</span>
+                                    </span>
+                                </div>
+                            @endif
                         </td>
                     </tr>
                 @empty

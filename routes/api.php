@@ -188,6 +188,16 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/mobile/siswa/penanganan/my', [App\Http\Controllers\Api\MobilePelanggaranController::class, 'myPenanganans']);
     Route::get('/mobile/penanganan/my', [App\Http\Controllers\Api\MobilePelanggaranController::class, 'myPenanganans']);
 
+    // --- Fitur Tabungan Siswa (Apps Siswa & Guru) ---
+    Route::get('/mobile/tabungan/my', [App\Http\Controllers\Api\MobileTabunganController::class, 'myTabungan']);
+    Route::get('/mobile/student/tabungan', [App\Http\Controllers\Api\MobileTabunganController::class, 'myTabungan']);
+    Route::get('/mobile/siswa/tabungan', [App\Http\Controllers\Api\MobileTabunganController::class, 'myTabungan']);
+    Route::get('/mobile/guru/tabungan', [App\Http\Controllers\Api\MobileTabunganController::class, 'teacherIndex']);
+    Route::get('/mobile/teacher/tabungan', [App\Http\Controllers\Api\MobileTabunganController::class, 'teacherIndex']);
+    Route::get('/mobile/tabungan', [App\Http\Controllers\Api\MobileTabunganController::class, 'teacherIndex']);
+    Route::get('/mobile/guru/tabungan/student/{id}', [App\Http\Controllers\Api\MobileTabunganController::class, 'teacherStudentDetail']);
+    Route::get('/mobile/teacher/tabungan/student/{id}', [App\Http\Controllers\Api\MobileTabunganController::class, 'teacherStudentDetail']);
+
     Route::post('/mobile/logout', [MobileAttendanceController::class, 'logout']);
 });
 

@@ -98,6 +98,20 @@ class MenuHelper
                         ]
                     ]
                 ];
+
+                $guruMenu[] = [
+                    'title' => 'Tabungan',
+                    'items' => [
+                        [
+                            'name'     => 'Tabungan Siswa',
+                            'icon'     => 'ecommerce',
+                            'subItems' => [
+                                ['name' => 'Mutasi Transaksi', 'path' => route('tabungan.index', [], false)],
+                                ['name' => 'Rekap Saldo Kelas', 'path' => route('tabungan.rekap', [], false)],
+                            ]
+                        ]
+                    ]
+                ];
             }
 
             return $guruMenu;
@@ -130,6 +144,11 @@ class MenuHelper
                     'icon' => 'calendar',
                     'name' => 'Riwayat Kehadiran',
                     'path' => route('siswa.riwayat', [], false),
+                ],
+                [
+                    'icon' => 'ecommerce',
+                    'name' => 'Buku Tabungan',
+                    'path' => route('tabungan.my', [], false),
                 ],
                 [
                     'icon' => 'forms',
@@ -306,6 +325,20 @@ class MenuHelper
                                 ['name' => 'Catatan Pelanggaran', 'path' => route('pelanggaran.index', [], false)],
                                 ['name' => 'Riwayat Penanganan BK', 'path' => route('pelanggaran.penanganan.index', [], false)],
                                 ['name' => 'Rekap Pelanggaran', 'path' => route('pelanggaran.rekap', [], false)],
+                            ]
+                        ]
+                    ]
+                ];
+
+                $menu[] = [
+                    'title' => 'Keuangan Siswa',
+                    'items' => [
+                        [
+                            'name'     => 'Tabungan Siswa',
+                            'icon'     => 'ecommerce',
+                            'subItems' => [
+                                ['name' => 'Loket & Mutasi', 'path' => route('tabungan.index', [], false)],
+                                ['name' => 'Rekap Saldo Siswa', 'path' => route('tabungan.rekap', [], false)],
                             ]
                         ]
                     ]

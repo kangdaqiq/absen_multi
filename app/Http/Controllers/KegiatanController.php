@@ -438,7 +438,15 @@ class KegiatanController extends Controller
             $studentQuery->where('kelas_id', $request->kelas_id);
         }
 
-        $studentIds = $studentQuery->pluck('id');
+        // Kecualikan siswa PKL (is_khusus) dan Siswa Khusus di luar jadwal hari masuknya pada tanggal kegiatan
+        $tanggalAbsen = $request->tanggal;
+        $studentIds = $studentQuery->get()
+            ->reject(function ($st) use ($tanggalAbsen) {
+                $isPklExempt = (bool) $st->is_khusus;
+                $isKhususExempt = (bool) $st->is_siswa_khusus && !$st->isEntryDay($tanggalAbsen);
+                return $isPklExempt || $isKhususExempt;
+            })
+            ->pluck('id');
         $jam = now()->format('H:i:s');
 
         if ($request->status === 'A') {
@@ -570,9 +578,24 @@ class KegiatanController extends Controller
             $meetingQuery->where('kegiatan_id', $kegiatanId);
         }
 
-        $totalMeetings = $meetingQuery->selectRaw('COUNT(DISTINCT tanggal, kegiatan_id) as count')
-            ->first()
-            ->count ?? 0;
+        $meetingSessions = (clone $meetingQuery)
+            ->select('tanggal', 'kegiatan_id')
+            ->distinct()
+            ->get();
+
+        $totalMeetings = $meetingSessions->count();
+
+        foreach ($students as $st) {
+            if ($st->is_khusus) {
+                // Siswa PKL dibebaskan dari kewajiban pertemuan kegiatan (hanya dihitung pertemuan yang diikuti)
+                $st->eligible_meetings = ($st->count_hadir ?? 0) + ($st->count_izin ?? 0) + ($st->count_sakit ?? 0);
+            } elseif ($st->is_siswa_khusus) {
+                // Siswa Khusus hanya wajib mengikuti pertemuan yang jatuh pada jadwal hari_masuk-nya
+                $st->eligible_meetings = $meetingSessions->filter(fn($m) => $st->isEntryDay($m->tanggal))->count();
+            } else {
+                $st->eligible_meetings = $totalMeetings;
+            }
+        }
 
         return view('kegiatan.rekap', compact(
             'startDate',
@@ -638,6 +661,21 @@ class KegiatanController extends Controller
 
         $students = $studentQuery->get();
 
+        // Hitung total pertemuan kegiatan dalam periode tanggal ini
+        $meetingQuery = KegiatanAttendance::where('school_id', $schoolId)
+            ->whereBetween('tanggal', [$startDate, $endDate]);
+        
+        if ($kegiatanId) {
+            $meetingQuery->where('kegiatan_id', $kegiatanId);
+        }
+
+        $meetingSessions = (clone $meetingQuery)
+            ->select('tanggal', 'kegiatan_id')
+            ->distinct()
+            ->get();
+
+        $totalMeetings = $meetingSessions->count();
+
         $filename = "rekap_kegiatan_" . date('Ymd_His') . ".csv";
 
         $headers = [
@@ -648,20 +686,37 @@ class KegiatanController extends Controller
             "Expires"             => "0"
         ];
 
-        $callback = function () use ($students) {
+        $callback = function () use ($students, $meetingSessions, $totalMeetings) {
             $file = fopen('php://output', 'w');
             fputs($file, "\xEF\xBB\xBF");
-            fputcsv($file, ['No', 'NIS/NISN', 'Nama Siswa', 'Kelas', 'Hadir (H)', 'Izin (I)', 'Sakit (S)']);
+            fputcsv($file, ['No', 'NIS/NISN', 'Nama Siswa', 'Status Siswa', 'Kelas', 'Hadir (H)', 'Izin (I)', 'Sakit (S)', 'Total Pertemuan Wajib', 'Persentase Kehadiran']);
 
             foreach ($students as $index => $s) {
+                if ($s->is_khusus) {
+                    $statusSiswa = 'PKL';
+                    $studentMeetings = ($s->count_hadir ?? 0) + ($s->count_izin ?? 0) + ($s->count_sakit ?? 0);
+                    $persentase = $studentMeetings > 0 ? min(100, round((($s->count_hadir ?? 0) / $studentMeetings) * 100)) . '%' : 'Dibebaskan (PKL)';
+                } elseif ($s->is_siswa_khusus) {
+                    $statusSiswa = 'Khusus';
+                    $studentMeetings = $meetingSessions->filter(fn($m) => $s->isEntryDay($m->tanggal))->count();
+                    $persentase = $studentMeetings > 0 ? min(100, round((($s->count_hadir ?? 0) / $studentMeetings) * 100)) . '%' : 'Dibebaskan';
+                } else {
+                    $statusSiswa = 'Reguler';
+                    $studentMeetings = $totalMeetings;
+                    $persentase = $studentMeetings > 0 ? min(100, round((($s->count_hadir ?? 0) / $studentMeetings) * 100)) . '%' : '0%';
+                }
+
                 fputcsv($file, [
                     $index + 1,
                     $s->nisn ?? $s->nis ?? '-',
                     $s->nama,
+                    $statusSiswa,
                     $s->kelas->nama_kelas ?? '-',
                     $s->count_hadir ?? 0,
                     $s->count_izin ?? 0,
                     $s->count_sakit ?? 0,
+                    $studentMeetings,
+                    $persentase,
                 ]);
             }
 

@@ -41,7 +41,7 @@
 
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-2">
-                        <i class="fas fa-piggy-bank text-amber-300 text-xl"></i>
+                        <i class="fas fa-coins text-amber-300 text-xl"></i>
                         <span class="text-xs font-black tracking-widest uppercase">BUKU TABUNGAN SISWA</span>
                     </div>
                     <span class="rounded-full bg-white/20 px-2.5 py-0.5 text-[10px] font-bold backdrop-blur-xs">

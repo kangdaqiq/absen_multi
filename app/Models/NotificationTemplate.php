@@ -46,6 +46,10 @@ class NotificationTemplate extends Model
         'late_guru'            => ['label' => 'Masuk Terlambat (Guru/Pegawai)', 'target' => 'guru', 'desc' => 'Notifikasi guru/pegawai terlambat.'],
         'checkout_guru'        => ['label' => 'Absen Pulang (Guru/Pegawai)', 'target' => 'guru', 'desc' => 'Notifikasi pulang guru/pegawai.'],
         'early_checkout_guru'  => ['label' => 'Pulang Cepat (Guru/Pegawai)', 'target' => 'guru', 'desc' => 'Notifikasi guru/pegawai pulang cepat.'],
+
+        // Tabungan Siswa
+        'tabungan_ortu'        => ['label' => 'Transaksi Tabungan (ke Orang Tua)', 'target' => 'ortu', 'desc' => 'Notifikasi dikirim ke nomor WhatsApp orang tua saat siswa melakukan setor atau tarik tabungan.'],
+        'tabungan_siswa'       => ['label' => 'Transaksi Tabungan (ke Siswa)', 'target' => 'siswa', 'desc' => 'Notifikasi dikirim ke nomor WhatsApp siswa saat melakukan setor atau tarik tabungan.'],
     ];
 
     /**
@@ -65,6 +69,12 @@ class NotificationTemplate extends Model
         '{status}'              => 'Keterangan Status (Hadir, Izin, Sakit, Terlambat, dll.)',
         '{nama_sekolah}'        => 'Nama Sekolah',
         '{diotorisasi}'         => 'Nama Petugas Pengawas (Absen Pulang)',
+        '{jenis}'               => 'Jenis Mutasi Tabungan (SETOR TUNAI / TARIK TUNAI)',
+        '{nominal}'             => 'Nominal Transaksi (contoh: Rp 50.000)',
+        '{saldo}'               => 'Saldo Akhir Tabungan (contoh: Rp 250.000)',
+        '{kode}'                => 'No. Referensi Transaksi (contoh: TAB-20261123-0001)',
+        '{petugas}'             => 'Nama Petugas Bendahara / Kasir',
+        '{keterangan}'          => 'Catatan Transaksi',
     ];
 
     public function school(): BelongsTo

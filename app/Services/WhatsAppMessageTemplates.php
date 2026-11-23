@@ -1370,8 +1370,9 @@ class WhatsAppMessageTemplates
             '{jam}'        => $waktu,
             '{waktu}'      => $waktu,
             '{kode}'       => $code,
-            '{petugas}'    => $petugas,
-            '{keterangan}' => $ketStr,
+            '{petugas}'      => $petugas,
+            '{keterangan}'   => $ketStr,
+            '{nama_sekolah}' => self::getSchoolName($schoolId),
         ], $code);
 
         if ($custom !== null) {

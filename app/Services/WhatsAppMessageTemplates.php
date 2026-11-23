@@ -79,19 +79,19 @@ class WhatsAppMessageTemplates
 
         if ($isParent) {
             $closings = [
-                "_\n\nSilakan balas pesan ini dengan kata *OK* atau *Diterima* sebagai konfirmasi Anda._",
-                "_\n\nMohon berkenan membalas chat ini singkat saja (contoh: *Diterima*) sebagai tanda laporan telah dibaca._",
-                "_\n\nHarap balas pesan otomatis ini untuk memastikan laporan absensi anak Anda terkirim dengan baik._",
+                "_\n\nSilakan balas pesan ini singkat saja (contoh: *OK*) untuk konfirmasi Anda._",
+                "_\n\nMohon berkenan membalas chat ini singkat saja (contoh: *OK*) sebagai tanda laporan telah dibaca._",
+                "_\n\nHarap balas pesan singkat (contoh: *OK*) untuk memastikan laporan absensi anak Anda terkirim dengan baik._",
                 "_\n\nSilakan ketik balas *OK* pada chat ini agar sistem mencatat tanda terima orang tua._",
-                "_\n\nMohon balas pesan ini singkat saja untuk menjaga kelancaran saluran komunikasi absensi sekolah._",
+                "_\n\nMohon balas pesan ini (contoh: *OK*) singkat saja untuk menjaga kelancaran saluran komunikasi absensi sekolah._",
             ];
         } else {
             $closings = [
                 "_\n\nSilakan balas pesan ini singkat saja (contoh: *OK*) untuk konfirmasi Anda._",
-                "_\n\nMohon balas chat ini sebagai tanda bahwa pemberitahuan ini telah dibaca._",
+                "_\n\nMohon balas chat ini (contoh: *OK*) sebagai tanda bahwa pemberitahuan ini telah dibaca._",
                 "_\n\nHarap ketik balas *Diterima/OK* untuk memastikan pesan absensi Anda telah sampai._",
-                "_\n\nSilakan balas pesan otomatis ini dengan ketikan singkat._",
-                "_\n\nMohon berkenan membalas chat ini untuk verifikasi penerimaan pesan._",
+                "_\n\nSilakan balas pesan otomatis ini dengan ketikan singkat (contoh: *OK*)._",
+                "_\n\nMohon berkenan membalas chat ini (contoh: *OK*) untuk verifikasi penerimaan pesan._",
             ];
         }
 

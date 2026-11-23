@@ -357,6 +357,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/siswa/{id}/delete-finger', [SiswaController::class, 'deleteFingerId']);
 
         // Management
+        Route::post('/devices/{id}/sync', [DeviceController::class, 'triggerSync'])->name('devices.sync');
         Route::resource('devices', DeviceController::class)->except(['create', 'show', 'edit']);
         Route::post('/jadwal/update-all', [App\Http\Controllers\JadwalController::class, 'updateAll'])->name('jadwal.update-all');
         Route::resource('jadwal', App\Http\Controllers\JadwalController::class)->except(['create', 'show', 'edit']);

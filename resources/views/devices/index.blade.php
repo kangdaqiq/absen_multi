@@ -4,8 +4,8 @@
 
 @section('content')
     <x-page-header 
-        title="Manajemen Device RFID" 
-        subtitle="Kelola perangkat mesin scanner tap kartu RFID & biometric sekolah" 
+        title="Manajemen Device RFID & Biometrik" 
+        subtitle="Kelola perangkat mesin scanner tap kartu RFID & biometric sidik jari sekolah" 
         icon="fas fa-microchip"
         x-data>
         <button @click="$dispatch('open-modal', 'modalTambahDevice')"
@@ -13,6 +13,77 @@
             <i class="fas fa-plus"></i> Tambah Device
         </button>
     </x-page-header>
+
+    {{-- Counter Ringkasan Sidik Jari Tersimpan di Server --}}
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-6">
+        <!-- Card 1: Total Template -->
+        <div class="rounded-sm border border-stroke bg-white p-5 shadow-default dark:border-strokedark dark:bg-boxdark">
+            <div class="flex items-center justify-between">
+                <div>
+                    <span class="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Total Template Server</span>
+                    <h4 class="mt-1 text-2xl font-bold text-black dark:text-white">{{ number_format($totalTemplates ?? 0) }}</h4>
+                </div>
+                <div class="flex h-11 w-11 items-center justify-center rounded-full bg-brand-50 text-brand-500 dark:bg-brand-500/10">
+                    <i class="fas fa-database text-lg"></i>
+                </div>
+            </div>
+            <div class="mt-3 flex items-center gap-1.5 text-xs text-brand-600 dark:text-brand-400">
+                <i class="fas fa-check-circle"></i>
+                <span>Tersimpan di database sekolah</span>
+            </div>
+        </div>
+
+        <!-- Card 2: Template Siswa -->
+        <div class="rounded-sm border border-stroke bg-white p-5 shadow-default dark:border-strokedark dark:bg-boxdark">
+            <div class="flex items-center justify-between">
+                <div>
+                    <span class="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Template Siswa</span>
+                    <h4 class="mt-1 text-2xl font-bold text-black dark:text-white">{{ number_format($siswaTemplatesCount ?? 0) }}</h4>
+                </div>
+                <div class="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-50 text-emerald-500 dark:bg-emerald-500/10">
+                    <i class="fas fa-user-graduate text-lg"></i>
+                </div>
+            </div>
+            <div class="mt-3 flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400">
+                <i class="fas fa-fingerprint"></i>
+                <span>Sidik jari siswa aktif</span>
+            </div>
+        </div>
+
+        <!-- Card 3: Template Guru -->
+        <div class="rounded-sm border border-stroke bg-white p-5 shadow-default dark:border-strokedark dark:bg-boxdark">
+            <div class="flex items-center justify-between">
+                <div>
+                    <span class="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Template Guru & Staff</span>
+                    <h4 class="mt-1 text-2xl font-bold text-black dark:text-white">{{ number_format($guruTemplatesCount ?? 0) }}</h4>
+                </div>
+                <div class="flex h-11 w-11 items-center justify-center rounded-full bg-amber-50 text-amber-500 dark:bg-amber-500/10">
+                    <i class="fas fa-chalkboard-teacher text-lg"></i>
+                </div>
+            </div>
+            <div class="mt-3 flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400">
+                <i class="fas fa-fingerprint"></i>
+                <span>Sidik jari guru aktif</span>
+            </div>
+        </div>
+
+        <!-- Card 4: Device Scanner Biometrik -->
+        <div class="rounded-sm border border-stroke bg-white p-5 shadow-default dark:border-strokedark dark:bg-boxdark">
+            <div class="flex items-center justify-between">
+                <div>
+                    <span class="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Scanner Fingerprint</span>
+                    <h4 class="mt-1 text-2xl font-bold text-black dark:text-white">{{ $devices->where('type', '!=', 'rfid')->count() }} <span class="text-sm font-normal text-gray-500">Unit</span></h4>
+                </div>
+                <div class="flex h-11 w-11 items-center justify-center rounded-full bg-purple-50 text-purple-500 dark:bg-purple-500/10">
+                    <i class="fas fa-fingerprint text-lg"></i>
+                </div>
+            </div>
+            <div class="mt-3 flex items-center gap-1.5 text-xs text-purple-600 dark:text-purple-400">
+                <i class="fas fa-network-wired"></i>
+                <span>Dari total {{ $devices->count() }} unit device</span>
+            </div>
+        </div>
+    </div>
 
     <div class="rounded-sm border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark">
         <div class="border-b border-stroke py-4 px-6.5 dark:border-strokedark">
@@ -103,9 +174,15 @@
                                 </td>
                                 <td class="border-b border-gray-100 py-5 px-4 dark:border-gray-800 text-center">
                                     @if($d->type !== 'rfid')
-                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
-                                            ID {{ $d->finger_id_min ?? 1 }} - {{ $d->finger_id_max ?? 200 }}
-                                        </span>
+                                        <div class="flex flex-col items-center">
+                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-brand-50 text-brand-600 dark:bg-brand-500/15 dark:text-brand-400">
+                                                ID {{ $d->finger_id_min ?? 1 }} - {{ $d->finger_id_max ?? 200 }}
+                                            </span>
+                                            <span class="text-[11px] text-gray-500 dark:text-gray-400 mt-1 inline-flex items-center gap-1 font-medium">
+                                                <i class="fas fa-fingerprint text-orange-500 text-[10px]"></i>
+                                                <span class="text-black dark:text-white font-semibold">{{ $d->matched_templates_count ?? 0 }}</span> template server
+                                            </span>
+                                        </div>
                                     @else
                                         <span class="text-gray-400 text-xs">-</span>
                                     @endif
@@ -120,7 +197,17 @@
                                     @endif
                                 </td>
                                 <td class="border-b border-gray-100 py-5 px-4 dark:border-gray-800">
-                                    <div class="flex items-center space-x-3.5" x-data>
+                                    <div class="flex items-center space-x-2" x-data>
+                                        @if($d->type !== 'rfid')
+                                            <form action="{{ route('devices.sync', $d->id) }}" method="POST" class="inline" onsubmit="return confirm('Kirim instruksi sinkronisasi template sidik jari ke {{ addslashes($d->name) }}?')">
+                                                @csrf
+                                                <button type="submit"
+                                                    class="text-blue-500 hover:text-blue-700 hover:bg-blue-50 p-2 rounded-lg transition"
+                                                    title="Sinkronkan Template ke Alat Ini">
+                                                    <i class="fas fa-sync-alt"></i>
+                                                </button>
+                                            </form>
+                                        @endif
                                         <button
                                             class="text-orange-500 hover:text-orange-700 hover:bg-orange-50 p-2 rounded-lg transition"
                                             @click="$dispatch('open-modal', 'modalEditDevice'); $dispatch('set-edit-device', { id: '{{ $d->id }}', name: '{{ addslashes($d->name) }}', key: '{{ $d->api_key }}', type: '{{ $d->type }}', category: '{{ $d->device_category ?? 'attendance' }}', finger_min: '{{ $d->finger_id_min ?? 1 }}', finger_max: '{{ $d->finger_id_max ?? 200 }}', active: '{{ $d->active }}' })"
@@ -137,6 +224,118 @@
                                 </td>
                             </tr>
                         @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    {{-- Log Sinkronisasi & Pendaftaran Template Sidik Jari --}}
+    <div class="mt-6 rounded-sm border border-stroke bg-white shadow-default dark:border-strokedark dark:bg-boxdark">
+        <div class="border-b border-stroke py-4 px-6.5 dark:border-strokedark flex flex-wrap items-center justify-between gap-2">
+            <div>
+                <h3 class="font-medium text-black dark:text-white flex items-center gap-2">
+                    <i class="fas fa-history text-brand-500"></i> Log Sinkronisasi & Pendaftaran Template Sidik Jari
+                </h3>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                    15 riwayat aktivitas transfer template, download ke alat, dan pendaftaran sidik jari terbaru
+                </p>
+            </div>
+            <div>
+                <a href="{{ route('api-logs.index', ['tab' => 'sync_template']) }}" 
+                   class="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-500 hover:text-brand-600 dark:text-brand-400 bg-brand-50 dark:bg-brand-500/10 px-3 py-1.5 rounded-lg transition">
+                    <span>Buka Semua di Log API</span>
+                    <i class="fas fa-arrow-right text-[10px]"></i>
+                </a>
+            </div>
+        </div>
+
+        <div class="p-6.5">
+            <div class="max-w-full overflow-x-auto">
+                <table class="w-full table-auto">
+                    <thead>
+                        <tr class="bg-gray-50 text-left dark:bg-gray-800/50 text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                            <th class="py-3 px-4 font-semibold" width="16%">Waktu</th>
+                            <th class="py-3 px-4 font-semibold" width="18%">Aktivitas</th>
+                            <th class="py-3 px-4 font-semibold text-center" width="10%">Slot ID</th>
+                            <th class="py-3 px-4 font-semibold">Keterangan / Detail</th>
+                            <th class="py-3 px-4 font-semibold text-center" width="10%">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-sm divide-y divide-gray-100 dark:divide-gray-800">
+                        @forelse($syncLogs ?? [] as $log)
+                            <tr>
+                                <td class="py-3 px-4 font-mono text-xs text-gray-500 dark:text-gray-400">
+                                    {{ $log->created_at ? \Carbon\Carbon::parse($log->created_at)->format('d M Y H:i:s') : '-' }}
+                                    <div class="text-[10px] text-gray-400">{{ $log->created_at ? \Carbon\Carbon::parse($log->created_at)->diffForHumans() : '' }}</div>
+                                </td>
+                                <td class="py-3 px-4">
+                                    @if($log->action === 'sync_template_download' || $log->action === 'sync_template')
+                                        <span class="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-500/15 dark:text-blue-400 border border-blue-200 dark:border-blue-800">
+                                            <i class="fas fa-download text-[10px]"></i> Download Template
+                                        </span>
+                                    @elseif($log->action === 'sync_template_list')
+                                        <span class="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-medium text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800">
+                                            <i class="fas fa-list text-[10px]"></i> Cek Daftar Sync
+                                        </span>
+                                    @elseif($log->action === 'sync_template_result')
+                                        <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
+                                            <i class="fas fa-check-double text-[10px]"></i> Hasil Sync Alat
+                                        </span>
+                                    @elseif($log->action === 'sync_requested')
+                                        <span class="inline-flex items-center gap-1 rounded-full bg-purple-50 px-2.5 py-0.5 text-xs font-medium text-purple-700 dark:bg-purple-500/15 dark:text-purple-400 border border-purple-200 dark:border-purple-800">
+                                            <i class="fas fa-paper-plane text-[10px]"></i> Trigger Sync
+                                        </span>
+                                    @elseif($log->action === 'enroll_success')
+                                        <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
+                                            <i class="fas fa-fingerprint text-[10px]"></i> Enroll Sukses
+                                        </span>
+                                    @elseif($log->action === 'enroll_failed')
+                                        <span class="inline-flex items-center gap-1 rounded-full bg-red-50 px-2.5 py-0.5 text-xs font-medium text-red-700 dark:bg-red-500/15 dark:text-red-400 border border-red-200 dark:border-red-800">
+                                            <i class="fas fa-times-circle text-[10px]"></i> Enroll Gagal
+                                        </span>
+                                    @else
+                                        <span class="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                                            {{ $log->action }}
+                                        </span>
+                                    @endif
+                                </td>
+                                <td class="py-3 px-4 text-center">
+                                    @if($log->uid)
+                                        <code class="px-2 py-0.5 bg-gray-100 dark:bg-gray-800 rounded font-semibold text-xs text-brand-600 dark:text-brand-400">#{{ $log->uid }}</code>
+                                    @else
+                                        <span class="text-gray-400 text-xs">-</span>
+                                    @endif
+                                </td>
+                                <td class="py-3 px-4 text-black dark:text-white">
+                                    <p class="text-xs sm:text-sm font-medium">{{ $log->message }}</p>
+                                    @if($log->ip_address)
+                                        <span class="text-[11px] text-gray-400">IP: {{ $log->ip_address }}</span>
+                                    @endif
+                                </td>
+                                <td class="py-3 px-4 text-center">
+                                    @if($log->success)
+                                        <span class="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                                            <i class="fas fa-check-circle"></i> Berhasil
+                                        </span>
+                                    @else
+                                        <span class="inline-flex items-center gap-1 text-xs font-semibold text-red-600 dark:text-red-400">
+                                            <i class="fas fa-times-circle"></i> Gagal
+                                        </span>
+                                    @endif
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="5" class="py-8 text-center text-gray-500 dark:text-gray-400">
+                                    <div class="flex flex-col items-center justify-center">
+                                        <i class="fas fa-fingerprint text-3xl text-gray-300 dark:text-gray-600 mb-2"></i>
+                                        <p class="font-medium text-sm">Belum ada riwayat aktivitas sinkronisasi template.</p>
+                                        <p class="text-xs text-gray-400 mt-1">Log akan otomatis tercatat saat scanner mengunduh template atau saat pendaftaran sidik jari dilakukan.</p>
+                                    </div>
+                                </td>
+                            </tr>
+                        @endforelse
                     </tbody>
                 </table>
             </div>

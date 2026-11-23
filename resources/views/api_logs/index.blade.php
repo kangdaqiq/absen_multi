@@ -43,6 +43,11 @@
                   {{ $tab === 'sync' ? 'border-blue-500 text-blue-500' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400' }}">
             <i class="fas fa-sync-alt text-xs"></i> Sync Offline
         </a>
+        <a href="{{ request()->fullUrlWithQuery(['tab' => 'sync_template', 'page' => 1]) }}"
+           class="px-4 py-2 text-sm font-medium rounded-t border-b-2 transition flex items-center gap-1.5
+                  {{ $tab === 'sync_template' ? 'border-orange-500 text-orange-500 font-semibold' : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400' }}">
+            <i class="fas fa-fingerprint text-xs"></i> Sync Template Sidik Jari
+        </a>
 
         {{-- Filter form --}}
         <form method="GET" class="ml-auto flex flex-wrap items-center gap-2 pb-2">

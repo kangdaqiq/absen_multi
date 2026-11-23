@@ -22,7 +22,7 @@ class ApiLogController extends Controller
             }
         }
 
-        // Filter: tab (auth_failed / failed / sync / all)
+        // Filter: tab (auth_failed / failed / sync / sync_template / all)
         $tab = $request->input('tab', 'all');
         if ($tab === 'auth_failed') {
             $query->where('action', 'auth_failed');
@@ -30,6 +30,21 @@ class ApiLogController extends Controller
             $query->where('success', false)->where('action', '!=', 'auth_failed');
         } elseif ($tab === 'sync') {
             $query->where('message', 'like', '%[Sync]%');
+        } elseif ($tab === 'sync_template') {
+            $query->where(function ($q) {
+                $q->whereIn('action', [
+                    'sync_template',
+                    'sync_template_list',
+                    'sync_template_download',
+                    'sync_template_result',
+                    'sync_requested',
+                    'enroll_success',
+                    'enroll_failed'
+                ])
+                ->orWhere('message', 'like', '%template%')
+                ->orWhere('message', 'like', '%sinkronisasi%')
+                ->orWhere('message', 'like', '%Enroll%');
+            });
         }
 
         // Filter: UID

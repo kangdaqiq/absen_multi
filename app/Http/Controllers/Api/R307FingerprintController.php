@@ -118,6 +118,22 @@ if ($request->has('enroll_success') && $request->input('enroll_success') == true
     return $this->finalizeEnrollment($fingerId, $device);
 }
 
+// Check if this is a Sync Result Report from hardware
+if ($request->has('sync_completed') && $request->input('sync_completed') == true) {
+    $total = (int) $request->input('total', 0);
+    $success = (int) $request->input('success', 0);
+    ApiLog::create([
+        'school_id' => $device->school_id,
+        'api_key' => $apiKey,
+        'action' => 'sync_template_result',
+        'uid' => null,
+        'success' => ($success > 0 || $total == 0),
+        'message' => "Sinkronisasi alat '{$device->name}' selesai: $success/$total template berhasil diinjeksikan ke sensor",
+        'created_at' => now()
+    ]);
+    return $this->response(true, 'ok', 'Sync result logged');
+}
+
 // Check if this is an Enroll Error Notification
 if ($request->has('enroll_error') && $request->input('enroll_error') == true) {
     $schoolId = $device->school_id;
@@ -890,6 +906,16 @@ return response()->json(array_merge([
             return $id >= $min && $id <= $max;
         }));
 
+        ApiLog::create([
+            'school_id' => $schoolId,
+            'api_key' => $device->api_key,
+            'action' => 'sync_template_list',
+            'uid' => null,
+            'success' => true,
+            'message' => "Alat '{$device->name}' meminta daftar sinkronisasi (" . count($filteredIds) . " template dalam rentang slot ID $min - $max)",
+            'created_at' => now()
+        ]);
+
         return response()->json([
             'ok' => true,
             'school_id' => $schoolId,
@@ -924,11 +950,21 @@ return response()->json(array_merge([
             ->first();
 
         if ($siswaFp && !empty($siswaFp->template_data) && $siswaFp->student) {
+            $name = $siswaFp->student->nama ?? 'Siswa';
+            ApiLog::create([
+                'school_id' => $device->school_id,
+                'api_key' => $device->api_key,
+                'action' => 'sync_template_download',
+                'uid' => $fingerId,
+                'success' => true,
+                'message' => "Download template ID #$fingerId ($name) ke alat '{$device->name}'",
+                'created_at' => now()
+            ]);
             return response()->json([
                 'ok' => true,
                 'finger_id' => $fingerId,
                 'type' => 'siswa',
-                'name' => $siswaFp->student->nama ?? 'Siswa',
+                'name' => $name,
                 'template' => $siswaFp->template_data
             ]);
         }
@@ -942,11 +978,21 @@ return response()->json(array_merge([
             ->first();
 
         if ($guruFp && !empty($guruFp->template_data) && $guruFp->guru) {
+            $name = $guruFp->guru->nama ?? 'Guru';
+            ApiLog::create([
+                'school_id' => $device->school_id,
+                'api_key' => $device->api_key,
+                'action' => 'sync_template_download',
+                'uid' => $fingerId,
+                'success' => true,
+                'message' => "Download template ID #$fingerId ($name) ke alat '{$device->name}'",
+                'created_at' => now()
+            ]);
             return response()->json([
                 'ok' => true,
                 'finger_id' => $fingerId,
                 'type' => 'guru',
-                'name' => $guruFp->guru->nama ?? 'Guru',
+                'name' => $name,
                 'template' => $guruFp->template_data
             ]);
         }
@@ -960,11 +1006,21 @@ return response()->json(array_merge([
             ->first();
 
         if ($gateFp && !empty($gateFp->template_data) && $gateFp->gateCard) {
+            $name = $gateFp->gateCard->name ?? 'Gerbang';
+            ApiLog::create([
+                'school_id' => $device->school_id,
+                'api_key' => $device->api_key,
+                'action' => 'sync_template_download',
+                'uid' => $fingerId,
+                'success' => true,
+                'message' => "Download template ID #$fingerId ($name) ke alat '{$device->name}'",
+                'created_at' => now()
+            ]);
             return response()->json([
                 'ok' => true,
                 'finger_id' => $fingerId,
                 'type' => 'gate_card',
-                'name' => $gateFp->gateCard->name ?? 'Gerbang',
+                'name' => $name,
                 'template' => $gateFp->template_data
             ]);
         }

@@ -123,6 +123,12 @@
             let text = `Halo, saya admin dari sekolah *{{ $school->name }}*.%0A%0ASaya ingin memperpanjang paket *${this.selectedPackage.name}* (${cycleText}).%0ABerikut bukti transfer saya:`;
             return `https://wa.me/${phone}?text=${text}`;
         },
+        getQrisWaLink() {
+            if (!this.activeOrder) return '#';
+            let phone = '{{ env('DEVELOPER_WA', '6281327735093') }}';
+            let text = `Halo Admin, saya dari *{{ $school->name }}*.%0A%0ASaya sudah melakukan pembayaran via *QRIS Manual* sebesar *Rp ${Number(this.activeOrder.total_amount).toLocaleString('id-ID')}* untuk langganan paket *${this.activeOrder.package_name}*.%0ABerikut bukti pembayarannya:`;
+            return `https://wa.me/${phone}?text=${text}`;
+        },
         async confirmManualAndRedirect() {
             if (!this.selectedPackage || this.isSubmitting) return;
             this.isSubmitting = true;
@@ -599,16 +605,16 @@
                         <button type="button" @click="paymentTab = 'qris'"
                             :class="paymentTab === 'qris' ? 'bg-white text-brand-600 shadow-sm dark:bg-boxdark dark:text-white font-bold' : 'text-gray-600 dark:text-gray-400 hover:text-black'"
                             class="flex-1 rounded-lg py-2 text-xs transition flex items-center justify-center gap-1.5">
-                            <i class="fas fa-qrcode"></i> ⚡ QRIS (Otomatis / Instan)
+                            <i class="fas fa-qrcode"></i> QRIS Manual
                         </button>
                         <button type="button" @click="paymentTab = 'manual'"
                             :class="paymentTab === 'manual' ? 'bg-white text-brand-600 shadow-sm dark:bg-boxdark dark:text-white font-bold' : 'text-gray-600 dark:text-gray-400 hover:text-black'"
                             class="flex-1 rounded-lg py-2 text-xs transition flex items-center justify-center gap-1.5">
-                            <i class="fas fa-university"></i> Transfer Manual & WA
+                            <i class="fas fa-university"></i> Transfer Bank & WA
                         </button>
                     </div>
 
-                    {{-- ── TAB 1: QRIS OTOMATIS ───────────────────────────── --}}
+                    {{-- ── TAB 1: QRIS MANUAL ───────────────────────────── --}}
                     <div x-show="paymentTab === 'qris'" class="space-y-4 text-sm">
                         {{-- Jika Belum Ada Order QRIS Terbuka --}}
                         <template x-if="!activeOrder">
@@ -662,10 +668,10 @@
                         <template x-if="activeOrder">
                             <div class="space-y-4 text-center">
                                 {{-- QR Code Box --}}
-                                <div class="inline-block p-4 bg-white rounded-2xl border-2 border-brand-500 shadow-md">
+                                <div class="inline-block p-4 bg-white rounded-2xl border-2 border-emerald-500 shadow-md">
                                     <div class="mb-2">
-                                        <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-brand-50 text-brand-700 dark:bg-brand-500/10 dark:text-brand-300 text-[11px] font-bold tracking-wide border border-brand-200 dark:border-brand-500/30">
-                                            <i class="fas fa-bolt text-amber-500"></i> QRIS
+                                        <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300 text-[11px] font-bold tracking-wide border border-emerald-200 dark:border-emerald-500/30">
+                                            <i class="fas fa-qrcode text-emerald-600"></i> QRIS Manual
                                         </div>
                                     </div>
                                     
@@ -691,19 +697,25 @@
                                             <span x-text="copied ? 'Tersalin!' : 'Salin'"></span>
                                         </button>
                                     </div>
-                                    <p class="text-[11px] text-amber-700 dark:text-amber-400 mt-2 flex items-start gap-1">
-                                        <i class="fas fa-exclamation-circle mt-0.5 shrink-0"></i>
-                                        <span><strong>Wajib transfer sesuai nominal tepat</strong> (termasuk 3 digit terakhir) agar verifikasi otomatis berhasil.</span>
+                                    <p class="text-[11px] text-gray-600 dark:text-gray-300 mt-2 flex items-start gap-1">
+                                        <i class="fas fa-info-circle mt-0.5 shrink-0 text-brand-500"></i>
+                                        <span>Setelah melakukan pembayaran via QRIS, klik tombol <strong>Konfirmasi via WhatsApp</strong> di bawah untuk mengirim bukti transfer ke Super Admin.</span>
                                     </p>
+
+                                    {{-- Tombol Konfirmasi WhatsApp --}}
+                                    <a :href="getQrisWaLink()" target="_blank"
+                                        class="mt-3 w-full inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-2.5 px-4 text-xs font-bold text-white hover:bg-emerald-700 transition shadow-sm">
+                                        <i class="fab fa-whatsapp text-sm"></i> Konfirmasi Pembayaran via WhatsApp
+                                    </a>
                                 </div>
 
                                 {{-- Status Realtime Indicator --}}
                                 <div class="flex items-center justify-center gap-2 p-2.5 rounded-lg bg-gray-50 dark:bg-gray-800 text-xs text-gray-600 dark:text-gray-300">
                                     <span class="relative flex h-3 w-3">
-                                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-400 opacity-75"></span>
-                                        <span class="relative inline-flex rounded-full h-3 w-3 bg-brand-500"></span>
+                                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                                        <span class="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
                                     </span>
-                                    <span>Menunggu pembayaran masuk... </span>
+                                    <span>Menunggu verifikasi admin... </span>
                                 </div>
 
                                 <div class="flex items-center justify-between text-xs text-gray-400 pt-1">

@@ -36,7 +36,7 @@ Route::post('/license/storage/sync', [App\Http\Controllers\Api\ClientStorageCont
 // Mobile Storage Direct PUT upload (single-use presigned token authenticated, for internal storage driver)
 Route::put('/mobile/storage/direct-put/{token}', [App\Http\Controllers\Api\MobileJadwalPelajaranController::class, 'directPutUpload']);
 
-// Qiospay QRIS Callback Endpoint (POST /api/callback/accept/{secret_key})
+// QRIS Callback Endpoint (Nonaktif - Mode QRIS Manual)
 Route::any('/callback/accept/{key?}', [App\Http\Controllers\Api\QrisCallbackController::class, 'accept']);
 Route::any('/endpoint/accept/{key?}', [App\Http\Controllers\Api\QrisCallbackController::class, 'accept']);
 

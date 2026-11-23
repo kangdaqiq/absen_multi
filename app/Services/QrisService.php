@@ -2,23 +2,21 @@
 
 namespace App\Services;
 
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 /**
- * QrisService - Qiospay Official Dynamic QRIS & API Service
- * Compatible with reactmore/qiospay-sdk
+ * QrisService - Layanan QRIS Manual (Static & Dynamic EMVCo QRIS)
  */
 class QrisService
 {
     /**
      * Default base static QRIS string (Indonesian National QRIS template).
-     * Used when no custom merchant string is configured in .env.
+     * Template default static QRIS merchant.
      */
-    public const DEFAULT_BASE_QRIS = '00020101021126570011ID.CO.QRIS.WWW011893600002000000000002082950941560303UMI51440014ID.LINKAJA.WWW02159360099900000105204549953033605802ID5908QIOSPAY6007JAKARTA61051011063040E0A';
+    public const DEFAULT_BASE_QRIS = '00020101021126670016COM.NOBUBANK.WWW01189360050300000907180214260824000025290303UMI51440014ID.CO.QRIS.WWW0215ID10265768717210303UMI5204581653033605802ID5925JagatTechDigitalQP52976015TULANGBAWANGBA61053459462070703A016304811A';
 
     /**
-     * QRIS service fee codes according to ASPI / Qiospay standard.
+     * QRIS service fee codes according to ASPI standard.
      */
     public const FEE_CODE_PERSEN = '55020357';
     public const FEE_CODE_RUPIAH = '55020256';
@@ -31,19 +29,20 @@ class QrisService
         $fromConfig = null;
         if (function_exists('config')) {
             try {
-                $fromConfig = config('services.qiospay.qris_string') ?: config('services.qiospay.base_qris_string');
+                $fromConfig = config('services.qris.base_string')
+                    ?: config('services.qris.qris_string');
             } catch (\Throwable $e) {
                 // Laravel container might not be booted yet
             }
         }
 
         return $fromConfig
-            ?: (function_exists('env') ? (env('QIOSPAY_QRIS_STRING') ?: env('QRIS_BASE_STRING')) : null)
+            ?: (function_exists('env') ? (env('QRIS_BASE_STRING') ?: env('QRIS_STRING')) : null)
             ?: self::DEFAULT_BASE_QRIS;
     }
 
     /**
-     * Generate dynamic QRIS matching official Qiospay SDK method createQris().
+     * Generate dynamic QRIS payload and QR image URL.
      *
      * @param array $params [
      *      'amount'      => (int/float) nominal amount,
@@ -52,7 +51,7 @@ class QrisService
      *      'fee_value'   => (float/int) fee amount/percentage (e.g. 0.7),
      *      'base_qris'   => (string|null) custom static QRIS,
      * ]
-     * @return array ['qris_string' => string, 'qris_image' => string]
+     * @return array ['status' => 'success', 'qris_string' => string, 'qris_image' => string, 'amount' => float|int|null]
      */
     public static function createQris(array $params = []): array
     {
@@ -165,43 +164,15 @@ class QrisService
     }
 
     /**
-     * Retrieve QRIS mutations from Qiospay API (matching official QiosPay SDK).
-     * Endpoint: GET api/mutasi/qris/{merchantCode}/{apiKey}
+     * Status mutasi QRIS - Dalam mode manual tidak menggunakan provider API eksternal.
      */
     public static function getMutation(array $filters = []): array
     {
-        $merchantCode = config('services.qiospay.merchant_code', env('QIOSPAY_MERCHANT_CODE'));
-        $apiKey       = config('services.qiospay.api_key', env('QIOSPAY_API_KEY'));
-
-        if (empty($merchantCode) || empty($apiKey)) {
-            return [
-                'status'  => 'error',
-                'message' => 'Qiospay merchantCode atau apiKey belum dikonfigurasi di .env',
-                'data'    => []
-            ];
-        }
-
-        try {
-            $baseUrl = rtrim(config('services.qiospay.base_url', env('QIOSPAY_BASE_URL', 'https://qiospay.id')), '/');
-            $response = Http::timeout(15)->get("{$baseUrl}/api/mutasi/qris/{$merchantCode}/{$apiKey}", $filters);
-
-            if ($response->successful()) {
-                return $response->json() ?? [];
-            }
-
-            return [
-                'status'  => 'error',
-                'message' => 'Gagal mengambil mutasi QRIS dari server Qiospay. HTTP: ' . $response->status(),
-                'data'    => []
-            ];
-        } catch (\Throwable $e) {
-            Log::error('Qiospay getMutation error: ' . $e->getMessage());
-            return [
-                'status'  => 'error',
-                'message' => 'Terjadi kesalahan koneksi ke server Qiospay: ' . $e->getMessage(),
-                'data'    => []
-            ];
-        }
+        return [
+            'status'  => 'manual',
+            'message' => 'Integrasi API otomatis telah dinonaktifkan (mode QRIS Manual). Pembayaran dikonfirmasi manual oleh Super Admin.',
+            'data'    => []
+        ];
     }
 
     /**
@@ -209,6 +180,18 @@ class QrisService
      */
     public static function getQrCodeUrl(string $payload, int $size = 300): string
     {
+        // Jika ada image statis khusus yang dikonfigurasi
+        $customImage = null;
+        if (function_exists('config')) {
+            $customImage = config('services.qris.image_url');
+        }
+        if (empty($customImage) && function_exists('env')) {
+            $customImage = env('QRIS_IMAGE_URL');
+        }
+        if (!empty($customImage)) {
+            return $customImage;
+        }
+
         return 'https://api.qrserver.com/v1/create-qr-code/?size=' . $size . 'x' . $size . '&data=' . urlencode($payload);
     }
 }

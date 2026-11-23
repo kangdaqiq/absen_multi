@@ -35,13 +35,11 @@ return [
         ],
     ],
 
-    'qiospay' => [
-        'merchant_code' => env('QIOSPAY_MERCHANT_CODE'),
-        'api_key' => env('QIOSPAY_API_KEY'),
-        'secret_key' => env('QIOSPAY_SECRET_KEY', 'mysecret'),
-        'qris_string' => env('QIOSPAY_QRIS_STRING', env('QRIS_BASE_STRING', '00020101021126570011ID.CO.QRIS.WWW011893600002000000000002082950941560303UMI51440014ID.LINKAJA.WWW02159360099900000105204549953033605802ID5908QIOSPAY6007JAKARTA61051011063040E0A')),
-        'merchant_name' => env('QRIS_MERCHANT_NAME', 'QIOSPAY'),
-        'base_url' => env('QIOSPAY_BASE_URL', 'https://qiospay.id'),
+    'qris' => [
+        'mode' => env('QRIS_MODE', 'manual'),
+        'base_string' => env('QRIS_BASE_STRING', env('QRIS_STRING', '00020101021126670016COM.NOBUBANK.WWW01189360050300000907180214260824000025290303UMI51440014ID.CO.QRIS.WWW0215ID10265768717210303UMI5204581653033605802ID5925JagatTechDigitalQP52976015TULANGBAWANGBA61053459462070703A016304811A')),
+        'merchant_name' => env('QRIS_MERCHANT_NAME', 'JagatTech'),
+        'image_url' => env('QRIS_IMAGE_URL'),
     ],
 
     'whatsapp' => [

@@ -664,7 +664,7 @@
                 </div>
             @elseif($subscription->status === 'unpaid' && !empty($qrisImage))
                 <div class="qris-section" id="qrisSection">
-                    <span class="qris-badge">Pembayaran Instan Otomatis</span>
+                    <span class="qris-badge" style="background: #e0f2fe; color: #0369a1; border-color: #bae6fd;">QRIS Manual</span>
                     <h2 style="font-size: 1.35rem; color: var(--dark); margin-bottom: 4px;">Scan QRIS</h2>
                     <p style="font-size: 0.875rem; color: var(--gray-500);">
                         Dapat dibayar menggunakan BCA, Mandiri, BRI, BNI, Dana, GoPay, OVO, ShopeePay, LinkAja, atau seluruh aplikasi perbankan berlogo QRIS.
@@ -682,8 +682,15 @@
                     </div>
 
                     <div class="pulse-indicator">
-                        <span class="pulse-dot"></span>
-                        <span id="statusText">Menunggu pembayaran...</span>
+                        <span class="pulse-dot" style="background-color: #f59e0b;"></span>
+                        <span id="statusText">Menunggu verifikasi admin...</span>
+                    </div>
+
+                    <div style="margin-top: 16px;">
+                        <a href="https://wa.me/{{ env('DEVELOPER_WA', '6281327735093') }}?text={{ urlencode('Halo Admin, saya ingin konfirmasi pembayaran QRIS untuk tagihan ' . ($subscription->invoice_number ?? ('#' . $subscription->id)) . ' (' . ($subscription->school?->name ?? 'Sekolah') . ') sebesar Rp ' . number_format($totalAmount, 0, ',', '.') . '. Berikut bukti pembayarannya:') }}" target="_blank" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 12px 20px; background-color: #10b981; color: white; border-radius: 12px; font-weight: 600; text-decoration: none; font-size: 0.95rem; box-shadow: 0 2px 6px rgba(16, 185, 129, 0.3); transition: background 0.2s;">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.299.045-.677.063-1.092-.069-.252-.08-.575-.187-.988-.365-1.739-.751-2.874-2.502-2.961-2.617-.087-.116-.708-.94-.708-1.793s.448-1.273.607-1.446c.159-.173.346-.217.462-.217l.332.006c.106.005.249-.04.39.298.144.347.491 1.2.534 1.287.043.087.072.188.014.304-.058.116-.087.188-.173.289l-.26.304c-.087.086-.177.18-.076.354.101.174.449.741.964 1.201.662.591 1.221.774 1.394.86.173.086.275.072.376-.043.101-.116.433-.506.549-.68.116-.173.231-.145.39-.086s1.011.477 1.184.564.289.13.332.202c.043.073.043.419-.101.824z"/></svg>
+                            Konfirmasi Pembayaran via WhatsApp
+                        </a>
                     </div>
                 </div>
 
@@ -691,13 +698,13 @@
                 <div class="instructions-card">
                     <h4>
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
-                        Petunjuk Pembayaran QRIS
+                        Petunjuk Pembayaran QRIS Manual
                     </h4>
                     <ol>
                         <li>Buka aplikasi Mobile Banking (BCA mobile, Livin Mandiri, BRImo, BNI Mobile) atau E-Wallet (Dana, GoPay, OVO, ShopeePay).</li>
                         <li>Pilih menu <strong>Bayar / QRIS</strong>, lalu scan barcode QRIS di atas.</li>
                         <li>Pastikan nominal pembayaran sesuai persis dengan <strong>Rp {{ number_format($totalAmount, 0, ',', '.') }}</strong> (termasuk 3 digit kode unik).</li>
-                        <li>Selesaikan transaksi. Sistem akan langsung memverifikasi otomatis dalam 5-10 detik dan mengaktifkan perpanjangan langganan tanpa perlu konfirmasi manual.</li>
+                        <li>Selesaikan transaksi. Klik tombol <strong>Konfirmasi Pembayaran via WhatsApp</strong> di atas dan kirimkan bukti transfer ke Super Admin untuk aktivasi paket langganan.</li>
                     </ol>
                 </div>
             @endif

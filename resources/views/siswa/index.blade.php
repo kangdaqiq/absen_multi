@@ -17,6 +17,9 @@
         <button @click="$dispatch('open-modal', 'modalImportSiswa')" class="inline-flex items-center justify-center gap-2.5 rounded-lg bg-success-500 px-4 py-2 text-center font-medium text-white hover:bg-success-600 transition shadow-xs">
             <i class="fas fa-file-excel"></i> Import Excel
         </button>
+        <a href="{{ route('siswa.export', request()->query()) }}" class="inline-flex items-center justify-center gap-2.5 rounded-lg bg-emerald-600 px-4 py-2 text-center font-medium text-white hover:bg-emerald-700 transition shadow-xs">
+            <i class="fas fa-file-export"></i> Export Excel
+        </a>
         <button @click="$dispatch('open-modal', 'modalTambahSiswa')" class="inline-flex items-center justify-center gap-2.5 rounded-lg bg-brand-500 px-4 py-2 text-center font-medium text-white hover:bg-brand-600 transition shadow-xs">
             <i class="fas fa-plus"></i> Tambah Siswa
         </button>
@@ -62,6 +65,7 @@
             <!-- Bulk Actions Toolbar -->
             <div x-show="selected.length > 0" x-cloak class="flex items-center gap-2 border-l border-gray-200 pl-3 dark:border-gray-700" style="display: none;">
                 <span class="text-sm font-medium text-brand-500" x-text="selected.length + ' terpilih'"></span>
+                <button @click="exportSelected()" class="rounded bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-600 hover:bg-emerald-100 dark:bg-emerald-500/15 dark:text-emerald-500 dark:hover:bg-emerald-500/25">Export Terpilih</button>
                 <button @click="$dispatch('open-modal', 'modalBulkEditKelas')" class="rounded bg-brand-50 px-2 py-1 text-xs font-medium text-brand-600 hover:bg-brand-100 dark:bg-brand-500/15 dark:text-brand-500 dark:hover:bg-brand-500/25">Edit Kelas</button>
                 <button @click="$dispatch('open-modal', 'modalBulkHapusSiswa')" class="rounded bg-error-50 px-2 py-1 text-xs font-medium text-error-600 hover:bg-error-100 dark:bg-error-500/15 dark:text-error-500 dark:hover:bg-error-500/25">Hapus</button>
             </div>
@@ -1499,6 +1503,10 @@
                     } else {
                         this.selected = [...this.allIds];
                     }
+                },
+                exportSelected() {
+                    if (this.selected.length === 0) return;
+                    window.location.href = '{{ route("siswa.export") }}?ids=' + this.selected.join(',');
                 },
                 bulkDelete() {
                     if(this.selected.length === 0) return;

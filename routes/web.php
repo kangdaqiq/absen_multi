@@ -185,6 +185,7 @@ Route::middleware('auth')->group(function () {
 
     // Data Siswa (Admin, Teacher, Wali Kelas, Waka Kurikulum)
     Route::middleware('role:admin,teacher,wali_kelas,waka_kurikulum')->group(function () {
+        Route::get('siswa/export', [SiswaController::class, 'exportExcel'])->name('siswa.export');
         Route::delete('siswa/bulk-destroy', [SiswaController::class, 'bulkDestroy'])->name('siswa.bulk-destroy');
         Route::put('siswa/bulk-update-kelas', [SiswaController::class, 'bulkUpdateKelas'])->name('siswa.bulk-update-kelas');
         Route::match(['post', 'delete'], 'siswa/{id}/delete-face', [SiswaController::class, 'deleteFaceId'])->name('siswa.delete-face');

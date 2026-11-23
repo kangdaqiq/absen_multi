@@ -10,6 +10,13 @@ use App\Models\ApiLog;
 use App\Models\SiswaFingerprint;
 use Illuminate\Http\Request;
 use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Border;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Style\Color;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\Rule;
@@ -876,6 +883,170 @@ class SiswaController extends Controller
         $response->headers->set('Cache-Control', 'max-age=0');
 
         return $response;
+    }
+
+    /**
+     * Export data siswa ke file Excel (.xlsx)
+     */
+    public function exportExcel(Request $request)
+    {
+        $query = Siswa::with('kelas')->orderBy('nama');
+
+        // Filter by school_id for non-super admin users
+        if (auth()->user() && !auth()->user()->isSuperAdmin()) {
+            $query->where('school_id', auth()->user()->school_id);
+        }
+
+        // Filter by selected IDs if requested
+        if ($request->filled('ids')) {
+            $ids = is_array($request->ids) ? $request->ids : explode(',', $request->ids);
+            $cleanIds = array_filter(array_map('trim', $ids));
+            if (!empty($cleanIds)) {
+                $query->whereIn('id', $cleanIds);
+            }
+        }
+
+        // Search functionality
+        if ($request->has('search') && !empty($request->search)) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('nama', 'like', "%{$search}%")
+                  ->orWhere('nis', 'like', "%{$search}%")
+                  ->orWhere('nisn', 'like', "%{$search}%")
+                  ->orWhere('no_wa', 'like', "%{$search}%")
+                  ->orWhere('alamat', 'like', "%{$search}%");
+            });
+        }
+
+        // Filter by kelas
+        $kelasLabel = 'Semua Kelas';
+        if ($request->filled('kelas_id')) {
+            if (in_array($request->kelas_id, ['tidak_ada', 'none', 'tanpa_kelas', 'null', '0'])) {
+                $query->whereNull('kelas_id');
+                $kelasLabel = 'Tanpa Kelas';
+            } else {
+                $query->where('kelas_id', $request->kelas_id);
+                $kelasObj = Kelas::find($request->kelas_id);
+                if ($kelasObj) {
+                    $kelasLabel = $kelasObj->nama_kelas;
+                }
+            }
+        }
+
+        $siswaList = $query->get();
+
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Data Siswa');
+
+        // Document Title & Subtitle
+        $schoolName = auth()->user()?->school?->name ?? 'SEKOLAH';
+        $sheet->setCellValue('A1', 'DATA SISWA - ' . strtoupper($schoolName));
+        $sheet->mergeCells('A1:L1');
+        $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14)->getColor()->setARGB('FF1E293B');
+        $sheet->getStyle('A1')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+        $subtitle = 'Kelas: ' . $kelasLabel . ' | Tanggal Unduh: ' . now()->format('d/m/Y H:i') . ' | Total: ' . $siswaList->count() . ' Siswa';
+        $sheet->setCellValue('A2', $subtitle);
+        $sheet->mergeCells('A2:L2');
+        $sheet->getStyle('A2')->getFont()->setItalic(true)->setSize(10)->getColor()->setARGB('FF64748B');
+        $sheet->getStyle('A2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+        // Header Columns
+        $headers = [
+            'A4' => 'No',
+            'B4' => 'Nama Lengkap',
+            'C4' => 'NIS',
+            'D4' => 'NISN',
+            'E4' => 'Kelas',
+            'F4' => 'Tanggal Lahir',
+            'G4' => 'Alamat',
+            'H4' => 'No WhatsApp Siswa',
+            'I4' => 'No WhatsApp Ortu',
+            'J4' => 'UID RFID',
+            'K4' => 'ID Finger',
+            'L4' => 'Status'
+        ];
+
+        foreach ($headers as $cell => $title) {
+            $sheet->setCellValue($cell, $title);
+        }
+
+        // Header Styling
+        $sheet->getStyle('A4:L4')->applyFromArray([
+            'font' => [
+                'bold'  => true,
+                'color' => ['argb' => 'FFFFFFFF'],
+                'size'  => 11,
+            ],
+            'fill' => [
+                'fillType'   => Fill::FILL_SOLID,
+                'startColor' => ['argb' => 'FF3C50E0'],
+            ],
+            'alignment' => [
+                'horizontal' => Alignment::HORIZONTAL_CENTER,
+                'vertical'   => Alignment::VERTICAL_CENTER,
+            ],
+        ]);
+        $sheet->getRowDimension(4)->setRowHeight(28);
+
+        // Data Rows
+        $row = 5;
+        foreach ($siswaList as $idx => $s) {
+            $sheet->setCellValue('A' . $row, $idx + 1);
+            $sheet->setCellValue('B' . $row, $s->nama);
+            $sheet->setCellValueExplicit('C' . $row, (string) ($s->nis ?: '-'), DataType::TYPE_STRING);
+            $sheet->setCellValueExplicit('D' . $row, (string) ($s->nisn ?: '-'), DataType::TYPE_STRING);
+            $sheet->setCellValue('E' . $row, $s->kelas ? $s->kelas->nama_kelas : 'Tanpa Kelas');
+            
+            $tglLahir = $s->tgl_lahir ? \Carbon\Carbon::parse($s->tgl_lahir)->format('d/m/Y') : '-';
+            $sheet->setCellValueExplicit('F' . $row, $tglLahir, DataType::TYPE_STRING);
+
+            $sheet->setCellValue('G' . $row, $s->alamat ?: '-');
+            $sheet->setCellValueExplicit('H' . $row, (string) ($s->no_wa ?: '-'), DataType::TYPE_STRING);
+            $sheet->setCellValueExplicit('I' . $row, (string) ($s->wa_ortu ?: '-'), DataType::TYPE_STRING);
+            $sheet->setCellValueExplicit('J' . $row, (string) ($s->uid_rfid ?: '-'), DataType::TYPE_STRING);
+            $sheet->setCellValueExplicit('K' . $row, (string) ($s->id_finger ?: '-'), DataType::TYPE_STRING);
+
+            $statusArr = [];
+            if ($s->is_khusus) $statusArr[] = 'PKL';
+            if ($s->is_siswa_khusus) $statusArr[] = 'Khusus';
+            $statusText = empty($statusArr) ? 'Reguler' : implode(', ', $statusArr);
+            $sheet->setCellValue('L' . $row, $statusText);
+
+            // Alignments
+            $sheet->getStyle('A' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('C' . $row . ':F' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+            $sheet->getStyle('H' . $row . ':L' . $row)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+
+            // Zebra background for even rows
+            if ($row % 2 === 0) {
+                $sheet->getStyle('A' . $row . ':L' . $row)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FFF8FAFC');
+            }
+
+            $sheet->getRowDimension($row)->setRowHeight(22);
+            $row++;
+        }
+
+        $lastRow = max(5, $row - 1);
+
+        // Apply borders
+        $sheet->getStyle("A4:L{$lastRow}")->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN)->getColor()->setARGB('FFCBD5E1');
+
+        // Auto-size columns
+        foreach (range('A', 'L') as $col) {
+            $sheet->getColumnDimension($col)->setAutoSize(true);
+        }
+
+        $cleanKelasSlug = ($kelasLabel !== 'Semua Kelas') ? '_' . \Illuminate\Support\Str::slug($kelasLabel) : '';
+        $fileName = 'Data_Siswa' . $cleanKelasSlug . '_' . now()->format('Ymd_His') . '.xlsx';
+
+        $writer = new Xlsx($spreadsheet);
+        return response()->streamDownload(function () use ($writer) {
+            $writer->save('php://output');
+        }, $fileName, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ]);
     }
 
 

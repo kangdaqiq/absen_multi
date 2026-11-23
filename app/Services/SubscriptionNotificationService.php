@@ -202,9 +202,9 @@ class SubscriptionNotificationService
             "• No. Invoice: `{$subscription->invoice_number}`\n" .
             "• Paket: *{$packageName}* ({$billingCycleText})\n" .
             "• Total Pembayaran: *{$totalFormatted}*\n\n" .
-            "💳 *Link Pembayaran:*\n" .
+            "💳 *Link Pembayaran & QRIS:*\n" .
             "👉 {$invoiceUrl}\n\n" .
-            "_Pembayaran via QRIS (BCA, Mandiri, BRI, BNI, Dana, GoPay, OVO, ShopeePay) langsung diverifikasi sistem secara instan._\n\n" .
+            "_Pembayaran via QRIS Manual (BCA, Mandiri, BRI, BNI, Dana, GoPay, OVO, ShopeePay). Setelah pembayaran berhasil, kirim bukti bayar untuk verifikasi admin._\n\n" .
             "Terima kasih atas kerja samanya. 🙏";
 
         $sender = $this->determineSenderDevice($school);

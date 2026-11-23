@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Package;
 use App\Models\Subscription;
 use App\Services\QrisService;
+use App\Services\ShopeePayService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -204,7 +205,7 @@ class SubscriptionController extends Controller
     public function checkStatus($id): JsonResponse
     {
         $school = Auth::user()->school;
-        $subscription = Subscription::with('package')
+        $subscription = Subscription::with(['school', 'package'])
             ->where('school_id', $school->id)
             ->where('id', $id)
             ->first();
@@ -214,6 +215,12 @@ class SubscriptionController extends Controller
                 'success' => false,
                 'message' => 'Data langganan tidak ditemukan.'
             ], 404);
+        }
+
+        // Cek mutasi masuk via ShopeePay Gateway secara real-time jika status masih unpaid
+        if ($subscription->status === 'unpaid') {
+            ShopeePayService::checkSubscription($subscription);
+            $subscription->refresh();
         }
 
         return response()->json([

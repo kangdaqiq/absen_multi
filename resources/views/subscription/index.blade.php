@@ -605,7 +605,7 @@
                         <button type="button" @click="paymentTab = 'qris'"
                             :class="paymentTab === 'qris' ? 'bg-white text-brand-600 shadow-sm dark:bg-boxdark dark:text-white font-bold' : 'text-gray-600 dark:text-gray-400 hover:text-black'"
                             class="flex-1 rounded-lg py-2 text-xs transition flex items-center justify-center gap-1.5">
-                            <i class="fas fa-qrcode"></i> QRIS Manual
+                            <i class="fas fa-qrcode"></i> QRIS Otomatis
                         </button>
                         <button type="button" @click="paymentTab = 'manual'"
                             :class="paymentTab === 'manual' ? 'bg-white text-brand-600 shadow-sm dark:bg-boxdark dark:text-white font-bold' : 'text-gray-600 dark:text-gray-400 hover:text-black'"
@@ -614,7 +614,7 @@
                         </button>
                     </div>
 
-                    {{-- ── TAB 1: QRIS MANUAL ───────────────────────────── --}}
+                    {{-- ── TAB 1: QRIS OTOMATIS ─────────────────────────── --}}
                     <div x-show="paymentTab === 'qris'" class="space-y-4 text-sm">
                         {{-- Jika Belum Ada Order QRIS Terbuka --}}
                         <template x-if="!activeOrder">
@@ -671,7 +671,7 @@
                                 <div class="inline-block p-4 bg-white rounded-2xl border-2 border-emerald-500 shadow-md">
                                     <div class="mb-2">
                                         <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300 text-[11px] font-bold tracking-wide border border-emerald-200 dark:border-emerald-500/30">
-                                            <i class="fas fa-qrcode text-emerald-600"></i> QRIS Manual
+                                            <i class="fas fa-bolt text-emerald-600"></i> QRIS Otomatis
                                         </div>
                                     </div>
                                     
@@ -681,7 +681,7 @@
                                             alt="QRIS Barcode Dinamis" 
                                             class="w-full h-full object-contain" />
                                     </div>
-                                    <p class="text-[10px] text-gray-400 mt-1.5">Scan via GoPay, OVO, DANA, BCA, Mandiri, BRImo, dll.</p>
+                                    <p class="text-[10px] text-gray-400 mt-1.5">Scan via GoPay, OVO, DANA, BCA, Mandiri, ShopeePay, BRImo, dll.</p>
                                 </div>
 
                                 {{-- Nominal Tagihan & Kode Unik --}}
@@ -698,24 +698,24 @@
                                         </button>
                                     </div>
                                     <p class="text-[11px] text-gray-600 dark:text-gray-300 mt-2 flex items-start gap-1">
-                                        <i class="fas fa-info-circle mt-0.5 shrink-0 text-brand-500"></i>
-                                        <span>Setelah melakukan pembayaran via QRIS, klik tombol <strong>Konfirmasi via WhatsApp</strong> di bawah untuk mengirim bukti transfer ke Super Admin.</span>
+                                        <i class="fas fa-check-circle mt-0.5 shrink-0 text-emerald-500"></i>
+                                        <span>Tagihan terverifikasi <strong>otomatis dalam hitungan detik</strong> setelah dibayar. Pastikan nominal pembayaran sesuai persis hingga 3 digit terakhir.</span>
                                     </p>
 
-                                    {{-- Tombol Konfirmasi WhatsApp --}}
+                                    {{-- Tombol Konfirmasi WhatsApp (Opsional jika ada kendala) --}}
                                     <a :href="getQrisWaLink()" target="_blank"
-                                        class="mt-3 w-full inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-2.5 px-4 text-xs font-bold text-white hover:bg-emerald-700 transition shadow-sm">
-                                        <i class="fab fa-whatsapp text-sm"></i> Konfirmasi Pembayaran via WhatsApp
+                                        class="mt-3 w-full inline-flex items-center justify-center gap-2 rounded-xl bg-gray-100 dark:bg-gray-800 py-2 px-3 text-xs font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition">
+                                        <i class="fab fa-whatsapp text-emerald-500 text-sm"></i> Bantuan Konfirmasi Manual via WA
                                     </a>
                                 </div>
 
                                 {{-- Status Realtime Indicator --}}
                                 <div class="flex items-center justify-center gap-2 p-2.5 rounded-lg bg-gray-50 dark:bg-gray-800 text-xs text-gray-600 dark:text-gray-300">
                                     <span class="relative flex h-3 w-3">
-                                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                                        <span class="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
+                                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                        <span class="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
                                     </span>
-                                    <span>Menunggu verifikasi admin... </span>
+                                    <span>Menunggu pembayaran QRIS... (Verifikasi Otomatis)</span>
                                 </div>
 
                                 <div class="flex items-center justify-between text-xs text-gray-400 pt-1">

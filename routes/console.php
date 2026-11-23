@@ -27,6 +27,9 @@ Schedule::command('absen:kegiatan-report')->everyMinute()->withoutOverlapping(5)
 Schedule::command('wa:process')->everyMinute()->withoutOverlapping(5);
 Schedule::command('wa:reconnect')->everyFiveMinutes()->withoutOverlapping(10);
 
+// Auto-check QRIS ShopeePay mutations for unpaid subscriptions
+Schedule::command('qris:check-shopee')->everyMinute()->withoutOverlapping(5);
+
 // Daily Abnormal Attendance Check
 Schedule::command('absen:check-abnormal')->everyMinute()->withoutOverlapping()
     ->when(function () {

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Subscription;
 use App\Services\QrisService;
+use App\Services\ShopeePayService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -60,6 +61,12 @@ class PublicInvoiceController extends Controller
                 'success' => false,
                 'message' => 'Invoice tidak ditemukan.'
             ], 404);
+        }
+
+        // Cek mutasi masuk via ShopeePay Gateway secara real-time jika status masih unpaid
+        if ($subscription->status === 'unpaid') {
+            ShopeePayService::checkSubscription($subscription);
+            $subscription->refresh();
         }
 
         return response()->json([

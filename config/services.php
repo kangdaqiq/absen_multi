@@ -36,10 +36,16 @@ return [
     ],
 
     'qris' => [
-        'mode' => env('QRIS_MODE', 'manual'),
+        'mode' => env('QRIS_MODE', 'automatic'),
         'base_string' => env('QRIS_BASE_STRING', env('QRIS_STRING', '00020101021126610016ID.CO.SHOPEE.WWW01189360091800235336060208235336060303UMI51440014ID.CO.QRIS.WWW0215ID10265729711860303UMI5204581753033605802ID5910Jagat Tech6015TULANGBAWANG BA61053459462070703A0163045F57')),
         'merchant_name' => env('QRIS_MERCHANT_NAME', 'JAGAT TECH - SOFTWARE'),
         'image_url' => env('QRIS_IMAGE_URL'),
+    ],
+
+    'shopeepay' => [
+        'gateway_url' => env('SHOPEEPAY_GATEWAY_URL', env('QRIS_GATEWAY_URL', 'http://127.0.0.1:3005')),
+        'api_key'     => env('SHOPEEPAY_API_KEY', env('QRIS_GATEWAY_API_KEY', 'kunci-rahasia-anda-2026')),
+        'timeout'     => (int) env('SHOPEEPAY_TIMEOUT', 10),
     ],
 
     'whatsapp' => [

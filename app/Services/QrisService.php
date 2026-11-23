@@ -164,15 +164,42 @@ class QrisService
     }
 
     /**
-     * Status mutasi QRIS - Dalam mode manual tidak menggunakan provider API eksternal.
+     * Status mutasi QRIS - Mengambil data mutasi dari ShopeePay Partner API Gateway jika mode otomatis aktif.
      */
     public static function getMutation(array $filters = []): array
     {
+        if (ShopeePayService::isAutomaticMode()) {
+            try {
+                $pageSize = $filters['pageSize'] ?? 20;
+                $res = \Illuminate\Support\Facades\Http::withHeaders([
+                    'X-API-Key' => ShopeePayService::getApiKey(),
+                ])->timeout(8)->get(ShopeePayService::getGatewayUrl() . '/transactions?pageSize=' . $pageSize);
+
+                if ($res->successful()) {
+                    return [
+                        'status'  => 'success',
+                        'message' => 'Mutasi ShopeePay berhasil diambil',
+                        'data'    => $res->json('data.transactions') ?? []
+                    ];
+                }
+            } catch (\Throwable $e) {
+                Log::warning('QrisService::getMutation error: ' . $e->getMessage());
+            }
+        }
+
         return [
             'status'  => 'manual',
-            'message' => 'Integrasi API otomatis telah dinonaktifkan (mode QRIS Manual). Pembayaran dikonfirmasi manual oleh Super Admin.',
+            'message' => 'Integrasi otomatis sedang tidak aktif atau gateway tidak dapat dijangkau.',
             'data'    => []
         ];
+    }
+
+    /**
+     * Cek pembayaran langganan melalui ShopeePay Gateway
+     */
+    public static function checkSubscriptionPayment(\App\Models\Subscription $subscription): ?array
+    {
+        return ShopeePayService::checkSubscription($subscription);
     }
 
     /**

@@ -739,3 +739,15 @@ Dokumen ini mencatat seluruh riwayat pembaruan, penambahan fitur penting, integr
 - Restrukturisasi halaman Rekap Absensi Guru menjadi format rekapitulasi ringkasan per guru (Nama, Hadir, Terlambat, Tidak Hadir, Izin, Sakit, Alpha, % Hadir) dilengkapi fitur Sorting interaktif serta penyesuaian ekspor file Excel dan cetak PDF.
 
 ---
+
+## 🗓️ Periode November 2026
+
+### 📅 24 November 2026 (v2.6.0)
+
+- **Ekspor Excel Data Siswa**: Penambahan fitur export data siswa ke Excel (.xlsx) dengan pemformatan teks lengkap (NIS, NISN, No WhatsApp, UID RFID, ID Finger), style header profesional, zebra striping, dan dukungan filter otomatis (pencarian, kelas, pilihan terpilih).
+- **Transisi QRIS Manual**: Penghapusan integrasi payment gateway Qiospay (yang telah tutup operasional) dan migrasi penuh ke QRIS Manual EMVCo dengan konfirmasi WhatsApp otomatis ke Super Admin.
+- **Live Monitor Presensi Instan (Fast Polling)**: Optimalisasi interval pembaruan realtime pada seluruh layar monitor presensi (`/live`, `/live/boxes`, `/live/fullscreen`) menjadi 1 detik dengan proteksi *request-locking* concurrency untuk mencegah penumpukan request.
+- **Buku Tabungan Siswa Digital**: Integrasi modul mutasi tabungan siswa, kasir RFID, rekapitulasi saldo, serta cetak buku tabungan PDF.
+- **Pembaruan Aset Build Frontend**: Re-kompilasi aset produksi Vite (`public/build`).
+
+---

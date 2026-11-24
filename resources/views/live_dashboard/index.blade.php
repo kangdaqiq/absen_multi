@@ -267,7 +267,11 @@
             document.getElementById('live-clock').textContent = now.toLocaleTimeString('id-ID', { hour12: false });
         }
 
+        let isFetchingLiveData = false;
         async function fetchLiveData() {
+            if (isFetchingLiveData) return;
+            isFetchingLiveData = true;
+
             try {
                 const response = await fetch('{{ route('live.data') }}', {
                     headers: {
@@ -356,6 +360,8 @@
                 }
             } catch (error) {
                 console.error('Failed to fetch live data:', error);
+            } finally {
+                isFetchingLiveData = false;
             }
         }
 
@@ -412,7 +418,7 @@
 
         // Initialize
         setInterval(updateClock, 1000);
-        setInterval(fetchLiveData, 3000); // Update every 3 seconds
+        setInterval(fetchLiveData, 1000); // Fast Polling 1 Detik (Near-Instant)
         updateClock();
         fetchLiveData();
     </script>

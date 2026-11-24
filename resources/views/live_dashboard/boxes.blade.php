@@ -592,7 +592,11 @@
     });
 
     // ── Fetch Real-time Box / List Data ───────────────────────────────────────
+    let isFetchingBoxData = false;
     async function fetchLiveBoxData() {
+        if (isFetchingBoxData) return;
+        isFetchingBoxData = true;
+
         const kelasId = document.getElementById('filter-kelas')?.value || '';
         const syncIcon = document.getElementById('icon-sync');
 
@@ -673,6 +677,7 @@
                 indText.className = 'text-amber-500 font-semibold';
             }
         } finally {
+            isFetchingBoxData = false;
             if (syncIcon) syncIcon.classList.remove('animate-spin');
         }
     }
@@ -1018,7 +1023,7 @@
         setInterval(updateDigitalClock, 1000);
 
         fetchLiveBoxData();
-        pollingInterval = setInterval(fetchLiveBoxData, 3500);
+        pollingInterval = setInterval(fetchLiveBoxData, 1000); // Fast Polling 1 Detik (Near-Instant)
     });
 </script>
 @endpush

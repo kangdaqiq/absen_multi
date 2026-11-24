@@ -625,7 +625,11 @@
         }
 
         // Fetch data
+        let isFetchingFullscreenData = false;
         async function fetchData() {
+            if (isFetchingFullscreenData) return;
+            isFetchingFullscreenData = true;
+
             try {
                 const res = await fetch('{{ route('live.data') }}');
                 const data = await res.json();
@@ -647,6 +651,8 @@
                 renderLogs(data.logs);
             } catch (e) {
                 console.error(e);
+            } finally {
+                isFetchingFullscreenData = false;
             }
         }
 
@@ -702,7 +708,7 @@
         }
 
         setInterval(updateClock, 1000);
-        setInterval(fetchData, 3000);
+        setInterval(fetchData, 1000); // Fast Polling 1 Detik (Near-Instant)
         updateClock();
         fetchData();
     </script>

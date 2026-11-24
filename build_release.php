@@ -292,7 +292,7 @@ function deleteDir(string $dir): void
     if (!is_dir($dir)) return;
     if (PHP_OS_FAMILY === 'Windows') {
         $winDir = str_replace('/', '\\', $dir);
-        exec('cmd /c "rmdir /s /q \"' . $winDir . '\""');
+        exec('cmd /c rmdir /s /q "' . $winDir . '" 2>nul');
         clearstatcache(true, $dir);
         if (!is_dir($dir)) return;
     }
@@ -301,13 +301,10 @@ function deleteDir(string $dir): void
     foreach ($items as $item) {
         if ($item === '.' || $item === '..') continue;
         $path = $dir . '/' . $item;
-        if (is_link($path)) {
+        if (is_link($path) || !is_dir($path)) {
             @unlink($path);
-            @rmdir($path);
-        } elseif (is_dir($path)) {
-            deleteDir($path);
         } else {
-            @unlink($path);
+            deleteDir($path);
         }
     }
     @rmdir($dir);
